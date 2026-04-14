@@ -1,130 +1,160 @@
-using System.Text;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TenantCore.Application.Features.Applications.Commands;
+using TenantCore.Application.Features.Applications.Queries;
+using TenantCore.Shared.Dtos.Auth;
 
 namespace TenantCore.Api.Controllers;
 
 /// <summary>
-/// Proxies Application management requests to the dedicated TenantCore.Auth service.
-///
-/// This keeps the Blazor WebAssembly client talking to a single API origin
-/// (this application API), while the API forwards to the Auth service.
-/// All endpoints require a valid JWT Bearer token.
+/// Wrapper controller for Application management operations.
+/// Dispatches commands and queries via MediatR; handlers delegate
+/// to <c>IAuthApplicationService</c> (implemented in Infrastructure),
+/// which forwards the request — including the caller's bearer token — to
+/// the downstream TenantCore.Auth service.
 /// </summary>
 [ApiController]
 [Route("api/Application")]
 [Authorize]
-public class ApplicationController(IHttpClientFactory httpClientFactory) : ControllerBase
+[Produces("application/json")]
+public class ApplicationController(ISender sender) : ControllerBase
 {
-    private readonly HttpClient _authClient = httpClientFactory.CreateClient("AuthApi");
-
     // POST /api/Application?ownerId={guid}
     [HttpPost]
-    public Task<IActionResult> CreateApplicationAsync() =>
-        ForwardAsync(HttpMethod.Post, "api/Application");
+    [ProducesResponseType(typeof(ApplicationResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateApplicationAsync(
+        [FromQuery] Guid ownerId,
+        [FromBody] ApplicationCreationRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new CreateApplicationCommand(ownerId, request), cancellationToken);
+        return Ok(result);
+    }
 
     // PUT /api/Application/{applicationId}
     [HttpPut("{applicationId:guid}")]
-    public Task<IActionResult> EditApplicationAsync(Guid applicationId) =>
-        ForwardAsync(HttpMethod.Put, $"api/Application/{applicationId}");
+    [ProducesResponseType(typeof(ApplicationResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> EditApplicationAsync(
+        Guid applicationId,
+        [FromBody] ApplicationCreationRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new EditApplicationCommand(applicationId, request), cancellationToken);
+        return Ok(result);
+    }
 
     // GET /api/Application/{applicationId}
     [HttpGet("{applicationId:guid}")]
-    public Task<IActionResult> GetApplicationByIdAsync(Guid applicationId) =>
-        ForwardAsync(HttpMethod.Get, $"api/Application/{applicationId}", includeBody: false);
+    [ProducesResponseType(typeof(ApplicationResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetApplicationByIdAsync(Guid applicationId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetApplicationByIdQuery(applicationId), cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
 
     // GET /api/Application/by-code/{code}
     [HttpGet("by-code/{code}")]
-    public Task<IActionResult> GetApplicationByCodeAsync(string code) =>
-        ForwardAsync(HttpMethod.Get, $"api/Application/by-code/{Uri.EscapeDataString(code)}", includeBody: false);
+    [ProducesResponseType(typeof(ApplicationResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetApplicationByCodeAsync(string code, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetApplicationByCodeQuery(code), cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
 
     // GET /api/Application/get-all
     [HttpGet("get-all")]
-    public Task<IActionResult> GetAllApplicationsAsync() =>
-        ForwardAsync(HttpMethod.Get, "api/Application/get-all", includeBody: false);
+    [ProducesResponseType(typeof(List<ApplicationResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllApplicationsAsync(CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetAllApplicationsQuery(), cancellationToken);
+        return Ok(result);
+    }
 
     // GET /api/Application/by-type/{applicationType}
     [HttpGet("by-type/{applicationType:int}")]
-    public Task<IActionResult> GetApplicationsByTypeAsync(int applicationType) =>
-        ForwardAsync(HttpMethod.Get, $"api/Application/by-type/{applicationType}", includeBody: false);
+    [ProducesResponseType(typeof(List<ApplicationResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetApplicationsByTypeAsync(int applicationType, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetApplicationsByTypeQuery(applicationType), cancellationToken);
+        return Ok(result);
+    }
 
     // GET /api/Application/{applicationId}/users
     [HttpGet("{applicationId:guid}/users")]
-    public Task<IActionResult> GetApplicationUsersAsync(Guid applicationId) =>
-        ForwardAsync(HttpMethod.Get, $"api/Application/{applicationId}/users", includeBody: false);
+    [ProducesResponseType(typeof(List<ApplicationUserResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetApplicationUsersQuery(applicationId), cancellationToken);
+        return Ok(result);
+    }
 
     // POST /api/Application/invite-user?invitedBy={guid}
     [HttpPost("invite-user")]
-    public Task<IActionResult> InviteUserAsync() =>
-        ForwardAsync(HttpMethod.Post, "api/Application/invite-user");
+    [ProducesResponseType(typeof(InvitationResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> InviteUserAsync(
+        [FromQuery] Guid invitedBy,
+        [FromBody] InviteUserRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new InviteUserCommand(invitedBy, request), cancellationToken);
+        return Ok(result);
+    }
 
     // POST /api/Application/{applicationId}/users/{userId}/assign?roleId={guid}&assignedBy={guid}
     [HttpPost("{applicationId:guid}/users/{userId:guid}/assign")]
-    public Task<IActionResult> AssignUserToApplicationAsync(Guid applicationId, Guid userId) =>
-        ForwardAsync(HttpMethod.Post, $"api/Application/{applicationId}/users/{userId}/assign", includeBody: false);
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> AssignUserToApplicationAsync(
+        Guid applicationId,
+        Guid userId,
+        [FromQuery] Guid roleId,
+        [FromQuery] Guid assignedBy,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new AssignUserCommand(applicationId, userId, roleId, assignedBy), cancellationToken);
+        return Ok();
+    }
 
     // POST /api/Application/{applicationId}/users/{userId}/mapping?assignedBy={guid}
     [HttpPost("{applicationId:guid}/users/{userId:guid}/mapping")]
-    public Task<IActionResult> AddApplicationUserMappingAsync(Guid applicationId, Guid userId) =>
-        ForwardAsync(HttpMethod.Post, $"api/Application/{applicationId}/users/{userId}/mapping", includeBody: false);
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> AddApplicationUserMappingAsync(
+        Guid applicationId,
+        Guid userId,
+        [FromQuery] Guid assignedBy,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new AddUserMappingCommand(applicationId, userId, assignedBy), cancellationToken);
+        return Ok();
+    }
 
     // DELETE /api/Application/{applicationId}/users/{userId}?removedBy={guid}
     [HttpDelete("{applicationId:guid}/users/{userId:guid}")]
-    public Task<IActionResult> RemoveUserFromApplicationAsync(Guid applicationId, Guid userId) =>
-        ForwardAsync(HttpMethod.Delete, $"api/Application/{applicationId}/users/{userId}", includeBody: false);
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveUserFromApplicationAsync(
+        Guid applicationId,
+        Guid userId,
+        [FromQuery] Guid removedBy,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new RemoveUserCommand(applicationId, userId, removedBy), cancellationToken);
+        return Ok();
+    }
 
     // DELETE /api/Application/{applicationId}
     [HttpDelete("{applicationId:guid}")]
-    public Task<IActionResult> DeleteApplicationAsync(Guid applicationId) =>
-        ForwardAsync(HttpMethod.Delete, $"api/Application/{applicationId}", includeBody: false);
-
-    private async Task<IActionResult> ForwardAsync(HttpMethod method, string downstreamPath, bool includeBody = true)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteApplicationAsync(Guid applicationId, CancellationToken cancellationToken)
     {
-        var cancellationToken = HttpContext.RequestAborted;
-
-        var downstreamUri = downstreamPath + Request.QueryString.Value;
-
-        using var requestMessage = new HttpRequestMessage(method, downstreamUri);
-
-        CopyHeaderIfPresent(requestMessage, "Authorization");
-        CopyHeaderIfPresent(requestMessage, "X-ClinicApp-Id");
-        CopyHeaderIfPresent(requestMessage, "X-Correlation-Id");
-
-        if (includeBody && (Request.ContentLength is null || Request.ContentLength > 0))
-        {
-            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-            var body = await reader.ReadToEndAsync(cancellationToken);
-
-            var mediaType = "application/json";
-            if (!string.IsNullOrWhiteSpace(Request.ContentType))
-            {
-                mediaType = Request.ContentType.Split(';', 2)[0].Trim();
-            }
-
-            requestMessage.Content = new StringContent(body, Encoding.UTF8, mediaType);
-        }
-
-        using var responseMessage = await _authClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-
-        var responseBody = responseMessage.Content is null
-            ? string.Empty
-            : await responseMessage.Content.ReadAsStringAsync(cancellationToken);
-
-        var responseContentType = responseMessage.Content?.Headers.ContentType?.ToString() ?? "application/json";
-
-        return new ContentResult
-        {
-            StatusCode = (int)responseMessage.StatusCode,
-            ContentType = responseContentType,
-            Content = responseBody
-        };
-    }
-
-    private void CopyHeaderIfPresent(HttpRequestMessage downstreamRequest, string headerName)
-    {
-        if (Request.Headers.TryGetValue(headerName, out var values))
-        {
-            downstreamRequest.Headers.TryAddWithoutValidation(headerName, values.ToArray());
-        }
+        await sender.Send(new DeleteApplicationCommand(applicationId), cancellationToken);
+        return NoContent();
     }
 }

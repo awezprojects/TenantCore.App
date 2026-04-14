@@ -1,0 +1,187 @@
+@page "/applications/create"
+@layout AuthorizedLayout
+@inject IApplicationApiClient AppClient
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Create Application - TenantCore</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => NavigationManager.NavigateTo("/applications"))" />
+    <MudText Typo="Typo.h4">Create Application</MudText>
+</MudStack>
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-6" Elevation="2">
+            <MudForm @ref="_form" @bind-IsValid="_formValid">
+                <MudText Typo="Typo.h6" Class="mb-4">Basic Information</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.ApplicationName"
+                                      Label="Application Name"
+                                      Required="true"
+                                      RequiredError="Application name is required."
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Apps" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.ApplicationCode"
+                                      Label="Application Code"
+                                      Required="true"
+                                      RequiredError="Application code is required."
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Tag"
+                                      HelperText="Unique short identifier (e.g. DMC001)" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="int" @bind-Value="_model.ApplicationType"
+                                   Label="Application Type"
+                                   Required="true"
+                                   Variant="Variant.Outlined">
+                            <MudSelectItem Value="0">Clinic</MudSelectItem>
+                            <MudSelectItem Value="1">School</MudSelectItem>
+                            <MudSelectItem Value="2">HR Management</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.RegistrationNumber"
+                                      Label="Registration Number"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Numbers" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.h6" Class="mb-4">Contact Information</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.ContactPerson"
+                                      Label="Contact Person"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Person" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.ContactNumber"
+                                      Label="Contact Number"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Phone" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.OfficialEmail"
+                                      Label="Official Email"
+                                      InputType="InputType.Email"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Email" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.Website"
+                                      Label="Website"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Language" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Address"
+                                      Label="Address"
+                                      Lines="2"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.LocationOn" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudStack Row="true" Spacing="2" Class="mt-6" Justify="Justify.FlexEnd">
+                    <MudButton Variant="Variant.Text"
+                               OnClick="@(() => NavigationManager.NavigateTo("/applications"))">
+                        Cancel
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               OnClick="SubmitAsync"
+                               Disabled="_submitting"
+                               StartIcon="@(_submitting ? null : Icons.Material.Filled.Save)">
+                        @if (_submitting)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Creating...</span>
+                        }
+                        else
+                        {
+                            <span>Create Application</span>
+                        }
+                    </MudButton>
+                </MudStack>
+            </MudForm>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudText Typo="Typo.h6" Class="mb-3">Tips</MudText>
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Info" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">The application code must be unique across the system.</MudText>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Info" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">Choose the type that best describes your organization.</MudText>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Info" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">Contact information is optional but recommended for administration.</MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private MudForm _form = null!;
+    private bool _formValid;
+    private bool _submitting;
+    private ApplicationCreationRequestDto _model = new();
+
+    private async Task SubmitAsync()
+    {
+        await _form.Validate();
+        if (!_formValid) return;
+
+        if (AuthState.CurrentUser is null)
+        {
+            Snackbar.Add("You must be logged in to create an application.", Severity.Error);
+            return;
+        }
+
+        _submitting = true;
+        try
+        {
+            var result = await AppClient.CreateApplicationAsync(AuthState.CurrentUser.UserId, _model);
+            if (result.Success)
+            {
+                Snackbar.Add($"Application '{result.Data?.ApplicationName}' created successfully.", Severity.Success);
+                NavigationManager.NavigateTo("/applications");
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating application: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}
