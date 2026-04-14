@@ -1,0 +1,15 @@
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+    <MudNavLink Href="/tenants" Icon="@Icons.Material.Filled.Business">Tenants</MudNavLink>
+    <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    <MudNavGroup Title="Settings" Icon="@Icons.Material.Filled.Settings" Expanded="false">
+        <MudNavLink Href="/auth/profile" Icon="@Icons.Material.Filled.Person">Profile</MudNavLink>
+        <MudNavLink Href="/settings/preferences" Icon="@Icons.Material.Filled.Tune">Preferences</MudNavLink>
+    </MudNavGroup>
+</MudNavMenu>

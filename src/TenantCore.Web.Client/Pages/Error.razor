@@ -1,0 +1,31 @@
+@page "/error"
+@layout MainLayout
+
+<PageTitle>Error - TenantCore</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Elevation="4" Class="pa-8">
+        <MudStack AlignItems="AlignItems.Center" Spacing="4">
+            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Style="font-size: 4rem;" />
+            <MudText Typo="Typo.h4">Something went wrong</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
+                An unexpected error has occurred. Please try again later.
+            </MudText>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true))">
+                    <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-1" />
+                    Reload Page
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/">
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-1" />
+                    Go to Home
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+}

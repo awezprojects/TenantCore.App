@@ -1,0 +1,208 @@
+@page "/auth/profile"
+@layout AuthorizedLayout
+@inject AuthStateService AuthState
+@inject IAuthApiClient AuthClient
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Profile - TenantCore</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Profile</MudText>
+
+@if (AuthState.CurrentUser != null)
+{
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-6">
+                <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                    <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 100px; height: 100px; font-size: 2.5rem;">
+                        @(AuthState.CurrentUser.FirstName[0])@(AuthState.CurrentUser.LastName[0])
+                    </MudAvatar>
+                    <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                        <MudText Typo="Typo.h5">@AuthState.CurrentUser.FullName</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@AuthState.CurrentUser.EmailId</MudText>
+                    </MudStack>
+                    <MudStack Row="true" Spacing="1">
+                        <MudChip T="string" Color="@(AuthState.CurrentUser.IsActive ? Color.Success : Color.Error)" 
+                                 Size="Size.Small" Variant="Variant.Filled">
+                            @(AuthState.CurrentUser.IsActive ? "Active" : "Inactive")
+                        </MudChip>
+                        <MudChip T="string" Color="@(AuthState.CurrentUser.IsEmailVerified ? Color.Success : Color.Warning)" 
+                                 Size="Size.Small" Variant="Variant.Outlined">
+                            @(AuthState.CurrentUser.IsEmailVerified ? "Verified" : "Unverified")
+                        </MudChip>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-6">
+                <MudText Typo="Typo.h6" Class="mb-4">Account Information</MudText>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">First Name</MudText>
+                            <MudText>@AuthState.CurrentUser.FirstName</MudText>
+                        </MudStack>
+                    </MudItem>
+                    @if (!string.IsNullOrEmpty(AuthState.CurrentUser.MiddleName))
+                    {
+                        <MudItem xs="12" sm="6">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Middle Name</MudText>
+                                <MudText>@AuthState.CurrentUser.MiddleName</MudText>
+                            </MudStack>
+                        </MudItem>
+                    }
+                    <MudItem xs="12" sm="6">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Last Name</MudText>
+                            <MudText>@AuthState.CurrentUser.LastName</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Email</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText>@AuthState.CurrentUser.EmailId</MudText>
+                                @if (AuthState.CurrentUser.IsEmailVerified)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" />
+                                }
+                            </MudStack>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Mobile Number</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText>@(AuthState.CurrentUser.MobileNo ?? "Not provided")</MudText>
+                                @if (AuthState.CurrentUser.IsMobileVerified)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" />
+                                }
+                            </MudStack>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Member Since</MudText>
+                            <MudText>@AuthState.CurrentUser.CreatedDate.ToString("MMMM dd, yyyy")</MudText>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            @if (AuthState.CurrentUser.UserApplications.Any())
+            {
+                <MudPaper Elevation="2" Class="pa-6 mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-4">Applications</MudText>
+                    <MudTable Items="AuthState.CurrentUser.UserApplications" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Application</MudTh>
+                            <MudTh>Role</MudTh>
+                            <MudTh>Status</MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="app">
+                            <MudTd>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText>@app.ApplicationName</MudText>
+                                    @if (app.IsOwner)
+                                    {
+                                        <MudChip T="string" Color="Color.Primary" Size="Size.Small">Owner</MudChip>
+                                    }
+                                </MudStack>
+                            </MudTd>
+                            <MudTd>
+                                @{
+                                    var roles = AuthState.CurrentUser.UserRoles
+                                        .Where(r => r.ApplicationId == app.ApplicationId)
+                                        .Select(r => r.RoleName);
+                                }
+                                @string.Join(", ", roles)
+                            </MudTd>
+                            <MudTd>
+                                <MudChip T="string" Color="@(app.IsActive ? Color.Success : Color.Error)" 
+                                         Size="Size.Small" Variant="Variant.Text">
+                                    @(app.IsActive ? "Active" : "Inactive")
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+
+            <MudPaper Elevation="2" Class="pa-6 mt-4">
+                <MudText Typo="Typo.h6" Class="mb-4">Security</MudText>
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body1">Two-Factor Authentication</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Add an extra layer of security to your account
+                            </MudText>
+                        </MudStack>
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                            Enabled
+                        </MudChip>
+                    </MudStack>
+                    <MudDivider />
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body1">Change Password</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Update your account password
+                            </MudText>
+                        </MudStack>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   Href="/auth/reset-password">
+                            Change
+                        </MudButton>
+                    </MudStack>
+                    <MudDivider />
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body1">Sign Out All Devices</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Sign out from all sessions on all devices
+                            </MudText>
+                        </MudStack>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
+                                   OnClick="SignOutAllDevices">
+                            Sign Out All
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+
+@code {
+    private async Task SignOutAllDevices()
+    {
+        try
+        {
+            var response = await AuthClient.LogoutAllSessionsAsync();
+            if (response.Success)
+            {
+                Snackbar.Add("Signed out from all devices.", Severity.Success);
+                await AuthState.ClearAuthStateAsync();
+                NavigationManager.NavigateTo("/auth/login", forceLoad: true);
+            }
+            else
+            {
+                Snackbar.Add(response.Message ?? "Failed to sign out.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+}

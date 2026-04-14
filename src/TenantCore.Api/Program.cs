@@ -63,10 +63,19 @@ try
     builder.Services.AddHealthChecks()
         .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
 
+    builder.Services.AddHttpClient("AuthApi", client =>
+    {
+        var authBaseUrl = builder.Configuration["AuthApi:BaseUrl"] ?? "https://localhost:7136/";
+        client.BaseAddress = new Uri(authBaseUrl);
+    });
+
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowAll", policy =>
-            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+            policy.WithOrigins("http://localhost:5246", "https://localhost:7247")
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials());
     });
 
     var app = builder.Build();

@@ -6,6 +6,9 @@ using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Api.Controllers;
 
+/// <summary>
+/// Controller for tenant management operations.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]

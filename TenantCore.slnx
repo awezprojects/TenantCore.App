@@ -5,7 +5,7 @@
     <Project Path="src/TenantCore.Domain/TenantCore.Domain.csproj" />
     <Project Path="src/TenantCore.Infrastructure/TenantCore.Infrastructure.csproj" />
     <Project Path="src/TenantCore.Shared/TenantCore.Shared.csproj" />
-    <Project Path="src/TenantCore.Web/TenantCore.Web.csproj" />
+    <Project Path="src/TenantCore.Web.Client/TenantCore.Web.Client.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TenantCore.Application.Tests/TenantCore.Application.Tests.csproj" />

@@ -1,0 +1,58 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudMainContent Class="auth-layout">
+        <div class="auth-background">
+            <div class="auth-overlay"></div>
+            <MudContainer MaxWidth="MaxWidth.False" Class="auth-container">
+                @Body
+            </MudContainer>
+        </div>
+    </MudMainContent>
+</MudLayout>
+
+<style>
+    .auth-layout {
+        min-height: 100vh;
+        padding: 0 !important;
+    }
+
+    .auth-background {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .auth-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></svg>');
+        background-size: 50px 50px;
+        opacity: 0.5;
+    }
+
+    .auth-container {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 2rem;
+    }
+</style>
+
+@code {
+    private bool _isDarkMode;
+}

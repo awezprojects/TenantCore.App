@@ -5,22 +5,20 @@ using TenantCore.Infrastructure.Persistence;
 
 namespace TenantCore.Infrastructure.Repositories;
 
-public class TenantRepository(AppDbContext dbContext) : ITenantRepository
+/// <summary>
+/// Repository for Tenant-specific operations.
+/// Inherits common CRUD operations from Repository&lt;Tenant&gt;.
+/// </summary>
+public class TenantRepository(AppDbContext dbContext) : Repository<Tenant>(dbContext), ITenantRepository
 {
-    public async Task<Tenant?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-        => await dbContext.Tenants.FindAsync([id], cancellationToken);
-
     public async Task<Tenant?> GetBySubdomainAsync(string subdomain, CancellationToken cancellationToken = default)
-        => await dbContext.Tenants
+        => await DbSet
             .FirstOrDefaultAsync(t => t.Subdomain == subdomain.ToLowerInvariant(), cancellationToken);
-
-    public async Task<IReadOnlyList<Tenant>> GetAllAsync(CancellationToken cancellationToken = default)
-        => await dbContext.Tenants.ToListAsync(cancellationToken);
 
     public async Task<(IReadOnlyList<Tenant> Items, int TotalCount)> GetPagedAsync(
         int page, int pageSize, string? search, CancellationToken cancellationToken = default)
     {
-        var query = dbContext.Tenants.AsQueryable();
+        var query = DbSet.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(t => t.Name.Contains(search) || t.Subdomain.Contains(search));
@@ -35,18 +33,6 @@ public class TenantRepository(AppDbContext dbContext) : ITenantRepository
         return (items, total);
     }
 
-    public async Task AddAsync(Tenant tenant, CancellationToken cancellationToken = default)
-        => await dbContext.Tenants.AddAsync(tenant, cancellationToken);
-
-    public void Update(Tenant tenant)
-        => dbContext.Tenants.Update(tenant);
-
-    public void Delete(Tenant tenant)
-        => dbContext.Tenants.Remove(tenant);
-
     public async Task<bool> ExistsBySubdomainAsync(string subdomain, CancellationToken cancellationToken = default)
-        => await dbContext.Tenants.AnyAsync(t => t.Subdomain == subdomain.ToLowerInvariant(), cancellationToken);
-
-    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-        => dbContext.SaveChangesAsync(cancellationToken);
+        => await DbSet.AnyAsync(t => t.Subdomain == subdomain.ToLowerInvariant(), cancellationToken);
 }
