@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using TenantCore.Shared.Authorization;
 
 namespace TenantCore.Api.Extensions;
 
@@ -32,11 +33,30 @@ public static class ServiceCollectionExtensions
                 ValidateAudience = !string.IsNullOrEmpty(jwtSection["Audience"]),
                 ValidAudience = jwtSection["Audience"],
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.FromMinutes(5)
+                ClockSkew = TimeSpan.FromMinutes(5),
+                // Map the 'role' claim properly from JWT
+                RoleClaimType = "role",
+                NameClaimType = "email"
             };
         });
 
-        services.AddAuthorization();
+        // Add role-based authorization policies
+        services.AddAuthorizationBuilder()
+            // Default policy - requires authentication
+            .AddPolicy(AuthPolicies.RequireAuthenticated, policy =>
+                policy.RequireAuthenticatedUser())
+            // Admin policy - any admin role
+            .AddPolicy(AuthPolicies.RequireAdmin, policy =>
+                policy.RequireRole(AppRoles.AdminRoles))
+            // Clinic Admin policy
+            .AddPolicy(AuthPolicies.RequireClinicAdmin, policy =>
+                policy.RequireRole(AppRoles.ClinicAdmin, AppRoles.SystemAdmin))
+            // School Admin policy
+            .AddPolicy(AuthPolicies.RequireSchoolAdmin, policy =>
+                policy.RequireRole(AppRoles.SchoolAdmin, AppRoles.SystemAdmin))
+            // Management policy - admins and managers
+            .AddPolicy(AuthPolicies.RequireManagement, policy =>
+                policy.RequireRole(AppRoles.ManagementRoles));
 
         return services;
     }

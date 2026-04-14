@@ -1,0 +1,150 @@
+@page "/"
+@layout AuthorizedLayout
+@inject AuthStateService AuthState
+
+<PageTitle>Home - TenantCore</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">
+    Welcome@(AuthState.CurrentUser != null ? $", {AuthState.CurrentUser.FirstName}" : "")!
+</MudText>
+<MudText Typo="Typo.body1" Class="mb-6">
+    A production-ready multi-tenant management platform built with Blazor WebAssembly.
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Tenant Management</MudText>
+                </CardHeaderContent>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText>Manage your tenants, subscriptions, and configurations.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/tenants"
+                           EndIcon="@Icons.Material.Filled.ArrowForward">
+                    Go to Tenants
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Dashboard</MudText>
+                </CardHeaderContent>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Dashboard" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText>View analytics, metrics, and system overview.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/dashboard"
+                           EndIcon="@Icons.Material.Filled.ArrowForward">
+                    View Dashboard
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudCard Elevation="2" Class="h-100">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Your Profile</MudText>
+                </CardHeaderContent>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Secondary" Variant="Variant.Filled">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" />
+                    </MudAvatar>
+                </CardHeaderAvatar>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText>View and manage your account settings and security.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/auth/profile"
+                           EndIcon="@Icons.Material.Filled.ArrowForward">
+                    View Profile
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4 mt-6" Elevation="1">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+        <MudIcon Icon="@Icons.Material.Filled.Speed" Color="Color.Primary" />
+        <MudText Typo="Typo.h6">WebAssembly Benefits</MudText>
+    </MudStack>
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.FlashOn" Color="Color.Warning" Size="Size.Small" />
+                <MudText Typo="Typo.body2">Client-side execution</MudText>
+            </MudStack>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.CloudOff" Color="Color.Info" Size="Size.Small" />
+                <MudText Typo="Typo.body2">Offline capable</MudText>
+            </MudStack>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Success" Size="Size.Small" />
+                <MudText Typo="Typo.body2">Reduced server load</MudText>
+            </MudStack>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Speed" Color="Color.Primary" Size="Size.Small" />
+                <MudText Typo="Typo.body2">Fast interactivity</MudText>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (AuthState.CurrentUser != null)
+{
+    <MudPaper Class="pa-4 mt-6" Elevation="1">
+        <MudText Typo="Typo.h6" Class="mb-3">Session Information</MudText>
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Signed in as</MudText>
+                <MudText Typo="Typo.body1">@AuthState.CurrentUser.EmailId</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Email Status</MudText>
+                <MudChip T="string" Color="@(AuthState.CurrentUser.IsEmailVerified ? Color.Success : Color.Warning)" 
+                         Size="Size.Small" Variant="Variant.Filled">
+                    @(AuthState.CurrentUser.IsEmailVerified ? "Verified" : "Not Verified")
+                </MudChip>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Account Status</MudText>
+                <MudChip T="string" Color="@(AuthState.CurrentUser.IsActive ? Color.Success : Color.Error)" 
+                         Size="Size.Small" Variant="Variant.Filled">
+                    @(AuthState.CurrentUser.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Applications</MudText>
+                <MudText Typo="Typo.body1">@AuthState.CurrentUser.UserApplications.Count</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+}

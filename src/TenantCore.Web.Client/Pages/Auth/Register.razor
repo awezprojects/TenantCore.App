@@ -1,0 +1,172 @@
+@page "/auth/register"
+@layout AuthLayout
+@inject IAuthApiClient AuthClient
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Create Account - TenantCore</PageTitle>
+
+<MudGrid Justify="Justify.Center" Style="min-height: 100vh; margin: 0;">
+    <MudItem xs="12" sm="10" md="8" lg="6" xl="5">
+        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="background: white;">
+            <!-- Logo & Header -->
+            <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+                <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 80px; height: 80px;">
+                    <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Style="font-size: 2.5rem;" />
+                </MudAvatar>
+                <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600; color: #1a1a2e;">
+                    Create Account
+                </MudText>
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                    Join TenantCore today
+                </MudText>
+            </MudStack>
+
+            <EditForm Model="_model" OnValidSubmit="HandleRegister">
+                <DataAnnotationsValidator />
+
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.FirstName"
+                                      Label="First Name"
+                                      Variant="Variant.Outlined"
+                                      For="@(() => _model.FirstName)"
+                                      Disabled="_loading"
+                                      Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_model.LastName"
+                                      Label="Last Name"
+                                      Variant="Variant.Outlined"
+                                      For="@(() => _model.LastName)"
+                                      Disabled="_loading"
+                                      Required="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.EmailId"
+                                      Label="Email Address"
+                                      Variant="Variant.Outlined"
+                                      InputType="InputType.Email"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Email"
+                                      For="@(() => _model.EmailId)"
+                                      Disabled="_loading"
+                                      Required="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.MobileNo"
+                                      Label="Mobile Number (Optional)"
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Phone"
+                                      Disabled="_loading" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_model.Password"
+                                      Label="Password"
+                                      Variant="Variant.Outlined"
+                                      InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@(_showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                      OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                                      For="@(() => _model.Password)"
+                                      Disabled="_loading"
+                                      Required="true"
+                                      HelperText="At least 8 characters" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_confirmPassword"
+                                      Label="Confirm Password"
+                                      Variant="Variant.Outlined"
+                                      InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                      Disabled="_loading"
+                                      Required="true" />
+                    </MudItem>
+                </MudGrid>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-4" Dense="true" Variant="Variant.Filled">
+                        @_errorMessage
+                    </MudAlert>
+                }
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Disabled="_loading"
+                           Class="mt-6 mb-4"
+                           Style="height: 48px; font-size: 1rem; text-transform: none;">
+                    @if (_loading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                        <span>Creating Account...</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                        <span>Create Account</span>
+                    }
+                </MudButton>
+            </EditForm>
+
+            <MudDivider Class="my-4" />
+
+            <MudStack AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.body2">
+                    Already have an account?
+                    <MudLink Href="/auth/login" Color="Color.Primary" Typo="Typo.body2" Style="font-weight: 600;">
+                        Sign in
+                    </MudLink>
+                </MudText>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private RegisterRequestDto _model = new();
+    private string _confirmPassword = string.Empty;
+    private bool _loading;
+    private bool _showPassword;
+    private string? _errorMessage;
+
+    private async Task HandleRegister()
+    {
+        _errorMessage = null;
+
+        if (_model.Password != _confirmPassword)
+        {
+            _errorMessage = "Passwords do not match.";
+            return;
+        }
+
+        _loading = true;
+
+        try
+        {
+            var response = await AuthClient.RegisterAsync(_model);
+
+            if (response.Success)
+            {
+                Snackbar.Add("Account created successfully! Please check your email to verify your account.", Severity.Success);
+                NavigationManager.NavigateTo("/auth/login");
+            }
+            else
+            {
+                _errorMessage = response.Message ?? "Registration failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Registration error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

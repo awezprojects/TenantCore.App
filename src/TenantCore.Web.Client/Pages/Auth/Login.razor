@@ -1,0 +1,219 @@
+@page "/auth/login"
+@layout AuthLayout
+@inject IAuthApiClient AuthClient
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Sign In - TenantCore</PageTitle>
+
+<MudGrid Justify="Justify.Center" Style="min-height: 100vh; margin: 0;">
+    <MudItem xs="12" sm="10" md="8" lg="6" xl="4">
+        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="background: white;">
+            <!-- Logo & Header -->
+            <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+                <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 80px; height: 80px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Business" Style="font-size: 2.5rem;" />
+                </MudAvatar>
+                <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600; color: #1a1a2e;">
+                    TenantCore
+                </MudText>
+                <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Filled">WebAssembly</MudChip>
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                    Sign in to your account to continue
+                </MudText>
+            </MudStack>
+
+            <EditForm Model="_loginModel" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+
+                <MudTextField @bind-Value="_loginModel.EmailId"
+                              Label="Email Address"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Email"
+                              Class="mb-4"
+                              For="@(() => _loginModel.EmailId)"
+                              Disabled="_loading"
+                              Placeholder="you@example.com" />
+
+                <MudTextField @bind-Value="_loginModel.Password"
+                              Label="Password"
+                              Variant="Variant.Outlined"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                              OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                              Class="mb-2"
+                              For="@(() => _loginModel.Password)"
+                              Disabled="_loading"
+                              Placeholder="Enter your password" />
+
+                <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-4">
+                    <MudLink Href="/auth/reset-password" Typo="Typo.body2" Color="Color.Primary">
+                        Forgot password?
+                    </MudLink>
+                </MudStack>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
+                        @_errorMessage
+                    </MudAlert>
+                }
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Disabled="_loading"
+                           Class="mb-4"
+                           Style="height: 48px; font-size: 1rem; text-transform: none;">
+                    @if (_loading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                        <span>Signing In...</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
+                        <span>Sign In</span>
+                    }
+                </MudButton>
+            </EditForm>
+
+            <MudStack AlignItems="AlignItems.Center" Class="my-4">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">OR</MudText>
+            </MudStack>
+
+            <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.body2">
+                    Don't have an account?
+                    <MudLink Href="/auth/register" Color="Color.Primary" Typo="Typo.body2" Style="font-weight: 600;">
+                        Create one
+                    </MudLink>
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    Need to verify your email?
+                    <MudLink Href="/auth/resend-verification" Color="Color.Secondary" Typo="Typo.body2">
+                        Resend verification
+                    </MudLink>
+                </MudText>
+            </MudStack>
+
+            <!-- Footer -->
+            <MudStack AlignItems="AlignItems.Center" Class="mt-6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Protected by enterprise-grade security
+                </MudText>
+                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" Color="Color.Secondary" />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Two-Factor Authentication Enabled
+                    </MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private LoginRequestDto _loginModel = new();
+    private bool _loading;
+    private bool _showPassword;
+    private string? _errorMessage;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            await AuthState.InitializeAsync();
+
+            if (AuthState.IsAuthenticated)
+            {
+                NavigateToReturn();
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await AuthClient.LoginAsync(_loginModel);
+
+            if (response.Success && response.Data != null)
+            {
+                var data = response.Data;
+
+                if (data.RequiresPasswordReset)
+                {
+                    AuthState.SetTempLoginState(data);
+                    Snackbar.Add("Please reset your password to continue.", Severity.Warning);
+                    NavigationManager.NavigateTo($"/auth/reset-password?userId={data.User?.UserId}");
+                }
+                else if (data.RequiresTwoFactor)
+                {
+                    AuthState.SetTempLoginState(data);
+                    var returnParam = !string.IsNullOrEmpty(ReturnUrl) ? $"?returnUrl={ReturnUrl}" : "";
+                    NavigationManager.NavigateTo($"/auth/two-factor{returnParam}");
+                }
+                else
+                {
+                    await AuthState.SetAuthenticatedStateAsync(data);
+                    Snackbar.Add("Login successful!", Severity.Success);
+                    NavigateToReturn();
+                }
+            }
+            else
+            {
+                _errorMessage = response.Message ?? "Invalid email or password. Please try again.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "Unable to connect to the authentication server. Please try again later.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "An unexpected error occurred. Please try again.";
+            Console.WriteLine($"Login error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void NavigateToReturn()
+    {
+        if (!string.IsNullOrEmpty(ReturnUrl))
+        {
+            try
+            {
+                var decodedUrl = Uri.UnescapeDataString(ReturnUrl);
+                NavigationManager.NavigateTo(decodedUrl);
+            }
+            catch
+            {
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+}

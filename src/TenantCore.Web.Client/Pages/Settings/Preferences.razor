@@ -1,0 +1,162 @@
+@page "/settings/preferences"
+@layout AuthorizedLayout
+@inject AuthStateService AuthState
+@inject ISnackbar Snackbar
+
+<PageTitle>Preferences - TenantCore</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Preferences</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudText Typo="Typo.h6" Class="mb-4">Display Settings</MudText>
+
+            <MudStack Spacing="4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body1">Dark Mode</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Toggle dark/light theme
+                        </MudText>
+                    </MudStack>
+                    <MudSwitch @bind-Value="_darkMode" Color="Color.Primary" />
+                </MudStack>
+
+                <MudDivider />
+
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body1">Compact View</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Use denser table layouts
+                        </MudText>
+                    </MudStack>
+                    <MudSwitch @bind-Value="_compactView" Color="Color.Primary" />
+                </MudStack>
+
+                <MudDivider />
+
+                <MudSelect T="int" @bind-Value="_pageSize" Label="Default Page Size" Variant="Variant.Outlined">
+                    <MudSelectItem Value="10">10 items</MudSelectItem>
+                    <MudSelectItem Value="25">25 items</MudSelectItem>
+                    <MudSelectItem Value="50">50 items</MudSelectItem>
+                    <MudSelectItem Value="100">100 items</MudSelectItem>
+                </MudSelect>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudText Typo="Typo.h6" Class="mb-4">Notification Settings</MudText>
+
+            <MudStack Spacing="4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body1">Email Notifications</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Receive important updates via email
+                        </MudText>
+                    </MudStack>
+                    <MudSwitch @bind-Value="_emailNotifications" Color="Color.Primary" />
+                </MudStack>
+
+                <MudDivider />
+
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body1">Browser Notifications</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Show desktop notifications
+                        </MudText>
+                    </MudStack>
+                    <MudSwitch @bind-Value="_browserNotifications" Color="Color.Primary" />
+                </MudStack>
+
+                <MudDivider />
+
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body1">Sound Effects</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Play sounds for notifications
+                        </MudText>
+                    </MudStack>
+                    <MudSwitch @bind-Value="_soundEffects" Color="Color.Primary" />
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudPaper Elevation="2" Class="pa-6">
+            <MudText Typo="Typo.h6" Class="mb-4">Language & Region</MudText>
+
+            <MudGrid>
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string" @bind-Value="_language" Label="Language" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("en")">English</MudSelectItem>
+                        <MudSelectItem Value="@("es")">Spanish</MudSelectItem>
+                        <MudSelectItem Value="@("fr")">French</MudSelectItem>
+                        <MudSelectItem Value="@("de")">German</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string" @bind-Value="_timezone" Label="Timezone" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("UTC")">UTC</MudSelectItem>
+                        <MudSelectItem Value="@("EST")">Eastern Time</MudSelectItem>
+                        <MudSelectItem Value="@("PST")">Pacific Time</MudSelectItem>
+                        <MudSelectItem Value="@("GMT")">GMT</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudSelect T="string" @bind-Value="_dateFormat" Label="Date Format" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("MM/dd/yyyy")">MM/DD/YYYY</MudSelectItem>
+                        <MudSelectItem Value="@("dd/MM/yyyy")">DD/MM/YYYY</MudSelectItem>
+                        <MudSelectItem Value="@("yyyy-MM-dd")">YYYY-MM-DD</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-4">
+    <MudButton Variant="Variant.Text" OnClick="ResetDefaults">Reset to Defaults</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SavePreferences"
+               StartIcon="@Icons.Material.Filled.Save">
+        Save Changes
+    </MudButton>
+</MudStack>
+
+@code {
+    private bool _darkMode;
+    private bool _compactView;
+    private int _pageSize = 10;
+    private bool _emailNotifications = true;
+    private bool _browserNotifications;
+    private bool _soundEffects;
+    private string _language = "en";
+    private string _timezone = "UTC";
+    private string _dateFormat = "MM/dd/yyyy";
+
+    private void SavePreferences()
+    {
+        Snackbar.Add("Preferences saved successfully!", Severity.Success);
+    }
+
+    private void ResetDefaults()
+    {
+        _darkMode = false;
+        _compactView = false;
+        _pageSize = 10;
+        _emailNotifications = true;
+        _browserNotifications = false;
+        _soundEffects = false;
+        _language = "en";
+        _timezone = "UTC";
+        _dateFormat = "MM/dd/yyyy";
+        Snackbar.Add("Preferences reset to defaults.", Severity.Info);
+    }
+}

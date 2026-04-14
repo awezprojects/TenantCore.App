@@ -1,0 +1,168 @@
+@page "/auth/two-factor"
+@layout AuthLayout
+@inject IAuthApiClient AuthClient
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Two-Factor Authentication - TenantCore</PageTitle>
+
+<MudGrid Justify="Justify.Center" Style="min-height: 100vh; margin: 0;">
+    <MudItem xs="12" sm="10" md="8" lg="6" xl="4">
+        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="background: white;">
+            <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+                <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 80px; height: 80px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Security" Style="font-size: 2.5rem;" />
+                </MudAvatar>
+                <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600;">
+                    Two-Factor Authentication
+                </MudText>
+
+                @if (AuthState.IsFirstTimeSetup)
+                {
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        Scan the QR code with your authenticator app
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        Enter the code from your authenticator app
+                    </MudText>
+                }
+            </MudStack>
+
+            @if (AuthState.IsFirstTimeSetup && !string.IsNullOrEmpty(AuthState.QrCodeBase64))
+            {
+                <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+                    <MudPaper Elevation="2" Class="pa-4">
+                        <img src="@($"data:image/png;base64,{AuthState.QrCodeBase64}")" 
+                             alt="QR Code" style="width: 200px; height: 200px;" />
+                    </MudPaper>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                        Scan this QR code with Google Authenticator or similar app
+                    </MudText>
+                </MudStack>
+            }
+
+            @if (!string.IsNullOrEmpty(AuthState.UserDisplayName))
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+                    Signing in as: <strong>@AuthState.UserDisplayName</strong>
+                </MudAlert>
+            }
+
+            <EditForm Model="_model" OnValidSubmit="HandleValidate">
+                <DataAnnotationsValidator />
+
+                <MudTextField @bind-Value="_model.OtpCode"
+                              Label="6-Digit Code"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Pin"
+                              For="@(() => _model.OtpCode)"
+                              Disabled="_loading"
+                              MaxLength="6"
+                              Placeholder="000000"
+                              Class="mb-4"
+                              Style="font-size: 1.5rem; text-align: center; letter-spacing: 0.5rem;" />
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
+                        @_errorMessage
+                    </MudAlert>
+                }
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           Disabled="_loading"
+                           Class="mb-4"
+                           Style="height: 48px;">
+                    @if (_loading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                        <span>Verifying...</span>
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Verified" Class="mr-2" />
+                        <span>Verify Code</span>
+                    }
+                </MudButton>
+            </EditForm>
+
+            <MudStack AlignItems="AlignItems.Center" Class="mt-4">
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="BackToLogin">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-1" />
+                    Back to Login
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private ValidateTwoFactorRequestDto _model = new();
+    private bool _loading;
+    private string? _errorMessage;
+
+    protected override void OnInitialized()
+    {
+        if (string.IsNullOrEmpty(AuthState.TempLoginToken))
+        {
+            NavigationManager.NavigateTo("/auth/login");
+        }
+    }
+
+    private async Task HandleValidate()
+    {
+        _loading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await AuthClient.ValidateTwoFactorAsync(AuthState.TempLoginToken!, _model);
+
+            if (response.Success && response.Data != null)
+            {
+                await AuthState.SetAuthenticatedStateAsync(response.Data);
+                Snackbar.Add("Login successful!", Severity.Success);
+
+                if (!string.IsNullOrEmpty(ReturnUrl))
+                {
+                    NavigationManager.NavigateTo(Uri.UnescapeDataString(ReturnUrl));
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("/");
+                }
+            }
+            else
+            {
+                _errorMessage = response.Message ?? "Invalid code. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Verification failed. Please try again.";
+            Console.WriteLine($"2FA error: {ex.Message}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void BackToLogin()
+    {
+        AuthState.ClearTempState();
+        NavigationManager.NavigateTo("/auth/login");
+    }
+}

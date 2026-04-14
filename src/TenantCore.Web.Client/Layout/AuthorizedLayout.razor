@@ -1,0 +1,110 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject AuthStateService AuthState
+
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (_checkingAuth)
+{
+    <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+    </div>
+}
+else if (_isAuthenticated)
+{
+    <MudLayout>
+        <MudAppBar Elevation="1" Color="Color.Primary">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="ToggleDrawer" />
+            <MudText Typo="Typo.h6">TenantCore</MudText>
+            <MudSpacer />
+            <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Filled">WebAssembly</MudChip>
+            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+                           Color="Color.Inherit" OnClick="ToggleDarkMode" Class="mx-2" />
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" 
+                     AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <ChildContent>
+                    <MudMenuItem Href="/auth/profile" Icon="@Icons.Material.Filled.Person">Profile</MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem OnClick="Logout" Icon="@Icons.Material.Filled.Logout">Sign Out</MudMenuItem>
+                </ChildContent>
+            </MudMenu>
+        </MudAppBar>
+        <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always">
+            <MudDrawerHeader>
+                <MudStack>
+                    <MudText Typo="Typo.h6">Navigation</MudText>
+                    @if (AuthState.CurrentUser != null)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @AuthState.CurrentUser.FullName
+                        </MudText>
+                    }
+                </MudStack>
+            </MudDrawerHeader>
+            <NavMenu />
+        </MudDrawer>
+        <MudMainContent>
+            <MudContainer MaxWidth="MaxWidth.Large" Class="pt-6">
+                @Body
+            </MudContainer>
+        </MudMainContent>
+    </MudLayout>
+}
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _checkingAuth = true;
+    private bool _isAuthenticated;
+    private bool _isDarkMode;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckAuthAndRedirect();
+        }
+    }
+
+    private async Task CheckAuthAndRedirect()
+    {
+        try
+        {
+            await AuthState.InitializeAsync();
+            _isAuthenticated = AuthState.IsAuthenticated;
+        }
+        catch
+        {
+            _isAuthenticated = false;
+        }
+
+        _checkingAuth = false;
+
+        if (!_isAuthenticated)
+        {
+            var uri = NavigationManager.Uri;
+            var baseUri = NavigationManager.BaseUri;
+            var path = uri.Replace(baseUri, "/");
+
+            if (!path.StartsWith("/auth/"))
+            {
+                var returnUrl = Uri.EscapeDataString(path);
+                NavigationManager.NavigateTo($"/auth/login?returnUrl={returnUrl}", forceLoad: true);
+                return;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+    private void ToggleDarkMode() => _isDarkMode = !_isDarkMode;
+
+    private async Task Logout()
+    {
+        await AuthState.ClearAuthStateAsync();
+        NavigationManager.NavigateTo("/auth/login", forceLoad: true);
+    }
+}
