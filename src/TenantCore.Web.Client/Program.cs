@@ -30,4 +30,10 @@ builder.Services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
     client.BaseAddress = new Uri(authApiBaseUrl);
 });
 
+// Register Application API Client
+builder.Services.AddHttpClient<IApplicationApiClient, ApplicationApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+});
+
 await builder.Build().RunAsync();
