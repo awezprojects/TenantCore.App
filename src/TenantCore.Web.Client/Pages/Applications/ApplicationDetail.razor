@@ -5,6 +5,7 @@
 @using TenantCore.Web.Client.Services
 @using TenantCore.Shared.Dtos.Auth
 @inject IApplicationApiClient AppClient
+@inject IAuthApiClient AuthClient
 @inject AuthStateService AuthState
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
@@ -60,7 +61,7 @@ else if (_app is not null)
                     <MudButton Variant="Variant.Outlined"
                                Color="@(_app.IsOwner ? Color.Default : (_isAppActive ? Color.Error : Color.Success))"
                                StartIcon="@(_isAppActive ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)"
-                               OnClick="ToggleApplicationStatus"
+                               OnClick="@(() => _toggleAppStatusDialogVisible = true)"
                                Disabled="_togglingAppStatus || _app.IsOwner">
                         @(_isAppActive ? "Deactivate" : "Activate")
                     </MudButton>
@@ -139,7 +140,7 @@ else if (_app is not null)
                     {
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                    StartIcon="@Icons.Material.Filled.PersonAdd"
-                                   OnClick="@(() => { _inviteDialogVisible = true; _ = OnInviteDialogOpen(); })">
+                                   OnClick="OpenInviteDialog">
                             Invite User
                         </MudButton>
                     }
@@ -200,7 +201,7 @@ else if (_app is not null)
                                         <MudTooltip Text="@(user.IsActive ? "Deactivate user" : "Activate user")">
                                             <MudIconButton Icon="@(user.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)"
                                                            Color="@(user.IsActive ? Color.Warning : Color.Success)" Size="Size.Small"
-                                                           OnClick="@(() => ToggleUserStatus(user))" />
+                                                           OnClick="@(() => ConfirmToggleUser(user))" />
                                         </MudTooltip>
                                         <MudTooltip Text="Change role">
                                             <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
@@ -226,77 +227,183 @@ else if (_app is not null)
     </MudGrid>
 }
 
-<!-- Invite User Dialog -->
+<!-- Invite / Add User Dialog -->
 <MudDialog @bind-Visible="_inviteDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
             <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">Invite User</MudText>
+            <MudText Typo="Typo.h6">Add User to Application</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
-        <MudForm @ref="_inviteForm" @bind-IsValid="_inviteFormValid">
-            <MudGrid>
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_inviteModel.FirstName"
-                                  Label="First Name" Required="true"
-                                  RequiredError="First name is required."
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudTextField @bind-Value="_inviteModel.LastName"
-                                  Label="Last Name" Required="true"
-                                  RequiredError="Last name is required."
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudTextField @bind-Value="_inviteModel.EmailId"
-                                  Label="Email Address" Required="true"
-                                  RequiredError="Email is required."
-                                  InputType="InputType.Email"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudTextField @bind-Value="_inviteModel.MobileNo"
-                                  Label="Mobile Number"
-                                  Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudSelect T="Guid" @bind-Value="_selectedRoleId" Label="Role" Required="true" RequiredError="Role is required." Variant="Variant.Outlined" Disabled="_rolesLoading || _roles.Count == 0">
-                        @if (_rolesLoading)
+        <!-- Step 1: Email Search -->
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Search for an existing user by email, or invite a new user.
+        </MudText>
+        <MudTextField @bind-Value="_searchEmail"
+                      Label="Email Address" Placeholder="Type at least 2 characters to search..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true"
+                      DebounceInterval="300"
+                      OnDebounceIntervalElapsed="OnSearchEmailChanged" />
+
+        @if (_searching)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2" />
+        }
+
+        @if (_searchResults is not null && _searchResults.Count > 0 && !_existingUserSelected)
+        {
+            <MudList T="UserSearchResultDto" Class="mt-2" Dense="true" Style="max-height: 200px; overflow-y: auto;">
+                @foreach (var user in _searchResults)
+                {
+                    <MudListItem T="UserSearchResultDto" OnClick="@(() => SelectExistingUser(user))">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudAvatar Size="Size.Small" Color="Color.Secondary">@(user.FirstName.Length > 0 ? user.FirstName[0] : '?')</MudAvatar>
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.body2"><b>@user.FullName</b></MudText>
+                                <MudText Typo="Typo.caption">@user.EmailId</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+        else if (_searchResults is not null && _searchResults.Count == 0 && _searchEmail?.Length >= 2 && !_searching && !_existingUserSelected)
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-3" Dense="true">
+                No existing user found. You can send a new invitation below.
+            </MudAlert>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-1"
+                       OnClick="SwitchToNewInvite" StartIcon="@Icons.Material.Filled.Email">
+                Send a new invitation to "@_searchEmail"
+            </MudButton>
+        }
+
+        <!-- Selected existing user display -->
+        @if (_existingUserSelected && _selectedExistingUser is not null)
+        {
+            <MudPaper Class="pa-3 mt-3" Elevation="1">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudAvatar Color="Color.Primary" Size="Size.Small">@_selectedExistingUser.FirstName[0]</MudAvatar>
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body2"><b>@_selectedExistingUser.FullName</b></MudText>
+                            <MudText Typo="Typo.caption">@_selectedExistingUser.EmailId</MudText>
+                        </MudStack>
+                    </MudStack>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="ClearSelectedUser" />
+                </MudStack>
+            </MudPaper>
+            <MudItem xs="12" Class="mt-3">
+                <MudSelect T="Guid" @bind-Value="_selectedRoleId" Label="Role" Required="true" RequiredError="Role is required." Variant="Variant.Outlined" Disabled="_rolesLoading || _roles.Count == 0">
+                    @if (_rolesLoading)
+                    {
+                        <MudSelectItem Value="@Guid.Empty">Loading roles...</MudSelectItem>
+                    }
+                    else if (_roles.Count == 0)
+                    {
+                        <MudSelectItem Value="@Guid.Empty">No roles available</MudSelectItem>
+                    }
+                    else
+                    {
+                        @foreach (var role in _roles)
                         {
-                            <MudSelectItem Value="@Guid.Empty">Loading roles...</MudSelectItem>
+                            <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
                         }
-                        else if (_roles.Count == 0)
-                        {
-                            <MudSelectItem Value="@Guid.Empty">No roles available</MudSelectItem>
-                        }
-                        else
-                        {
-                            @foreach (var role in _roles)
+                    }
+                </MudSelect>
+            </MudItem>
+        }
+
+        <!-- New invitation form -->
+        @if (_showNewInviteForm)
+        {
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.subtitle2" Class="mb-2">New User Invitation</MudText>
+            <MudForm @ref="_inviteForm" @bind-IsValid="_inviteFormValid">
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_inviteModel.FirstName"
+                                      Label="First Name" Required="true"
+                                      RequiredError="First name is required."
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_inviteModel.LastName"
+                                      Label="Last Name" Required="true"
+                                      RequiredError="Last name is required."
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_inviteModel.EmailId"
+                                      Label="Email Address" Required="true"
+                                      RequiredError="Email is required."
+                                      InputType="InputType.Email"
+                                      Variant="Variant.Outlined" ReadOnly="true" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_inviteModel.MobileNo"
+                                      Label="Mobile Number"
+                                      Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudSelect T="Guid" @bind-Value="_selectedRoleId" Label="Role" Required="true" RequiredError="Role is required." Variant="Variant.Outlined" Disabled="_rolesLoading || _roles.Count == 0">
+                            @if (_rolesLoading)
                             {
-                                <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                                <MudSelectItem Value="@Guid.Empty">Loading roles...</MudSelectItem>
                             }
-                        }
-                    </MudSelect>
-                </MudItem>
-            </MudGrid>
-        </MudForm>
+                            else if (_roles.Count == 0)
+                            {
+                                <MudSelectItem Value="@Guid.Empty">No roles available</MudSelectItem>
+                            }
+                            else
+                            {
+                                @foreach (var role in _roles)
+                                {
+                                    <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _inviteDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled"
-                   OnClick="InviteUserAsync" Disabled="_inviting">
-            @if (_inviting)
-            {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                <span>Sending...</span>
-            }
-            else
-            {
-                <span>Send Invitation</span>
-            }
-        </MudButton>
+        <MudButton OnClick="CloseInviteDialog">Cancel</MudButton>
+        @if (_existingUserSelected)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       OnClick="AddExistingUserAsync" Disabled="_inviting || _selectedRoleId == Guid.Empty">
+                @if (_inviting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Adding...</span>
+                }
+                else
+                {
+                    <span>Add User</span>
+                }
+            </MudButton>
+        }
+        else if (_showNewInviteForm)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       OnClick="InviteNewUserAsync" Disabled="_inviting">
+                @if (_inviting)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Sending...</span>
+                }
+                else
+                {
+                    <span>Send Invitation</span>
+                }
+            </MudButton>
+        }
     </DialogActions>
 </MudDialog>
 
@@ -315,6 +422,66 @@ else if (_app is not null)
     <DialogActions>
         <MudButton OnClick="@(() => _removeUserDialogVisible = false)">Cancel</MudButton>
         <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveUserAsync">Remove</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Toggle Application Status Confirmation -->
+<MudDialog @bind-Visible="_toggleAppStatusDialogVisible">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="@(_isAppActive ? Color.Error : Color.Success)" />
+            <MudText Typo="Typo.h6">@(_isAppActive ? "Deactivate" : "Activate") Application</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_isAppActive)
+        {
+            <MudText>Are you sure you want to <b>deactivate</b> this application?</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">Users will lose access until it is reactivated.</MudText>
+        }
+        else
+        {
+            <MudText>Are you sure you want to <b>activate</b> this application?</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _toggleAppStatusDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="@(_isAppActive ? Color.Error : Color.Success)" Variant="Variant.Filled"
+                   OnClick="ConfirmToggleApplicationStatus" Disabled="_togglingAppStatus">
+            @if (_togglingAppStatus)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            @(_isAppActive ? "Deactivate" : "Activate")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Toggle User Status Confirmation -->
+<MudDialog @bind-Visible="_toggleUserStatusDialogVisible">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="@(_userToToggle?.IsActive == true ? Color.Warning : Color.Success)" />
+            <MudText Typo="Typo.h6">@(_userToToggle?.IsActive == true ? "Deactivate" : "Activate") User</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_userToToggle?.IsActive == true)
+        {
+            <MudText>Are you sure you want to <b>deactivate</b> <b>@_userToToggle?.FullName</b>?</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">They will lose access to this application until reactivated.</MudText>
+        }
+        else
+        {
+            <MudText>Are you sure you want to <b>activate</b> <b>@_userToToggle?.FullName</b>?</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _toggleUserStatusDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="@(_userToToggle?.IsActive == true ? Color.Warning : Color.Success)" Variant="Variant.Filled"
+                   OnClick="ConfirmToggleUserStatus">
+            @(_userToToggle?.IsActive == true ? "Deactivate" : "Activate")
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -362,7 +529,7 @@ else if (_app is not null)
     private ApplicationResponseDto? _app;
     private List<ApplicationUserResponseDto>? _users;
 
-    // Invite dialog
+    // Invite / Add user dialog
     private bool _inviteDialogVisible;
     private bool _inviting;
     private MudForm _inviteForm = null!;
@@ -372,6 +539,14 @@ else if (_app is not null)
     private List<RoleResponseDto> _roles = new();
     private bool _rolesLoading = false;
 
+    // Email search for existing users
+    private string? _searchEmail;
+    private bool _searching;
+    private List<UserSearchResultDto>? _searchResults;
+    private bool _existingUserSelected;
+    private UserSearchResultDto? _selectedExistingUser;
+    private bool _showNewInviteForm;
+
     // Remove user dialog
     private bool _removeUserDialogVisible;
     private ApplicationUserResponseDto? _userToRemove;
@@ -379,6 +554,11 @@ else if (_app is not null)
     // Toggle application status
     private bool _togglingAppStatus;
     private bool _isAppActive => _app?.IsActive ?? false;
+    private bool _toggleAppStatusDialogVisible;
+
+    // Toggle user status
+    private bool _toggleUserStatusDialogVisible;
+    private ApplicationUserResponseDto? _userToToggle;
 
     // Change role dialog
     private bool _changeRoleDialogVisible;
@@ -429,14 +609,131 @@ else if (_app is not null)
         }
     }
 
-    private async Task InviteUserAsync()
+    // ── Invite / Add User ──
+
+    private void OpenInviteDialog()
+    {
+        _searchEmail = null;
+        _searchResults = null;
+        _existingUserSelected = false;
+        _selectedExistingUser = null;
+        _showNewInviteForm = false;
+        _inviteModel = new InviteUserRequestDto();
+        _selectedRoleId = _roles.Count > 0 ? _roles[0].RoleId : Guid.Empty;
+        _inviteDialogVisible = true;
+    }
+
+    private void CloseInviteDialog()
+    {
+        _inviteDialogVisible = false;
+        _searchEmail = null;
+        _searchResults = null;
+        _existingUserSelected = false;
+        _selectedExistingUser = null;
+        _showNewInviteForm = false;
+    }
+
+    private async Task OnSearchEmailChanged(string value)
+    {
+        _searchEmail = value;
+        _existingUserSelected = false;
+        _selectedExistingUser = null;
+        _showNewInviteForm = false;
+
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 2)
+        {
+            _searchResults = null;
+            return;
+        }
+
+        _searching = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AuthClient.SearchUsersByEmailAsync(value);
+            _searchResults = result.Success ? result.Data ?? [] : [];
+        }
+        catch
+        {
+            _searchResults = [];
+        }
+        finally
+        {
+            _searching = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectExistingUser(UserSearchResultDto user)
+    {
+        _selectedExistingUser = user;
+        _existingUserSelected = true;
+        _searchResults = null;
+        _showNewInviteForm = false;
+        _selectedRoleId = _roles.Count > 0 ? _roles[0].RoleId : Guid.Empty;
+        StateHasChanged();
+    }
+
+    private void ClearSelectedUser()
+    {
+        _existingUserSelected = false;
+        _selectedExistingUser = null;
+        _searchEmail = null;
+        _searchResults = null;
+    }
+
+    private void SwitchToNewInvite()
+    {
+        _showNewInviteForm = true;
+        _existingUserSelected = false;
+        _selectedExistingUser = null;
+        _inviteModel = new InviteUserRequestDto { EmailId = _searchEmail ?? string.Empty };
+        _selectedRoleId = _roles.Count > 0 ? _roles[0].RoleId : Guid.Empty;
+    }
+
+    private async Task AddExistingUserAsync()
+    {
+        if (_selectedExistingUser is null || AuthState.CurrentUser is null || _selectedRoleId == Guid.Empty) return;
+
+        _inviting = true;
+        try
+        {
+            var request = new InviteExistingUserRequestDto
+            {
+                UserId = _selectedExistingUser.UserId,
+                ApplicationId = Id,
+                RoleId = _selectedRoleId
+            };
+            var result = await AppClient.InviteExistingUserAsync(AuthState.CurrentUser.UserId, request);
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? $"{_selectedExistingUser.FullName} added to application.", Severity.Success);
+                CloseInviteDialog();
+                await LoadUsersAsync();
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to add user.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error adding user: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _inviting = false;
+        }
+    }
+
+    private async Task InviteNewUserAsync()
     {
         await _inviteForm.Validate();
         if (!_inviteFormValid) return;
 
-
-        var roleId = _selectedRoleId;
-        if (roleId == Guid.Empty)
+        if (_selectedRoleId == Guid.Empty)
         {
             Snackbar.Add("Please select a valid role.", Severity.Error);
             return;
@@ -445,8 +742,7 @@ else if (_app is not null)
         if (AuthState.CurrentUser is null) return;
 
         _inviteModel.ApplicationId = Id;
-
-        _inviteModel.RoleId = roleId;
+        _inviteModel.RoleId = _selectedRoleId;
         _inviting = true;
 
         try
@@ -455,14 +751,13 @@ else if (_app is not null)
             if (result.Success)
             {
                 Snackbar.Add($"Invitation sent to {_inviteModel.EmailId}.", Severity.Success);
-                _inviteDialogVisible = false;
-                _inviteModel = new InviteUserRequestDto();
-                _selectedRoleId = Guid.Empty;
+                CloseInviteDialog();
                 await LoadUsersAsync();
+                StateHasChanged();
             }
             else
             {
-                Snackbar.Add(result.Message, Severity.Error);
+                Snackbar.Add(result.Message ?? "Failed to send invitation.", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -512,13 +807,7 @@ else if (_app is not null)
         }
     }
 
-    private Task OnInviteDialogOpen()
-    {
-        // Roles are already loaded and cached on page load
-        _rolesLoading = false;
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
+    // ── Remove User ──
 
     private void ConfirmRemoveUser(ApplicationUserResponseDto user)
     {
@@ -539,10 +828,11 @@ else if (_app is not null)
                 _removeUserDialogVisible = false;
                 _userToRemove = null;
                 await LoadUsersAsync();
+                StateHasChanged();
             }
             else
             {
-                Snackbar.Add(result.Message, Severity.Error);
+                Snackbar.Add(result.Message ?? "Failed to remove user.", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -551,7 +841,9 @@ else if (_app is not null)
         }
     }
 
-    private async Task ToggleApplicationStatus()
+    // ── Toggle Application Status (with confirmation) ──
+
+    private async Task ConfirmToggleApplicationStatus()
     {
         if (_app is null || AuthState.CurrentUser is null) return;
 
@@ -564,7 +856,9 @@ else if (_app is not null)
             if (result.Success)
             {
                 Snackbar.Add(result.Message ?? (newStatus ? "Application activated." : "Application deactivated."), Severity.Success);
+                _toggleAppStatusDialogVisible = false;
                 await LoadApplicationAsync();
+                StateHasChanged();
             }
             else
             {
@@ -581,18 +875,28 @@ else if (_app is not null)
         }
     }
 
-    private async Task ToggleUserStatus(ApplicationUserResponseDto user)
+    // ── Toggle User Status (with confirmation) ──
+
+    private void ConfirmToggleUser(ApplicationUserResponseDto user)
     {
-        if (AuthState.CurrentUser is null) return;
+        _userToToggle = user;
+        _toggleUserStatusDialogVisible = true;
+    }
+
+    private async Task ConfirmToggleUserStatus()
+    {
+        if (_userToToggle is null || AuthState.CurrentUser is null) return;
 
         try
         {
-            var newStatus = !user.IsActive;
+            var newStatus = !_userToToggle.IsActive;
             var request = new ToggleStatusRequestDto { IsActive = newStatus };
-            var result = await AppClient.ToggleUserApplicationMappingAsync(Id, user.UserId, AuthState.CurrentUser.UserId, request);
+            var result = await AppClient.ToggleUserApplicationMappingAsync(Id, _userToToggle.UserId, AuthState.CurrentUser.UserId, request);
             if (result.Success)
             {
-                Snackbar.Add(result.Message ?? (newStatus ? $"{user.FullName} activated." : $"{user.FullName} deactivated."), Severity.Success);
+                Snackbar.Add(result.Message ?? (newStatus ? $"{_userToToggle.FullName} activated." : $"{_userToToggle.FullName} deactivated."), Severity.Success);
+                _toggleUserStatusDialogVisible = false;
+                _userToToggle = null;
                 await LoadUsersAsync();
                 StateHasChanged();
             }
@@ -606,6 +910,8 @@ else if (_app is not null)
             Snackbar.Add($"Error toggling user status: {ex.Message}", Severity.Error);
         }
     }
+
+    // ── Change Role ──
 
     private void OpenChangeRoleDialog(ApplicationUserResponseDto user)
     {
@@ -645,6 +951,8 @@ else if (_app is not null)
             _changingRole = false;
         }
     }
+
+    // ── Helpers ──
 
     private static string GetTypeName(int type) => type switch
     {

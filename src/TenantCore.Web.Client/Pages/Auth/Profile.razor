@@ -243,7 +243,7 @@
                             </MudText>
                         </MudStack>
                         <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
-                                   OnClick="SignOutAllDevices">
+                                   OnClick="@(() => _signOutAllDialogVisible = true)">
                             Sign Out All
                         </MudButton>
                     </MudStack>
@@ -257,10 +257,29 @@ else
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
 }
 
+<!-- Sign Out All Confirmation -->
+<MudDialog @bind-Visible="_signOutAllDialogVisible">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" />
+            <MudText Typo="Typo.h6">Sign Out All Devices</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText>Are you sure you want to sign out from <b>all devices</b>?</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">You will need to log in again on every device.</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _signOutAllDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="SignOutAllDevices">Sign Out All</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private bool _editingProfile;
     private bool _savingProfile;
     private bool _isTwoFactorEnabled;
+    private bool _signOutAllDialogVisible;
     private UpdateUserProfileRequestDto _profileModel = new();
 
     protected override void OnInitialized()
