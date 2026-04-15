@@ -71,3 +71,21 @@ public class InviteUserRequestDto
     [Required(ErrorMessage = "Role ID is required")]
     public Guid RoleId { get; set; }
 }
+
+/// <summary>
+/// Request model for toggling active status.
+/// </summary>
+public class ToggleStatusRequestDto
+{
+    [Required(ErrorMessage = "IsActive is required")]
+    public bool IsActive { get; set; }
+}
+
+/// <summary>
+/// Request model for changing a user's role.
+/// </summary>
+public class ChangeUserRoleRequestDto
+{
+    [Required(ErrorMessage = "New role ID is required")]
+    public Guid NewRoleId { get; set; }
+}

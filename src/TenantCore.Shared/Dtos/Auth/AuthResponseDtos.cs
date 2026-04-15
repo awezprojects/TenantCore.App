@@ -80,3 +80,14 @@ public class ApplicationDto
     public bool IsActive { get; set; }
     public bool IsOwner { get; set; }
 }
+
+/// <summary>
+/// Response model for enabling 2FA.
+/// </summary>
+public class EnableTwoFactorResponseDto
+{
+    public string? QrCodeBase64 { get; set; }
+    public string? ManualEntryKey { get; set; }
+    public bool RequiresOtpConfirmation { get; set; }
+    public string? Message { get; set; }
+}
