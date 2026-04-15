@@ -1,9 +1,6 @@
 @page "/auth/accept-existing-invitation"
 @layout AuthorizedLayout
-@using TenantCore.Web.Client.Services
 @inject IAuthApiClient AuthClient
-@inject AuthStateService AuthState
-@inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
 <PageTitle>Accept Invitation - TenantCore</PageTitle>
@@ -101,14 +98,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (AuthState.CurrentUser == null)
-        {
-            // Redirect to login with return URL
-            var returnUrl = Uri.EscapeDataString(NavigationManager.Uri);
-            NavigationManager.NavigateTo($"/auth/login?returnUrl={returnUrl}");
-            return;
-        }
-
         if (!string.IsNullOrEmpty(Token))
         {
             await AcceptInvitationAsync();

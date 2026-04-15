@@ -811,7 +811,7 @@ else if (_app is not null)
             var result = await AppClient.InviteExistingUserAsync(AuthState.CurrentUser.UserId, request);
             if (result.Success)
             {
-                Snackbar.Add(result.Message ?? $"Invitation sent to {_selectedExistingUser.FullName}. They will be added once they accept.", Severity.Success);
+                Snackbar.Add(result.Message ?? $"Invitation sent to {_selectedExistingUser.FullName}.", Severity.Success);
                 CloseInviteDialog();
             }
             else
