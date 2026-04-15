@@ -53,6 +53,30 @@ public class AuthController(IHttpClientFactory httpClientFactory) : ControllerBa
     [HttpPost("2fa/disable/{userId:guid}")]
     public Task<IActionResult> DisableTwoFactorAsync(Guid userId) => ForwardAsync(HttpMethod.Post, $"api/auth/2fa/disable/{userId}");
 
+    [HttpPost("forgot-password")]
+    public Task<IActionResult> ForgotPasswordAsync() => ForwardAsync(HttpMethod.Post, "api/auth/forgot-password");
+
+    [HttpPost("change-password/{userId:guid}")]
+    public Task<IActionResult> ChangePasswordAsync(Guid userId) => ForwardAsync(HttpMethod.Post, $"api/auth/change-password/{userId}");
+
+    [HttpGet("verify-email")]
+    public Task<IActionResult> VerifyEmailGetAsync() => ForwardAsync(HttpMethod.Get, "api/auth/verify-email", includeBody: false);
+
+    [HttpPost("2fa/enable/{userId:guid}")]
+    public Task<IActionResult> EnableTwoFactorAsync(Guid userId) => ForwardAsync(HttpMethod.Post, $"api/auth/2fa/enable/{userId}", includeBody: false);
+
+    [HttpPost("2fa/confirm/{userId:guid}")]
+    public Task<IActionResult> ConfirmTwoFactorAsync(Guid userId) => ForwardAsync(HttpMethod.Post, $"api/auth/2fa/confirm/{userId}");
+
+    [HttpPut("user/{userId:guid}/profile")]
+    public Task<IActionResult> UpdateUserProfileAsync(Guid userId) => ForwardAsync(HttpMethod.Put, $"api/auth/user/{userId}/profile");
+
+    [HttpPatch("user/{userId:guid}/activate")]
+    public Task<IActionResult> ActivateUserAsync(Guid userId) => ForwardAsync(HttpMethod.Patch, $"api/auth/user/{userId}/activate", includeBody: false);
+
+    [HttpPatch("user/{userId:guid}/deactivate")]
+    public Task<IActionResult> DeactivateUserAsync(Guid userId) => ForwardAsync(HttpMethod.Patch, $"api/auth/user/{userId}/deactivate", includeBody: false);
+
     private async Task<IActionResult> ForwardAsync(HttpMethod method, string downstreamPath, bool includeBody = true)
     {
         var cancellationToken = HttpContext.RequestAborted;

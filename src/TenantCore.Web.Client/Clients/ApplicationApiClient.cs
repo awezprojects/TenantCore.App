@@ -213,6 +213,63 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
+    public async Task<ApiResponse> ToggleApplicationStatusAsync(Guid applicationId, Guid modifiedBy, ToggleStatusRequestDto request)
+    {
+        try
+        {
+            SetAuthorizationHeader();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Patch, $"{BaseRoute}/{applicationId}/status?modifiedBy={modifiedBy}")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            httpRequest.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+            var response = await httpClient.SendAsync(httpRequest);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Toggle application status failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> ToggleUserApplicationMappingAsync(Guid applicationId, Guid userId, Guid modifiedBy, ToggleStatusRequestDto request)
+    {
+        try
+        {
+            SetAuthorizationHeader();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Patch, $"{BaseRoute}/{applicationId}/users/{userId}/status?modifiedBy={modifiedBy}")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            httpRequest.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+            var response = await httpClient.SendAsync(httpRequest);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Toggle user mapping status failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, ChangeUserRoleRequestDto request)
+    {
+        try
+        {
+            SetAuthorizationHeader();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Put, $"{BaseRoute}/{applicationId}/users/{userId}/role?modifiedBy={modifiedBy}")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            httpRequest.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+            var response = await httpClient.SendAsync(httpRequest);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Change user role failed: {ex.Message}");
+        }
+    }
+
     private void SetAuthorizationHeader()
     {
         if (!string.IsNullOrEmpty(authState.AccessToken))

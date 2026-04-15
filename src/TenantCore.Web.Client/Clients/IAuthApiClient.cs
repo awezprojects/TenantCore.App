@@ -18,5 +18,12 @@ public interface IAuthApiClient
     Task<ApiResponse> ResetPasswordAsync(Guid userId, ResetPasswordRequestDto request);
     Task<ApiResponse<UserProfileDto>> AcceptInvitationAsync(AcceptInvitationRequestDto request);
     Task<ApiResponse<UserProfileDto>> GetUserByIdAsync(Guid userId);
+    Task<ApiResponse> ForgotPasswordAsync(ForgotPasswordRequestDto request);
+    Task<ApiResponse> ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request);
+    Task<ApiResponse<EnableTwoFactorResponseDto>> EnableTwoFactorAsync(Guid userId);
+    Task<ApiResponse> ConfirmEnableTwoFactorAsync(Guid userId, ValidateTwoFactorRequestDto request);
     Task<ApiResponse> DisableTwoFactorAsync(Guid userId, DisableTwoFactorRequestDto request);
+    Task<ApiResponse<UserProfileDto>> UpdateUserProfileAsync(Guid userId, UpdateUserProfileRequestDto request);
+    Task<ApiResponse> ActivateUserAsync(Guid userId);
+    Task<ApiResponse> DeactivateUserAsync(Guid userId);
 }

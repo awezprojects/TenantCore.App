@@ -126,6 +126,42 @@ public sealed class AuthApplicationService(
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task ToggleApplicationStatusAsync(Guid applicationId, Guid modifiedBy, bool isActive, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"api/Application/{applicationId}/status?modifiedBy={modifiedBy}")
+        {
+            Content = JsonContent.Create(new { isActive }, options: JsonOptions)
+        };
+        request.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+        var response = await client.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ToggleUserApplicationMappingAsync(Guid applicationId, Guid userId, Guid modifiedBy, bool isActive, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"api/Application/{applicationId}/users/{userId}/status?modifiedBy={modifiedBy}")
+        {
+            Content = JsonContent.Create(new { isActive }, options: JsonOptions)
+        };
+        request.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+        var response = await client.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, Guid newRoleId, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Put, $"api/Application/{applicationId}/users/{userId}/role?modifiedBy={modifiedBy}")
+        {
+            Content = JsonContent.Create(new { newRoleId }, options: JsonOptions)
+        };
+        request.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+        var response = await client.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     private async Task<T> ParseRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var body = await response.Content.ReadAsStringAsync(cancellationToken);

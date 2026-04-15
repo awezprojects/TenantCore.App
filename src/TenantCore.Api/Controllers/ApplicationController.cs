@@ -204,4 +204,63 @@ public class ApplicationController(ISender sender) : ControllerBase
         await sender.Send(new DeleteApplicationCommand(applicationId), cancellationToken);
         return NoContent();
     }
+
+    // PATCH /api/Application/{applicationId}/status?modifiedBy={guid}
+    [HttpPatch("{applicationId:guid}/status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ToggleApplicationStatusAsync(
+        Guid applicationId,
+        [FromQuery] Guid modifiedBy,
+        [FromBody] ToggleStatusRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ToggleApplicationStatusCommand(applicationId, modifiedBy, request.IsActive), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = request.IsActive ? "Application activated successfully" : "Application deactivated successfully"
+        };
+        return Ok(response);
+    }
+
+    // PATCH /api/Application/{applicationId}/users/{userId}/status?modifiedBy={guid}
+    [HttpPatch("{applicationId:guid}/users/{userId:guid}/status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ToggleUserApplicationMappingAsync(
+        Guid applicationId,
+        Guid userId,
+        [FromQuery] Guid modifiedBy,
+        [FromBody] ToggleStatusRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ToggleUserApplicationMappingCommand(applicationId, userId, modifiedBy, request.IsActive), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = request.IsActive ? "User mapping activated successfully" : "User mapping deactivated successfully"
+        };
+        return Ok(response);
+    }
+
+    // PUT /api/Application/{applicationId}/users/{userId}/role?modifiedBy={guid}
+    [HttpPut("{applicationId:guid}/users/{userId:guid}/role")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ChangeUserRoleAsync(
+        Guid applicationId,
+        Guid userId,
+        [FromQuery] Guid modifiedBy,
+        [FromBody] ChangeUserRoleRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ChangeUserRoleCommand(applicationId, userId, modifiedBy, request.NewRoleId), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = "User role changed successfully"
+        };
+        return Ok(response);
+    }
 }
