@@ -89,3 +89,18 @@ public class ChangeUserRoleRequestDto
     [Required(ErrorMessage = "New role ID is required")]
     public Guid NewRoleId { get; set; }
 }
+
+/// <summary>
+/// Request model for inviting an existing user to an application.
+/// </summary>
+public class InviteExistingUserRequestDto
+{
+    [Required(ErrorMessage = "User ID is required")]
+    public Guid UserId { get; set; }
+
+    [Required(ErrorMessage = "Application ID is required")]
+    public Guid ApplicationId { get; set; }
+
+    [Required(ErrorMessage = "Role ID is required")]
+    public Guid RoleId { get; set; }
+}

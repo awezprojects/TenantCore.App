@@ -270,6 +270,28 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
+    public async Task<ApiResponse> InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request)
+    {
+        try
+        {
+            SetAuthorizationHeader();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/invite-existing-user?invitedBy={invitedBy}")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            if (request.ApplicationId != Guid.Empty)
+            {
+                httpRequest.Headers.Add("X-ClinicApp-Id", request.ApplicationId.ToString());
+            }
+            var response = await httpClient.SendAsync(httpRequest);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Invite existing user failed: {ex.Message}");
+        }
+    }
+
     private void SetAuthorizationHeader()
     {
         if (!string.IsNullOrEmpty(authState.AccessToken))

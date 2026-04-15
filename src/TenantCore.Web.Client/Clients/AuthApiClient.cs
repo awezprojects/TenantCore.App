@@ -359,6 +359,22 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         }
     }
 
+    public async Task<ApiResponse<List<UserSearchResultDto>>> SearchUsersByEmailAsync(string email)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/user/search?email={Uri.EscapeDataString(email)}");
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleResponse<List<UserSearchResultDto>>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<List<UserSearchResultDto>>($"User search failed: {ex.Message}");
+        }
+    }
+
     private static async Task<ApiResponse<T>> HandleResponse<T>(HttpResponseMessage response)
     {
         var content = await response.Content.ReadAsStringAsync();

@@ -162,6 +162,21 @@ public sealed class AuthApplicationService(
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"api/Application/invite-existing-user?invitedBy={invitedBy}")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        if (request.ApplicationId != Guid.Empty)
+        {
+            httpRequest.Headers.Add("X-ClinicApp-Id", request.ApplicationId.ToString());
+        }
+        var response = await client.SendAsync(httpRequest, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
     private async Task<T> ParseRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var body = await response.Content.ReadAsStringAsync(cancellationToken);

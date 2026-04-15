@@ -92,3 +92,18 @@ public class EnableTwoFactorResponseDto
     public bool RequiresOtpConfirmation { get; set; }
     public string? Message { get; set; }
 }
+
+/// <summary>
+/// Response model for user search results (typeahead).
+/// </summary>
+public class UserSearchResultDto
+{
+    public Guid UserId { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string? MiddleName { get; set; }
+    public string LastName { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string EmailId { get; set; } = string.Empty;
+    public string? MobileNo { get; set; }
+    public bool IsActive { get; set; }
+}

@@ -154,6 +154,25 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
+    // POST /api/Application/invite-existing-user?invitedBy={guid}
+    [HttpPost("invite-existing-user")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> InviteExistingUserAsync(
+        [FromQuery] Guid invitedBy,
+        [FromBody] InviteExistingUserRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new InviteExistingUserCommand(invitedBy, request), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = "User added to application successfully."
+        };
+        return Ok(response);
+    }
+
     // POST /api/Application/{applicationId}/users/{userId}/assign?roleId={guid}&assignedBy={guid}
     [HttpPost("{applicationId:guid}/users/{userId:guid}/assign")]
     [ProducesResponseType(StatusCodes.Status200OK)]

@@ -77,6 +77,9 @@ public class AuthController(IHttpClientFactory httpClientFactory) : ControllerBa
     [HttpPatch("user/{userId:guid}/deactivate")]
     public Task<IActionResult> DeactivateUserAsync(Guid userId) => ForwardAsync(HttpMethod.Patch, $"api/auth/user/{userId}/deactivate", includeBody: false);
 
+    [HttpGet("user/search")]
+    public Task<IActionResult> SearchUsersByEmailAsync() => ForwardAsync(HttpMethod.Get, "api/auth/user/search", includeBody: false);
+
     private async Task<IActionResult> ForwardAsync(HttpMethod method, string downstreamPath, bool includeBody = true)
     {
         var cancellationToken = HttpContext.RequestAborted;
