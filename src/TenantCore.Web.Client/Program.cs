@@ -13,6 +13,7 @@ builder.Services.AddMudServices();
 // Register Auth services
 builder.Services.AddScoped<TokenStorageService>();
 builder.Services.AddScoped<AuthStateService>();
+builder.Services.AddSingleton<RoleCacheService>();
 
 // Get API base URLs from configuration
 var tenantApiBaseUrl = builder.Configuration["TenantApiBaseUrl"] ?? "https://localhost:7246/";
@@ -28,6 +29,12 @@ builder.Services.AddHttpClient<ITenantApiClient, TenantApiClient>(client =>
 builder.Services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
 {
     client.BaseAddress = new Uri(authApiBaseUrl);
+});
+
+// Register Application API Client
+builder.Services.AddHttpClient<IApplicationApiClient, ApplicationApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
 });
 
 await builder.Build().RunAsync();

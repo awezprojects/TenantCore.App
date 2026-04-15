@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TenantCore.Application.Services;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Infrastructure.ExternalServices;
 using TenantCore.Infrastructure.Persistence;
 using TenantCore.Infrastructure.Repositories;
 
@@ -19,6 +21,7 @@ public static class DependencyInjection
                 b => b.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IAuthApplicationService, AuthApplicationService>();
 
         return services;
     }

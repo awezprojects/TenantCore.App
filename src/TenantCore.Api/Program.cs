@@ -63,6 +63,8 @@ try
     builder.Services.AddHealthChecks()
         .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
 
+    builder.Services.AddHttpContextAccessor();
+
     builder.Services.AddHttpClient("AuthApi", client =>
     {
         var authBaseUrl = builder.Configuration["AuthApi:BaseUrl"] ?? "https://localhost:7136/";

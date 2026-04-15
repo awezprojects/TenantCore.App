@@ -1,0 +1,509 @@
+
+@page "/applications/{Id:guid}"
+@layout AuthorizedLayout
+@using MudBlazor
+@using TenantCore.Web.Client.Services
+@using TenantCore.Shared.Dtos.Auth
+@inject IApplicationApiClient AppClient
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject RoleCacheService RoleCache
+
+<PageTitle>Application Details - TenantCore</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_notFound)
+{
+    <MudPaper Class="pa-6" Elevation="2">
+        <MudStack AlignItems="AlignItems.Center" Spacing="4">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Warning" Style="font-size: 4rem;" />
+            <MudText Typo="Typo.h5">Application Not Found</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/applications">Back to Applications</MudButton>
+        </MudStack>
+    </MudPaper>
+}
+else if (_app is not null)
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Justify="Justify.SpaceBetween">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => NavigationManager.NavigateTo("/applications"))" />
+            <MudAvatar Size="Size.Large" Color="@GetTypeColor(_app.ApplicationType)">@_app.ApplicationName[0]</MudAvatar>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h4">@_app.ApplicationName</MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@_app.ApplicationCode</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(_app.ApplicationType)">@GetTypeName(_app.ApplicationType)</MudChip>
+                    @if (_app.IsOwner)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Star">Owner</MudChip>
+                    }
+                </MudStack>
+            </MudStack>
+        </MudStack>
+        @if (IsAdmin || IsClinicAdminForApp)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="@(() => NavigationManager.NavigateTo($"/applications/{Id}/edit"))">
+                Edit
+            </MudButton>
+        }
+    </MudStack>
+
+    <MudGrid>
+        <!-- Details Card -->
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudText Typo="Typo.h6" Class="mb-3">Details</MudText>
+                <MudStack Spacing="3">
+                    @if (!string.IsNullOrEmpty(_app.Address))
+                    {
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Address</MudText>
+                            <MudText Typo="Typo.body2">@_app.Address</MudText>
+                        </MudStack>
+                    }
+                    @if (!string.IsNullOrEmpty(_app.ContactPerson))
+                    {
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Contact Person</MudText>
+                            <MudText Typo="Typo.body2">@_app.ContactPerson</MudText>
+                        </MudStack>
+                    }
+                    @if (!string.IsNullOrEmpty(_app.ContactNumber))
+                    {
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Contact Number</MudText>
+                            <MudText Typo="Typo.body2">@_app.ContactNumber</MudText>
+                        </MudStack>
+                    }
+                    @if (!string.IsNullOrEmpty(_app.OfficialEmail))
+                    {
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Official Email</MudText>
+                            <MudText Typo="Typo.body2">@_app.OfficialEmail</MudText>
+                        </MudStack>
+                    }
+                    @if (!string.IsNullOrEmpty(_app.Website))
+                    {
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Website</MudText>
+                            <MudLink Href="@_app.Website" Target="_blank" Typo="Typo.body2">@_app.Website</MudLink>
+                        </MudStack>
+                    }
+                    @if (!string.IsNullOrEmpty(_app.RegistrationNumber))
+                    {
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Registration Number</MudText>
+                            <MudText Typo="Typo.body2">@_app.RegistrationNumber</MudText>
+                        </MudStack>
+                    }
+                    <MudDivider />
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Created</MudText>
+                        <MudText Typo="Typo.body2">@_app.CreatedDate.ToString("MMM dd, yyyy HH:mm")</MudText>
+                    </MudStack>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Last Modified</MudText>
+                        <MudText Typo="Typo.body2">@_app.ModifiedDate.ToString("MMM dd, yyyy HH:mm")</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Users Card -->
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4" Elevation="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.h6">Users (@(_users?.Count ?? 0))</MudText>
+                    @if (IsAdmin || IsClinicAdminForApp)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                                   OnClick="@(() => { _inviteDialogVisible = true; _ = OnInviteDialogOpen(); })">
+                            Invite User
+                        </MudButton>
+                    }
+                </MudStack>
+
+                @if (_usersLoading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                }
+                else if (_users is not null)
+                {
+                    <MudTable Items="@_users" Hover="true" Dense="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Name</MudTh>
+                            <MudTh>Email</MudTh>
+                            <MudTh>Role</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh Style="width: 80px;"></MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="user">
+                            <MudTd DataLabel="Name">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudAvatar Size="Size.Small" Color="Color.Secondary">
+                                        @(user.FirstName.Length > 0 ? user.FirstName[0] : '?')
+                                    </MudAvatar>
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2">@user.FullName</MudText>
+                                        @if (user.IsOwner)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Primary">Owner</MudText>
+                                        }
+                                    </MudStack>
+                                </MudStack>
+                            </MudTd>
+                            <MudTd DataLabel="Email">
+                                <MudText Typo="Typo.body2">@user.EmailId</MudText>
+                            </MudTd>
+                            <MudTd DataLabel="Role">
+                                @if (!string.IsNullOrEmpty(user.RoleName))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@user.RoleName</MudChip>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Status">
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(user.IsActive ? Color.Success : Color.Error)">
+                                    @(user.IsActive ? "Active" : "Inactive")
+                                </MudChip>
+                            </MudTd>
+                            <MudTd>
+                                @if (!user.IsOwner && (IsAdmin || IsClinicAdminForApp))
+                                {
+                                    <MudTooltip Text="Remove from application">
+                                        <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                       Color="Color.Error" Size="Size.Small"
+                                                       OnClick="@(() => ConfirmRemoveUser(user))" />
+                                    </MudTooltip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Color="Color.Secondary">No users in this application.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<!-- Invite User Dialog -->
+<MudDialog @bind-Visible="_inviteDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Invite User</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_inviteForm" @bind-IsValid="_inviteFormValid">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_inviteModel.FirstName"
+                                  Label="First Name" Required="true"
+                                  RequiredError="First name is required."
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_inviteModel.LastName"
+                                  Label="Last Name" Required="true"
+                                  RequiredError="Last name is required."
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_inviteModel.EmailId"
+                                  Label="Email Address" Required="true"
+                                  RequiredError="Email is required."
+                                  InputType="InputType.Email"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_inviteModel.MobileNo"
+                                  Label="Mobile Number"
+                                  Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudSelect T="Guid" @bind-Value="_selectedRoleId" Label="Role" Required="true" RequiredError="Role is required." Variant="Variant.Outlined" Disabled="_rolesLoading || _roles.Count == 0">
+                        @if (_rolesLoading)
+                        {
+                            <MudSelectItem Value="@Guid.Empty">Loading roles...</MudSelectItem>
+                        }
+                        else if (_roles.Count == 0)
+                        {
+                            <MudSelectItem Value="@Guid.Empty">No roles available</MudSelectItem>
+                        }
+                        else
+                        {
+                            @foreach (var role in _roles)
+                            {
+                                <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _inviteDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="InviteUserAsync" Disabled="_inviting">
+            @if (_inviting)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Sending...</span>
+            }
+            else
+            {
+                <span>Send Invitation</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Remove User Confirmation -->
+<MudDialog @bind-Visible="_removeUserDialogVisible">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Remove User</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText>Are you sure you want to remove <b>@_userToRemove?.FullName</b> from this application?</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">They will lose access immediately.</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _removeUserDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="RemoveUserAsync">Remove</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true;
+    private bool _notFound;
+    private bool _usersLoading = true;
+    private ApplicationResponseDto? _app;
+    private List<ApplicationUserResponseDto>? _users;
+
+    // Invite dialog
+    private bool _inviteDialogVisible;
+    private bool _inviting;
+    private MudForm _inviteForm = null!;
+    private bool _inviteFormValid;
+    private InviteUserRequestDto _inviteModel = new();
+    private Guid _selectedRoleId = Guid.Empty;
+    private List<RoleResponseDto> _roles = new();
+    private bool _rolesLoading = false;
+
+    // Remove user dialog
+    private bool _removeUserDialogVisible;
+    private ApplicationUserResponseDto? _userToRemove;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadApplicationAsync(), LoadUsersAsync(), LoadAndCacheRolesAsync());
+    }
+
+    private async Task LoadApplicationAsync()
+    {
+        try
+        {
+            var result = await AppClient.GetApplicationByIdAsync(Id);
+            if (!result.Success || result.Data is null)
+                _notFound = true;
+            else
+                _app = result.Data;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading application: {ex.Message}", Severity.Error);
+            _notFound = true;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        try
+        {
+            var result = await AppClient.GetApplicationUsersAsync(Id);
+            _users = result.Success ? result.Data ?? [] : [];
+        }
+        catch
+        {
+            _users = [];
+        }
+        finally
+        {
+            _usersLoading = false;
+        }
+    }
+
+    private async Task InviteUserAsync()
+    {
+        await _inviteForm.Validate();
+        if (!_inviteFormValid) return;
+
+
+        var roleId = _selectedRoleId;
+        if (roleId == Guid.Empty)
+        {
+            Snackbar.Add("Please select a valid role.", Severity.Error);
+            return;
+        }
+
+        if (AuthState.CurrentUser is null) return;
+
+        _inviteModel.ApplicationId = Id;
+
+        _inviteModel.RoleId = roleId;
+        _inviting = true;
+
+        try
+        {
+            var result = await AppClient.InviteUserAsync(AuthState.CurrentUser.UserId, _inviteModel);
+            if (result.Success)
+            {
+                Snackbar.Add($"Invitation sent to {_inviteModel.EmailId}.", Severity.Success);
+                _inviteDialogVisible = false;
+                _inviteModel = new InviteUserRequestDto();
+                _selectedRoleId = Guid.Empty;
+                await LoadUsersAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error sending invitation: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _inviting = false;
+        }
+    }
+
+    private async Task LoadAndCacheRolesAsync()
+    {
+        _rolesLoading = true;
+        try
+        {
+            var cached = RoleCache.GetRoles(Id);
+            if (cached != null && cached.Count > 0)
+            {
+                _roles = cached;
+                _selectedRoleId = _roles[0].RoleId;
+            }
+            else
+            {
+                var result = await AppClient.GetRolesByApplicationAsync(Id);
+                _roles = result.Success && result.Data != null ? result.Data.Roles : new List<RoleResponseDto>();
+                if (_roles.Count > 0)
+                {
+                    RoleCache.SetRoles(Id, _roles);
+                    _selectedRoleId = _roles[0].RoleId;
+                }
+                else
+                {
+                    _selectedRoleId = Guid.Empty;
+                }
+            }
+        }
+        catch
+        {
+            _roles = new List<RoleResponseDto>();
+            _selectedRoleId = Guid.Empty;
+        }
+        finally
+        {
+            _rolesLoading = false;
+        }
+    }
+
+    private Task OnInviteDialogOpen()
+    {
+        // Roles are already loaded and cached on page load
+        _rolesLoading = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void ConfirmRemoveUser(ApplicationUserResponseDto user)
+    {
+        _userToRemove = user;
+        _removeUserDialogVisible = true;
+    }
+
+    private async Task RemoveUserAsync()
+    {
+        if (_userToRemove is null || AuthState.CurrentUser is null) return;
+
+        try
+        {
+            var result = await AppClient.RemoveUserFromApplicationAsync(Id, _userToRemove.UserId, AuthState.CurrentUser.UserId);
+            if (result.Success)
+            {
+                Snackbar.Add($"{_userToRemove.FullName} removed from application.", Severity.Success);
+                _removeUserDialogVisible = false;
+                _userToRemove = null;
+                await LoadUsersAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error removing user: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static string GetTypeName(int type) => type switch
+    {
+        0 => "Clinic",
+        1 => "School",
+        2 => "HR Management",
+        _ => "Unknown"
+    };
+
+    private static Color GetTypeColor(int type) => type switch
+    {
+        0 => Color.Success,
+        1 => Color.Info,
+        2 => Color.Warning,
+        _ => Color.Default
+    };
+
+    private bool IsAdmin => AuthState.CurrentUser?.UserRoles.Any(r => r.RoleName == "Admin" && r.IsActive) == true;
+    private bool IsClinicAdminForApp {
+        get {
+            if (_app == null || _users == null || AuthState.CurrentUser == null)
+                return false;
+            var currentUser = _users.FirstOrDefault(u => u.EmailId == AuthState.CurrentUser.EmailId);
+            return currentUser != null &&
+                string.Equals(currentUser.RoleName, "Clinic Admin", StringComparison.OrdinalIgnoreCase) &&
+                currentUser.IsActive;
+        }
+    }
+}

@@ -1,0 +1,232 @@
+@page "/applications"
+@layout AuthorizedLayout
+@inject IApplicationApiClient AppClient
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Applications - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Applications</MudText>
+    @if (IsAdmin)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => NavigationManager.NavigateTo("/applications/create"))">
+            New Application
+        </MudButton>
+    }
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudTextField @bind-Value="_searchTerm" Label="Search applications..." Variant="Variant.Outlined"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @bind-Value="_typeFilter" Label="Type" Variant="Variant.Outlined"
+                       @bind-Value:after="ApplyFilter">
+                <MudSelectItem Value="@("all")">All Types</MudSelectItem>
+                <MudSelectItem Value="@("0")">Clinic</MudSelectItem>
+                <MudSelectItem Value="@("1")">School</MudSelectItem>
+                <MudSelectItem Value="@("2")">HR Management</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       OnClick="LoadApplicationsAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_applications is not null)
+{
+    <MudTable Items="@FilteredApplications" Hover="true" Striped="true" Bordered="true"
+              Dense="false" Breakpoint="Breakpoint.Sm" Class="mb-4" Elevation="2">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortBy="new Func<ApplicationResponseDto, object>(x => x.ApplicationName)">Name</MudTableSortLabel></MudTh>
+            <MudTh>Code</MudTh>
+            <MudTh>Type</MudTh>
+            <MudTh>Contact</MudTh>
+            <MudTh>Owner</MudTh>
+            <MudTh><MudTableSortLabel SortBy="new Func<ApplicationResponseDto, object>(x => x.CreatedDate)">Created</MudTableSortLabel></MudTh>
+            <MudTh Style="width: 140px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="app">
+            <MudTd DataLabel="Name">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudAvatar Size="Size.Small" Color="@GetTypeColor(app.ApplicationType)">
+                        @(app.ApplicationName.Length > 0 ? app.ApplicationName[0] : '?')
+                    </MudAvatar>
+                    <MudText>@app.ApplicationName</MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Code">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">@app.ApplicationCode</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Type">
+                <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(app.ApplicationType)">
+                    @GetTypeName(app.ApplicationType)
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Contact">@(app.ContactPerson ?? app.OfficialEmail ?? "-")</MudTd>
+            <MudTd DataLabel="Owner">
+                @if (app.IsOwner)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Star">Owner</MudChip>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary" Typo="Typo.body2">Member</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Created">@app.CreatedDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd>
+                <MudStack Row="true" Spacing="1">
+                    <MudTooltip Text="View Details">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small"
+                                       OnClick="@(() => NavigationManager.NavigateTo($"/applications/{app.ApplicationId}"))" />
+                    </MudTooltip>
+                    @if (IsAdmin || IsClinicAdminForApp(app))
+                    {
+                        <MudTooltip Text="Edit">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="@(() => NavigationManager.NavigateTo($"/applications/{app.ApplicationId}/edit"))" />
+                        </MudTooltip>
+                    }
+                    @if (IsAdmin)
+                    {
+                        <MudTooltip Text="Delete">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => ConfirmDelete(app))" />
+                        </MudTooltip>
+                    }
+                </MudStack>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No applications found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudText Typo="Typo.body2" Color="Color.Secondary">
+        Showing @FilteredApplications.Count() of @_applications.Count applications
+    </MudText>
+}
+
+<!-- Delete Confirmation Dialog -->
+<MudDialog @bind-Visible="_deleteDialogVisible">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+            <MudText Typo="Typo.h6">Confirm Delete</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText>Are you sure you want to delete application <b>@_appToDelete?.ApplicationName</b>?</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">This action cannot be undone.</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _deleteDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeleteApplicationAsync">Delete</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<ApplicationResponseDto>? _applications;
+    private bool _loading = true;
+    private string? _searchTerm;
+    private string _typeFilter = "all";
+    private bool _deleteDialogVisible;
+    private ApplicationResponseDto? _appToDelete;
+
+    private IEnumerable<ApplicationResponseDto> FilteredApplications => (_applications ?? [])
+        .Where(a => (_typeFilter == "all" || a.ApplicationType.ToString() == _typeFilter) &&
+                    (string.IsNullOrWhiteSpace(_searchTerm) ||
+                     a.ApplicationName.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                     a.ApplicationCode.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)));
+
+    protected override async Task OnInitializedAsync() => await LoadApplicationsAsync();
+
+    private async Task LoadApplicationsAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await AppClient.GetAllApplicationsAsync();
+            if (result.Success)
+                _applications = result.Data ?? [];
+            else
+                Snackbar.Add(result.Message, Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading applications: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ApplyFilter() => StateHasChanged();
+
+    private void ConfirmDelete(ApplicationResponseDto app)
+    {
+        _appToDelete = app;
+        _deleteDialogVisible = true;
+    }
+
+    private async Task DeleteApplicationAsync()
+    {
+        if (_appToDelete is null) return;
+        try
+        {
+            var result = await AppClient.DeleteApplicationAsync(_appToDelete.ApplicationId);
+            if (result.Success)
+            {
+                Snackbar.Add($"Application '{_appToDelete.ApplicationName}' deleted successfully.", Severity.Success);
+                _deleteDialogVisible = false;
+                _appToDelete = null;
+                await LoadApplicationsAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Message, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting application: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static string GetTypeName(int type) => type switch
+    {
+        0 => "Clinic",
+        1 => "School",
+        2 => "HR Management",
+        _ => "Unknown"
+    };
+
+    private static Color GetTypeColor(int type) => type switch
+    {
+        0 => Color.Success,
+        1 => Color.Info,
+        2 => Color.Warning,
+        _ => Color.Default
+    };
+
+    private bool IsAdmin => AuthState.CurrentUser?.UserRoles.Any(r => r.RoleName == "Admin" && r.IsActive) == true;
+    private bool IsClinicAdminForApp(ApplicationResponseDto app) =>
+        AuthState.CurrentUser?.UserRoles.Any(r => r.RoleName == "Clinic Admin" && r.IsActive && r.ApplicationId == app.ApplicationId) == true;
+}
