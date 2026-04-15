@@ -1,0 +1,138 @@
+@page "/auth/accept-existing-invitation"
+@layout AuthorizedLayout
+@inject IAuthApiClient AuthClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Accept Invitation - TenantCore</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-8">
+    <MudItem xs="12" sm="8" md="6" lg="4">
+        <MudPaper Elevation="4" Class="pa-8 rounded-lg">
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudAvatar Size="Size.Large"
+                           Color="@(_accepted ? Color.Success : _error ? Color.Error : Color.Primary)"
+                           Style="width: 80px; height: 80px;">
+                    @if (_processing)
+                    {
+                        <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Surface" />
+                    }
+                    else if (_accepted)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="font-size: 2.5rem;" />
+                    }
+                    else if (_error)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Error" Style="font-size: 2.5rem;" />
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Email" Style="font-size: 2.5rem;" />
+                    }
+                </MudAvatar>
+
+                @if (_processing)
+                {
+                    <MudText Typo="Typo.h5" Align="Align.Center" Style="font-weight: 600;">
+                        Accepting Invitation...
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        Please wait while we process your invitation.
+                    </MudText>
+                }
+                else if (_accepted)
+                {
+                    <MudText Typo="Typo.h5" Align="Align.Center" Style="font-weight: 600; color: var(--mud-palette-success);">
+                        Invitation Accepted!
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        @(_successMessage ?? "You have been added to the application. You can now access it from your dashboard.")
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/applications"
+                               FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;" Class="mt-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Apps" Class="mr-2" />
+                        Go to Applications
+                    </MudButton>
+                }
+                else if (_error)
+                {
+                    <MudText Typo="Typo.h5" Align="Align.Center" Style="font-weight: 600;">
+                        Invitation Failed
+                    </MudText>
+                    <MudAlert Severity="Severity.Error" Class="mt-2" Variant="Variant.Filled">
+                        @_errorMessage
+                    </MudAlert>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/applications"
+                               FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;" Class="mt-4">
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-2" />
+                        Go to Applications
+                    </MudButton>
+                }
+                else
+                {
+                    <MudText Typo="Typo.h5" Align="Align.Center" Style="font-weight: 600;">
+                        Invalid Invitation
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        The invitation link is invalid or missing the required token.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/applications"
+                               FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;" Class="mt-4">
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-2" />
+                        Go to Applications
+                    </MudButton>
+                }
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Token { get; set; }
+
+    private bool _processing;
+    private bool _accepted;
+    private bool _error;
+    private string? _successMessage;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Token))
+        {
+            await AcceptInvitationAsync();
+        }
+    }
+
+    private async Task AcceptInvitationAsync()
+    {
+        _processing = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await AuthClient.AcceptExistingInvitationAsync(Token!);
+
+            if (response.Success)
+            {
+                _accepted = true;
+                _successMessage = response.Message;
+            }
+            else
+            {
+                _error = true;
+                _errorMessage = response.Message ?? "Failed to accept invitation. The link may have expired or already been used.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _errorMessage = "An unexpected error occurred while accepting the invitation. Please try again.";
+            Console.WriteLine($"Accept existing invitation error: {ex.Message}");
+        }
+        finally
+        {
+            _processing = false;
+        }
+    }
+}

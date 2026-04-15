@@ -20,4 +20,9 @@ public interface IApplicationApiClient
     Task<ApiResponse> RemoveUserFromApplicationAsync(Guid applicationId, Guid userId, Guid removedBy);
     Task<ApiResponse> DeleteApplicationAsync(Guid applicationId);
     Task<ApiResponse<ApplicationRolesResponseDto>> GetRolesByApplicationAsync(Guid applicationId);
+    Task<ApiResponse> ToggleApplicationStatusAsync(Guid applicationId, Guid modifiedBy, ToggleStatusRequestDto request);
+    Task<ApiResponse> ToggleUserApplicationMappingAsync(Guid applicationId, Guid userId, Guid modifiedBy, ToggleStatusRequestDto request);
+    Task<ApiResponse> ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, ChangeUserRoleRequestDto request);
+    Task<ApiResponse> InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request);
+    Task<ApiResponse<List<ApplicationUserResponseDto>>> GetDeactivatedApplicationUsersAsync(Guid applicationId);
 }

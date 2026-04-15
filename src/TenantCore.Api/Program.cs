@@ -92,11 +92,15 @@ try
         app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "TenantCore API v1"));
     }
 
+    app.UseBlazorFrameworkFiles();
+    app.UseStaticFiles();
+
     app.UseCors("AllowAll");
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
     app.MapHealthChecks("/health");
+    app.MapFallbackToFile("index.html");
 
     app.Run();
 }

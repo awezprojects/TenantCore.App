@@ -34,6 +34,7 @@ public class UserProfileDto
     public string? MobileNo { get; set; }
     public bool IsMobileVerified { get; set; }
     public bool IsActive { get; set; }
+    public bool IsTwoFactorEnabled { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime ModifiedDate { get; set; }
     public List<UserApplicationDto> UserApplications { get; set; } = [];
@@ -79,4 +80,30 @@ public class ApplicationDto
     public int ApplicationType { get; set; }
     public bool IsActive { get; set; }
     public bool IsOwner { get; set; }
+}
+
+/// <summary>
+/// Response model for enabling 2FA.
+/// </summary>
+public class EnableTwoFactorResponseDto
+{
+    public string? QrCodeBase64 { get; set; }
+    public string? ManualEntryKey { get; set; }
+    public bool RequiresOtpConfirmation { get; set; }
+    public string? Message { get; set; }
+}
+
+/// <summary>
+/// Response model for user search results (typeahead).
+/// </summary>
+public class UserSearchResultDto
+{
+    public Guid UserId { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string? MiddleName { get; set; }
+    public string LastName { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string EmailId { get; set; } = string.Empty;
+    public string? MobileNo { get; set; }
+    public bool IsActive { get; set; }
 }

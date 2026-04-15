@@ -126,6 +126,64 @@ public sealed class AuthApplicationService(
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task ToggleApplicationStatusAsync(Guid applicationId, Guid modifiedBy, bool isActive, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"api/Application/{applicationId}/status?modifiedBy={modifiedBy}")
+        {
+            Content = JsonContent.Create(new { isActive }, options: JsonOptions)
+        };
+        request.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+        var response = await client.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ToggleUserApplicationMappingAsync(Guid applicationId, Guid userId, Guid modifiedBy, bool isActive, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"api/Application/{applicationId}/users/{userId}/status?modifiedBy={modifiedBy}")
+        {
+            Content = JsonContent.Create(new { isActive }, options: JsonOptions)
+        };
+        request.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+        var response = await client.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, Guid newRoleId, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var request = new HttpRequestMessage(HttpMethod.Put, $"api/Application/{applicationId}/users/{userId}/role?modifiedBy={modifiedBy}")
+        {
+            Content = JsonContent.Create(new { newRoleId }, options: JsonOptions)
+        };
+        request.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+        var response = await client.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"api/Application/invite-existing-user?invitedBy={invitedBy}")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        if (request.ApplicationId != Guid.Empty)
+        {
+            httpRequest.Headers.Add("X-ClinicApp-Id", request.ApplicationId.ToString());
+        }
+        var response = await client.SendAsync(httpRequest, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<List<ApplicationUserResponseDto>> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var response = await client.GetAsync($"api/Application/{applicationId}/users/deactivated", cancellationToken);
+        return await ParseRequiredAsync<List<ApplicationUserResponseDto>>(response, cancellationToken);
+    }
+
     private async Task<T> ParseRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var body = await response.Content.ReadAsStringAsync(cancellationToken);

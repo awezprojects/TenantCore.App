@@ -21,4 +21,9 @@ public interface IAuthApplicationService
     Task AddApplicationUserMappingAsync(Guid applicationId, Guid userId, Guid assignedBy, CancellationToken cancellationToken = default);
     Task RemoveUserFromApplicationAsync(Guid applicationId, Guid userId, Guid removedBy, CancellationToken cancellationToken = default);
     Task DeleteApplicationAsync(Guid applicationId, CancellationToken cancellationToken = default);
+    Task ToggleApplicationStatusAsync(Guid applicationId, Guid modifiedBy, bool isActive, CancellationToken cancellationToken = default);
+    Task ToggleUserApplicationMappingAsync(Guid applicationId, Guid userId, Guid modifiedBy, bool isActive, CancellationToken cancellationToken = default);
+    Task ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, Guid newRoleId, CancellationToken cancellationToken = default);
+    Task InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request, CancellationToken cancellationToken = default);
+    Task<List<ApplicationUserResponseDto>> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken = default);
 }

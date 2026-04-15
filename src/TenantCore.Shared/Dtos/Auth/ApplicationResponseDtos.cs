@@ -17,6 +17,7 @@ public class ApplicationResponseDto
     public string? Website { get; set; }
     public string? AdditionalInfo { get; set; }
     public bool IsOwner { get; set; }
+    public bool IsActive { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime ModifiedDate { get; set; }
     public List<UserRoleResponseDto> UserRoles { get; set; } = [];
