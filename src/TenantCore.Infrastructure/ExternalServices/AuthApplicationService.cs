@@ -85,7 +85,16 @@ public sealed class AuthApplicationService(
     public async Task<InvitationResponseDto> InviteUserAsync(Guid invitedBy, InviteUserRequestDto request, CancellationToken cancellationToken = default)
     {
         using var client = CreateClient();
-        var response = await client.PostAsJsonAsync($"api/Application/invite-user?invitedBy={invitedBy}", request, JsonOptions, cancellationToken);
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"api/Application/invite-user?invitedBy={invitedBy}")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        // Forward X-ClinicApp-Id header if present in the request
+        if (request.ApplicationId != Guid.Empty)
+        {
+            httpRequest.Headers.Add("X-ClinicApp-Id", request.ApplicationId.ToString());
+        }
+        var response = await client.SendAsync(httpRequest, cancellationToken);
         return await ParseRequiredAsync<InvitationResponseDto>(response, cancellationToken);
     }
 

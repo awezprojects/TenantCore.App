@@ -1,0 +1,84 @@
+@page "/auth/accept-invitation/{Token}"
+@layout AuthInvitationLayout
+@inject IAuthApiClient AuthApi
+@inject NavigationManager Navigation
+@using TenantCore.Shared.Dtos.Auth
+
+<PageTitle>Accept Invitation</PageTitle>
+
+<MudPaper Class="pa-6 mx-auto mt-12" MaxWidth="400px" Elevation="4">
+    <MudStack Spacing="3">
+        <MudText Typo="Typo.h5" Align="Align.Center">Accept Invitation</MudText>
+        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Dense="true">
+            Please set your password to activate your account.
+        </MudAlert>
+        <MudForm @ref="_form" @bind-IsValid="_formValid">
+            <MudTextField @bind-Value="_model.Password" Label="Password" InputType="InputType.Password" Required="true" RequiredError="Password is required" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_model.ConfirmPassword" Label="Confirm Password" InputType="InputType.Password" Required="true" RequiredError="Confirm password is required" Variant="Variant.Outlined" />
+        </MudForm>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+        }
+        @if (_success)
+        {
+            <MudAlert Severity="Severity.Success" Dense="true">Invitation accepted! You can now <MudLink Href="/auth/login">sign in</MudLink>.</MudAlert>
+        }
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_loading || _success" OnClick="AcceptInvitationAsync" FullWidth="true">
+            @if (_loading)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" />
+                <span>Submitting...</span>
+            }
+            else
+            {
+                <span>Accept Invitation</span>
+            }
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public string Token { get; set; } = string.Empty;
+
+    private AcceptInvitationRequestDto _model = new();
+    private MudForm _form = null!;
+    private bool _formValid;
+    private bool _loading;
+    private bool _success;
+    private string _error = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _model.Token = Token;
+    }
+
+    private async Task AcceptInvitationAsync()
+    {
+        _error = string.Empty;
+        await _form.Validate();
+        if (!_formValid)
+            return;
+        _loading = true;
+        try
+        {
+            var result = await AuthApi.AcceptInvitationAsync(_model);
+            if (result.Success)
+            {
+                _success = true;
+            }
+            else
+            {
+                _error = result.Message ?? "Failed to accept invitation.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

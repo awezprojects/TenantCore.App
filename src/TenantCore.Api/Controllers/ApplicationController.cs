@@ -30,7 +30,13 @@ public class ApplicationController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new CreateApplicationCommand(ownerId, request), cancellationToken);
-        return Ok(result);
+        var response = new ApiResponse<ApplicationResponseDto>
+        {
+            Success = result != null,
+            Data = result,
+            Message = result != null ? "Success" : "Failed to create application."
+        };
+        return Ok(response);
     }
 
     // PUT /api/Application/{applicationId}
@@ -43,7 +49,13 @@ public class ApplicationController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new EditApplicationCommand(applicationId, request), cancellationToken);
-        return Ok(result);
+        var response = new ApiResponse<ApplicationResponseDto>
+        {
+            Success = result != null,
+            Data = result,
+            Message = result != null ? "Success" : "Failed to edit application."
+        };
+        return Ok(response);
     }
 
     // GET /api/Application/{applicationId}
@@ -53,7 +65,14 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetApplicationByIdAsync(Guid applicationId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetApplicationByIdQuery(applicationId), cancellationToken);
-        return result is null ? NotFound() : Ok(result);
+        if (result is null)
+            return NotFound();
+        var response = new ApiResponse<ApplicationResponseDto>
+        {
+            Success = true,
+            Data = result
+        };
+        return Ok(response);
     }
 
     // GET /api/Application/by-code/{code}
@@ -63,7 +82,14 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetApplicationByCodeAsync(string code, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetApplicationByCodeQuery(code), cancellationToken);
-        return result is null ? NotFound() : Ok(result);
+        if (result is null)
+            return NotFound();
+        var response = new ApiResponse<ApplicationResponseDto>
+        {
+            Success = true,
+            Data = result
+        };
+        return Ok(response);
     }
 
     // GET /api/Application/get-all
@@ -72,7 +98,12 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetAllApplicationsAsync(CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetAllApplicationsQuery(), cancellationToken);
-        return Ok(result);
+        var response = new ApiResponse<List<ApplicationResponseDto>>
+        {
+            Success = true,
+            Data = result
+        };
+        return Ok(response);
     }
 
     // GET /api/Application/by-type/{applicationType}
@@ -81,7 +112,12 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetApplicationsByTypeAsync(int applicationType, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetApplicationsByTypeQuery(applicationType), cancellationToken);
-        return Ok(result);
+        var response = new ApiResponse<List<ApplicationResponseDto>>
+        {
+            Success = true,
+            Data = result
+        };
+        return Ok(response);
     }
 
     // GET /api/Application/{applicationId}/users
@@ -90,7 +126,12 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> GetApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetApplicationUsersQuery(applicationId), cancellationToken);
-        return Ok(result);
+        var response = new ApiResponse<List<ApplicationUserResponseDto>>
+        {
+            Success = true,
+            Data = result
+        };
+        return Ok(response);
     }
 
     // POST /api/Application/invite-user?invitedBy={guid}
@@ -104,7 +145,13 @@ public class ApplicationController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new InviteUserCommand(invitedBy, request), cancellationToken);
-        return Ok(result);
+        var response = new ApiResponse<InvitationResponseDto>
+        {
+            Success = result != null,
+            Data = result,
+            Message = result != null ? "Success" : "Failed to invite user."
+        };
+        return Ok(response);
     }
 
     // POST /api/Application/{applicationId}/users/{userId}/assign?roleId={guid}&assignedBy={guid}

@@ -82,16 +82,26 @@ else if (_isAuthenticated)
 
         _checkingAuth = false;
 
+
+        var uri = NavigationManager.Uri;
+        var baseUri = NavigationManager.BaseUri;
+        var path = uri.Replace(baseUri, "/");
+
         if (!_isAuthenticated)
         {
-            var uri = NavigationManager.Uri;
-            var baseUri = NavigationManager.BaseUri;
-            var path = uri.Replace(baseUri, "/");
-
             if (!path.StartsWith("/auth/"))
             {
                 var returnUrl = Uri.EscapeDataString(path);
                 NavigationManager.NavigateTo($"/auth/login?returnUrl={returnUrl}", forceLoad: true);
+                return;
+            }
+        }
+        else
+        {
+            // If authenticated and on login page, redirect to dashboard
+            if (path.StartsWith("/auth/login"))
+            {
+                NavigationManager.NavigateTo("/dashboard", forceLoad: true);
                 return;
             }
         }

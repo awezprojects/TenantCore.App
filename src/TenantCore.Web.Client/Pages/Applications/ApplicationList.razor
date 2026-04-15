@@ -9,11 +9,14 @@
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Applications</MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Add"
-               OnClick="@(() => NavigationManager.NavigateTo("/applications/create"))">
-        New Application
-    </MudButton>
+    @if (IsAdmin)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="@(() => NavigationManager.NavigateTo("/applications/create"))">
+            New Application
+        </MudButton>
+    }
 </MudStack>
 
 <MudPaper Class="pa-4 mb-4">
@@ -93,14 +96,20 @@ else if (_applications is not null)
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small"
                                        OnClick="@(() => NavigationManager.NavigateTo($"/applications/{app.ApplicationId}"))" />
                     </MudTooltip>
-                    <MudTooltip Text="Edit">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
-                                       OnClick="@(() => NavigationManager.NavigateTo($"/applications/{app.ApplicationId}/edit"))" />
-                    </MudTooltip>
-                    <MudTooltip Text="Delete">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
-                                       OnClick="@(() => ConfirmDelete(app))" />
-                    </MudTooltip>
+                    @if (IsAdmin || IsClinicAdminForApp(app))
+                    {
+                        <MudTooltip Text="Edit">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="@(() => NavigationManager.NavigateTo($"/applications/{app.ApplicationId}/edit"))" />
+                        </MudTooltip>
+                    }
+                    @if (IsAdmin)
+                    {
+                        <MudTooltip Text="Delete">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => ConfirmDelete(app))" />
+                        </MudTooltip>
+                    }
                 </MudStack>
             </MudTd>
         </RowTemplate>
@@ -216,4 +225,8 @@ else if (_applications is not null)
         2 => Color.Warning,
         _ => Color.Default
     };
+
+    private bool IsAdmin => AuthState.CurrentUser?.UserRoles.Any(r => r.RoleName == "Admin" && r.IsActive) == true;
+    private bool IsClinicAdminForApp(ApplicationResponseDto app) =>
+        AuthState.CurrentUser?.UserRoles.Any(r => r.RoleName == "Clinic Admin" && r.IsActive && r.ApplicationId == app.ApplicationId) == true;
 }

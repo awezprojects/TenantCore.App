@@ -1,9 +1,14 @@
+
 @page "/applications/{Id:guid}"
 @layout AuthorizedLayout
+@using MudBlazor
+@using TenantCore.Web.Client.Services
+@using TenantCore.Shared.Dtos.Auth
 @inject IApplicationApiClient AppClient
 @inject AuthStateService AuthState
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject RoleCacheService RoleCache
 
 <PageTitle>Application Details - TenantCore</PageTitle>
 
@@ -39,11 +44,14 @@ else if (_app is not null)
                 </MudStack>
             </MudStack>
         </MudStack>
-        <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Edit"
-                   OnClick="@(() => NavigationManager.NavigateTo($"/applications/{Id}/edit"))">
-            Edit
-        </MudButton>
+        @if (IsAdmin || IsClinicAdminForApp)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="@(() => NavigationManager.NavigateTo($"/applications/{Id}/edit"))">
+                Edit
+            </MudButton>
+        }
     </MudStack>
 
     <MudGrid>
@@ -112,11 +120,14 @@ else if (_app is not null)
             <MudPaper Class="pa-4" Elevation="2">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
                     <MudText Typo="Typo.h6">Users (@(_users?.Count ?? 0))</MudText>
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                               StartIcon="@Icons.Material.Filled.PersonAdd"
-                               OnClick="@(() => _inviteDialogVisible = true)">
-                        Invite User
-                    </MudButton>
+                    @if (IsAdmin || IsClinicAdminForApp)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                                   OnClick="@(() => { _inviteDialogVisible = true; _ = OnInviteDialogOpen(); })">
+                            Invite User
+                        </MudButton>
+                    }
                 </MudStack>
 
                 @if (_usersLoading)
@@ -168,7 +179,7 @@ else if (_app is not null)
                                 </MudChip>
                             </MudTd>
                             <MudTd>
-                                @if (!user.IsOwner)
+                                @if (!user.IsOwner && (IsAdmin || IsClinicAdminForApp))
                                 {
                                     <MudTooltip Text="Remove from application">
                                         <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
@@ -224,12 +235,23 @@ else if (_app is not null)
                                   Variant="Variant.Outlined" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="_roleIdText"
-                                  Label="Role ID (GUID)"
-                                  Required="true"
-                                  RequiredError="Role ID is required."
-                                  Variant="Variant.Outlined"
-                                  HelperText="Enter the role GUID to assign" />
+                    <MudSelect T="Guid" @bind-Value="_selectedRoleId" Label="Role" Required="true" RequiredError="Role is required." Variant="Variant.Outlined" Disabled="_rolesLoading || _roles.Count == 0">
+                        @if (_rolesLoading)
+                        {
+                            <MudSelectItem Value="@Guid.Empty">Loading roles...</MudSelectItem>
+                        }
+                        else if (_roles.Count == 0)
+                        {
+                            <MudSelectItem Value="@Guid.Empty">No roles available</MudSelectItem>
+                        }
+                        else
+                        {
+                            @foreach (var role in _roles)
+                            {
+                                <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
+                            }
+                        }
+                    </MudSelect>
                 </MudItem>
             </MudGrid>
         </MudForm>
@@ -284,7 +306,9 @@ else if (_app is not null)
     private MudForm _inviteForm = null!;
     private bool _inviteFormValid;
     private InviteUserRequestDto _inviteModel = new();
-    private string _roleIdText = string.Empty;
+    private Guid _selectedRoleId = Guid.Empty;
+    private List<RoleResponseDto> _roles = new();
+    private bool _rolesLoading = false;
 
     // Remove user dialog
     private bool _removeUserDialogVisible;
@@ -292,7 +316,7 @@ else if (_app is not null)
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadApplicationAsync(), LoadUsersAsync());
+        await Task.WhenAll(LoadApplicationAsync(), LoadUsersAsync(), LoadAndCacheRolesAsync());
     }
 
     private async Task LoadApplicationAsync()
@@ -338,15 +362,18 @@ else if (_app is not null)
         await _inviteForm.Validate();
         if (!_inviteFormValid) return;
 
-        if (!Guid.TryParse(_roleIdText, out var roleId))
+
+        var roleId = _selectedRoleId;
+        if (roleId == Guid.Empty)
         {
-            Snackbar.Add("Please enter a valid Role ID (GUID format).", Severity.Error);
+            Snackbar.Add("Please select a valid role.", Severity.Error);
             return;
         }
 
         if (AuthState.CurrentUser is null) return;
 
         _inviteModel.ApplicationId = Id;
+
         _inviteModel.RoleId = roleId;
         _inviting = true;
 
@@ -358,7 +385,7 @@ else if (_app is not null)
                 Snackbar.Add($"Invitation sent to {_inviteModel.EmailId}.", Severity.Success);
                 _inviteDialogVisible = false;
                 _inviteModel = new InviteUserRequestDto();
-                _roleIdText = string.Empty;
+                _selectedRoleId = Guid.Empty;
                 await LoadUsersAsync();
             }
             else
@@ -374,6 +401,51 @@ else if (_app is not null)
         {
             _inviting = false;
         }
+    }
+
+    private async Task LoadAndCacheRolesAsync()
+    {
+        _rolesLoading = true;
+        try
+        {
+            var cached = RoleCache.GetRoles(Id);
+            if (cached != null && cached.Count > 0)
+            {
+                _roles = cached;
+                _selectedRoleId = _roles[0].RoleId;
+            }
+            else
+            {
+                var result = await AppClient.GetRolesByApplicationAsync(Id);
+                _roles = result.Success && result.Data != null ? result.Data.Roles : new List<RoleResponseDto>();
+                if (_roles.Count > 0)
+                {
+                    RoleCache.SetRoles(Id, _roles);
+                    _selectedRoleId = _roles[0].RoleId;
+                }
+                else
+                {
+                    _selectedRoleId = Guid.Empty;
+                }
+            }
+        }
+        catch
+        {
+            _roles = new List<RoleResponseDto>();
+            _selectedRoleId = Guid.Empty;
+        }
+        finally
+        {
+            _rolesLoading = false;
+        }
+    }
+
+    private Task OnInviteDialogOpen()
+    {
+        // Roles are already loaded and cached on page load
+        _rolesLoading = false;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private void ConfirmRemoveUser(ApplicationUserResponseDto user)
@@ -422,4 +494,16 @@ else if (_app is not null)
         2 => Color.Warning,
         _ => Color.Default
     };
+
+    private bool IsAdmin => AuthState.CurrentUser?.UserRoles.Any(r => r.RoleName == "Admin" && r.IsActive) == true;
+    private bool IsClinicAdminForApp {
+        get {
+            if (_app == null || _users == null || AuthState.CurrentUser == null)
+                return false;
+            var currentUser = _users.FirstOrDefault(u => u.EmailId == AuthState.CurrentUser.EmailId);
+            return currentUser != null &&
+                string.Equals(currentUser.RoleName, "Clinic Admin", StringComparison.OrdinalIgnoreCase) &&
+                currentUser.IsActive;
+        }
+    }
 }

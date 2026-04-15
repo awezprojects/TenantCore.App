@@ -19,4 +19,5 @@ public interface IApplicationApiClient
     Task<ApiResponse> AddApplicationUserMappingAsync(Guid applicationId, Guid userId, Guid assignedBy);
     Task<ApiResponse> RemoveUserFromApplicationAsync(Guid applicationId, Guid userId, Guid removedBy);
     Task<ApiResponse> DeleteApplicationAsync(Guid applicationId);
+    Task<ApiResponse<ApplicationRolesResponseDto>> GetRolesByApplicationAsync(Guid applicationId);
 }

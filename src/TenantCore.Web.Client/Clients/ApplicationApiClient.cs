@@ -15,6 +15,22 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
     private const string BaseRoute = "api/Application";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    public async Task<ApiResponse<ApplicationRolesResponseDto>> GetRolesByApplicationAsync(Guid applicationId)
+    {
+        try
+        {
+            SetAuthorizationHeader();
+            var request = new HttpRequestMessage(HttpMethod.Get, $"api/role/by-application/{applicationId}");
+            request.Headers.Add("X-ClinicApp-Id", applicationId.ToString());
+            var response = await httpClient.SendAsync(request);
+            return await HandleResponse<ApplicationRolesResponseDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<ApplicationRolesResponseDto>($"Get roles failed: {ex.Message}");
+        }
+    }
+
     public async Task<ApiResponse<ApplicationResponseDto>> CreateApplicationAsync(Guid ownerId, ApplicationCreationRequestDto request)
     {
         try
@@ -118,7 +134,16 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         try
         {
             SetAuthorizationHeader();
-            var response = await httpClient.PostAsJsonAsync($"{BaseRoute}/invite-user?invitedBy={invitedBy}", request, JsonOptions);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/invite-user?invitedBy={invitedBy}")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            // Add X-ClinicApp-Id header if ApplicationId is present in the request
+            if (request.ApplicationId != Guid.Empty)
+            {
+                httpRequest.Headers.Add("X-ClinicApp-Id", request.ApplicationId.ToString());
+            }
+            var response = await httpClient.SendAsync(httpRequest);
             return await HandleResponse<InvitationResponseDto>(response);
         }
         catch (Exception ex)

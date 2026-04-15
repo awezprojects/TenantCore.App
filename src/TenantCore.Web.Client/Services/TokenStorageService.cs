@@ -25,13 +25,13 @@ public class TokenStorageService
     {
         try
         {
-            await _jsRuntime.InvokeVoidAsync("sessionStorage.setItem", AccessTokenKey, response.AccessToken ?? "");
-            await _jsRuntime.InvokeVoidAsync("sessionStorage.setItem", TokenExpiryKey, response.ExpiresAt.ToString("O"));
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", AccessTokenKey, response.AccessToken ?? "");
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", TokenExpiryKey, response.ExpiresAt.ToString("O"));
 
             if (response.User != null)
             {
                 var userJson = System.Text.Json.JsonSerializer.Serialize(response.User);
-                await _jsRuntime.InvokeVoidAsync("sessionStorage.setItem", UserDataKey, userJson);
+                await _jsRuntime.InvokeVoidAsync("localStorage.setItem", UserDataKey, userJson);
             }
         }
         catch
@@ -47,7 +47,7 @@ public class TokenStorageService
     {
         try
         {
-            return await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", AccessTokenKey);
+            return await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", AccessTokenKey);
         }
         catch
         {
@@ -62,7 +62,7 @@ public class TokenStorageService
     {
         try
         {
-            var expiryStr = await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", TokenExpiryKey);
+            var expiryStr = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", TokenExpiryKey);
             if (DateTime.TryParse(expiryStr, out var expiry))
             {
                 return expiry;
@@ -82,7 +82,7 @@ public class TokenStorageService
     {
         try
         {
-            var userJson = await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", UserDataKey);
+            var userJson = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", UserDataKey);
             if (!string.IsNullOrEmpty(userJson))
             {
                 return System.Text.Json.JsonSerializer.Deserialize<UserProfileDto>(userJson);
@@ -121,9 +121,9 @@ public class TokenStorageService
     {
         try
         {
-            await _jsRuntime.InvokeVoidAsync("sessionStorage.removeItem", AccessTokenKey);
-            await _jsRuntime.InvokeVoidAsync("sessionStorage.removeItem", UserDataKey);
-            await _jsRuntime.InvokeVoidAsync("sessionStorage.removeItem", TokenExpiryKey);
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", AccessTokenKey);
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", UserDataKey);
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", TokenExpiryKey);
         }
         catch
         {

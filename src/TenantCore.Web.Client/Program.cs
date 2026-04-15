@@ -13,6 +13,7 @@ builder.Services.AddMudServices();
 // Register Auth services
 builder.Services.AddScoped<TokenStorageService>();
 builder.Services.AddScoped<AuthStateService>();
+builder.Services.AddSingleton<RoleCacheService>();
 
 // Get API base URLs from configuration
 var tenantApiBaseUrl = builder.Configuration["TenantApiBaseUrl"] ?? "https://localhost:7246/";

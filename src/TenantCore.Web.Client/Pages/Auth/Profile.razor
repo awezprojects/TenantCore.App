@@ -32,6 +32,12 @@
                             @(AuthState.CurrentUser.IsEmailVerified ? "Verified" : "Unverified")
                         </MudChip>
                     </MudStack>
+                    <MudStack Row="true" Spacing="1">
+                        @foreach (var role in AuthState.CurrentUser.UserRoles.Where(r => r.IsActive))
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Filled">@role.RoleName</MudChip>
+                        }
+                    </MudStack>
                 </MudStack>
             </MudPaper>
         </MudItem>
