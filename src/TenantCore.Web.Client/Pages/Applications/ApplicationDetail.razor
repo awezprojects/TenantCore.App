@@ -261,7 +261,7 @@ else if (_app is not null)
                 {
                     <MudListItem T="UserSearchResultDto" OnClick="@(() => SelectExistingUser(user))">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                            <MudAvatar Size="Size.Small" Color="Color.Secondary">@(user.FirstName.Length > 0 ? user.FirstName[0] : '?')</MudAvatar>
+                            <MudAvatar Size="Size.Small" Color="Color.Secondary">@(string.IsNullOrEmpty(user.FirstName) ? '?' : user.FirstName[0])</MudAvatar>
                             <MudStack Spacing="0">
                                 <MudText Typo="Typo.body2"><b>@user.FullName</b></MudText>
                                 <MudText Typo="Typo.caption">@user.EmailId</MudText>
@@ -288,7 +288,7 @@ else if (_app is not null)
             <MudPaper Class="pa-3 mt-3" Elevation="1">
                 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudAvatar Color="Color.Primary" Size="Size.Small">@_selectedExistingUser.FirstName[0]</MudAvatar>
+                        <MudAvatar Color="Color.Primary" Size="Size.Small">@(string.IsNullOrEmpty(_selectedExistingUser.FirstName) ? '?' : _selectedExistingUser.FirstName[0])</MudAvatar>
                         <MudStack Spacing="0">
                             <MudText Typo="Typo.body2"><b>@_selectedExistingUser.FullName</b></MudText>
                             <MudText Typo="Typo.caption">@_selectedExistingUser.EmailId</MudText>
