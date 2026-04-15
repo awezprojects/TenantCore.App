@@ -37,6 +37,9 @@ else if (_app is not null)
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@_app.ApplicationCode</MudChip>
                     <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(_app.ApplicationType)">@GetTypeName(_app.ApplicationType)</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="@(_app.IsActive ? Color.Success : Color.Error)" Variant="Variant.Filled">
+                        @(_app.IsActive ? "Active" : "Inactive")
+                    </MudChip>
                     @if (_app.IsOwner)
                     {
                         <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Star">Owner</MudChip>
@@ -375,7 +378,7 @@ else if (_app is not null)
 
     // Toggle application status
     private bool _togglingAppStatus;
-    private bool _isAppActive => _app?.IsOwner == true || (_app != null);
+    private bool _isAppActive => _app?.IsActive ?? false;
 
     // Change role dialog
     private bool _changeRoleDialogVisible;

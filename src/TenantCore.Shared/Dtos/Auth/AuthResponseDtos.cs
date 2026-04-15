@@ -34,6 +34,7 @@ public class UserProfileDto
     public string? MobileNo { get; set; }
     public bool IsMobileVerified { get; set; }
     public bool IsActive { get; set; }
+    public bool IsTwoFactorEnabled { get; set; }
     public DateTime CreatedDate { get; set; }
     public DateTime ModifiedDate { get; set; }
     public List<UserApplicationDto> UserApplications { get; set; } = [];

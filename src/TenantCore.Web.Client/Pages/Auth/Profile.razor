@@ -273,9 +273,10 @@ else
 
     private void LoadTwoFactorStatus()
     {
-        // Infer 2FA status: if user went through 2FA login flow, it's enabled
-        // The actual status would come from the user profile API if the backend includes it
-        _isTwoFactorEnabled = true; // Default to true since 2FA is required during login
+        if (AuthState.CurrentUser != null)
+        {
+            _isTwoFactorEnabled = AuthState.CurrentUser.IsTwoFactorEnabled;
+        }
     }
 
     private void StartEditProfile()
