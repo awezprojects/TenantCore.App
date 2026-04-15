@@ -27,4 +27,5 @@ public interface IAuthApiClient
     Task<ApiResponse> ActivateUserAsync(Guid userId);
     Task<ApiResponse> DeactivateUserAsync(Guid userId);
     Task<ApiResponse<List<UserSearchResultDto>>> SearchUsersByEmailAsync(string email);
+    Task<ApiResponse> AcceptExistingInvitationAsync(string token);
 }

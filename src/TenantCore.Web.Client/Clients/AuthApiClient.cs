@@ -396,6 +396,23 @@ public class AuthApiClient(HttpClient httpClient, AuthStateService authState) : 
         }
     }
 
+    public async Task<ApiResponse> AcceptExistingInvitationAsync(string token)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/accept-existing-invitation?token={Uri.EscapeDataString(token)}");
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Accept invitation failed: {ex.Message}");
+        }
+    }
+
     private static async Task<ApiResponse<T>> HandleResponse<T>(HttpResponseMessage response)
     {
         var content = await response.Content.ReadAsStringAsync();

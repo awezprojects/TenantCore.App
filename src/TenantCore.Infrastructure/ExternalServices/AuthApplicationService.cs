@@ -177,6 +177,13 @@ public sealed class AuthApplicationService(
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
+    public async Task<List<ApplicationUserResponseDto>> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var response = await client.GetAsync($"api/Application/{applicationId}/users/deactivated", cancellationToken);
+        return await ParseRequiredAsync<List<ApplicationUserResponseDto>>(response, cancellationToken);
+    }
+
     private async Task<T> ParseRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var body = await response.Content.ReadAsStringAsync(cancellationToken);

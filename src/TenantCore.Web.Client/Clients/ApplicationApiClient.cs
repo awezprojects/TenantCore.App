@@ -292,6 +292,20 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
+    public async Task<ApiResponse<List<ApplicationUserResponseDto>>> GetDeactivatedApplicationUsersAsync(Guid applicationId)
+    {
+        try
+        {
+            SetAuthorizationHeader();
+            var response = await httpClient.GetAsync($"{BaseRoute}/{applicationId}/users/deactivated");
+            return await HandleResponse<List<ApplicationUserResponseDto>>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<List<ApplicationUserResponseDto>>($"Get deactivated users failed: {ex.Message}");
+        }
+    }
+
     private void SetAuthorizationHeader()
     {
         if (!string.IsNullOrEmpty(authState.AccessToken))

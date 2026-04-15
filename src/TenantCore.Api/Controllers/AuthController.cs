@@ -80,6 +80,9 @@ public class AuthController(IHttpClientFactory httpClientFactory) : ControllerBa
     [HttpGet("user/search")]
     public Task<IActionResult> SearchUsersByEmailAsync() => ForwardAsync(HttpMethod.Get, "api/auth/user/search", includeBody: false);
 
+    [HttpGet("accept-existing-invitation")]
+    public Task<IActionResult> AcceptExistingInvitationAsync() => ForwardAsync(HttpMethod.Get, "api/auth/accept-existing-invitation", includeBody: false);
+
     private async Task<IActionResult> ForwardAsync(HttpMethod method, string downstreamPath, bool includeBody = true)
     {
         var cancellationToken = HttpContext.RequestAborted;

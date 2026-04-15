@@ -135,7 +135,7 @@ else if (_app is not null)
         <MudItem xs="12" md="8">
             <MudPaper Class="pa-4" Elevation="2">
                 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-                    <MudText Typo="Typo.h6">Users (@(_users?.Count ?? 0))</MudText>
+                    <MudText Typo="Typo.h6">Users</MudText>
                     @if (IsAdmin || IsClinicAdminForApp)
                     {
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
@@ -146,82 +146,147 @@ else if (_app is not null)
                     }
                 </MudStack>
 
-                @if (_usersLoading)
-                {
-                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-                }
-                else if (_users is not null)
-                {
-                    <MudTable Items="@_users" Hover="true" Dense="true" Elevation="0">
-                        <HeaderContent>
-                            <MudTh>Name</MudTh>
-                            <MudTh>Email</MudTh>
-                            <MudTh>Role</MudTh>
-                            <MudTh>Status</MudTh>
-                            <MudTh Style="width: 80px;"></MudTh>
-                        </HeaderContent>
-                        <RowTemplate Context="user">
-                            <MudTd DataLabel="Name">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudAvatar Size="Size.Small" Color="Color.Secondary">
-                                        @(user.FirstName.Length > 0 ? user.FirstName[0] : '?')
-                                    </MudAvatar>
-                                    <MudStack Spacing="0">
-                                        <MudText Typo="Typo.body2">@user.FullName</MudText>
-                                        @if (user.IsOwner)
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-3" ActivePanelIndexChanged="OnTabChanged">
+                    <MudTabPanel Text="@($"Active ({_users?.Count ?? 0})")" Icon="@Icons.Material.Filled.People">
+                        @if (_usersLoading)
+                        {
+                            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                        }
+                        else if (_users is not null)
+                        {
+                            <MudTable Items="@_users" Hover="true" Dense="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Name</MudTh>
+                                    <MudTh>Email</MudTh>
+                                    <MudTh>Role</MudTh>
+                                    <MudTh>Status</MudTh>
+                                    <MudTh Style="width: 80px;"></MudTh>
+                                </HeaderContent>
+                                <RowTemplate Context="user">
+                                    <MudTd DataLabel="Name">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudAvatar Size="Size.Small" Color="Color.Secondary">
+                                                @(user.FirstName.Length > 0 ? user.FirstName[0] : '?')
+                                            </MudAvatar>
+                                            <MudStack Spacing="0">
+                                                <MudText Typo="Typo.body2">@user.FullName</MudText>
+                                                @if (user.IsOwner)
+                                                {
+                                                    <MudText Typo="Typo.caption" Color="Color.Primary">Owner</MudText>
+                                                }
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudTd>
+                                    <MudTd DataLabel="Email">
+                                        <MudText Typo="Typo.body2">@user.EmailId</MudText>
+                                    </MudTd>
+                                    <MudTd DataLabel="Role">
+                                        @if (!string.IsNullOrEmpty(user.RoleName))
                                         {
-                                            <MudText Typo="Typo.caption" Color="Color.Primary">Owner</MudText>
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@user.RoleName</MudChip>
                                         }
-                                    </MudStack>
+                                        else
+                                        {
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                                        }
+                                    </MudTd>
+                                    <MudTd DataLabel="Status">
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="@(user.IsActive ? Color.Success : Color.Error)">
+                                            @(user.IsActive ? "Active" : "Inactive")
+                                        </MudChip>
+                                    </MudTd>
+                                    <MudTd>
+                                        @if (!user.IsOwner && (IsAdmin || IsClinicAdminForApp))
+                                        {
+                                            <MudStack Row="true" Spacing="0">
+                                                <MudTooltip Text="@(user.IsActive ? "Deactivate user" : "Activate user")">
+                                                    <MudIconButton Icon="@(user.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)"
+                                                                   Color="@(user.IsActive ? Color.Warning : Color.Success)" Size="Size.Small"
+                                                                   OnClick="@(() => ConfirmToggleUser(user))" />
+                                                </MudTooltip>
+                                                <MudTooltip Text="Change role">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                                                                   Color="Color.Info" Size="Size.Small"
+                                                                   OnClick="@(() => OpenChangeRoleDialog(user))" />
+                                                </MudTooltip>
+                                                <MudTooltip Text="Remove from application">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                                   Color="Color.Error" Size="Size.Small"
+                                                                   OnClick="@(() => ConfirmRemoveUser(user))" />
+                                                </MudTooltip>
+                                            </MudStack>
+                                        }
+                                    </MudTd>
+                                </RowTemplate>
+                                <NoRecordsContent>
+                                    <MudText Color="Color.Secondary">No active users in this application.</MudText>
+                                </NoRecordsContent>
+                            </MudTable>
+                        }
+                    </MudTabPanel>
+
+                    @if (IsAdmin || IsClinicAdminForApp)
+                    {
+                        <MudTabPanel Text="@($"Deactivated ({_deactivatedUsers?.Count ?? 0})")" Icon="@Icons.Material.Filled.PersonOff">
+                            @if (_deactivatedUsersLoading)
+                            {
+                                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                            }
+                            else if (_deactivatedUsers is not null && _deactivatedUsers.Count > 0)
+                            {
+                                <MudTable Items="@_deactivatedUsers" Hover="true" Dense="true" Elevation="0">
+                                    <HeaderContent>
+                                        <MudTh>Name</MudTh>
+                                        <MudTh>Email</MudTh>
+                                        <MudTh>Last Role</MudTh>
+                                        <MudTh Style="width: 120px;"></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate Context="user">
+                                        <MudTd DataLabel="Name">
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudAvatar Size="Size.Small" Color="Color.Default">
+                                                    @(string.IsNullOrEmpty(user.FirstName) ? '?' : user.FirstName[0])
+                                                </MudAvatar>
+                                                <MudText Typo="Typo.body2">@user.FullName</MudText>
+                                            </MudStack>
+                                        </MudTd>
+                                        <MudTd DataLabel="Email">
+                                            <MudText Typo="Typo.body2">@user.EmailId</MudText>
+                                        </MudTd>
+                                        <MudTd DataLabel="Last Role">
+                                            @if (!string.IsNullOrEmpty(user.RoleName))
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">@user.RoleName</MudChip>
+                                            }
+                                            else
+                                            {
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
+                                            }
+                                        </MudTd>
+                                        <MudTd>
+                                            <MudButton Variant="Variant.Outlined" Color="Color.Success" Size="Size.Small"
+                                                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                                                       OnClick="@(() => ConfirmReactivateUser(user))">
+                                                Re-Activate
+                                            </MudButton>
+                                        </MudTd>
+                                    </RowTemplate>
+                                    <NoRecordsContent>
+                                        <MudText Color="Color.Secondary">No deactivated users.</MudText>
+                                    </NoRecordsContent>
+                                </MudTable>
+                            }
+                            else
+                            {
+                                <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="pa-6">
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Style="font-size: 3rem;" />
+                                    <MudText Color="Color.Secondary">No deactivated users in this application.</MudText>
                                 </MudStack>
-                            </MudTd>
-                            <MudTd DataLabel="Email">
-                                <MudText Typo="Typo.body2">@user.EmailId</MudText>
-                            </MudTd>
-                            <MudTd DataLabel="Role">
-                                @if (!string.IsNullOrEmpty(user.RoleName))
-                                {
-                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">@user.RoleName</MudChip>
-                                }
-                                else
-                                {
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">-</MudText>
-                                }
-                            </MudTd>
-                            <MudTd DataLabel="Status">
-                                <MudChip T="string" Size="Size.Small"
-                                         Color="@(user.IsActive ? Color.Success : Color.Error)">
-                                    @(user.IsActive ? "Active" : "Inactive")
-                                </MudChip>
-                            </MudTd>
-                            <MudTd>
-                                @if (!user.IsOwner && (IsAdmin || IsClinicAdminForApp))
-                                {
-                                    <MudStack Row="true" Spacing="0">
-                                        <MudTooltip Text="@(user.IsActive ? "Deactivate user" : "Activate user")">
-                                            <MudIconButton Icon="@(user.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)"
-                                                           Color="@(user.IsActive ? Color.Warning : Color.Success)" Size="Size.Small"
-                                                           OnClick="@(() => ConfirmToggleUser(user))" />
-                                        </MudTooltip>
-                                        <MudTooltip Text="Change role">
-                                            <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
-                                                           Color="Color.Info" Size="Size.Small"
-                                                           OnClick="@(() => OpenChangeRoleDialog(user))" />
-                                        </MudTooltip>
-                                        <MudTooltip Text="Remove from application">
-                                            <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
-                                                           Color="Color.Error" Size="Size.Small"
-                                                           OnClick="@(() => ConfirmRemoveUser(user))" />
-                                        </MudTooltip>
-                                    </MudStack>
-                                }
-                            </MudTd>
-                        </RowTemplate>
-                        <NoRecordsContent>
-                            <MudText Color="Color.Secondary">No users in this application.</MudText>
-                        </NoRecordsContent>
-                    </MudTable>
-                }
+                            }
+                        </MudTabPanel>
+                    }
+                </MudTabs>
             </MudPaper>
         </MudItem>
     </MudGrid>
@@ -520,6 +585,34 @@ else if (_app is not null)
     </DialogActions>
 </MudDialog>
 
+<!-- Re-Activate User Confirmation -->
+<MudDialog @bind-Visible="_reactivateUserDialogVisible">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Success" />
+            <MudText Typo="Typo.h6">Re-Activate User</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText>Are you sure you want to <b>re-activate</b> <b>@_userToReactivate?.FullName</b>?</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">They will regain access to this application.</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _reactivateUserDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ReactivateUserAsync" Disabled="_reactivatingUser">
+            @if (_reactivatingUser)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Re-Activating...</span>
+            }
+            else
+            {
+                <span>Re-Activate</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -565,6 +658,16 @@ else if (_app is not null)
     private bool _changingRole;
     private ApplicationUserResponseDto? _userToChangeRole;
     private Guid _newRoleId = Guid.Empty;
+
+    // Deactivated users
+    private List<ApplicationUserResponseDto>? _deactivatedUsers;
+    private bool _deactivatedUsersLoading;
+    private bool _deactivatedUsersLoaded;
+
+    // Re-activate user
+    private bool _reactivateUserDialogVisible;
+    private bool _reactivatingUser;
+    private ApplicationUserResponseDto? _userToReactivate;
 
     protected override async Task OnInitializedAsync()
     {
@@ -708,10 +811,8 @@ else if (_app is not null)
             var result = await AppClient.InviteExistingUserAsync(AuthState.CurrentUser.UserId, request);
             if (result.Success)
             {
-                Snackbar.Add(result.Message ?? $"{_selectedExistingUser.FullName} added to application.", Severity.Success);
+                Snackbar.Add(result.Message ?? $"Invitation sent to {_selectedExistingUser.FullName}. They will be added once they accept.", Severity.Success);
                 CloseInviteDialog();
-                await LoadUsersAsync();
-                StateHasChanged();
             }
             else
             {
@@ -898,6 +999,7 @@ else if (_app is not null)
                 _toggleUserStatusDialogVisible = false;
                 _userToToggle = null;
                 await LoadUsersAsync();
+                if (_deactivatedUsersLoaded) await LoadDeactivatedUsersAsync();
                 StateHasChanged();
             }
             else
@@ -949,6 +1051,77 @@ else if (_app is not null)
         finally
         {
             _changingRole = false;
+        }
+    }
+
+    // ── Deactivated Users ──
+
+    private async Task OnTabChanged(int tabIndex)
+    {
+        // Tab 1 = Deactivated Users
+        if (tabIndex == 1 && !_deactivatedUsersLoaded)
+        {
+            await LoadDeactivatedUsersAsync();
+        }
+    }
+
+    private async Task LoadDeactivatedUsersAsync()
+    {
+        _deactivatedUsersLoading = true;
+        StateHasChanged();
+        try
+        {
+            var result = await AppClient.GetDeactivatedApplicationUsersAsync(Id);
+            _deactivatedUsers = result.Success ? result.Data ?? [] : [];
+            _deactivatedUsersLoaded = true;
+        }
+        catch
+        {
+            _deactivatedUsers = [];
+        }
+        finally
+        {
+            _deactivatedUsersLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ConfirmReactivateUser(ApplicationUserResponseDto user)
+    {
+        _userToReactivate = user;
+        _reactivateUserDialogVisible = true;
+    }
+
+    private async Task ReactivateUserAsync()
+    {
+        if (_userToReactivate is null || AuthState.CurrentUser is null) return;
+
+        _reactivatingUser = true;
+        try
+        {
+            var request = new ToggleStatusRequestDto { IsActive = true };
+            var result = await AppClient.ToggleUserApplicationMappingAsync(Id, _userToReactivate.UserId, AuthState.CurrentUser.UserId, request);
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? $"{_userToReactivate.FullName} has been re-activated.", Severity.Success);
+                _reactivateUserDialogVisible = false;
+                _userToReactivate = null;
+                // Refresh both lists
+                await Task.WhenAll(LoadUsersAsync(), LoadDeactivatedUsersAsync());
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to re-activate user.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error re-activating user: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _reactivatingUser = false;
         }
     }
 

@@ -168,7 +168,22 @@ public class ApplicationController(ISender sender) : ControllerBase
         var response = new ApiResponse
         {
             Success = true,
-            Message = "User added to application successfully."
+            Message = "Invitation sent to the user. They will be added to the application once they accept."
+        };
+        return Ok(response);
+    }
+
+    // GET /api/Application/{applicationId}/users/deactivated
+    [HttpGet("{applicationId:guid}/users/deactivated")]
+    [ProducesResponseType(typeof(List<ApplicationUserResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetDeactivatedApplicationUsersQuery(applicationId), cancellationToken);
+        var response = new ApiResponse<List<ApplicationUserResponseDto>>
+        {
+            Success = true,
+            Data = result,
+            Message = $"{result.Count} deactivated user(s) found"
         };
         return Ok(response);
     }
