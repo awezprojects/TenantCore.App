@@ -1,15 +1,17 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using TenantCore.Shared.Dtos.Auth;
+using TenantCore.Web.Client.Services;
 
 namespace TenantCore.Web.Client.Clients;
 
 /// <summary>
 /// HTTP client implementation for Auth API in WebAssembly.
 /// </summary>
-public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
+public class AuthApiClient(HttpClient httpClient, AuthStateService authState) : IAuthApiClient
 {
     private const string BaseRoute = "api/auth";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -17,6 +19,14 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
     private static void IncludeCookies(HttpRequestMessage request)
     {
         request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+    }
+
+    private void SetAuthorizationHeader(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrEmpty(authState.AccessToken))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authState.AccessToken);
+        }
     }
 
     public async Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto request)
@@ -79,6 +89,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/logout");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -95,6 +106,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/logout-all");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -205,6 +217,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/user/{userId}");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -224,6 +237,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -262,6 +276,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -278,6 +293,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/2fa/enable/{userId}");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -297,6 +313,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -316,6 +333,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -332,6 +350,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Patch, $"{BaseRoute}/user/{userId}/activate");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -348,6 +367,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Patch, $"{BaseRoute}/user/{userId}/deactivate");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -364,6 +384,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/user/search?email={Uri.EscapeDataString(email)}");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
