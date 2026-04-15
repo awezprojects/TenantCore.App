@@ -46,11 +46,23 @@ else if (_app is not null)
         </MudStack>
         @if (IsAdmin || IsClinicAdminForApp)
         {
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Edit"
-                       OnClick="@(() => NavigationManager.NavigateTo($"/applications/{Id}/edit"))">
-                Edit
-            </MudButton>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Edit"
+                           OnClick="@(() => NavigationManager.NavigateTo($"/applications/{Id}/edit"))">
+                    Edit
+                </MudButton>
+                @if (IsAdmin)
+                {
+                    <MudButton Variant="Variant.Outlined"
+                               Color="@(_app.IsOwner ? Color.Default : (_isAppActive ? Color.Error : Color.Success))"
+                               StartIcon="@(_isAppActive ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)"
+                               OnClick="ToggleApplicationStatus"
+                               Disabled="_togglingAppStatus || _app.IsOwner">
+                        @(_isAppActive ? "Deactivate" : "Activate")
+                    </MudButton>
+                }
+            </MudStack>
         }
     </MudStack>
 
@@ -181,11 +193,23 @@ else if (_app is not null)
                             <MudTd>
                                 @if (!user.IsOwner && (IsAdmin || IsClinicAdminForApp))
                                 {
-                                    <MudTooltip Text="Remove from application">
-                                        <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
-                                                       Color="Color.Error" Size="Size.Small"
-                                                       OnClick="@(() => ConfirmRemoveUser(user))" />
-                                    </MudTooltip>
+                                    <MudStack Row="true" Spacing="0">
+                                        <MudTooltip Text="@(user.IsActive ? "Deactivate user" : "Activate user")">
+                                            <MudIconButton Icon="@(user.IsActive ? Icons.Material.Filled.PersonOff : Icons.Material.Filled.PersonAdd)"
+                                                           Color="@(user.IsActive ? Color.Warning : Color.Success)" Size="Size.Small"
+                                                           OnClick="@(() => ToggleUserStatus(user))" />
+                                        </MudTooltip>
+                                        <MudTooltip Text="Change role">
+                                            <MudIconButton Icon="@Icons.Material.Filled.SwapHoriz"
+                                                           Color="Color.Info" Size="Size.Small"
+                                                           OnClick="@(() => OpenChangeRoleDialog(user))" />
+                                        </MudTooltip>
+                                        <MudTooltip Text="Remove from application">
+                                            <MudIconButton Icon="@Icons.Material.Filled.PersonRemove"
+                                                           Color="Color.Error" Size="Size.Small"
+                                                           OnClick="@(() => ConfirmRemoveUser(user))" />
+                                        </MudTooltip>
+                                    </MudStack>
                                 }
                             </MudTd>
                         </RowTemplate>
@@ -291,6 +315,41 @@ else if (_app is not null)
     </DialogActions>
 </MudDialog>
 
+<!-- Change Role Dialog -->
+<MudDialog @bind-Visible="_changeRoleDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Info" />
+            <MudText Typo="Typo.h6">Change Role</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText Class="mb-3">Change role for <b>@_userToChangeRole?.FullName</b></MudText>
+        <MudSelect T="Guid" @bind-Value="_newRoleId" Label="New Role" Variant="Variant.Outlined"
+                   Disabled="_roles.Count == 0">
+            @foreach (var role in _roles)
+            {
+                <MudSelectItem Value="@role.RoleId">@role.RoleName</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _changeRoleDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   OnClick="ChangeUserRoleAsync" Disabled="_changingRole || _newRoleId == Guid.Empty">
+            @if (_changingRole)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Changing...</span>
+            }
+            else
+            {
+                <span>Change Role</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -313,6 +372,16 @@ else if (_app is not null)
     // Remove user dialog
     private bool _removeUserDialogVisible;
     private ApplicationUserResponseDto? _userToRemove;
+
+    // Toggle application status
+    private bool _togglingAppStatus;
+    private bool _isAppActive => _app?.IsOwner == true || (_app != null);
+
+    // Change role dialog
+    private bool _changeRoleDialogVisible;
+    private bool _changingRole;
+    private ApplicationUserResponseDto? _userToChangeRole;
+    private Guid _newRoleId = Guid.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -476,6 +545,101 @@ else if (_app is not null)
         catch (Exception ex)
         {
             Snackbar.Add($"Error removing user: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task ToggleApplicationStatus()
+    {
+        if (_app is null || AuthState.CurrentUser is null) return;
+
+        _togglingAppStatus = true;
+        try
+        {
+            var newStatus = !_isAppActive;
+            var request = new ToggleStatusRequestDto { IsActive = newStatus };
+            var result = await AppClient.ToggleApplicationStatusAsync(Id, AuthState.CurrentUser.UserId, request);
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? (newStatus ? "Application activated." : "Application deactivated."), Severity.Success);
+                await LoadApplicationAsync();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to toggle application status.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error toggling status: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _togglingAppStatus = false;
+        }
+    }
+
+    private async Task ToggleUserStatus(ApplicationUserResponseDto user)
+    {
+        if (AuthState.CurrentUser is null) return;
+
+        try
+        {
+            var newStatus = !user.IsActive;
+            var request = new ToggleStatusRequestDto { IsActive = newStatus };
+            var result = await AppClient.ToggleUserApplicationMappingAsync(Id, user.UserId, AuthState.CurrentUser.UserId, request);
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? (newStatus ? $"{user.FullName} activated." : $"{user.FullName} deactivated."), Severity.Success);
+                await LoadUsersAsync();
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to toggle user status.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error toggling user status: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenChangeRoleDialog(ApplicationUserResponseDto user)
+    {
+        _userToChangeRole = user;
+        _newRoleId = user.RoleId ?? Guid.Empty;
+        _changeRoleDialogVisible = true;
+    }
+
+    private async Task ChangeUserRoleAsync()
+    {
+        if (_userToChangeRole is null || AuthState.CurrentUser is null || _newRoleId == Guid.Empty) return;
+
+        _changingRole = true;
+        try
+        {
+            var request = new ChangeUserRoleRequestDto { NewRoleId = _newRoleId };
+            var result = await AppClient.ChangeUserRoleAsync(Id, _userToChangeRole.UserId, AuthState.CurrentUser.UserId, request);
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? "User role changed successfully.", Severity.Success);
+                _changeRoleDialogVisible = false;
+                _userToChangeRole = null;
+                await LoadUsersAsync();
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to change user role.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error changing role: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _changingRole = false;
         }
     }
 

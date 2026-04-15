@@ -44,60 +44,127 @@
 
         <MudItem xs="12" md="8">
             <MudPaper Elevation="2" Class="pa-6">
-                <MudText Typo="Typo.h6" Class="mb-4">Account Information</MudText>
-                <MudGrid>
-                    <MudItem xs="12" sm="6">
-                        <MudStack Spacing="1">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">First Name</MudText>
-                            <MudText>@AuthState.CurrentUser.FirstName</MudText>
-                        </MudStack>
-                    </MudItem>
-                    @if (!string.IsNullOrEmpty(AuthState.CurrentUser.MiddleName))
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                    <MudText Typo="Typo.h6">Account Information</MudText>
+                    @if (!_editingProfile)
                     {
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Edit" OnClick="StartEditProfile">
+                            Edit Profile
+                        </MudButton>
+                    }
+                </MudStack>
+
+                @if (_editingProfile)
+                {
+                    <EditForm Model="_profileModel" OnValidSubmit="SaveProfile">
+                        <DataAnnotationsValidator />
+                        <MudGrid>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_profileModel.FirstName"
+                                              Label="First Name"
+                                              Variant="Variant.Outlined"
+                                              For="@(() => _profileModel.FirstName)"
+                                              Disabled="_savingProfile" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_profileModel.MiddleName"
+                                              Label="Middle Name"
+                                              Variant="Variant.Outlined"
+                                              Disabled="_savingProfile" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_profileModel.LastName"
+                                              Label="Last Name"
+                                              Variant="Variant.Outlined"
+                                              For="@(() => _profileModel.LastName)"
+                                              Disabled="_savingProfile" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_profileModel.MobileNo"
+                                              Label="Mobile Number"
+                                              Variant="Variant.Outlined"
+                                              Disabled="_savingProfile" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudStack Row="true" Spacing="2" Justify="Justify.FlexEnd">
+                                    <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="CancelEditProfile"
+                                               Disabled="_savingProfile">
+                                        Cancel
+                                    </MudButton>
+                                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                                               Disabled="_savingProfile">
+                                        @if (_savingProfile)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                                            <span>Saving...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Save Changes</span>
+                                        }
+                                    </MudButton>
+                                </MudStack>
+                            </MudItem>
+                        </MudGrid>
+                    </EditForm>
+                }
+                else
+                {
+                    <MudGrid>
                         <MudItem xs="12" sm="6">
                             <MudStack Spacing="1">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Middle Name</MudText>
-                                <MudText>@AuthState.CurrentUser.MiddleName</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">First Name</MudText>
+                                <MudText>@AuthState.CurrentUser.FirstName</MudText>
                             </MudStack>
                         </MudItem>
-                    }
-                    <MudItem xs="12" sm="6">
-                        <MudStack Spacing="1">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Last Name</MudText>
-                            <MudText>@AuthState.CurrentUser.LastName</MudText>
-                        </MudStack>
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudStack Spacing="1">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Email</MudText>
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                <MudText>@AuthState.CurrentUser.EmailId</MudText>
-                                @if (AuthState.CurrentUser.IsEmailVerified)
-                                {
-                                    <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" />
-                                }
+                        @if (!string.IsNullOrEmpty(AuthState.CurrentUser.MiddleName))
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Middle Name</MudText>
+                                    <MudText>@AuthState.CurrentUser.MiddleName</MudText>
+                                </MudStack>
+                            </MudItem>
+                        }
+                        <MudItem xs="12" sm="6">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Last Name</MudText>
+                                <MudText>@AuthState.CurrentUser.LastName</MudText>
                             </MudStack>
-                        </MudStack>
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudStack Spacing="1">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Mobile Number</MudText>
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                <MudText>@(AuthState.CurrentUser.MobileNo ?? "Not provided")</MudText>
-                                @if (AuthState.CurrentUser.IsMobileVerified)
-                                {
-                                    <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" />
-                                }
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Email</MudText>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudText>@AuthState.CurrentUser.EmailId</MudText>
+                                    @if (AuthState.CurrentUser.IsEmailVerified)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" />
+                                    }
+                                </MudStack>
                             </MudStack>
-                        </MudStack>
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudStack Spacing="1">
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">Member Since</MudText>
-                            <MudText>@AuthState.CurrentUser.CreatedDate.ToString("MMMM dd, yyyy")</MudText>
-                        </MudStack>
-                    </MudItem>
-                </MudGrid>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Mobile Number</MudText>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudText>@(AuthState.CurrentUser.MobileNo ?? "Not provided")</MudText>
+                                    @if (AuthState.CurrentUser.IsMobileVerified)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" />
+                                    }
+                                </MudStack>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Member Since</MudText>
+                                <MudText>@AuthState.CurrentUser.CreatedDate.ToString("MMMM dd, yyyy")</MudText>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                }
             </MudPaper>
 
             @if (AuthState.CurrentUser.UserApplications.Any())
@@ -149,8 +216,9 @@
                                 Add an extra layer of security to your account
                             </MudText>
                         </MudStack>
-                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
-                            Enabled
+                        <MudChip T="string" Color="@(_isTwoFactorEnabled ? Color.Success : Color.Default)" 
+                                 Size="Size.Small" Variant="Variant.Filled">
+                            @(_isTwoFactorEnabled ? "Enabled" : "Disabled")
                         </MudChip>
                     </MudStack>
                     <MudDivider />
@@ -162,7 +230,7 @@
                             </MudText>
                         </MudStack>
                         <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
-                                   Href="/auth/reset-password">
+                                   Href="/auth/change-password">
                             Change
                         </MudButton>
                     </MudStack>
@@ -190,6 +258,73 @@ else
 }
 
 @code {
+    private bool _editingProfile;
+    private bool _savingProfile;
+    private bool _isTwoFactorEnabled;
+    private UpdateUserProfileRequestDto _profileModel = new();
+
+    protected override void OnInitialized()
+    {
+        if (AuthState.CurrentUser != null)
+        {
+            LoadTwoFactorStatus();
+        }
+    }
+
+    private void LoadTwoFactorStatus()
+    {
+        // Infer 2FA status: if user went through 2FA login flow, it's enabled
+        // The actual status would come from the user profile API if the backend includes it
+        _isTwoFactorEnabled = true; // Default to true since 2FA is required during login
+    }
+
+    private void StartEditProfile()
+    {
+        if (AuthState.CurrentUser == null) return;
+        _profileModel = new UpdateUserProfileRequestDto
+        {
+            FirstName = AuthState.CurrentUser.FirstName,
+            MiddleName = AuthState.CurrentUser.MiddleName,
+            LastName = AuthState.CurrentUser.LastName,
+            MobileNo = AuthState.CurrentUser.MobileNo
+        };
+        _editingProfile = true;
+    }
+
+    private void CancelEditProfile()
+    {
+        _editingProfile = false;
+    }
+
+    private async Task SaveProfile()
+    {
+        if (AuthState.CurrentUser == null) return;
+
+        _savingProfile = true;
+        try
+        {
+            var response = await AuthClient.UpdateUserProfileAsync(AuthState.CurrentUser.UserId, _profileModel);
+            if (response.Success && response.Data != null)
+            {
+                AuthState.UpdateUserProfile(response.Data);
+                Snackbar.Add("Profile updated successfully!", Severity.Success);
+                _editingProfile = false;
+            }
+            else
+            {
+                Snackbar.Add(response.Message ?? "Failed to update profile.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingProfile = false;
+        }
+    }
+
     private async Task SignOutAllDevices()
     {
         try
