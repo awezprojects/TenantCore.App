@@ -146,7 +146,7 @@ else if (_app is not null)
                     }
                 </MudStack>
 
-                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-3" ActivePanelIndexChanged="OnTabChanged">
+                <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-3">
                     <MudTabPanel Text="@($"Active ({_users?.Count ?? 0})")" Icon="@Icons.Material.Filled.People">
                         @if (_usersLoading)
                         {
@@ -671,7 +671,7 @@ else if (_app is not null)
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadApplicationAsync(), LoadUsersAsync(), LoadAndCacheRolesAsync());
+        await Task.WhenAll(LoadApplicationAsync(), LoadUsersAsync(), LoadAndCacheRolesAsync(), LoadDeactivatedUsersAsync());
     }
 
     private async Task LoadApplicationAsync()
@@ -1055,15 +1055,6 @@ else if (_app is not null)
     }
 
     // ── Deactivated Users ──
-
-    private async Task OnTabChanged(int tabIndex)
-    {
-        // Tab 1 = Deactivated Users
-        if (tabIndex == 1 && !_deactivatedUsersLoaded)
-        {
-            await LoadDeactivatedUsersAsync();
-        }
-    }
 
     private async Task LoadDeactivatedUsersAsync()
     {
