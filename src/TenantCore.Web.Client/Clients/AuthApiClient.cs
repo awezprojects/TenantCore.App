@@ -1,15 +1,17 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using TenantCore.Shared.Dtos.Auth;
+using TenantCore.Web.Client.Services;
 
 namespace TenantCore.Web.Client.Clients;
 
 /// <summary>
 /// HTTP client implementation for Auth API in WebAssembly.
 /// </summary>
-public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
+public class AuthApiClient(HttpClient httpClient, AuthStateService authState) : IAuthApiClient
 {
     private const string BaseRoute = "api/auth";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -17,6 +19,14 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
     private static void IncludeCookies(HttpRequestMessage request)
     {
         request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+    }
+
+    private void SetAuthorizationHeader(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrEmpty(authState.AccessToken))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authState.AccessToken);
+        }
     }
 
     public async Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto request)
@@ -79,6 +89,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/logout");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -95,6 +106,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/logout-all");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -205,6 +217,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         try
         {
             using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/user/{userId}");
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -224,6 +237,7 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
+            SetAuthorizationHeader(requestMessage);
             IncludeCookies(requestMessage);
 
             var response = await httpClient.SendAsync(requestMessage);
@@ -232,6 +246,170 @@ public class AuthApiClient(HttpClient httpClient) : IAuthApiClient
         catch (Exception ex)
         {
             return CreateBasicErrorResponse($"Disable 2FA failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> ForgotPasswordAsync(ForgotPasswordRequestDto request)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/forgot-password")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Forgot password request failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/change-password/{userId}")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Change password failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<EnableTwoFactorResponseDto>> EnableTwoFactorAsync(Guid userId)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/2fa/enable/{userId}");
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleResponse<EnableTwoFactorResponseDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<EnableTwoFactorResponseDto>($"Enable 2FA failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> ConfirmEnableTwoFactorAsync(Guid userId, ValidateTwoFactorRequestDto request)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/2fa/confirm/{userId}")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Confirm 2FA failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<UserProfileDto>> UpdateUserProfileAsync(Guid userId, UpdateUserProfileRequestDto request)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Put, $"{BaseRoute}/user/{userId}/profile")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleResponse<UserProfileDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<UserProfileDto>($"Update profile failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> ActivateUserAsync(Guid userId)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Patch, $"{BaseRoute}/user/{userId}/activate");
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Activate user failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> DeactivateUserAsync(Guid userId)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Patch, $"{BaseRoute}/user/{userId}/deactivate");
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Deactivate user failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<List<UserSearchResultDto>>> SearchUsersByEmailAsync(string email)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/user/search?email={Uri.EscapeDataString(email)}");
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleResponse<List<UserSearchResultDto>>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<List<UserSearchResultDto>>($"User search failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse> AcceptExistingInvitationAsync(string token)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/accept-existing-invitation?token={Uri.EscapeDataString(token)}");
+            SetAuthorizationHeader(requestMessage);
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleBasicResponse(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateBasicErrorResponse($"Accept invitation failed: {ex.Message}");
         }
     }
 

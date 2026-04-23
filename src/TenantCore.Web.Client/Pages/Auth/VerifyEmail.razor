@@ -1,0 +1,147 @@
+@page "/auth/verify-email"
+@layout AuthLayout
+@inject IAuthApiClient AuthClient
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Verify Email - TenantCore</PageTitle>
+
+<MudGrid Justify="Justify.Center" Style="min-height: 100vh; margin: 0;">
+    <MudItem xs="12" sm="10" md="8" lg="6" xl="4">
+        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="background: white;">
+            <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+                <MudAvatar Size="Size.Large" Color="@(_verified ? Color.Success : _error ? Color.Error : Color.Primary)"
+                           Style="width: 80px; height: 80px;">
+                    @if (_verifying)
+                    {
+                        <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Surface" />
+                    }
+                    else if (_verified)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="font-size: 2.5rem;" />
+                    }
+                    else if (_error)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Error" Style="font-size: 2.5rem;" />
+                    }
+                    else
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.MarkEmailRead" Style="font-size: 2.5rem;" />
+                    }
+                </MudAvatar>
+
+                @if (_verifying)
+                {
+                    <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600;">
+                        Verifying Email...
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        Please wait while we verify your email address
+                    </MudText>
+                }
+                else if (_verified)
+                {
+                    <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600; color: var(--mud-palette-success);">
+                        Email Verified!
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        Your email has been successfully verified. You can now sign in to your account.
+                    </MudText>
+                }
+                else if (_error)
+                {
+                    <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600;">
+                        Verification Failed
+                    </MudText>
+                    <MudAlert Severity="Severity.Error" Class="mt-2" Variant="Variant.Filled">
+                        @_errorMessage
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600;">
+                        Invalid Link
+                    </MudText>
+                    <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                        The verification link is invalid or missing required parameters.
+                    </MudText>
+                }
+            </MudStack>
+
+            <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                @if (_verified)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/auth/login"
+                               FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;">
+                        <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
+                        Sign In
+                    </MudButton>
+                }
+                else if (!_verifying)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/auth/login"
+                               FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;">
+                        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-2" />
+                        Back to Login
+                    </MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/auth/resend-verification"
+                               Size="Size.Small">
+                        Resend Verification Email
+                    </MudButton>
+                }
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery]
+    public Guid? UserId { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? VerificationCode { get; set; }
+
+    private bool _verifying;
+    private bool _verified;
+    private bool _error;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (UserId.HasValue && !string.IsNullOrEmpty(VerificationCode))
+        {
+            await VerifyEmailAsync();
+        }
+    }
+
+    private async Task VerifyEmailAsync()
+    {
+        _verifying = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await AuthClient.VerifyEmailAsync(UserId!.Value, VerificationCode!);
+
+            if (response.Success)
+            {
+                _verified = true;
+            }
+            else
+            {
+                _error = true;
+                _errorMessage = response.Message ?? "Email verification failed. The link may have expired.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _errorMessage = "An unexpected error occurred during verification. Please try again.";
+            Console.WriteLine($"Verify email error: {ex.Message}");
+        }
+        finally
+        {
+            _verifying = false;
+        }
+    }
+}

@@ -154,6 +154,40 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
+    // POST /api/Application/invite-existing-user?invitedBy={guid}
+    [HttpPost("invite-existing-user")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> InviteExistingUserAsync(
+        [FromQuery] Guid invitedBy,
+        [FromBody] InviteExistingUserRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new InviteExistingUserCommand(invitedBy, request), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = "Invitation sent to the user. They will be added to the application once they accept."
+        };
+        return Ok(response);
+    }
+
+    // GET /api/Application/{applicationId}/users/deactivated
+    [HttpGet("{applicationId:guid}/users/deactivated")]
+    [ProducesResponseType(typeof(List<ApplicationUserResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetDeactivatedApplicationUsersQuery(applicationId), cancellationToken);
+        var response = new ApiResponse<List<ApplicationUserResponseDto>>
+        {
+            Success = true,
+            Data = result,
+            Message = $"{result.Count} deactivated user(s) found"
+        };
+        return Ok(response);
+    }
+
     // POST /api/Application/{applicationId}/users/{userId}/assign?roleId={guid}&assignedBy={guid}
     [HttpPost("{applicationId:guid}/users/{userId:guid}/assign")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -203,5 +237,64 @@ public class ApplicationController(ISender sender) : ControllerBase
     {
         await sender.Send(new DeleteApplicationCommand(applicationId), cancellationToken);
         return NoContent();
+    }
+
+    // PATCH /api/Application/{applicationId}/status?modifiedBy={guid}
+    [HttpPatch("{applicationId:guid}/status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ToggleApplicationStatusAsync(
+        Guid applicationId,
+        [FromQuery] Guid modifiedBy,
+        [FromBody] ToggleStatusRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ToggleApplicationStatusCommand(applicationId, modifiedBy, request.IsActive), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = request.IsActive ? "Application activated successfully" : "Application deactivated successfully"
+        };
+        return Ok(response);
+    }
+
+    // PATCH /api/Application/{applicationId}/users/{userId}/status?modifiedBy={guid}
+    [HttpPatch("{applicationId:guid}/users/{userId:guid}/status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ToggleUserApplicationMappingAsync(
+        Guid applicationId,
+        Guid userId,
+        [FromQuery] Guid modifiedBy,
+        [FromBody] ToggleStatusRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ToggleUserApplicationMappingCommand(applicationId, userId, modifiedBy, request.IsActive), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = request.IsActive ? "User mapping activated successfully" : "User mapping deactivated successfully"
+        };
+        return Ok(response);
+    }
+
+    // PUT /api/Application/{applicationId}/users/{userId}/role?modifiedBy={guid}
+    [HttpPut("{applicationId:guid}/users/{userId:guid}/role")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ChangeUserRoleAsync(
+        Guid applicationId,
+        Guid userId,
+        [FromQuery] Guid modifiedBy,
+        [FromBody] ChangeUserRoleRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ChangeUserRoleCommand(applicationId, userId, modifiedBy, request.NewRoleId), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = "User role changed successfully"
+        };
+        return Ok(response);
     }
 }
