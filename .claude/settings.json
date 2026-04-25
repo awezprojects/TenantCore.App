@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/src/TenantCore.Auth.API/Controllers/**)",
+      "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/**)"
+    ]
+  }
+}

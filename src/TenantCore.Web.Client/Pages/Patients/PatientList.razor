@@ -1,0 +1,247 @@
+@page "/patients"
+@layout AuthorizedLayout
+@inject IClinicApiClient ClinicClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Patients - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Patients</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="OpenRegisterDialog">
+        Register Patient
+    </MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_search" Label="Search by name or phone..." Variant="Variant.Outlined"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="false" Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is not null)
+{
+    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
+              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Phone</MudTh>
+            <MudTh>Date of Birth</MudTh>
+            <MudTh>Gender</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width: 100px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="patient">
+            <MudTd DataLabel="Name">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudAvatar Size="Size.Small" Color="Color.Primary">
+                        @(patient.FirstName.Length > 0 ? patient.FirstName[0] : '?')
+                    </MudAvatar>
+                    <MudText>@patient.FullName</MudText>
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Phone">@patient.PhoneNumber</MudTd>
+            <MudTd DataLabel="DOB">@(patient.DateOfBirth.HasValue ? patient.DateOfBirth.Value.ToString("MMM dd, yyyy") : "—")</MudTd>
+            <MudTd DataLabel="Gender">@patient.Gender</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="@(patient.IsActive ? Color.Success : Color.Error)"
+                         Size="Size.Small" Variant="Variant.Text">
+                    @(patient.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudTooltip Text="Edit">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="@(() => OpenEditDialog(patient))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No patients found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Showing @_result.Items.Count() of @_result.TotalCount patients
+        </MudText>
+        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
+    </MudStack>
+}
+
+<!-- Register / Edit Dialog -->
+<MudDialog @bind-Visible="_dialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit Patient" : "Register Patient")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_dob" Label="Date of Birth" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_gender" Label="Gender" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("Male")">Male</MudSelectItem>
+                    <MudSelectItem Value="@("Female")">Female</MudSelectItem>
+                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.PhoneNumber" Label="Phone Number" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Email" Label="Email (optional)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.AadhaarNumber" Label="Aadhaar Number (optional)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Address" Label="Address (optional)" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _saving;
+    private string? _search;
+    private int _page = 1;
+    private const int PageSize = 20;
+    private TenantCore.Shared.Common.PagedResult<PatientDto>? _result;
+    private Guid? _editingId;
+    private PatientFormModel _form = new();
+    private DateTime? _dob;
+    private string _gender = "Male";
+
+    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await ClinicClient.GetPatientsAsync(_page, PageSize, _search);
+        if (response.Success)
+            _result = response.Data;
+        else
+            Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") { _page = 1; await LoadAsync(); }
+    }
+
+    private void OpenRegisterDialog()
+    {
+        _editingId = null;
+        _form = new();
+        _dob = null;
+        _gender = "Male";
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(PatientDto patient)
+    {
+        _editingId = patient.Id;
+        _form = new PatientFormModel
+        {
+            FirstName = patient.FirstName,
+            LastName = patient.LastName,
+            PhoneNumber = patient.PhoneNumber,
+            Email = patient.Email,
+            AadhaarNumber = patient.AadhaarNumber,
+            Address = patient.Address
+        };
+        _dob = patient.DateOfBirth.HasValue ? patient.DateOfBirth.Value.ToDateTime(TimeOnly.MinValue) : null;
+        _gender = patient.Gender.ToString();
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.FirstName) || string.IsNullOrWhiteSpace(_form.LastName) ||
+            string.IsNullOrWhiteSpace(_form.PhoneNumber))
+        {
+            Snackbar.Add("First name, last name and phone number are required.", Severity.Warning);
+            return;
+        }
+        _saving = true;
+        var dob = _dob.HasValue ? DateOnly.FromDateTime(_dob.Value) : (DateOnly?)null;
+        var gender = Enum.Parse<TenantCore.Shared.Enums.Gender>(_gender);
+
+        ApiResponse<PatientDto> response;
+        if (_editingId.HasValue)
+        {
+            var dto = new UpdatePatientDto(_form.FirstName, _form.LastName, dob, gender,
+                _form.PhoneNumber, _form.Email, _form.AadhaarNumber, null, _form.Address);
+            response = await ClinicClient.UpdatePatientAsync(_editingId.Value, dto);
+        }
+        else
+        {
+            var dto = new CreatePatientDto(_form.FirstName, _form.LastName, dob, gender,
+                _form.PhoneNumber, _form.Email, _form.AadhaarNumber, null, _form.Address);
+            response = await ClinicClient.CreatePatientAsync(dto);
+        }
+
+        if (response.Success)
+        {
+            Snackbar.Add(_editingId.HasValue ? "Patient updated." : "Patient registered.", Severity.Success);
+            CloseDialog();
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(response.Message, Severity.Error);
+        }
+        _saving = false;
+    }
+
+    private class PatientFormModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
+        public string? Email { get; set; }
+        public string? AadhaarNumber { get; set; }
+        public string? Address { get; set; }
+    }
+}

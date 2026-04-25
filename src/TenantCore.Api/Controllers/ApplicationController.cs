@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TenantCore.Application.Features.Applications.Commands;
 using TenantCore.Application.Features.Applications.Queries;
+using TenantCore.Shared.Dtos;
 using TenantCore.Shared.Dtos.Auth;
 
 namespace TenantCore.Api.Controllers;
@@ -113,6 +114,20 @@ public class ApplicationController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new GetApplicationsByTypeQuery(applicationType), cancellationToken);
         var response = new ApiResponse<List<ApplicationResponseDto>>
+        {
+            Success = true,
+            Data = result
+        };
+        return Ok(response);
+    }
+
+    // GET /api/Application/{applicationId}/doctors
+    [HttpGet("{applicationId:guid}/doctors")]
+    [ProducesResponseType(typeof(List<DoctorDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDoctorsAsync(Guid applicationId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetDoctorsByApplicationQuery(applicationId), cancellationToken);
+        var response = new ApiResponse<List<DoctorDto>>
         {
             Success = true,
             Data = result

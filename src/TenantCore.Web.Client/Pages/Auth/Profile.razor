@@ -216,10 +216,32 @@
                                 Add an extra layer of security to your account
                             </MudText>
                         </MudStack>
-                        <MudChip T="string" Color="@(_isTwoFactorEnabled ? Color.Success : Color.Default)" 
-                                 Size="Size.Small" Variant="Variant.Filled">
-                            @(_isTwoFactorEnabled ? "Enabled" : "Disabled")
-                        </MudChip>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudChip T="string" Color="@(_isTwoFactorEnabled ? Color.Success : Color.Default)"
+                                     Size="Size.Small" Variant="Variant.Filled">
+                                @(_isTwoFactorEnabled ? "Enabled" : "Disabled")
+                            </MudChip>
+                            @if (_isTwoFactorEnabled)
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                                           OnClick="@(() => _disable2faDialogVisible = true)"
+                                           Disabled="_processing2fa">
+                                    Disable
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="InitiateEnable2faAsync"
+                                           Disabled="_processing2fa">
+                                    @if (_processing2fa)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                    }
+                                    Enable
+                                </MudButton>
+                            }
+                        </MudStack>
                     </MudStack>
                     <MudDivider />
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
@@ -275,12 +297,120 @@ else
     </DialogActions>
 </MudDialog>
 
+<!-- Enable 2FA Dialog -->
+<MudDialog @bind-Visible="_enable2faDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = false })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Enable Two-Factor Authentication</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_enable2faStep == 1 && !string.IsNullOrEmpty(_enable2faQrCode))
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                    Scan this QR code with your authenticator app (e.g. Google Authenticator), then enter the 6-digit code below.
+                </MudText>
+                <MudPaper Elevation="2" Class="pa-3">
+                    <img src="@($"data:image/png;base64,{_enable2faQrCode}")"
+                         alt="2FA QR Code" style="width: 200px; height: 200px;" />
+                </MudPaper>
+                <MudTextField @bind-Value="_enable2faOtp"
+                              Label="6-Digit Code"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Number"
+                              MaxLength="6"
+                              Placeholder="000000"
+                              FullWidth="true"
+                              Disabled="_processing2fa" />
+                @if (!string.IsNullOrEmpty(_twoFaError))
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_twoFaError</MudAlert>
+                }
+            </MudStack>
+        }
+        else if (string.IsNullOrEmpty(_enable2faQrCode))
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CancelEnable2fa" Disabled="_processing2fa">Cancel</MudButton>
+        @if (_enable2faStep == 1)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       OnClick="ConfirmEnable2faAsync"
+                       Disabled="_processing2fa || _enable2faOtp.Length != 6">
+                @if (_processing2fa)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Verify & Enable
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<!-- Disable 2FA Dialog -->
+<MudDialog @bind-Visible="_disable2faDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.SecurityUpdateWarning" Color="Color.Warning" />
+            <MudText Typo="Typo.h6">Disable Two-Factor Authentication</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Enter the current 6-digit code from your authenticator app to confirm.
+        </MudText>
+        <MudTextField @bind-Value="_disable2faOtp"
+                      Label="6-Digit Code"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Number"
+                      MaxLength="6"
+                      Placeholder="000000"
+                      FullWidth="true"
+                      Disabled="_processing2fa" />
+        @if (!string.IsNullOrEmpty(_twoFaError))
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_twoFaError</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => { _disable2faDialogVisible = false; _disable2faOtp = string.Empty; _twoFaError = null; })"
+                   Disabled="_processing2fa">
+            Cancel
+        </MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled"
+                   OnClick="Disable2faAsync"
+                   Disabled="_processing2fa || _disable2faOtp.Length != 6">
+            @if (_processing2fa)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Disable 2FA
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private bool _editingProfile;
     private bool _savingProfile;
     private bool _isTwoFactorEnabled;
     private bool _signOutAllDialogVisible;
     private UpdateUserProfileRequestDto _profileModel = new();
+
+    private bool _enable2faDialogVisible;
+    private bool _disable2faDialogVisible;
+    private bool _processing2fa;
+    private int _enable2faStep;
+    private string _enable2faQrCode = string.Empty;
+    private string _enable2faOtp = string.Empty;
+    private string _disable2faOtp = string.Empty;
+    private string? _twoFaError;
 
     protected override void OnInitialized()
     {
@@ -364,6 +494,140 @@ else
         catch (Exception ex)
         {
             Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task InitiateEnable2faAsync()
+    {
+        if (AuthState.CurrentUser is null) return;
+
+        _processing2fa = true;
+        _twoFaError = null;
+        _enable2faQrCode = string.Empty;
+        _enable2faStep = 0;
+        _enable2faOtp = string.Empty;
+        _enable2faDialogVisible = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await AuthClient.EnableTwoFactorAsync(AuthState.CurrentUser.UserId);
+            if (response.Success && response.Data?.QrCodeBase64 is not null)
+            {
+                _enable2faQrCode = response.Data.QrCodeBase64;
+                _enable2faStep = 1;
+            }
+            else
+            {
+                _twoFaError = response.Message ?? "Failed to initiate 2FA setup.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _twoFaError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _processing2fa = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ConfirmEnable2faAsync()
+    {
+        if (AuthState.CurrentUser is null) return;
+
+        _processing2fa = true;
+        _twoFaError = null;
+        StateHasChanged();
+
+        try
+        {
+            var request = new ValidateTwoFactorRequestDto { OtpCode = _enable2faOtp };
+            var response = await AuthClient.ConfirmEnableTwoFactorAsync(AuthState.CurrentUser.UserId, request);
+            if (response.Success)
+            {
+                _enable2faDialogVisible = false;
+                _enable2faOtp = string.Empty;
+                _enable2faQrCode = string.Empty;
+                await SyncUserProfileAsync();
+                Snackbar.Add("Two-factor authentication enabled successfully.", Severity.Success);
+            }
+            else
+            {
+                _twoFaError = response.Message ?? "Invalid code. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _twoFaError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _processing2fa = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SyncUserProfileAsync()
+    {
+        if (AuthState.CurrentUser is null) return;
+        try
+        {
+            var profile = await AuthClient.GetUserByIdAsync(AuthState.CurrentUser.UserId);
+            if (profile.Success && profile.Data is not null)
+            {
+                AuthState.UpdateUserProfile(profile.Data);
+                _isTwoFactorEnabled = profile.Data.IsTwoFactorEnabled;
+            }
+        }
+        catch
+        {
+            _isTwoFactorEnabled = AuthState.CurrentUser.IsTwoFactorEnabled;
+        }
+    }
+
+    private void CancelEnable2fa()
+    {
+        _enable2faDialogVisible = false;
+        _enable2faOtp = string.Empty;
+        _enable2faQrCode = string.Empty;
+        _enable2faStep = 0;
+        _twoFaError = null;
+    }
+
+    private async Task Disable2faAsync()
+    {
+        if (AuthState.CurrentUser is null) return;
+
+        _processing2fa = true;
+        _twoFaError = null;
+        StateHasChanged();
+
+        try
+        {
+            var request = new DisableTwoFactorRequestDto { Code = _disable2faOtp };
+            var response = await AuthClient.DisableTwoFactorAsync(AuthState.CurrentUser.UserId, request);
+            if (response.Success)
+            {
+                _disable2faDialogVisible = false;
+                _disable2faOtp = string.Empty;
+                await SyncUserProfileAsync();
+                Snackbar.Add("Two-factor authentication disabled.", Severity.Success);
+            }
+            else
+            {
+                _twoFaError = response.Message ?? "Invalid code. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _twoFaError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _processing2fa = false;
+            StateHasChanged();
         }
     }
 }

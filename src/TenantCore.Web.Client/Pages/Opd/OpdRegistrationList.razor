@@ -1,0 +1,288 @@
+@page "/opd"
+@page "/opd/new"
+@layout AuthorizedLayout
+@inject IClinicApiClient ClinicClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>OPD Registrations - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">OPD Registrations</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenNewDialog">
+        New OPD
+    </MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_search" Label="Search by patient name or reg. number..."
+                          Variant="Variant.Outlined" Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is not null)
+{
+    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
+              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
+        <HeaderContent>
+            <MudTh>Reg. No.</MudTh>
+            <MudTh>Patient</MudTh>
+            <MudTh>Doctor</MudTh>
+            <MudTh>Date</MudTh>
+            <MudTh>Fee</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width: 60px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="reg">
+            <MudTd DataLabel="Reg. No.">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
+                    @reg.RegistrationNumber
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Patient">@reg.PatientName</MudTd>
+            <MudTd DataLabel="Doctor">@(reg.DoctorName ?? "—")</MudTd>
+            <MudTd DataLabel="Date">@reg.RegistrationDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd DataLabel="Fee">₹@reg.Fee.ToString("N2")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(reg.Status)" Variant="Variant.Text">
+                    @reg.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudTooltip Text="View">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small"
+                                   OnClick="@(() => OpenViewDialog(reg))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No OPD registrations found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Showing @_result.Items.Count() of @_result.TotalCount registrations
+        </MudText>
+        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
+    </MudStack>
+}
+
+<!-- New OPD Dialog -->
+<MudDialog @bind-Visible="_newDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">New OPD Registration</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_patientSearch" Label="Search patient by name or phone..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true"
+                              @onkeyup="OnPatientSearchKeyUp" />
+            </MudItem>
+            @if (_patients.Any())
+            {
+                <MudItem xs="12">
+                    <MudSelect T="Guid" @bind-Value="_selectedPatientId" Label="Select Patient" Variant="Variant.Outlined">
+                        @foreach (var p in _patients)
+                        {
+                            <MudSelectItem Value="p.Id">@p.FullName — @p.PhoneNumber</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+            <MudItem xs="12">
+                <MudSelect T="Guid?" @bind-Value="_selectedDoctorId" Label="Select Doctor (optional)" Variant="Variant.Outlined">
+                    <MudSelectItem T="Guid?" Value="null">— No Doctor —</MudSelectItem>
+                    @foreach (var d in _doctors)
+                    {
+                        <MudSelectItem T="Guid?" Value="d.UserId">@d.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="_fee" Label="Fee (₹, leave 0 for clinic default)" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudNumericField @bind-Value="_weight" Label="Weight (kg)" Variant="Variant.Outlined" Min="0" Format="F1" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_bloodPressure" Label="BP (e.g. 120/80)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudNumericField @bind-Value="_pulseRate" Label="Pulse Rate (bpm)" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudNumericField @bind-Value="_oxygenSaturation" Label="O2 Saturation (%)" Variant="Variant.Outlined" Min="0" Max="100" Format="F1" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_notes" Label="Notes (optional)" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _newDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateOpdAsync" Disabled="_saving">
+            @(_saving ? "Saving..." : "Register")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- View Dialog -->
+<MudDialog @bind-Visible="_viewDialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">OPD Registration — @_selected?.RegistrationNumber</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_selected is not null)
+        {
+            <MudGrid>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Patient</MudText><MudText>@_selected.PatientName</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Doctor</MudText><MudText>@(_selected.DoctorName ?? "—")</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Date</MudText><MudText>@_selected.RegistrationDate.ToString("MMM dd, yyyy")</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Fee</MudText><MudText>₹@_selected.Fee.ToString("N2")</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText><MudText>@_selected.Status</MudText></MudItem>
+                <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">Weight</MudText><MudText>@(_selected.Weight.HasValue ? $"{_selected.Weight:F1} kg" : "—")</MudText></MudItem>
+                <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">BP</MudText><MudText>@(_selected.BloodPressure ?? "—")</MudText></MudItem>
+                <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">Pulse Rate</MudText><MudText>@(_selected.PulseRate.HasValue ? $"{_selected.PulseRate} bpm" : "—")</MudText></MudItem>
+                <MudItem xs="3"><MudText Typo="Typo.caption" Color="Color.Secondary">O2 Saturation</MudText><MudText>@(_selected.OxygenSaturation.HasValue ? $"{_selected.OxygenSaturation:F1}%" : "—")</MudText></MudItem>
+                <MudItem xs="12"><MudText Typo="Typo.caption" Color="Color.Secondary">Notes</MudText><MudText>@(_selected.Notes ?? "—")</MudText></MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _viewDialogVisible = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _newDialogVisible;
+    private bool _viewDialogVisible;
+    private bool _saving;
+    private string? _search;
+    private int _page = 1;
+    private const int PageSize = 20;
+    private TenantCore.Shared.Common.PagedResult<OpdRegistrationDto>? _result;
+    private OpdRegistrationDto? _selected;
+    private List<PatientDto> _patients = [];
+    private List<DoctorDto> _doctors = [];
+    private string? _patientSearch;
+    private Guid _selectedPatientId;
+    private Guid? _selectedDoctorId;
+    private decimal _fee;
+    private string? _notes;
+    private decimal? _weight;
+    private string? _bloodPressure;
+    private int? _pulseRate;
+    private decimal? _oxygenSaturation;
+
+    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        await LoadDoctorsAsync();
+        if (Navigation.Uri.EndsWith("/opd/new", StringComparison.OrdinalIgnoreCase))
+            OpenNewDialog();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await ClinicClient.GetOpdRegistrationsAsync(_page, PageSize, _search);
+        if (response.Success) _result = response.Data;
+        else Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private async Task LoadDoctorsAsync()
+    {
+        var response = await ClinicClient.GetDoctorsAsync();
+        if (response.Success) _doctors = response.Data?.ToList() ?? [];
+        else Snackbar.Add($"Could not load doctors: {response.Message}", Severity.Warning);
+    }
+
+    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAsync(); } }
+
+    private void OpenNewDialog()
+    {
+        _patientSearch = null;
+        _patients = [];
+        _selectedPatientId = Guid.Empty;
+        _selectedDoctorId = null;
+        _fee = 0;
+        _notes = null;
+        _weight = null;
+        _bloodPressure = null;
+        _pulseRate = null;
+        _oxygenSaturation = null;
+        _newDialogVisible = true;
+    }
+
+    private void OpenViewDialog(OpdRegistrationDto reg) { _selected = reg; _viewDialogVisible = true; }
+
+    private async Task OnPatientSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_patientSearch))
+        {
+            var response = await ClinicClient.GetPatientsAsync(1, 20, _patientSearch);
+            if (response.Success) _patients = response.Data?.Items.ToList() ?? [];
+        }
+    }
+
+    private async Task CreateOpdAsync()
+    {
+        if (_selectedPatientId == Guid.Empty) { Snackbar.Add("Please select a patient.", Severity.Warning); return; }
+        _saving = true;
+        var doctor = _selectedDoctorId.HasValue ? _doctors.FirstOrDefault(d => d.UserId == _selectedDoctorId) : null;
+        var dto = new CreateOpdRegistrationDto(
+            _selectedPatientId,
+            _selectedDoctorId ?? Guid.Empty,
+            doctor?.FullName ?? string.Empty,
+            _fee > 0 ? _fee : null,
+            _notes,
+            _weight > 0 ? _weight : null,
+            string.IsNullOrWhiteSpace(_bloodPressure) ? null : _bloodPressure,
+            _pulseRate > 0 ? _pulseRate : null,
+            _oxygenSaturation > 0 ? _oxygenSaturation : null);
+        var response = await ClinicClient.CreateOpdRegistrationAsync(dto);
+        if (response.Success)
+        {
+            Snackbar.Add($"OPD registration {response.Data?.RegistrationNumber} created.", Severity.Success);
+            _newDialogVisible = false;
+            await LoadAsync();
+        }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private static Color GetStatusColor(TenantCore.Shared.Enums.OpdStatus status) => status switch
+    {
+        TenantCore.Shared.Enums.OpdStatus.Pending => Color.Warning,
+        TenantCore.Shared.Enums.OpdStatus.InProgress => Color.Info,
+        TenantCore.Shared.Enums.OpdStatus.Completed => Color.Success,
+        TenantCore.Shared.Enums.OpdStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+}
