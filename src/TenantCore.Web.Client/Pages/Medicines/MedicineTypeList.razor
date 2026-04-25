@@ -1,0 +1,216 @@
+@page "/medicine-types"
+@layout AuthorizedLayout
+@inject IMedicineApiClient MedicineClient
+@inject ISnackbar Snackbar
+@inject AuthStateService AuthState
+
+<PageTitle>Medicine Types - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Medicine Types</MudText>
+    @if (_canManage)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
+            Add Type
+        </MudButton>
+    }
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="9">
+            <MudTextField @bind-Value="_search" Label="Search by name..." Variant="Variant.Outlined"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="false" Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is not null)
+{
+    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
+              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Description</MudTh>
+            <MudTh>Status</MudTh>
+            @if (_canManage)
+            {
+                <MudTh Style="width: 80px;">Actions</MudTh>
+            }
+        </HeaderContent>
+        <RowTemplate Context="type">
+            <MudTd DataLabel="Name"><strong>@type.Name</strong></MudTd>
+            <MudTd DataLabel="Description">@(type.Description ?? "—")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="@(type.IsActive ? Color.Success : Color.Error)"
+                         Size="Size.Small" Variant="Variant.Text">
+                    @(type.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            @if (_canManage)
+            {
+                <MudTd>
+                    <MudTooltip Text="Edit">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(type))" />
+                    </MudTooltip>
+                </MudTd>
+            }
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No medicine types found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Showing @_result.Items.Count of @_result.TotalCount types
+        </MudText>
+        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
+    </MudStack>
+}
+
+<!-- Create / Edit Dialog -->
+<MudDialog @bind-Visible="_dialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit Medicine Type" : "Add Medicine Type")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Name" Label="Name *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Description" Label="Description" Variant="Variant.Outlined" Lines="3" />
+            </MudItem>
+            @if (_editingId.HasValue)
+            {
+                <MudItem xs="12" Class="d-flex align-center">
+                    <MudCheckBox @bind-Value="_form.IsActive" Label="Is Active" Color="Color.Success" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _saving;
+    private bool _canManage;
+    private string? _search;
+    private int _page = 1;
+    private const int PageSize = 20;
+    private TenantCore.Shared.Common.PagedResult<MedicineTypeDto>? _result;
+    private Guid? _editingId;
+    private MedicineTypeFormModel _form = new();
+
+    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var clinicalRoles = TenantCore.Shared.Authorization.AppRoles.ClinicalRoles;
+        _canManage = AuthState.CurrentUser?.UserRoles
+            .Any(r => r.IsActive && clinicalRoles.Contains(r.RoleName)) ?? false;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await MedicineClient.GetMedicineTypesAsync(_page, PageSize, _search);
+        if (response.Success)
+            _result = response.Data;
+        else
+            Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") { _page = 1; await LoadAsync(); }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingId = null;
+        _form = new();
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(MedicineTypeDto type)
+    {
+        _editingId = type.Id;
+        _form = new MedicineTypeFormModel
+        {
+            Name = type.Name,
+            Description = type.Description,
+            IsActive = type.IsActive
+        };
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Name))
+        {
+            Snackbar.Add("Name is required.", Severity.Warning);
+            return;
+        }
+        _saving = true;
+
+        ApiResponse<MedicineTypeDto> response;
+        if (_editingId.HasValue)
+        {
+            var dto = new UpdateMedicineTypeDto(_form.Name, _form.Description, _form.IsActive);
+            response = await MedicineClient.UpdateMedicineTypeAsync(_editingId.Value, dto);
+        }
+        else
+        {
+            var dto = new CreateMedicineTypeDto(_form.Name, _form.Description);
+            response = await MedicineClient.CreateMedicineTypeAsync(dto);
+        }
+
+        if (response.Success)
+        {
+            Snackbar.Add(_editingId.HasValue ? "Medicine type updated." : "Medicine type added.", Severity.Success);
+            CloseDialog();
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(response.Message, Severity.Error);
+        }
+        _saving = false;
+    }
+
+    private class MedicineTypeFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+}

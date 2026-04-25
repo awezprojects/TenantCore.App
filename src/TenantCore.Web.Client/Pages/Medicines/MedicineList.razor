@@ -1,0 +1,378 @@
+@page "/medicines"
+@layout AuthorizedLayout
+@inject IMedicineApiClient MedicineClient
+@inject ISnackbar Snackbar
+@inject AuthStateService AuthState
+
+<PageTitle>Medicines - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Medicines</MudText>
+    @if (_canManage)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenCreateDialog">
+            Add Medicine
+        </MudButton>
+    }
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_search" Label="Search by name..." Variant="Variant.Outlined"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="false" Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="_brandNameFilter" Label="Brand Name" Variant="Variant.Outlined"
+                          Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="_genericNameFilter" Label="Generic Name" Variant="Variant.Outlined"
+                          Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="Guid?" @bind-Value="_medicineTypeFilter" Label="Type" Variant="Variant.Outlined" Clearable="true"
+                       SelectedValuesChanged="@(_ => OnFilterChanged())">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Types</MudSelectItem>
+                @foreach (var type in _medicineTypes)
+                {
+                    <MudSelectItem T="Guid?" Value="@type.Id">@type.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center gap-2">
+            <MudChip T="string" Color="@(_isGenericFilter == true ? Color.Primary : Color.Default)"
+                     OnClick="@(() => ToggleIsGeneric(true))" Variant="Variant.Outlined">Generic</MudChip>
+            <MudChip T="string" Color="@(_isGenericFilter == false ? Color.Secondary : Color.Default)"
+                     OnClick="@(() => ToggleIsGeneric(false))" Variant="Variant.Outlined">Branded</MudChip>
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true"
+                       OnClick="ClearFilters" StartIcon="@Icons.Material.Filled.Clear">
+                Clear
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is not null)
+{
+    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
+              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Generic Name</MudTh>
+            <MudTh>Brand Name</MudTh>
+            <MudTh>Type</MudTh>
+            <MudTh>Form</MudTh>
+            <MudTh>Dosage</MudTh>
+            <MudTh>Kind</MudTh>
+            <MudTh>Status</MudTh>
+            @if (_canManage)
+            {
+                <MudTh Style="width: 80px;">Actions</MudTh>
+            }
+        </HeaderContent>
+        <RowTemplate Context="medicine">
+            <MudTd DataLabel="Name"><strong>@medicine.Name</strong></MudTd>
+            <MudTd DataLabel="Generic Name">@(medicine.GenericName ?? "—")</MudTd>
+            <MudTd DataLabel="Brand Name">@(medicine.BrandName ?? "—")</MudTd>
+            <MudTd DataLabel="Type">@(medicine.MedicineTypeName ?? "—")</MudTd>
+            <MudTd DataLabel="Form">@(medicine.Form ?? "—")</MudTd>
+            <MudTd DataLabel="Dosage">@(medicine.Dosage ?? "—")</MudTd>
+            <MudTd DataLabel="Kind">
+                <MudChip T="string" Color="@(medicine.IsGeneric ? Color.Info : Color.Warning)"
+                         Size="Size.Small" Variant="Variant.Text">
+                    @(medicine.IsGeneric ? "Generic" : "Branded")
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="@(medicine.IsActive ? Color.Success : Color.Error)"
+                         Size="Size.Small" Variant="Variant.Text">
+                    @(medicine.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            @if (_canManage)
+            {
+                <MudTd>
+                    <MudTooltip Text="Edit">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(medicine))" />
+                    </MudTooltip>
+                </MudTd>
+            }
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No medicines found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Showing @_result.Items.Count of @_result.TotalCount medicines
+        </MudText>
+        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
+    </MudStack>
+}
+
+<!-- Create / Edit Dialog -->
+<MudDialog @bind-Visible="_dialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit Medicine" : "Add Medicine")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Name" Label="Name *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.GenericName" Label="Generic Name" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.BrandName" Label="Brand Name" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="Guid?" @bind-Value="_form.MedicineTypeId" Label="Medicine Type" Variant="Variant.Outlined" Clearable="true">
+                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">None</MudSelectItem>
+                    @foreach (var type in _medicineTypes)
+                    {
+                        <MudSelectItem T="Guid?" Value="@type.Id">@type.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Form" Label="Form (Tablet, Syrup...)" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Dosage" Label="Dosage" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Manufacturer" Label="Manufacturer" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.PackSize" Label="Pack Size" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Composition" Label="Composition" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Composition2" Label="Composition 2" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Description" Label="Description" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Uses" Label="Uses" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.SideEffects" Label="Side Effects" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Contraindications" Label="Contraindications" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.Storage" Label="Storage Instructions" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="3" Class="d-flex align-center">
+                <MudCheckBox @bind-Value="_form.IsGeneric" Label="Is Generic" Color="Color.Primary" />
+            </MudItem>
+            @if (_editingId.HasValue)
+            {
+                <MudItem xs="12" sm="3" Class="d-flex align-center">
+                    <MudCheckBox @bind-Value="_form.IsActive" Label="Is Active" Color="Color.Success" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _saving;
+    private bool _canManage;
+
+    private string? _search;
+    private string? _brandNameFilter;
+    private string? _genericNameFilter;
+    private Guid? _medicineTypeFilter;
+    private bool? _isGenericFilter;
+
+    private int _page = 1;
+    private const int PageSize = 20;
+
+    private TenantCore.Shared.Common.PagedResult<MedicineDto>? _result;
+    private List<MedicineTypeDto> _medicineTypes = [];
+
+    private Guid? _editingId;
+    private MedicineFormModel _form = new();
+
+    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var clinicalRoles = TenantCore.Shared.Authorization.AppRoles.ClinicalRoles;
+        _canManage = AuthState.CurrentUser?.UserRoles
+            .Any(r => r.IsActive && clinicalRoles.Contains(r.RoleName)) ?? false;
+
+        await LoadTypesAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadTypesAsync()
+    {
+        var response = await MedicineClient.GetMedicineTypesAsync(pageSize: 200);
+        if (response.Success && response.Data is not null)
+            _medicineTypes = response.Data.Items.ToList();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await MedicineClient.GetMedicinesAsync(
+            _page, PageSize, _search, _brandNameFilter, _genericNameFilter, _medicineTypeFilter, _isGenericFilter);
+        if (response.Success)
+            _result = response.Data;
+        else
+            Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") { _page = 1; await LoadAsync(); }
+    }
+
+    private async Task OnFilterChanged() { _page = 1; await LoadAsync(); }
+
+    private async Task ToggleIsGeneric(bool value)
+    {
+        _isGenericFilter = _isGenericFilter == value ? null : value;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        _search = null;
+        _brandNameFilter = null;
+        _genericNameFilter = null;
+        _medicineTypeFilter = null;
+        _isGenericFilter = null;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingId = null;
+        _form = new();
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(MedicineDto medicine)
+    {
+        _editingId = medicine.Id;
+        _form = new MedicineFormModel
+        {
+            Name = medicine.Name,
+            GenericName = medicine.GenericName,
+            BrandName = medicine.BrandName,
+            Description = medicine.Description,
+            Composition = medicine.Composition,
+            Composition2 = medicine.Composition2,
+            Dosage = medicine.Dosage,
+            Form = medicine.Form,
+            Manufacturer = medicine.Manufacturer,
+            IsGeneric = medicine.IsGeneric,
+            PackSize = medicine.PackSize,
+            Uses = medicine.Uses,
+            SideEffects = medicine.SideEffects,
+            Contraindications = medicine.Contraindications,
+            Storage = medicine.Storage,
+            IsActive = medicine.IsActive,
+            MedicineTypeId = medicine.MedicineTypeId
+        };
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Name))
+        {
+            Snackbar.Add("Medicine name is required.", Severity.Warning);
+            return;
+        }
+        _saving = true;
+
+        ApiResponse<MedicineDto> response;
+        if (_editingId.HasValue)
+        {
+            var dto = new UpdateMedicineDto(
+                _form.Name, _form.GenericName, _form.BrandName, _form.Description,
+                _form.Composition, _form.Composition2, _form.Dosage, _form.Form,
+                _form.Manufacturer, _form.IsGeneric, _form.PackSize, _form.Uses,
+                _form.SideEffects, _form.Contraindications, _form.Storage, _form.IsActive, _form.MedicineTypeId);
+            response = await MedicineClient.UpdateMedicineAsync(_editingId.Value, dto);
+        }
+        else
+        {
+            var dto = new CreateMedicineDto(
+                _form.Name, _form.GenericName, _form.BrandName, _form.Description,
+                _form.Composition, _form.Composition2, _form.Dosage, _form.Form,
+                _form.Manufacturer, _form.IsGeneric, _form.PackSize, _form.Uses,
+                _form.SideEffects, _form.Contraindications, _form.Storage, _form.MedicineTypeId);
+            response = await MedicineClient.CreateMedicineAsync(dto);
+        }
+
+        if (response.Success)
+        {
+            Snackbar.Add(_editingId.HasValue ? "Medicine updated." : "Medicine added.", Severity.Success);
+            CloseDialog();
+            await LoadAsync();
+        }
+        else
+        {
+            Snackbar.Add(response.Message, Severity.Error);
+        }
+        _saving = false;
+    }
+
+    private class MedicineFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? GenericName { get; set; }
+        public string? BrandName { get; set; }
+        public string? Description { get; set; }
+        public string? Composition { get; set; }
+        public string? Composition2 { get; set; }
+        public string? Dosage { get; set; }
+        public string? Form { get; set; }
+        public string? Manufacturer { get; set; }
+        public bool IsGeneric { get; set; }
+        public string? PackSize { get; set; }
+        public string? Uses { get; set; }
+        public string? SideEffects { get; set; }
+        public string? Contraindications { get; set; }
+        public string? Storage { get; set; }
+        public bool IsActive { get; set; } = true;
+        public Guid? MedicineTypeId { get; set; }
+    }
+}
