@@ -37,4 +37,10 @@ builder.Services.AddHttpClient<IApplicationApiClient, ApplicationApiClient>(clie
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 });
 
+// Register Medicine API Client
+builder.Services.AddHttpClient<IMedicineApiClient, MedicineApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+});
+
 await builder.Build().RunAsync();

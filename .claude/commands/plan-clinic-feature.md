@@ -1,4 +1,4 @@
-Plan a new feature for the TenantCore.App codebase. The feature to plan is: $ARGUMENTS
+﻿Plan a new feature for the TenantCore.App codebase. The feature to plan is: $ARGUMENTS
 
 ---
 
@@ -108,60 +108,6 @@ _(List all FluentValidation rules for new commands. Write "N/A" if no new valida
 
 ---
 
-## Exact Code Snippets
-
-For every non-trivial file, include the complete or key code so the plan can be executed by reading it alone.
-Follow these patterns exactly:
-
-**Controller** — thin, primary constructor, only `sender.Send(...)`:
-```csharp
-[ApiController]
-[Route("api/[controller]")]
-[Produces("application/json")]
-[Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class XxxController(ISender sender) : ControllerBase { ... }
-```
-
-**Command/Query** — `sealed record`, `IRequest<T>`:
-```csharp
-public sealed record CreateXxxCommand(string Name) : IRequest<XxxDto>;
-```
-
-**Handler** — `sealed class`, primary constructor, one per file:
-```csharp
-public sealed class CreateXxxHandler(IXxxRepository repository, ILogger<CreateXxxHandler> logger)
-    : IRequestHandler<CreateXxxCommand, XxxDto> { ... }
-```
-
-**Translator** — `static class`, `static` methods, no AutoMapper:
-```csharp
-public static class XxxTranslator
-{
-    public static XxxDto ToDto(Xxx entity) => new() { ... };
-}
-```
-
-**Entity** — static factory, private EF constructor:
-```csharp
-public class Xxx : AuditableEntity
-{
-    private Xxx() { }
-    public static Xxx Create(...) => new() { Id = Guid.NewGuid(), ... };
-}
-```
-
-**Read DTO** — `class` with `init` setters:
-```csharp
-public class XxxDto { public Guid Id { get; init; } ... }
-```
-
-**Write DTO** — `sealed record`:
-```csharp
-public sealed record CreateXxxDto(string Name);
-```
-
----
-
 ## Implementation Order
 
 Numbered list of every change, in the exact order to apply them:
@@ -195,4 +141,4 @@ Numbered list of every change, in the exact order to apply them:
 - **Status**: Not started
 ```
 
-The plan must be self-contained and precise. Every file path must be exact (relative from repo root). Every code snippet must be complete enough that a developer can implement it without referring to anything else. Do not leave vague instructions like "implement as needed" — specify exactly what to write.
+The plan must be concise and precise. Every file path must be exact (relative from repo root). Do NOT include any code examples or class implementations — those are written during execution. Field names, property types, validation rules, and endpoint signatures are sufficient. The plan is a blueprint, not code.
