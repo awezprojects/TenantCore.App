@@ -1,185 +1,112 @@
 @page "/dashboard"
 @layout AuthorizedLayout
 @inject AuthStateService AuthState
-@inject ITenantApiClient TenantClient
 
 <PageTitle>Dashboard - TenantCore</PageTitle>
 
 <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
 
-@if (_loading)
-{
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-}
-else
-{
-    <MudGrid>
-        <!-- Stats Cards -->
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Total Tenants</MudText>
-                        <MudText Typo="Typo.h4">@_totalTenants</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.Business" />
-                    </MudAvatar>
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">OPD Registrations</MudText>
+                    <MudText Typo="Typo.h4">—</MudText>
                 </MudStack>
-            </MudPaper>
-        </MudItem>
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
+                </MudAvatar>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Active Tenants</MudText>
-                        <MudText Typo="Typo.h4">@_activeTenants</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
-                    </MudAvatar>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">IPD Admissions</MudText>
+                    <MudText Typo="Typo.h4">—</MudText>
                 </MudStack>
-            </MudPaper>
-        </MudItem>
+                <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.Bed" />
+                </MudAvatar>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Inactive Tenants</MudText>
-                        <MudText Typo="Typo.h4">@_inactiveTenants</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.PauseCircle" />
-                    </MudAvatar>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Patients</MudText>
+                    <MudText Typo="Typo.h4">—</MudText>
                 </MudStack>
-            </MudPaper>
-        </MudItem>
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.People" />
+                </MudAvatar>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Expiring Soon</MudText>
-                        <MudText Typo="Typo.h4">@_expiringSoon</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Error" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.Warning" />
-                    </MudAvatar>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Today's Revenue</MudText>
+                    <MudText Typo="Typo.h4">—</MudText>
                 </MudStack>
-            </MudPaper>
-        </MudItem>
+                <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Large">
+                    <MudIcon Icon="@Icons.Material.Filled.CurrencyRupee" />
+                </MudAvatar>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-        <!-- Recent Tenants -->
-        <MudItem xs="12" md="8">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-4">Recent Tenants</MudText>
-                @if (_recentTenants.Any())
-                {
-                    <MudTable Items="_recentTenants" Hover="true" Dense="true">
-                        <HeaderContent>
-                            <MudTh>Name</MudTh>
-                            <MudTh>Subdomain</MudTh>
-                            <MudTh>Status</MudTh>
-                            <MudTh>Created</MudTh>
-                        </HeaderContent>
-                        <RowTemplate Context="tenant">
-                            <MudTd DataLabel="Name">@tenant.Name</MudTd>
-                            <MudTd DataLabel="Subdomain">@tenant.Subdomain</MudTd>
-                            <MudTd DataLabel="Status">
-                                <MudChip T="string" Color="@(tenant.IsActive ? Color.Success : Color.Error)" 
-                                         Size="Size.Small" Variant="Variant.Text">
-                                    @(tenant.IsActive ? "Active" : "Inactive")
-                                </MudChip>
-                            </MudTd>
-                            <MudTd DataLabel="Created">@tenant.CreatedAt.ToString("MMM dd, yyyy")</MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                }
-                else
-                {
-                    <MudText Color="Color.Secondary">No tenants found.</MudText>
-                }
-            </MudPaper>
-        </MudItem>
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">Quick Actions</MudText>
+            <MudStack Spacing="2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Add" Href="/opd/new">
+                    New OPD Registration
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Success" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Add" Href="/ipd/new">
+                    New IPD Admission
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.PersonAdd" Href="/patients/new">
+                    Register Patient
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Info" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Person" Href="/auth/profile">
+                    Manage Profile
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
 
-        <!-- Quick Actions -->
-        <MudItem xs="12" md="4">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-4">Quick Actions</MudText>
-                <MudStack Spacing="2">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                               StartIcon="@Icons.Material.Filled.Add" Href="/tenants/create">
-                        Create New Tenant
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true"
-                               StartIcon="@Icons.Material.Filled.List" Href="/tenants">
-                        View All Tenants
-                    </MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Info" FullWidth="true"
-                               StartIcon="@Icons.Material.Filled.Person" Href="/auth/profile">
-                        Manage Profile
-                    </MudButton>
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">System Info</MudText>
+            <MudStack Spacing="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Render Mode</MudText>
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small">WebAssembly</MudChip>
                 </MudStack>
-            </MudPaper>
-
-            <MudPaper Elevation="2" Class="pa-4 mt-4">
-                <MudText Typo="Typo.h6" Class="mb-4">System Info</MudText>
-                <MudStack Spacing="2">
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Render Mode</MudText>
-                        <MudChip T="string" Color="Color.Info" Size="Size.Small">WebAssembly</MudChip>
-                    </MudStack>
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Framework</MudText>
-                        <MudText Typo="Typo.body2">.NET 8</MudText>
-                    </MudStack>
-                    <MudStack Row="true" Justify="Justify.SpaceBetween">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">UI Library</MudText>
-                        <MudText Typo="Typo.body2">MudBlazor</MudText>
-                    </MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Framework</MudText>
+                    <MudText Typo="Typo.body2">.NET 8</MudText>
                 </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-}
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">UI Library</MudText>
+                    <MudText Typo="Typo.body2">MudBlazor</MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
 
 @code {
-    private bool _loading = true;
-    private int _totalTenants;
-    private int _activeTenants;
-    private int _inactiveTenants;
-    private int _expiringSoon;
-    private List<TenantDto> _recentTenants = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadDashboardData();
-    }
-
-    private async Task LoadDashboardData()
-    {
-        _loading = true;
-        try
-        {
-            var result = await TenantClient.GetTenantsAsync(1, 100);
-            var tenants = result.Items.ToList();
-
-            _totalTenants = result.TotalCount;
-            _activeTenants = tenants.Count(t => t.IsActive);
-            _inactiveTenants = tenants.Count(t => !t.IsActive);
-            _expiringSoon = tenants.Count(t => t.SubscriptionExpiresAt.HasValue && 
-                                               t.SubscriptionExpiresAt.Value <= DateTime.UtcNow.AddDays(30));
-            _recentTenants = tenants.OrderByDescending(t => t.CreatedAt).Take(5).ToList();
-        }
-        catch
-        {
-            // Handle error silently for dashboard
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
 }

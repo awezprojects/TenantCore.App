@@ -1,0 +1,338 @@
+@page "/ipd"
+@page "/ipd/new"
+@layout AuthorizedLayout
+@inject IClinicApiClient ClinicClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>IPD Admissions - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">IPD Admissions</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenAdmitDialog">
+        Admit Patient
+    </MudButton>
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_search" Label="Search by patient name or admission number..."
+                          Variant="Variant.Outlined" Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is not null)
+{
+    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
+              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
+        <HeaderContent>
+            <MudTh>Admission No.</MudTh>
+            <MudTh>Patient</MudTh>
+            <MudTh>Doctor</MudTh>
+            <MudTh>Ward / Bed</MudTh>
+            <MudTh>Admitted</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width: 100px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="reg">
+            <MudTd DataLabel="Admission No.">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
+                    @reg.AdmissionNumber
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Patient">@reg.PatientName</MudTd>
+            <MudTd DataLabel="Doctor">@(reg.DoctorName ?? "—")</MudTd>
+            <MudTd DataLabel="Ward / Bed">
+                @(reg.WardName ?? "—") @(reg.RoomNumber is not null ? $"/ Rm {reg.RoomNumber}" : "") @(reg.BedNumber is not null ? $"/ Bed {reg.BedNumber}" : "")
+            </MudTd>
+            <MudTd DataLabel="Admitted">@reg.AdmissionDate.ToString("MMM dd, yyyy")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(reg.Status)" Variant="Variant.Text">
+                    @reg.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudStack Row="true" Spacing="0">
+                    <MudTooltip Text="View">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small"
+                                       OnClick="@(() => OpenViewDialog(reg))" />
+                    </MudTooltip>
+                    @if (reg.Status == TenantCore.Shared.Enums.IpdStatus.Admitted)
+                    {
+                        <MudTooltip Text="Discharge">
+                            <MudIconButton Icon="@Icons.Material.Filled.ExitToApp" Color="Color.Warning" Size="Size.Small"
+                                           OnClick="@(() => OpenDischargeDialog(reg))" />
+                        </MudTooltip>
+                    }
+                </MudStack>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No IPD admissions found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Showing @_result.Items.Count() of @_result.TotalCount admissions
+        </MudText>
+        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
+    </MudStack>
+}
+
+<!-- Admit Dialog -->
+<MudDialog @bind-Visible="_admitDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Admit Patient (IPD)</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_patientSearch" Label="Search patient by name or phone..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true"
+                              @onkeyup="OnPatientSearchKeyUp" />
+            </MudItem>
+            @if (_patients.Any())
+            {
+                <MudItem xs="12">
+                    <MudSelect T="Guid" @bind-Value="_selectedPatientId" Label="Select Patient" Variant="Variant.Outlined">
+                        @foreach (var p in _patients)
+                        {
+                            <MudSelectItem Value="p.Id">@p.FullName — @p.PhoneNumber</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+            }
+            <MudItem xs="12">
+                <MudSelect T="Guid?" @bind-Value="_selectedDoctorId" Label="Select Doctor (optional)" Variant="Variant.Outlined">
+                    <MudSelectItem T="Guid?" Value="null">— No Doctor —</MudSelectItem>
+                    @foreach (var d in _doctors)
+                    {
+                        <MudSelectItem T="Guid?" Value="d.UserId">@d.FullName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_wardName" Label="Ward Name" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_roomNumber" Label="Room Number" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_bedNumber" Label="Bed Number" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="_initialFee" Label="Initial Fee (₹)" Variant="Variant.Outlined" Min="0" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_admissionNotes" Label="Admission Notes (optional)" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _admitDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AdmitAsync" Disabled="_saving">
+            @(_saving ? "Admitting..." : "Admit")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- View Dialog -->
+<MudDialog @bind-Visible="_viewDialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">IPD Admission — @_selected?.AdmissionNumber</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_selected is not null)
+        {
+            <MudGrid>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Patient</MudText><MudText>@_selected.PatientName</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Doctor</MudText><MudText>@(_selected.DoctorName ?? "—")</MudText></MudItem>
+                <MudItem xs="4"><MudText Typo="Typo.caption" Color="Color.Secondary">Ward</MudText><MudText>@(_selected.WardName ?? "—")</MudText></MudItem>
+                <MudItem xs="4"><MudText Typo="Typo.caption" Color="Color.Secondary">Room</MudText><MudText>@(_selected.RoomNumber ?? "—")</MudText></MudItem>
+                <MudItem xs="4"><MudText Typo="Typo.caption" Color="Color.Secondary">Bed</MudText><MudText>@(_selected.BedNumber ?? "—")</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Admitted</MudText><MudText>@_selected.AdmissionDate.ToString("MMM dd, yyyy")</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText><MudText>@_selected.Status</MudText></MudItem>
+                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Initial Fee</MudText><MudText>₹@_selected.InitialFee.ToString("N2")</MudText></MudItem>
+                @if (_selected.DischargeDate.HasValue)
+                {
+                    <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Discharged</MudText><MudText>@_selected.DischargeDate.Value.ToString("MMM dd, yyyy")</MudText></MudItem>
+                    <MudItem xs="12"><MudText Typo="Typo.caption" Color="Color.Secondary">Discharge Notes</MudText><MudText>@(_selected.DischargeNotes ?? "—")</MudText></MudItem>
+                }
+                <MudItem xs="12"><MudText Typo="Typo.caption" Color="Color.Secondary">Admission Notes</MudText><MudText>@(_selected.AdmissionNotes ?? "—")</MudText></MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _viewDialogVisible = false)">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Discharge Dialog -->
+<MudDialog @bind-Visible="_dischargeDialogVisible">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Discharge — @_discharging?.PatientName</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_dischargeNotes" Label="Discharge Notes (optional)" Variant="Variant.Outlined" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _dischargeDialogVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="DischargeAsync" Disabled="_saving">
+            @(_saving ? "Discharging..." : "Discharge")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _admitDialogVisible;
+    private bool _viewDialogVisible;
+    private bool _dischargeDialogVisible;
+    private bool _saving;
+    private string? _search;
+    private int _page = 1;
+    private const int PageSize = 20;
+    private TenantCore.Shared.Common.PagedResult<IpdRegistrationDto>? _result;
+    private IpdRegistrationDto? _selected;
+    private IpdRegistrationDto? _discharging;
+    private List<PatientDto> _patients = [];
+    private List<DoctorDto> _doctors = [];
+    private string? _patientSearch;
+    private Guid _selectedPatientId;
+    private Guid? _selectedDoctorId;
+    private string? _wardName;
+    private string? _roomNumber;
+    private string? _bedNumber;
+    private decimal _initialFee;
+    private string? _admissionNotes;
+    private string? _dischargeNotes;
+
+    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        await LoadDoctorsAsync();
+        if (Navigation.Uri.EndsWith("/ipd/new", StringComparison.OrdinalIgnoreCase))
+            OpenAdmitDialog();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await ClinicClient.GetIpdRegistrationsAsync(_page, PageSize, _search);
+        if (response.Success) _result = response.Data;
+        else Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private async Task LoadDoctorsAsync()
+    {
+        var response = await ClinicClient.GetDoctorsAsync();
+        if (response.Success) _doctors = response.Data?.ToList() ?? [];
+        else Snackbar.Add($"Could not load doctors: {response.Message}", Severity.Warning);
+    }
+
+    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAsync(); } }
+
+    private void OpenAdmitDialog()
+    {
+        _patientSearch = null;
+        _patients = [];
+        _selectedPatientId = Guid.Empty;
+        _selectedDoctorId = null;
+        _wardName = null;
+        _roomNumber = null;
+        _bedNumber = null;
+        _initialFee = 0;
+        _admissionNotes = null;
+        _admitDialogVisible = true;
+    }
+
+    private void OpenViewDialog(IpdRegistrationDto reg) { _selected = reg; _viewDialogVisible = true; }
+
+    private void OpenDischargeDialog(IpdRegistrationDto reg)
+    {
+        _discharging = reg;
+        _dischargeNotes = null;
+        _dischargeDialogVisible = true;
+    }
+
+    private async Task OnPatientSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_patientSearch))
+        {
+            var response = await ClinicClient.GetPatientsAsync(1, 20, _patientSearch);
+            if (response.Success) _patients = response.Data?.Items.ToList() ?? [];
+        }
+    }
+
+    private async Task AdmitAsync()
+    {
+        if (_selectedPatientId == Guid.Empty) { Snackbar.Add("Please select a patient.", Severity.Warning); return; }
+        _saving = true;
+        var doctor = _selectedDoctorId.HasValue ? _doctors.FirstOrDefault(d => d.UserId == _selectedDoctorId) : null;
+        var dto = new CreateIpdRegistrationDto(
+            _selectedPatientId,
+            _selectedDoctorId ?? Guid.Empty,
+            doctor?.FullName ?? string.Empty,
+            _wardName,
+            _roomNumber,
+            _bedNumber,
+            _initialFee,
+            _admissionNotes);
+        var response = await ClinicClient.CreateIpdRegistrationAsync(dto);
+        if (response.Success)
+        {
+            Snackbar.Add($"Patient admitted as {response.Data?.AdmissionNumber}.", Severity.Success);
+            _admitDialogVisible = false;
+            await LoadAsync();
+        }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private async Task DischargeAsync()
+    {
+        if (_discharging is null) return;
+        _saving = true;
+        var response = await ClinicClient.DischargePatientAsync(_discharging.Id, new DischargePatientDto(_dischargeNotes));
+        if (response.Success)
+        {
+            Snackbar.Add("Patient discharged successfully.", Severity.Success);
+            _dischargeDialogVisible = false;
+            await LoadAsync();
+        }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private static Color GetStatusColor(TenantCore.Shared.Enums.IpdStatus status) => status switch
+    {
+        TenantCore.Shared.Enums.IpdStatus.Admitted => Color.Info,
+        TenantCore.Shared.Enums.IpdStatus.Discharged => Color.Success,
+        TenantCore.Shared.Enums.IpdStatus.Transferred => Color.Warning,
+        TenantCore.Shared.Enums.IpdStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+}

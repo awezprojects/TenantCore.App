@@ -19,16 +19,16 @@ builder.Services.AddSingleton<RoleCacheService>();
 var tenantApiBaseUrl = builder.Configuration["TenantApiBaseUrl"] ?? "https://localhost:7246/";
 var authApiBaseUrl = builder.Configuration["AuthApiBaseUrl"] ?? tenantApiBaseUrl;
 
-// Register Tenant API Client
-builder.Services.AddHttpClient<ITenantApiClient, TenantApiClient>(client =>
-{
-    client.BaseAddress = new Uri(tenantApiBaseUrl);
-});
-
 // Register Auth API Client
 builder.Services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
 {
     client.BaseAddress = new Uri(authApiBaseUrl);
+});
+
+// Register Clinic API Client
+builder.Services.AddHttpClient<IClinicApiClient, ClinicApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
 });
 
 // Register Application API Client

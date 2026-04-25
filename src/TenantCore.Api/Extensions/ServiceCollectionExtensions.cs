@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         {
             options.RequireHttpsMetadata = false;
             options.SaveToken = true;
+            options.MapInboundClaims = false;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
@@ -42,21 +43,18 @@ public static class ServiceCollectionExtensions
 
         // Add role-based authorization policies
         services.AddAuthorizationBuilder()
-            // Default policy - requires authentication
+            // Any authenticated clinic user
             .AddPolicy(AuthPolicies.RequireAuthenticated, policy =>
                 policy.RequireAuthenticatedUser())
-            // Admin policy - any admin role
-            .AddPolicy(AuthPolicies.RequireAdmin, policy =>
-                policy.RequireRole(AppRoles.AdminRoles))
-            // Clinic Admin policy
+            // Clinic Admin only (fee config, admin-level settings)
             .AddPolicy(AuthPolicies.RequireClinicAdmin, policy =>
                 policy.RequireRole(AppRoles.ClinicAdmin, AppRoles.SystemAdmin))
-            // School Admin policy
-            .AddPolicy(AuthPolicies.RequireSchoolAdmin, policy =>
-                policy.RequireRole(AppRoles.SchoolAdmin, AppRoles.SystemAdmin))
-            // Management policy - admins and managers
-            .AddPolicy(AuthPolicies.RequireManagement, policy =>
-                policy.RequireRole(AppRoles.ManagementRoles));
+            // Reception: register patients, create OPD/IPD registrations
+            .AddPolicy(AuthPolicies.RequireReception, policy =>
+                policy.RequireRole(AppRoles.ReceptionRoles))
+            // Clinical: doctors + management for clinical actions (e.g. discharge)
+            .AddPolicy(AuthPolicies.RequireClinical, policy =>
+                policy.RequireRole(AppRoles.ClinicalRoles));
 
         return services;
     }

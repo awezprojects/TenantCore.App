@@ -15,12 +15,17 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddDbContext<AppDbContext>(options =>
+        services.AddDbContext<ClinicDbContext>(options =>
             options.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection"),
-                b => b.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
+                configuration.GetConnectionString("ClinicConnection"),
+                b => b.MigrationsAssembly(typeof(ClinicDbContext).Assembly.FullName)
+                      .MigrationsHistoryTable("__EFMigrationsHistory", "clinic")));
 
-        services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IPatientRepository, PatientRepository>();
+        services.AddScoped<IOpdRegistrationRepository, OpdRegistrationRepository>();
+        services.AddScoped<IIpdRegistrationRepository, IpdRegistrationRepository>();
+        services.AddScoped<IClinicFeeConfigRepository, ClinicFeeConfigRepository>();
+
         services.AddScoped<IAuthApplicationService, AuthApplicationService>();
 
         return services;

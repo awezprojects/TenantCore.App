@@ -1,52 +1,39 @@
 namespace TenantCore.Shared.Authorization;
 
-/// <summary>
-/// Defines application role names used for authorization across all layers.
-/// </summary>
 public static class AppRoles
 {
-    // Admin roles
-    public const string SystemAdmin = "System Admin";
+    // Clinic roles
+    public const string Pharmacist = "Pharmacist";
+    public const string LabTechnician = "Lab Technician";
+    public const string Nurse = "Nurse";
+    public const string Doctor = "Doctor";
     public const string ClinicAdmin = "Clinic Admin";
-    public const string SchoolAdmin = "School Admin";
+    public const string ClinicManager = "Clinic Manager";
+    public const string Receptionist = "Receptionist";
 
-    // Standard roles
-    public const string Manager = "Manager";
-    public const string Staff = "Staff";
-    public const string User = "User";
+    // Super-admin (cross-application system administrator)
+    public const string SystemAdmin = "System Admin";
 
-    // Viewer role
-    public const string Viewer = "Viewer";
+    // Roles that can register/update patients and create OPD/IPD registrations
+    public static readonly string[] ReceptionRoles =
+        [Receptionist, ClinicAdmin, ClinicManager, SystemAdmin];
 
-    /// <summary>
-    /// All admin-level roles.
-    /// </summary>
-    public static readonly string[] AdminRoles = [SystemAdmin, ClinicAdmin, SchoolAdmin];
-
-    /// <summary>
-    /// All management-level roles (admins + managers).
-    /// </summary>
-    public static readonly string[] ManagementRoles = [SystemAdmin, ClinicAdmin, SchoolAdmin, Manager];
-
-    /// <summary>
-    /// Comma-separated admin roles for [Authorize] attribute.
-    /// </summary>
-    public const string AdminRolesString = $"{SystemAdmin},{ClinicAdmin},{SchoolAdmin}";
-
-    /// <summary>
-    /// Comma-separated management roles for [Authorize] attribute.
-    /// </summary>
-    public const string ManagementRolesString = $"{SystemAdmin},{ClinicAdmin},{SchoolAdmin},{Manager}";
+    // Roles that can perform clinical actions such as patient discharge
+    public static readonly string[] ClinicalRoles =
+        [Doctor, ClinicAdmin, ClinicManager, SystemAdmin];
 }
 
-/// <summary>
-/// Defines authorization policy names used across all layers.
-/// </summary>
 public static class AuthPolicies
 {
-    public const string RequireAdmin = "RequireAdmin";
-    public const string RequireClinicAdmin = "RequireClinicAdmin";
-    public const string RequireSchoolAdmin = "RequireSchoolAdmin";
-    public const string RequireManagement = "RequireManagement";
+    // Any authenticated user (all clinic roles)
     public const string RequireAuthenticated = "RequireAuthenticated";
+
+    // Clinic Admin only (fee config, admin-level settings)
+    public const string RequireClinicAdmin = "RequireClinicAdmin";
+
+    // Receptionist + Clinic Admin + Clinic Manager (register patients, create OPD/IPD)
+    public const string RequireReception = "RequireReception";
+
+    // Doctor + Clinic Admin + Clinic Manager (clinical decisions e.g. discharge)
+    public const string RequireClinical = "RequireClinical";
 }
