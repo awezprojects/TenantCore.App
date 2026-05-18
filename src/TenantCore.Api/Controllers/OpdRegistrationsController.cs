@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TenantCore.Application.Features.OpdRegistrations.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Queries;
+using TenantCore.Application.Features.Prescriptions.Queries;
 using TenantCore.Shared.Authorization;
 using TenantCore.Shared.Common;
 using TenantCore.Shared.Dtos;
@@ -21,8 +22,10 @@ public class OpdRegistrationsController(ISender sender) : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? search = null,
+        [FromQuery] Guid? doctorUserId = null,
+        [FromQuery] bool todayOnly = false,
         CancellationToken ct = default)
-        => Ok(await sender.Send(new GetOpdRegistrationsQuery(GetApplicationId(), page, pageSize, search), ct));
+        => Ok(await sender.Send(new GetOpdRegistrationsQuery(GetApplicationId(), page, pageSize, search, doctorUserId, todayOnly), ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(OpdRegistrationDto), StatusCodes.Status200OK)]
@@ -50,6 +53,11 @@ public class OpdRegistrationsController(ISender sender) : ControllerBase
         => Ok(await sender.Send(new UpdateOpdRegistrationCommand(
             id, GetApplicationId(), dto.DoctorUserId, dto.DoctorName,
             dto.Fee, dto.Status, dto.Notes), ct));
+
+    [HttpGet("doctor-count")]
+    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetDoctorCount([FromQuery] Guid doctorUserId, CancellationToken ct)
+        => Ok(await sender.Send(new GetDoctorOpdCountQuery(GetApplicationId(), doctorUserId), ct));
 
     private Guid GetApplicationId()
     {

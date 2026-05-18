@@ -8,4 +8,6 @@ public sealed record GetOpdRegistrationsQuery(
     Guid ApplicationId,
     int Page = 1,
     int PageSize = 20,
-    string? Search = null) : IRequest<PagedResult<OpdRegistrationDto>>;
+    string? Search = null,
+    Guid? DoctorUserId = null,
+    bool TodayOnly = false) : IRequest<PagedResult<OpdRegistrationDto>>;

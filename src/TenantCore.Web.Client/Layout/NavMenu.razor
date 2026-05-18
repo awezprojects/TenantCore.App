@@ -1,11 +1,28 @@
 @inject AuthStateService AuthState
 @inject NavigationManager NavigationManager
+@using TenantCore.Web.Client.Services
+@implements IDisposable
 
 <MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-    <MudNavLink Href="/tenants" Icon="@Icons.Material.Filled.Business">Tenants</MudNavLink>
-    <MudNavLink Href="/applications" Icon="@Icons.Material.Filled.Apps">Applications</MudNavLink>
     <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+
+    <MudDivider Class="my-2" />
+
+    @if (_isDoctor)
+    {
+        <MudNavGroup Title="Doctor" Icon="@Icons.Material.Filled.LocalHospital" Expanded="true">
+            <MudNavLink Href="/doctor/opd-queue" Icon="@Icons.Material.Filled.PeopleAlt">My OPD Queue</MudNavLink>
+            <MudNavLink Href="/prescriptions" Icon="@Icons.Material.Filled.Assignment">Prescriptions</MudNavLink>
+        </MudNavGroup>
+        <MudDivider Class="my-2" />
+    }
+
+    <MudNavGroup Title="Clinic" Icon="@Icons.Material.Filled.MedicalServices" Expanded="false">
+        <MudNavLink Href="/patients" Icon="@Icons.Material.Filled.People">Patients</MudNavLink>
+        <MudNavLink Href="/opd" Icon="@Icons.Material.Filled.EventNote">OPD Registrations</MudNavLink>
+        <MudNavLink Href="/ipd" Icon="@Icons.Material.Filled.Bed">IPD Admissions</MudNavLink>
+    </MudNavGroup>
 
     <MudDivider Class="my-2" />
 
@@ -19,5 +36,34 @@
     <MudNavGroup Title="Settings" Icon="@Icons.Material.Filled.Settings" Expanded="false">
         <MudNavLink Href="/auth/profile" Icon="@Icons.Material.Filled.Person">Profile</MudNavLink>
         <MudNavLink Href="/settings/preferences" Icon="@Icons.Material.Filled.Tune">Preferences</MudNavLink>
+        @if (_isDoctor)
+        {
+            <MudNavLink Href="/settings/prescription" Icon="@Icons.Material.Filled.Translate">Prescription Language</MudNavLink>
+            <MudNavLink Href="/settings/dosage-remarks" Icon="@Icons.Material.Filled.StickyNote2">Dosage Remarks</MudNavLink>
+        }
     </MudNavGroup>
 </MudNavMenu>
+
+@code {
+    private bool _isDoctor;
+
+    protected override void OnInitialized()
+    {
+        AuthState.OnAuthStateChanged += OnAuthChanged;
+        RefreshRoles();
+    }
+
+    private void OnAuthChanged()
+    {
+        RefreshRoles();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshRoles()
+    {
+        _isDoctor = AuthState.CurrentUser?.UserRoles
+            .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
+    }
+
+    public void Dispose() => AuthState.OnAuthStateChanged -= OnAuthChanged;
+}

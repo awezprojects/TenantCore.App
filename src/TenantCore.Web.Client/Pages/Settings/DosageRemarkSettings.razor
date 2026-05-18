@@ -1,0 +1,135 @@
+@page "/settings/dosage-remarks"
+@layout AuthorizedLayout
+@inject IPrescriptionApiClient PrescriptionClient
+@inject ISnackbar Snackbar
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+
+<PageTitle>Dosage Remarks - Settings</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Dosage Remark Templates</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">@(_editing is null ? "Add Remark" : "Edit Remark")</MudText>
+            <MudSelect T="MedicineFormType" Label="Medicine Form" @bind-Value="_form" Variant="Variant.Outlined" Class="mb-3">
+                @foreach (MedicineFormType f in Enum.GetValues<MedicineFormType>())
+                {
+                    <MudSelectItem Value="f">@f</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_remarkEnglish" Label="Remark (English)" Variant="Variant.Outlined"
+                          Lines="2" MaxLength="500" Class="mb-2" />
+            <MudTextField @bind-Value="_remarkHindi" Label="Remark (Hindi)" Variant="Variant.Outlined"
+                          Lines="2" MaxLength="500" Class="mb-2" />
+            <MudTextField @bind-Value="_remarkMarathi" Label="Remark (Marathi)" Variant="Variant.Outlined"
+                          Lines="2" MaxLength="500" Class="mb-3" />
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync">
+                    @(_editing is null ? "Add" : "Update")
+                </MudButton>
+                @if (_editing is not null)
+                {
+                    <MudButton Variant="Variant.Text" OnClick="ClearForm">Cancel</MudButton>
+                }
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else if (_remarks is not null)
+        {
+            <MudTable Items="_remarks" Hover="true" Striped="true" Dense="true" Elevation="2">
+                <HeaderContent>
+                    <MudTh>Form</MudTh>
+                    <MudTh>English</MudTh>
+                    <MudTh>Hindi</MudTh>
+                    <MudTh>Marathi</MudTh>
+                    <MudTh>Active</MudTh>
+                    <MudTh Style="width:80px;">Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="r">
+                    <MudTd>@r.MedicineForm</MudTd>
+                    <MudTd>@r.RemarkEnglish</MudTd>
+                    <MudTd>@(r.RemarkHindi ?? "—")</MudTd>
+                    <MudTd>@(r.RemarkMarathi ?? "—")</MudTd>
+                    <MudTd><MudChip T="bool" Size="Size.Small" Color="@(r.IsActive ? Color.Success : Color.Default)">@(r.IsActive ? "Yes" : "No")</MudChip></MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => EditRemark(r)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="() => DeleteAsync(r.Id)" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _loading;
+    private List<DosageRemarkDto>? _remarks;
+    private DosageRemarkDto? _editing;
+    private MedicineFormType _form = MedicineFormType.Tab;
+    private string _remarkEnglish = string.Empty;
+    private string? _remarkHindi;
+    private string? _remarkMarathi;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var r = await PrescriptionClient.GetDosageRemarksAsync(pageSize: 100);
+        if (r.Success) _remarks = r.Data?.Items.ToList();
+        _loading = false;
+    }
+
+    private void EditRemark(DosageRemarkDto remark)
+    {
+        _editing = remark;
+        _form = remark.MedicineForm;
+        _remarkEnglish = remark.RemarkEnglish;
+        _remarkHindi = remark.RemarkHindi;
+        _remarkMarathi = remark.RemarkMarathi;
+    }
+
+    private void ClearForm()
+    {
+        _editing = null;
+        _remarkEnglish = string.Empty;
+        _remarkHindi = null;
+        _remarkMarathi = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_editing is null)
+        {
+            var r = await PrescriptionClient.CreateDosageRemarkAsync(
+                new CreateDosageRemarkDto(_form, _remarkEnglish, _remarkHindi, _remarkMarathi));
+            if (r.Success) { Snackbar.Add("Remark added.", Severity.Success); ClearForm(); }
+            else Snackbar.Add(r.Message ?? "Failed.", Severity.Error);
+        }
+        else
+        {
+            var r = await PrescriptionClient.UpdateDosageRemarkAsync(_editing.Id,
+                new UpdateDosageRemarkDto(_form, _remarkEnglish, _remarkHindi, _remarkMarathi, _editing.IsActive));
+            if (r.Success) { Snackbar.Add("Remark updated.", Severity.Success); ClearForm(); }
+            else Snackbar.Add(r.Message ?? "Failed.", Severity.Error);
+        }
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        var r = await PrescriptionClient.DeleteDosageRemarkAsync(id);
+        if (r.Success) { Snackbar.Add("Remark deleted.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(r.Message ?? "Failed.", Severity.Error);
+    }
+}
