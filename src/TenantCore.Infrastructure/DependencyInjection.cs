@@ -6,6 +6,7 @@ using TenantCore.Domain.Interfaces;
 using TenantCore.Infrastructure.ExternalServices;
 using TenantCore.Infrastructure.Persistence;
 using TenantCore.Infrastructure.Repositories;
+using TenantCore.Infrastructure.Services;
 
 namespace TenantCore.Infrastructure;
 
@@ -27,6 +28,13 @@ public static class DependencyInjection
         services.AddScoped<IClinicFeeConfigRepository, ClinicFeeConfigRepository>();
         services.AddScoped<IMedicineTypeRepository, MedicineTypeRepository>();
         services.AddScoped<IMedicineRepository, MedicineRepository>();
+        services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
+        services.AddScoped<IDosageRemarkRepository, DosageRemarkRepository>();
+        services.AddScoped<IPrescriptionConfigRepository, PrescriptionConfigRepository>();
+
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IPdfConversionService, PdfConversionService>();
 
         services.AddScoped<IAuthApplicationService, AuthApplicationService>();
 

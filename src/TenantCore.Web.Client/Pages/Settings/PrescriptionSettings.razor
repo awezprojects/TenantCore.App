@@ -1,0 +1,59 @@
+@page "/settings/prescription"
+@layout AuthorizedLayout
+@inject IPrescriptionApiClient PrescriptionClient
+@inject ISnackbar Snackbar
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+
+<PageTitle>Prescription Settings</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Prescription Settings</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudPaper Class="pa-4" Style="max-width: 500px;">
+        <MudText Typo="Typo.h6" Class="mb-3">Default Remark Language</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Choose the language in which dosage remarks are pre-filled on new prescriptions.
+        </MudText>
+        <MudSelect T="PrescriptionLanguage" Label="Default Language" @bind-Value="_language"
+                   Variant="Variant.Outlined" Class="mb-4">
+            @foreach (PrescriptionLanguage lang in Enum.GetValues<PrescriptionLanguage>())
+            {
+                <MudSelectItem Value="lang">@lang</MudSelectItem>
+            }
+        </MudSelect>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync"
+                   Disabled="_saving" StartIcon="@Icons.Material.Filled.Save">
+            Save
+        </MudButton>
+    </MudPaper>
+}
+
+@code {
+    private bool _loading;
+    private bool _saving;
+    private PrescriptionLanguage _language = PrescriptionLanguage.English;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        var r = await PrescriptionClient.GetPrescriptionConfigAsync();
+        if (r.Success && r.Data is not null) _language = r.Data.DefaultLanguage;
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        var r = await PrescriptionClient.UpdatePrescriptionConfigAsync(new UpdatePrescriptionConfigDto(_language));
+        if (r.Success) Snackbar.Add("Settings saved.", Severity.Success);
+        else Snackbar.Add(r.Message ?? "Failed to save.", Severity.Error);
+        _saving = false;
+    }
+}

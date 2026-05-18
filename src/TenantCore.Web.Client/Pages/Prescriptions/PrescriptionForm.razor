@@ -1,0 +1,349 @@
+@page "/prescriptions/{PrescriptionId:guid}"
+@page "/prescriptions/new/{OpdRegistrationId:guid}"
+@layout AuthorizedLayout
+@inject IPrescriptionApiClient PrescriptionClient
+@inject IMedicineApiClient MedicineClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject AuthStateService AuthState
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<PageTitle>Prescription - TenantCore</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">@(PrescriptionId == Guid.Empty ? "New Prescription" : "Edit Prescription")</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Prescription Details</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker Label="Next Visit Date" @bind-Date="_nextVisitDate" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_notes" Label="Prescription Notes" Variant="Variant.Outlined"
+                                      Lines="3" MaxLength="2000" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mb-4">
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudText Typo="Typo.h6">Medicines</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add" OnClick="AddMedicineRow">
+                        Add Medicine
+                    </MudButton>
+                </MudStack>
+
+                @for (var i = 0; i < _items.Count; i++)
+                {
+                    var idx = i;
+                    var item = _items[idx];
+                    <MudPaper Outlined="true" Class="pa-3 mb-3">
+                        <MudGrid>
+                            <MudItem xs="12" md="5">
+                                <MudAutocomplete T="MedicineDto" Label="Medicine" Value="item.SelectedMedicine"
+                                                 SearchFunc="SearchMedicines" ToStringFunc="m => m?.Name ?? string.Empty"
+                                                 Variant="Variant.Outlined" Dense="true"
+                                                 ValueChanged="m => OnMedicineSelected(idx, m)" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudSelect T="MedicineFormType" Label="Form" @bind-Value="item.MedicineForm"
+                                           Variant="Variant.Outlined" Dense="true">
+                                    @foreach (MedicineFormType f in Enum.GetValues<MedicineFormType>())
+                                    {
+                                        <MudSelectItem Value="f">@f</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="6" md="2">
+                                <MudTextField T="int" Value="item.DurationDays" Label="Days" Variant="Variant.Outlined"
+                                              Dense="true" InputType="InputType.Number"
+                                              ValueChanged='v => { item.DurationDays = v; RecalcQuantity(idx); }' />
+                            </MudItem>
+                            <MudItem xs="12" md="2" Class="d-flex align-end">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                               OnClick="() => RemoveMedicine(idx)" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTextField T="string?" Value="item.DosageMorningStr" Label="Morning"
+                                              Variant="Variant.Outlined" Dense="true"
+                                              AdornmentText="@item.DosageUnit" Adornment="Adornment.End"
+                                              ValueChanged='v => { item.DosageMorningStr = v; RecalcQuantity(idx); }' />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTextField T="string?" Value="item.DosageAfternoonStr" Label="Afternoon"
+                                              Variant="Variant.Outlined" Dense="true"
+                                              AdornmentText="@item.DosageUnit" Adornment="Adornment.End"
+                                              ValueChanged='v => { item.DosageAfternoonStr = v; RecalcQuantity(idx); }' />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTextField T="string?" Value="item.DosageEveningStr" Label="Evening"
+                                              Variant="Variant.Outlined" Dense="true"
+                                              AdornmentText="@item.DosageUnit" Adornment="Adornment.End"
+                                              ValueChanged='v => { item.DosageEveningStr = v; RecalcQuantity(idx); }' />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTextField T="string?" Value="item.DosageNightStr" Label="Night"
+                                              Variant="Variant.Outlined" Dense="true"
+                                              AdornmentText="@item.DosageUnit" Adornment="Adornment.End"
+                                              ValueChanged='v => { item.DosageNightStr = v; RecalcQuantity(idx); }' />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="item.RemarkEnglish" Label="Remark (English)"
+                                              Variant="Variant.Outlined" Dense="true" MaxLength="500" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTextField @bind-Value="item.RemarkHindi" Label="Remark (Hindi)"
+                                              Variant="Variant.Outlined" Dense="true" MaxLength="500" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTextField @bind-Value="item.RemarkMarathi" Label="Remark (Marathi)"
+                                              Variant="Variant.Outlined" Dense="true" MaxLength="500" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Quantity: <strong>@item.Quantity @item.DosageUnit</strong> for @item.DurationDays days
+                                </MudText>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Attached Reports</MudText>
+                @if (_prescription?.Reports.Any() == true)
+                {
+                    <MudList T="string" Dense="true">
+                        @foreach (var r in _prescription.Reports)
+                        {
+                            <MudListItem Icon="@Icons.Material.Filled.PictureAsPdf">
+                                @r.OriginalFileName (@((r.FileSizeBytes / 1024.0)?.ToString("F1") ?? "?") KB)
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+                <MudFileUpload T="IBrowserFile" FilesChanged="OnFileUploaded" Accept=".pdf,.jpg,.jpeg,.png,.bmp">
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.Upload">
+                            Upload Report
+                        </MudButton>
+                    </ActivatorContent>
+                </MudFileUpload>
+            </MudPaper>
+
+            <MudStack Row="true" Spacing="2" Class="mt-2">
+                @if (_prescription?.Status != PrescriptionStatus.Submitted)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync"
+                               Disabled="_saving" StartIcon="@Icons.Material.Filled.Save">
+                        Save Draft
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SubmitAsync"
+                               Disabled="_saving" StartIcon="@Icons.Material.Filled.Send">
+                        Submit & Send
+                    </MudButton>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Success">Prescription submitted.</MudAlert>
+                }
+                <MudButton Variant="Variant.Text" OnClick='() => Navigation.NavigateTo("/prescriptions")'>Cancel</MudButton>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid PrescriptionId { get; set; }
+    [Parameter] public Guid OpdRegistrationId { get; set; }
+
+    private bool _loading;
+    private bool _saving;
+    private PrescriptionDto? _prescription;
+    private DateTime? _nextVisitDate;
+    private string? _notes;
+    private List<PrescriptionItemRow> _items = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        if (PrescriptionId != Guid.Empty)
+        {
+            var r = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
+            if (r.Success && r.Data is not null)
+            {
+                _prescription = r.Data;
+                _nextVisitDate = r.Data.NextVisitDate;
+                _notes = r.Data.Notes;
+                _items = r.Data.Items.Select(i => new PrescriptionItemRow
+                {
+                    MedicineId = i.MedicineId,
+                    MedicineName = i.MedicineName,
+                    MedicineForm = i.MedicineForm,
+                    DosageUnit = i.DosageUnit,
+                    DosageMorningStr = i.DosageMorning?.ToString(),
+                    DosageAfternoonStr = i.DosageAfternoon?.ToString(),
+                    DosageEveningStr = i.DosageEvening?.ToString(),
+                    DosageNightStr = i.DosageNight?.ToString(),
+                    DurationDays = i.DurationDays,
+                    Quantity = i.Quantity,
+                    RemarkEnglish = i.RemarkEnglish,
+                    RemarkHindi = i.RemarkHindi,
+                    RemarkMarathi = i.RemarkMarathi
+                }).ToList();
+            }
+        }
+        _loading = false;
+    }
+
+    private void AddMedicineRow() => _items.Add(new PrescriptionItemRow());
+
+    private void RemoveMedicine(int idx) => _items.RemoveAt(idx);
+
+    private async Task<IEnumerable<MedicineDto>> SearchMedicines(string search, CancellationToken ct)
+    {
+        var r = await MedicineClient.GetMedicinesAsync(search: search, pageSize: 20);
+        return r.Success ? r.Data?.Items ?? [] : [];
+    }
+
+    private void OnMedicineSelected(int idx, MedicineDto? medicine)
+    {
+        if (medicine is null) return;
+        _items[idx].SelectedMedicine = medicine;
+        _items[idx].MedicineId = medicine.Id;
+        _items[idx].MedicineName = medicine.Name;
+        _items[idx].DosageUnit = GetDefaultUnit(_items[idx].MedicineForm);
+    }
+
+    private void RecalcQuantity(int idx)
+    {
+        var item = _items[idx];
+        var morning = decimal.TryParse(item.DosageMorningStr, out var m) ? m : 0;
+        var afternoon = decimal.TryParse(item.DosageAfternoonStr, out var a) ? a : 0;
+        var evening = decimal.TryParse(item.DosageEveningStr, out var e) ? e : 0;
+        var night = decimal.TryParse(item.DosageNightStr, out var n) ? n : 0;
+        item.Quantity = (morning + afternoon + evening + night) * item.DurationDays;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        var items = BuildItemDtos();
+        if (PrescriptionId == Guid.Empty)
+        {
+            var user = AuthState.CurrentUser;
+            if (user is null) { Snackbar.Add("Not authenticated.", Severity.Error); _saving = false; return; }
+            var dto = new CreatePrescriptionDto(OpdRegistrationId, user.UserId, user.FullName, _nextVisitDate, _notes, items);
+            var r = await PrescriptionClient.CreatePrescriptionAsync(dto);
+            if (r.Success && r.Data is not null)
+            {
+                _prescription = r.Data;
+                PrescriptionId = r.Data.Id;
+                Snackbar.Add("Prescription saved.", Severity.Success);
+                Navigation.NavigateTo($"/prescriptions/{PrescriptionId}");
+            }
+            else Snackbar.Add(r.Message ?? "Failed to save.", Severity.Error);
+        }
+        else
+        {
+            var dto = new UpdatePrescriptionDto(_nextVisitDate, _notes, items);
+            var r = await PrescriptionClient.UpdatePrescriptionAsync(PrescriptionId, dto);
+            if (r.Success) Snackbar.Add("Prescription updated.", Severity.Success);
+            else Snackbar.Add(r.Message ?? "Failed to update.", Severity.Error);
+        }
+        _saving = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (PrescriptionId == Guid.Empty) await SaveAsync();
+        if (PrescriptionId == Guid.Empty) return;
+
+        _saving = true;
+        var r = await PrescriptionClient.SubmitPrescriptionAsync(PrescriptionId);
+        if (r.Success)
+        {
+            _prescription = r.Data;
+            Snackbar.Add("Prescription submitted successfully.", Severity.Success);
+        }
+        else Snackbar.Add(r.Message ?? "Failed to submit.", Severity.Error);
+        _saving = false;
+    }
+
+    private async Task OnFileUploaded(IBrowserFile file)
+    {
+        if (PrescriptionId == Guid.Empty)
+        {
+            Snackbar.Add("Save the prescription first before uploading reports.", Severity.Warning);
+            return;
+        }
+        using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+        var r = await PrescriptionClient.UploadReportAsync(PrescriptionId, stream, file.Name);
+        if (r.Success)
+        {
+            Snackbar.Add("Report uploaded.", Severity.Success);
+            var pr = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
+            if (pr.Success) _prescription = pr.Data;
+        }
+        else Snackbar.Add(r.Message ?? "Upload failed.", Severity.Error);
+    }
+
+    private IReadOnlyList<CreatePrescriptionItemDto> BuildItemDtos() =>
+        _items.Select((item, idx) => new CreatePrescriptionItemDto(
+            item.MedicineId,
+            item.MedicineName,
+            item.MedicineForm,
+            GetDefaultUnit(item.MedicineForm),
+            decimal.TryParse(item.DosageMorningStr, out var m) ? m : null,
+            decimal.TryParse(item.DosageAfternoonStr, out var a) ? a : null,
+            decimal.TryParse(item.DosageEveningStr, out var e) ? e : null,
+            decimal.TryParse(item.DosageNightStr, out var n) ? n : null,
+            item.DurationDays,
+            item.Quantity,
+            item.RemarkEnglish,
+            item.RemarkHindi,
+            item.RemarkMarathi,
+            idx)).ToList();
+
+    private static string GetDefaultUnit(MedicineFormType form) => form switch
+    {
+        MedicineFormType.Tab or MedicineFormType.Capsule => "tablet",
+        MedicineFormType.Syrup => "ml",
+        MedicineFormType.Drops => "drops",
+        MedicineFormType.Tube => "application",
+        MedicineFormType.Injection => "dose",
+        MedicineFormType.Powder => "sachet",
+        _ => "unit"
+    };
+
+    private class PrescriptionItemRow
+    {
+        public Guid MedicineId { get; set; }
+        public string MedicineName { get; set; } = string.Empty;
+        public MedicineDto? SelectedMedicine { get; set; }
+        public MedicineFormType MedicineForm { get; set; } = MedicineFormType.Tab;
+        public string DosageUnit { get; set; } = "tablet";
+        public string? DosageMorningStr { get; set; }
+        public string? DosageAfternoonStr { get; set; }
+        public string? DosageEveningStr { get; set; }
+        public string? DosageNightStr { get; set; }
+        public int DurationDays { get; set; } = 1;
+        public decimal Quantity { get; set; }
+        public string? RemarkEnglish { get; set; }
+        public string? RemarkHindi { get; set; }
+        public string? RemarkMarathi { get; set; }
+    }
+}

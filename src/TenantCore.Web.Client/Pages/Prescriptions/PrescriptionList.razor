@@ -1,0 +1,95 @@
+@page "/prescriptions"
+@layout AuthorizedLayout
+@inject IPrescriptionApiClient PrescriptionClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+
+<PageTitle>Prescriptions - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Prescriptions</MudText>
+</MudStack>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudTextField @bind-Value="_search" Label="Search by prescription number or doctor name..."
+                          Variant="Variant.Outlined" Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Clearable="true" @onkeyup="OnSearchKeyUp" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
+                Refresh
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is not null)
+{
+    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
+              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
+        <HeaderContent>
+            <MudTh>Prescription No.</MudTh>
+            <MudTh>Patient</MudTh>
+            <MudTh>Doctor</MudTh>
+            <MudTh>Date</MudTh>
+            <MudTh>Next Visit</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width: 80px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="rx">
+            <MudTd DataLabel="Prescription No.">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
+                    @rx.PrescriptionNumber
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Patient">@rx.PatientName</MudTd>
+            <MudTd DataLabel="Doctor">@rx.DoctorName</MudTd>
+            <MudTd DataLabel="Date">@rx.PrescribedDate.ToString("dd MMM yyyy")</MudTd>
+            <MudTd DataLabel="Next Visit">@(rx.NextVisitDate?.ToString("dd MMM yyyy") ?? "—")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@(rx.Status == PrescriptionStatus.Submitted ? Color.Success : Color.Warning)">
+                    @rx.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                               OnClick='() => Navigation.NavigateTo($"/prescriptions/{rx.Id}")' />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+}
+
+@code {
+    private string? _search;
+    private bool _loading;
+    private TenantCore.Shared.Common.PagedResult<TenantCore.Shared.Dtos.PrescriptionDto>? _result;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await PrescriptionClient.GetPrescriptionsAsync(search: _search);
+        if (response.Success) _result = response.Data;
+        else Snackbar.Add(response.Message ?? "Failed to load prescriptions.", Severity.Error);
+        _loading = false;
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await LoadAsync();
+    }
+}

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Interfaces;
 using TenantCore.Infrastructure.Persistence;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Infrastructure.Repositories;
 
@@ -9,7 +10,8 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
     : ClinicRepository<OpdRegistration>(dbContext), IOpdRegistrationRepository
 {
     public async Task<(IEnumerable<OpdRegistration> Items, int Total)> GetPagedAsync(
-        Guid applicationId, int page, int pageSize, string? search, CancellationToken ct = default)
+        Guid applicationId, int page, int pageSize, string? search,
+        Guid? doctorUserId = null, bool todayOnly = false, CancellationToken ct = default)
     {
         var query = DbSet
             .Include(o => o.Patient)
@@ -21,6 +23,16 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
                 o.DoctorName.Contains(search) ||
                 o.Patient.FirstName.Contains(search) ||
                 o.Patient.LastName.Contains(search));
+
+        if (doctorUserId.HasValue)
+            query = query.Where(o => o.DoctorUserId == doctorUserId.Value);
+
+        if (todayOnly)
+        {
+            var today = DateTime.UtcNow.Date;
+            query = query.Where(o => o.RegistrationDate.Date == today &&
+                                     (o.Status == OpdStatus.Pending || o.Status == OpdStatus.InProgress));
+        }
 
         var total = await query.CountAsync(ct);
         var items = await query
@@ -36,6 +48,16 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
         var today = DateTime.UtcNow.Date;
         return await DbSet.CountAsync(
             o => o.ApplicationId == applicationId && o.RegistrationDate.Date == today, ct);
+    }
+
+    public async Task<int> CountTodayByDoctorAsync(Guid applicationId, Guid doctorUserId, CancellationToken ct = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        return await DbSet.CountAsync(
+            o => o.ApplicationId == applicationId &&
+                 o.DoctorUserId == doctorUserId &&
+                 o.RegistrationDate.Date == today &&
+                 (o.Status == OpdStatus.Pending || o.Status == OpdStatus.InProgress), ct);
     }
 
     public override async Task<OpdRegistration?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)

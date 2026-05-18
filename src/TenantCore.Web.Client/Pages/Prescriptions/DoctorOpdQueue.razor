@@ -1,0 +1,163 @@
+@page "/doctor/opd-queue"
+@layout AuthorizedLayout
+@inject IClinicApiClient ClinicClient
+@inject IPrescriptionApiClient PrescriptionClient
+@inject AuthStateService AuthState
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<PageTitle>My OPD Queue - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudStack Spacing="0">
+        <MudText Typo="Typo.h4">My OPD Queue</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Today's patients assigned to you</MudText>
+    </MudStack>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">
+        Refresh
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_result is null || !_result.Items.Any())
+{
+    <MudPaper Class="pa-8" Elevation="1">
+        <MudStack AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline" Color="Color.Success" Size="Size.Large" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">No pending patients for today</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">All done! Check back later or refresh.</MudText>
+        </MudStack>
+    </MudPaper>
+}
+else
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        @_result.TotalCount patient@(_result.TotalCount == 1 ? "" : "s") waiting
+    </MudText>
+
+    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
+              Breakpoint="Breakpoint.Sm" Elevation="2">
+        <HeaderContent>
+            <MudTh>Reg. No.</MudTh>
+            <MudTh>Patient</MudTh>
+            <MudTh>Time</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Vitals</MudTh>
+            <MudTh Style="width: 130px;">Action</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="reg">
+            <MudTd DataLabel="Reg. No.">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
+                    @reg.RegistrationNumber
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Patient">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.body1">@reg.PatientName</MudText>
+                    @if (reg.Fee > 0)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Fee: ₹@reg.Fee.ToString("N0")</MudText>
+                    }
+                </MudStack>
+            </MudTd>
+            <MudTd DataLabel="Time">@reg.RegistrationDate.ToString("hh:mm tt")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(reg.Status)" Variant="Variant.Text">
+                    @reg.Status
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Vitals">
+                <MudStack Spacing="0">
+                    @if (reg.Weight.HasValue)
+                    {
+                        <MudText Typo="Typo.caption">Wt: @reg.Weight.Value.ToString("F1") kg</MudText>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(reg.BloodPressure))
+                    {
+                        <MudText Typo="Typo.caption">BP: @reg.BloodPressure</MudText>
+                    }
+                    @if (reg.PulseRate.HasValue)
+                    {
+                        <MudText Typo="Typo.caption">Pulse: @reg.PulseRate bpm</MudText>
+                    }
+                </MudStack>
+            </MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Assignment"
+                           OnClick='() => OpenPrescription(reg)'>
+                    Prescribe
+                </MudButton>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No patients found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+
+    @if (_result.TotalCount > _result.Items.Count())
+    {
+        <MudStack Row="true" Justify="Justify.Center" Class="mt-3">
+            <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
+        </MudStack>
+    }
+}
+
+@code {
+    private bool _loading;
+    private TenantCore.Shared.Common.PagedResult<OpdRegistrationDto>? _result;
+    private int _page = 1;
+    private const int PageSize = 50;
+
+    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var userId = AuthState.CurrentUser?.UserId;
+        if (userId is null || userId == Guid.Empty)
+        {
+            Snackbar.Add("Could not identify logged-in doctor.", Severity.Warning);
+            return;
+        }
+
+        _loading = true;
+        var response = await ClinicClient.GetOpdRegistrationsAsync(
+            page: _page, pageSize: PageSize, doctorUserId: userId, todayOnly: true);
+        if (response.Success) _result = response.Data;
+        else Snackbar.Add(response.Message ?? "Failed to load queue.", Severity.Error);
+        _loading = false;
+    }
+
+    private async Task OnPageChanged(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private async Task OpenPrescription(OpdRegistrationDto reg)
+    {
+        // Check if a prescription already exists for this OPD registration
+        var existing = await PrescriptionClient.GetPrescriptionByOpdIdAsync(reg.Id);
+        if (existing.Success && existing.Data is not null)
+            Navigation.NavigateTo($"/prescriptions/{existing.Data.Id}");
+        else
+            Navigation.NavigateTo($"/prescriptions/new/{reg.Id}");
+    }
+
+    private static Color GetStatusColor(OpdStatus status) => status switch
+    {
+        OpdStatus.Pending => Color.Warning,
+        OpdStatus.InProgress => Color.Info,
+        _ => Color.Default
+    };
+}

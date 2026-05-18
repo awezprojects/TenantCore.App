@@ -77,13 +77,15 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
 
     // --- OPD Registrations ---
 
-    public async Task<ApiResponse<PagedResult<OpdRegistrationDto>>> GetOpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null)
+    public async Task<ApiResponse<PagedResult<OpdRegistrationDto>>> GetOpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null, Guid? doctorUserId = null, bool todayOnly = false)
     {
         try
         {
             SetAuth();
-            var url = $"api/opd-registrations?page={page}&pageSize={pageSize}" +
-                      (search is not null ? $"&search={Uri.EscapeDataString(search)}" : "");
+            var url = $"api/opd-registrations?page={page}&pageSize={pageSize}";
+            if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
+            if (doctorUserId.HasValue) url += $"&doctorUserId={doctorUserId}";
+            if (todayOnly) url += "&todayOnly=true";
             return await Ok<PagedResult<OpdRegistrationDto>>(await httpClient.GetAsync(url));
         }
         catch (Exception ex) { return Fail<PagedResult<OpdRegistrationDto>>(ex.Message); }
@@ -207,5 +209,15 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
             return await Ok<IEnumerable<DoctorDto>>(await httpClient.GetAsync("api/clinic-settings/doctors"));
         }
         catch (Exception ex) { return Fail<IEnumerable<DoctorDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<int>> GetDoctorOpdCountAsync(Guid doctorUserId, CancellationToken ct = default)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<int>(await httpClient.GetAsync($"api/opd-registrations/doctor-count?doctorUserId={doctorUserId}", ct));
+        }
+        catch (Exception ex) { return Fail<int>(ex.Message); }
     }
 }
