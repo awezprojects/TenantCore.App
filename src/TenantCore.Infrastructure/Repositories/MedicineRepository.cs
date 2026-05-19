@@ -15,11 +15,12 @@ public class MedicineRepository(ClinicDbContext dbContext)
         string? brandName,
         string? genericName,
         Guid? medicineTypeId,
+        Guid? dosageFormId,
         bool? isGeneric,
         bool includeInactive = false,
         CancellationToken ct = default)
     {
-        var query = DbSet.Include(m => m.MedicineType).AsQueryable();
+        var query = DbSet.Include(m => m.MedicineType).Include(m => m.DosageForm).AsQueryable();
 
         if (!includeInactive)
             query = query.Where(m => m.IsActive);
@@ -42,6 +43,9 @@ public class MedicineRepository(ClinicDbContext dbContext)
         if (isGeneric.HasValue)
             query = query.Where(m => m.IsGeneric == isGeneric.Value);
 
+        if (dosageFormId.HasValue)
+            query = query.Where(m => m.DosageFormId == dosageFormId.Value);
+
         var total = await query.CountAsync(ct);
         var items = await query
             .OrderBy(m => m.Name)
@@ -55,7 +59,15 @@ public class MedicineRepository(ClinicDbContext dbContext)
     public async Task<Medicine?> GetByIdWithTypeAsync(Guid id, CancellationToken ct = default)
         => await DbSet
             .Include(m => m.MedicineType)
+            .Include(m => m.DosageForm)
             .FirstOrDefaultAsync(m => m.Id == id, ct);
+
+    public async Task<IEnumerable<Medicine>> GetUnmappedAsync(int batchSize, CancellationToken ct = default)
+        => await DbSet
+            .Where(m => !m.IsDosageFormMapped)
+            .OrderBy(m => m.CreatedAt)
+            .Take(batchSize)
+            .ToListAsync(ct);
 
     public async Task<IEnumerable<Medicine>> FindSimilarAsync(
         string name,

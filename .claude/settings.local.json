@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(dotnet ef *)",
-      "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/src/**)"
+      "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/src/**)",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\plan\\\\medicine-enrichment-service\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\tools\\\\MedicineNormalizer\")"
     ]
   }
 }

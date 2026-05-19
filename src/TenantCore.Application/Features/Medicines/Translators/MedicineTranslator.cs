@@ -26,6 +26,8 @@ public static class MedicineTranslator
         IsActive = entity.IsActive,
         MedicineTypeId = entity.MedicineTypeId,
         MedicineTypeName = entity.MedicineType?.Name,
+        DosageFormId = entity.DosageFormId,
+        DosageFormName = entity.DosageForm?.Name,
         CreatedAt = entity.CreatedAt
     };
 
