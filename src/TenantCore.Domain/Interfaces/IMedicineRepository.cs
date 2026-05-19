@@ -11,6 +11,7 @@ public interface IMedicineRepository : IRepository<Medicine>
         string? brandName,
         string? genericName,
         Guid? medicineTypeId,
+        Guid? dosageFormId,
         bool? isGeneric,
         bool includeInactive = false,
         CancellationToken ct = default);
@@ -23,4 +24,6 @@ public interface IMedicineRepository : IRepository<Medicine>
         string? brandName,
         Guid? excludeId = null,
         CancellationToken ct = default);
+
+    Task<IEnumerable<Medicine>> GetUnmappedAsync(int batchSize, CancellationToken ct = default);
 }

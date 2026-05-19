@@ -24,10 +24,11 @@ public class MedicinesController(ISender sender) : ControllerBase
         [FromQuery] string? brandName = null,
         [FromQuery] string? genericName = null,
         [FromQuery] Guid? medicineTypeId = null,
+        [FromQuery] Guid? dosageFormId = null,
         [FromQuery] bool? isGeneric = null,
         CancellationToken ct = default)
         => Ok(await sender.Send(
-            new GetMedicinesQuery(page, pageSize, search, brandName, genericName, medicineTypeId, isGeneric), ct));
+            new GetMedicinesQuery(page, pageSize, search, brandName, genericName, medicineTypeId, dosageFormId, isGeneric), ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(MedicineDto), StatusCodes.Status200OK)]

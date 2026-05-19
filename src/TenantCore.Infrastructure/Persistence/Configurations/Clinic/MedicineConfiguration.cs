@@ -38,6 +38,17 @@ internal sealed class MedicineConfiguration : IEntityTypeConfiguration<Medicine>
             .HasForeignKey(m => m.MedicineTypeId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.Property(m => m.DosageFormId);
+        builder.Property(m => m.IsDosageFormMapped).IsRequired().HasDefaultValue(false);
+        builder.Property(m => m.DosageFormMappedAt);
+
+        builder.HasIndex(m => m.IsDosageFormMapped);
+
+        builder.HasOne(m => m.DosageForm)
+            .WithMany()
+            .HasForeignKey(m => m.DosageFormId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.Property(m => m.CreatedAt).IsRequired().HasColumnName("CreatedDate");
         builder.Property(m => m.UpdatedAt).HasColumnName("ModifiedDate");
         builder.Property(m => m.CreatedBy).HasMaxLength(256).HasColumnName("CreatedBy");

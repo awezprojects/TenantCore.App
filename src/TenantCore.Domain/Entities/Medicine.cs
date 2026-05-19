@@ -19,8 +19,12 @@ public class Medicine : TenantCore.Domain.Common.AuditableEntity
     public string? Storage { get; private set; }
     public bool IsActive { get; private set; }
     public Guid? MedicineTypeId { get; private set; }
+    public Guid? DosageFormId { get; private set; }
+    public bool IsDosageFormMapped { get; private set; }
+    public DateTime? DosageFormMappedAt { get; private set; }
 
     public MedicineType? MedicineType { get; private set; }
+    public MedicineDosageForm? DosageForm { get; private set; }
 
     private Medicine() { }
 
@@ -60,6 +64,7 @@ public class Medicine : TenantCore.Domain.Common.AuditableEntity
         Storage = storage,
         IsActive = true,
         MedicineTypeId = medicineTypeId,
+        IsDosageFormMapped = false,
         CreatedAt = DateTime.UtcNow
     };
 
@@ -99,6 +104,19 @@ public class Medicine : TenantCore.Domain.Common.AuditableEntity
         Storage = storage;
         IsActive = isActive;
         MedicineTypeId = medicineTypeId;
+        SetUpdatedAt();
+    }
+
+    public void MapDosageForm(Guid dosageFormId)
+    {
+        DosageFormId = dosageFormId;
+        SetUpdatedAt();
+    }
+
+    public void MarkDosageFormMapped()
+    {
+        IsDosageFormMapped = true;
+        DosageFormMappedAt = DateTime.UtcNow;
         SetUpdatedAt();
     }
 }

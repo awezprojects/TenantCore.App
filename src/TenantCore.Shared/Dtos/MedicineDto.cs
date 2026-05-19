@@ -21,6 +21,8 @@ public class MedicineDto
     public bool IsActive { get; init; }
     public Guid? MedicineTypeId { get; init; }
     public string? MedicineTypeName { get; init; }
+    public Guid? DosageFormId { get; init; }
+    public string? DosageFormName { get; init; }
     public DateTime CreatedAt { get; init; }
 }
 
