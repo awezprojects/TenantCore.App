@@ -9,9 +9,10 @@ namespace TenantCore.Web.Client.Services;
 public class TokenStorageService
 {
     private readonly IJSRuntime _jsRuntime;
-    private const string AccessTokenKey = "tenantcore_access_token";
-    private const string UserDataKey = "tenantcore_user_data";
-    private const string TokenExpiryKey = "tenantcore_token_expiry";
+    private const string AccessTokenKey       = "tenantcore_access_token";
+    private const string UserDataKey          = "tenantcore_user_data";
+    private const string TokenExpiryKey       = "tenantcore_token_expiry";
+    private const string AvailableAppsKey     = "tenantcore_available_apps";
 
     public TokenStorageService(IJSRuntime jsRuntime)
     {
@@ -19,7 +20,7 @@ public class TokenStorageService
     }
 
     /// <summary>
-    /// Stores authentication tokens and user data in local storage.
+    /// Stores authentication tokens, user data, and available applications in local storage.
     /// </summary>
     public async Task StoreTokensAsync(LoginResponseDto response)
     {
@@ -33,6 +34,9 @@ public class TokenStorageService
                 var userJson = System.Text.Json.JsonSerializer.Serialize(response.User);
                 await _jsRuntime.InvokeVoidAsync("localStorage.setItem", UserDataKey, userJson);
             }
+
+            var appsJson = System.Text.Json.JsonSerializer.Serialize(response.AvailableApplications);
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", AvailableAppsKey, appsJson);
         }
         catch
         {
@@ -96,6 +100,21 @@ public class TokenStorageService
     }
 
     /// <summary>
+    /// Retrieves the persisted list of applications the user is linked to.
+    /// </summary>
+    public async Task<List<ApplicationDto>> GetAvailableApplicationsAsync()
+    {
+        try
+        {
+            var json = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", AvailableAppsKey);
+            if (!string.IsNullOrEmpty(json))
+                return System.Text.Json.JsonSerializer.Deserialize<List<ApplicationDto>>(json) ?? [];
+        }
+        catch { }
+        return [];
+    }
+
+    /// <summary>
     /// Checks if the stored token is still valid.
     /// </summary>
     public async Task<bool> IsTokenValidAsync()
@@ -124,6 +143,7 @@ public class TokenStorageService
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", AccessTokenKey);
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", UserDataKey);
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", TokenExpiryKey);
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", AvailableAppsKey);
         }
         catch
         {

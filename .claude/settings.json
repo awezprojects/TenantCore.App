@@ -10,6 +10,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\src\\\\TenantCore.Api\\\\Middleware\\\\\" -Name)",
       "Bash(Get-Content \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\src\\\\TenantCore.Application\\\\Features\\\\Patients\\\\Commands\\\\RegisterPatientCommand.cs\")",
       "Bash(Select-Object -First 1)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Dell\\source\\repos\\awezprojects\\TenantCore.Auth\\src\\TenantCore.Auth.Application\\Services\\Implementations"
     ]
   }
 }

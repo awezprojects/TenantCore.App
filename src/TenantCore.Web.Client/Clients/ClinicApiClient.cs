@@ -112,7 +112,7 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
 
     // --- OPD Registrations ---
 
-    public async Task<ApiResponse<PagedResult<OpdRegistrationDto>>> GetOpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null, Guid? doctorUserId = null, bool todayOnly = false, DateTime? fromDate = null, DateTime? toDate = null, TenantCore.Shared.Enums.OpdStatus? status = null, bool notVisited = false)
+    public async Task<ApiResponse<PagedResult<OpdRegistrationDto>>> GetOpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null, Guid? doctorUserId = null, bool todayOnly = false, DateTime? fromDate = null, DateTime? toDate = null, TenantCore.Shared.Enums.OpdStatus? status = null, bool notVisited = false, Guid? applicationId = null)
     {
         try
         {
@@ -125,6 +125,17 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
             if (toDate.HasValue)   url += $"&toDate={toDate.Value:yyyy-MM-dd}";
             if (status.HasValue)   url += $"&status={(int)status.Value}";
             if (notVisited)        url += "&notVisited=true";
+
+            // When an explicit applicationId is supplied (e.g. landing-page per-clinic stats),
+            // attach it directly on the request so the shared ClinicContextService (Guid.Empty
+            // at that point) doesn't interfere via the delegating handler.
+            if (applicationId.HasValue)
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.TryAddWithoutValidation("X-Application-Id", applicationId.Value.ToString());
+                return await Ok<PagedResult<OpdRegistrationDto>>(await httpClient.SendAsync(req));
+            }
+
             return await Ok<PagedResult<OpdRegistrationDto>>(await httpClient.GetAsync(url));
         }
         catch (Exception ex) { return Fail<PagedResult<OpdRegistrationDto>>(ex.Message); }

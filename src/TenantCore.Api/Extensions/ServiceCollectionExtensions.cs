@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using TenantCore.Api.Authorization;
 using TenantCore.Shared.Authorization;
 
 namespace TenantCore.Api.Extensions;
@@ -41,20 +43,25 @@ public static class ServiceCollectionExtensions
             };
         });
 
-        // Add role-based authorization policies
+        // Register the handler that enforces per-clinic role checks via the app_roles JWT claim.
+        services.AddSingleton<IAuthorizationHandler, ClinicRoleAuthorizationHandler>();
+
         services.AddAuthorizationBuilder()
-            // Any authenticated clinic user
+            // Any authenticated clinic user — no clinic-role check needed
             .AddPolicy(AuthPolicies.RequireAuthenticated, policy =>
                 policy.RequireAuthenticatedUser())
-            // Clinic Admin only (fee config, admin-level settings)
+            // Clinic Admin only — checked against the active X-Application-Id clinic
             .AddPolicy(AuthPolicies.RequireClinicAdmin, policy =>
-                policy.RequireRole(AppRoles.ClinicAdmin, AppRoles.SystemAdmin))
-            // Reception: register patients, create OPD/IPD registrations
+                policy.RequireAuthenticatedUser()
+                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicAdmin, AppRoles.SystemAdmin)))
+            // Reception: register patients, create OPD/IPD — per-clinic check
             .AddPolicy(AuthPolicies.RequireReception, policy =>
-                policy.RequireRole(AppRoles.ReceptionRoles))
-            // Clinical: doctors + management for clinical actions (e.g. discharge)
+                policy.RequireAuthenticatedUser()
+                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ReceptionRoles)))
+            // Clinical: doctors + management — per-clinic check
             .AddPolicy(AuthPolicies.RequireClinical, policy =>
-                policy.RequireRole(AppRoles.ClinicalRoles));
+                policy.RequireAuthenticatedUser()
+                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicalRoles)));
 
         return services;
     }

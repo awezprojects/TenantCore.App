@@ -268,9 +268,11 @@ else
             foreach (var ua in AuthState.CurrentUser.UserApplications)
                 linkedIds.Add(ua.ApplicationId);
 
-        var linked = linkedIds.Count > 0
-            ? appsResult.Data.Where(a => linkedIds.Contains(a.ApplicationId)).ToList()
-            : appsResult.Data;
+        // Never fall through to all apps — if both collections are empty the doctor
+        // sees no clinics rather than every clinic in the system.
+        if (linkedIds.Count == 0) return;
+
+        var linked = appsResult.Data.Where(a => linkedIds.Contains(a.ApplicationId)).ToList();
 
         for (var i = 0; i < linked.Count; i++)
             _colorMap[linked[i].ApplicationId] = Colors[i % Colors.Length];
@@ -284,13 +286,17 @@ else
 
             if (userId != Guid.Empty)
             {
+                // Pass the clinic's own app ID explicitly so each card gets its own data,
+                // not the fallback-first-claim data from ClinicControllerBase.
                 var opdRes = await ClinicApi.GetOpdRegistrationsAsync(
-                    page: 1, pageSize: 1, doctorUserId: userId, todayOnly: true);
+                    page: 1, pageSize: 1, doctorUserId: userId, todayOnly: true,
+                    applicationId: app.ApplicationId);
                 if (opdRes.Success && opdRes.Data != null) appts = opdRes.Data.TotalCount;
 
                 var rxRes = await PrescriptionApi.GetPrescriptionsAsync(
                     page: 1, pageSize: 1, doctorUserId: userId,
-                    from: today, to: today.AddDays(1).AddSeconds(-1));
+                    from: today, to: today.AddDays(1).AddSeconds(-1),
+                    applicationId: app.ApplicationId);
                 if (rxRes.Success && rxRes.Data != null) rx = rxRes.Data.TotalCount;
             }
 

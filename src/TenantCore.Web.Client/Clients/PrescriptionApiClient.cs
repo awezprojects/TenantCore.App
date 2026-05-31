@@ -35,7 +35,8 @@ public class PrescriptionApiClient(HttpClient httpClient, AuthStateService authS
     public async Task<ApiResponse<PagedResult<PrescriptionDto>>> GetPrescriptionsAsync(
         int page = 1, int pageSize = 20, string? search = null,
         Guid? doctorUserId = null, Guid? patientId = null,
-        DateTime? from = null, DateTime? to = null)
+        DateTime? from = null, DateTime? to = null,
+        Guid? applicationId = null)
     {
         try
         {
@@ -46,6 +47,14 @@ public class PrescriptionApiClient(HttpClient httpClient, AuthStateService authS
             if (patientId.HasValue) url += $"&patientId={patientId}";
             if (from.HasValue) url += $"&from={from.Value:yyyy-MM-ddTHH:mm:ss}";
             if (to.HasValue) url += $"&to={to.Value:yyyy-MM-ddTHH:mm:ss}";
+
+            if (applicationId.HasValue)
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.TryAddWithoutValidation("X-Application-Id", applicationId.Value.ToString());
+                return await Ok<PagedResult<PrescriptionDto>>(await httpClient.SendAsync(req));
+            }
+
             return await Ok<PagedResult<PrescriptionDto>>(await httpClient.GetAsync(url));
         }
         catch (Exception ex) { return Fail<PagedResult<PrescriptionDto>>(ex.Message); }

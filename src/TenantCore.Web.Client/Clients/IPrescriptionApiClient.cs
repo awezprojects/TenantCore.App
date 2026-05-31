@@ -10,7 +10,8 @@ public interface IPrescriptionApiClient
     Task<ApiResponse<PagedResult<PrescriptionDto>>> GetPrescriptionsAsync(
         int page = 1, int pageSize = 20, string? search = null,
         Guid? doctorUserId = null, Guid? patientId = null,
-        DateTime? from = null, DateTime? to = null);
+        DateTime? from = null, DateTime? to = null,
+        Guid? applicationId = null);
 
     Task<ApiResponse<PrescriptionDto>> GetPrescriptionByIdAsync(Guid id);
     Task<ApiResponse<PrescriptionDto>> GetPrescriptionByOpdIdAsync(Guid opdRegistrationId);

@@ -48,9 +48,10 @@ public class AuthStateService
         {
             if (await _tokenStorage.IsTokenValidAsync())
             {
-                _accessToken = await _tokenStorage.GetAccessTokenAsync();
-                _tokenExpiry = await _tokenStorage.GetTokenExpiryAsync();
-                _currentUser = await _tokenStorage.GetUserAsync();
+                _accessToken        = await _tokenStorage.GetAccessTokenAsync();
+                _tokenExpiry        = await _tokenStorage.GetTokenExpiryAsync();
+                _currentUser        = await _tokenStorage.GetUserAsync();
+                _availableApplications = await _tokenStorage.GetAvailableApplicationsAsync();
             }
             else
             {
