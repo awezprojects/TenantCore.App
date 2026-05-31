@@ -1,0 +1,203 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject AuthStateService AuthState
+@implements IDisposable
+
+<MudThemeProvider Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (_checkingAuth)
+{
+    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#F0F4F9;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else if (_isAuthenticated)
+{
+    <div style="display:flex;min-height:100vh;background:#F0F4F9;">
+
+        <!-- Sidebar -->
+        <div style="width:@(_sidebarOpen ? "230px" : "68px");flex-shrink:0;background:#0A1628;
+                    display:flex;flex-direction:column;
+                    transition:width 0.2s ease;overflow:hidden;">
+
+            <!-- Logo -->
+            <div style="display:flex;align-items:center;gap:10px;
+                        padding:@(_sidebarOpen ? "18px 20px" : "18px 0");
+                        justify-content:@(_sidebarOpen ? "flex-start" : "center");
+                        border-bottom:1px solid rgba(255,255,255,0.08);min-height:68px;flex-shrink:0;">
+                <div style="width:36px;height:36px;border-radius:10px;
+                            background:linear-gradient(135deg,#1976D2,#42A5F5);
+                            display:flex;align-items:center;justify-content:center;
+                            font-size:18px;flex-shrink:0;">🏥</div>
+                @if (_sidebarOpen)
+                {
+                    <div>
+                        <div style="font-size:15px;font-weight:800;color:#fff;letter-spacing:-0.3px;">CloudClinic</div>
+                        <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.5px;">DOCTOR PORTAL</div>
+                    </div>
+                }
+            </div>
+
+            <!-- Doctor info -->
+            @if (_sidebarOpen && AuthState.CurrentUser != null)
+            {
+                <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="width:38px;height:38px;border-radius:10px;
+                                    background:linear-gradient(135deg,#1565C0,#42A5F5);
+                                    display:flex;align-items:center;justify-content:center;
+                                    color:#fff;font-weight:800;font-size:13px;flex-shrink:0;">
+                            @_initials
+                        </div>
+                        <div style="overflow:hidden;">
+                            <div style="font-size:13px;font-weight:700;color:#fff;
+                                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                @AuthState.CurrentUser.FullName
+                            </div>
+                            <div style="font-size:10px;color:rgba(255,255,255,0.45);">Doctor</div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Nav items -->
+            <nav style="flex:1;padding:10px 8px;overflow-y:auto;">
+                <DoctorNavItem Href="/doctor/home"    Icon="🏥" Label="My Clinics"       SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
+                <DoctorNavItem Href="/doctor/profile" Icon="👤" Label="My Profile"       SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
+                @if (!_hasOwnClinic)
+                {
+                    <DoctorNavItem Href="/doctor/register-clinic" Icon="➕" Label="Register Clinic" SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
+                }
+            </nav>
+
+            <!-- Collapse + Logout -->
+            <div style="padding:12px 8px;border-top:1px solid rgba(255,255,255,0.08);flex-shrink:0;">
+                <button class="cc-nav-btn" @onclick="ToggleSidebar" title="@(_sidebarOpen ? "" : "Expand")">
+                    <span style="font-size:16px;">@(_sidebarOpen ? "←" : "→")</span>
+                    @if (_sidebarOpen) { <span>Collapse</span> }
+                </button>
+                <button class="cc-nav-btn cc-nav-logout" @onclick="Logout" title="@(_sidebarOpen ? "" : "Sign Out")">
+                    <span style="font-size:16px;">🚪</span>
+                    @if (_sidebarOpen) { <span>Sign Out</span> }
+                </button>
+            </div>
+        </div>
+
+        <!-- Main area -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+
+            <!-- Top bar -->
+            <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:14px 28px;
+                        display:flex;justify-content:space-between;align-items:center;
+                        position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+                <div>
+                    <div style="font-size:16px;font-weight:700;color:#1E293B;">@_pageTitle</div>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:1px;">
+                        @DateTime.Now.ToString("dddd, dd MMMM yyyy")
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="padding:5px 12px;background:#EFF6FF;border-radius:20px;
+                                font-size:11px;font-weight:700;color:#1565C0;border:1px solid #BFDBFE;">
+                        🩺 Doctor Portal
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Content -->
+            <div style="flex:1;padding:28px 32px;overflow-y:auto;">
+                @Body
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _checkingAuth = true;
+    private bool _isAuthenticated;
+    private bool _sidebarOpen = true;
+    private bool _hasOwnClinic;
+    private string _initials = "DR";
+    private string _currentPath = "/doctor/home";
+    private string _pageTitle = "Doctor Portal";
+
+    private static readonly Dictionary<string, string> _titles = new()
+    {
+        ["/doctor/home"]             = "My Clinics",
+        ["/doctor/profile"]          = "My Profile",
+        ["/doctor/change-password"]  = "Change Password",
+        ["/doctor/register-clinic"]  = "Register Your Clinic",
+    };
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary       = "#1565C0",
+            Background    = "#F0F4F9",
+            Surface       = "#ffffff",
+            TextPrimary   = "#1E293B",
+            TextSecondary = "#64748B",
+        },
+    };
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+        UpdateTitle(Nav.Uri);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await AuthState.InitializeAsync();
+        _isAuthenticated = AuthState.IsAuthenticated;
+
+        if (!_isAuthenticated)
+        {
+            Nav.NavigateTo("/auth/login", forceLoad: true);
+            return;
+        }
+
+        if (AuthState.CurrentUser != null)
+        {
+            var name = AuthState.CurrentUser.FullName;
+            _initials = string.Join("", name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Take(2).Select(p => p[0].ToString().ToUpper()));
+            _hasOwnClinic = AuthState.CurrentUser.UserApplications?.Any(a => a.IsOwner) ?? false;
+        }
+
+        _checkingAuth = false;
+        StateHasChanged();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        UpdateTitle(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateTitle(string uri)
+    {
+        var path = "/" + uri.Replace(Nav.BaseUri, "").TrimStart('/').Split('?')[0];
+        _currentPath = path;
+        _pageTitle = _titles.TryGetValue(path, out var t) ? t : "Doctor Portal";
+    }
+
+    private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
+
+    private async Task Logout()
+    {
+        await AuthState.ClearAuthStateAsync();
+        Nav.NavigateTo("/auth/login", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

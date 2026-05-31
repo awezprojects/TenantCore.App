@@ -44,8 +44,8 @@ public class PrescriptionApiClient(HttpClient httpClient, AuthStateService authS
             if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
             if (doctorUserId.HasValue) url += $"&doctorUserId={doctorUserId}";
             if (patientId.HasValue) url += $"&patientId={patientId}";
-            if (from.HasValue) url += $"&from={from.Value:O}";
-            if (to.HasValue) url += $"&to={to.Value:O}";
+            if (from.HasValue) url += $"&from={from.Value:yyyy-MM-ddTHH:mm:ss}";
+            if (to.HasValue) url += $"&to={to.Value:yyyy-MM-ddTHH:mm:ss}";
             return await Ok<PagedResult<PrescriptionDto>>(await httpClient.GetAsync(url));
         }
         catch (Exception ex) { return Fail<PagedResult<PrescriptionDto>>(ex.Message); }

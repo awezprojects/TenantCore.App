@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudClinic – Print Export</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; font-family: 'Plus Jakarta Sans', 'Noto Sans Devanagari', sans-serif; background: #E5E7EB; color: #1E293B; -webkit-font-smoothing: antialiased; }
+    input, select, textarea, button { font-family: inherit; }
+    button { cursor: pointer; }
+    a { text-decoration: none; color: inherit; }
+
+    /* Each screen renders as a fixed 1280x900 frame */
+    .screen-page {
+      width: 1280px;
+      height: 900px;
+      background: #F4F6FA;
+      margin: 24px auto;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      break-after: page;
+      page-break-after: always;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .screen-page:last-child { break-after: auto; page-break-after: auto; }
+
+    .screen-label {
+      position: absolute;
+      top: 8px; right: 12px;
+      background: rgba(15,32,64,0.85);
+      color: #fff;
+      padding: 4px 10px;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 4px;
+      z-index: 50;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    @page { size: 1380px 980px; margin: 0; }
+
+    @media print {
+      body { background: #fff !important; }
+      .screen-page {
+        margin: 0 auto;
+        box-shadow: none;
+        page-break-after: always;
+        break-after: page;
+      }
+      .screen-page:last-child { break-after: auto; page-break-after: auto; }
+      .no-print { display: none !important; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes pulse  { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+    .fade-in { animation: none; } /* disable for print */
+
+    /* Cover */
+    .cover {
+      width: 1280px; height: 900px; margin: 24px auto;
+      background: linear-gradient(160deg, #0A1628 0%, #0D2456 60%, #1565C0 100%);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; text-align: center; position: relative;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      break-after: page; page-break-after: always;
+    }
+    .cover-inner { z-index: 2; }
+    .cover-bg-circle { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body>
+  <!-- Cover Page -->
+  <div class="cover">
+    <div class="cover-bg-circle" style="width:600px;height:600px;top:-100px;right:-150px;"></div>
+    <div class="cover-bg-circle" style="width:400px;height:400px;bottom:-80px;left:-80px;"></div>
+    <div class="cover-bg-circle" style="width:240px;height:240px;top:200px;right:200px;"></div>
+    <div class="cover-inner">
+      <div style="font-size:96px;margin-bottom:24px;">🏥</div>
+      <div style="font-size:56px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;">CloudClinic</div>
+      <div style="font-size:18px;color:rgba(255,255,255,0.7);letter-spacing:2px;margin-bottom:48px;">HEALTHCARE MANAGEMENT SYSTEM</div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.6);max-width:540px;margin:0 auto;line-height:1.7;">
+        Complete design specification covering authentication, multi-clinic dashboards, patient registration, OPD/IPD management, smart prescription writer with multi-language remarks, vitals trending charts, and inventory management.
+      </div>
+      <div style="margin-top:64px;padding:16px 28px;background:rgba(255,255,255,0.08);border-radius:14px;display:inline-block;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:1px;">DESIGN EXPORT</div>
+        <div style="font-size:16px;font-weight:700;margin-top:2px;">May 2026 · v2.4.1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screens render here -->
+  <div id="screens"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="cc-data.jsx"></script>
+  <script type="text/babel" src="cc-auth.jsx"></script>
+  <script type="text/babel" src="cc-sidebar.jsx"></script>
+  <script type="text/babel" src="cc-clinic-landing.jsx"></script>
+  <script type="text/babel" src="cc-chart.jsx"></script>
+  <script type="text/babel" src="cc-dashboard.jsx"></script>
+  <script type="text/babel" src="cc-patients.jsx"></script>
+  <script type="text/babel" src="cc-opd.jsx"></script>
+  <script type="text/babel" src="cc-ipd.jsx"></script>
+  <script type="text/babel" src="cc-prescription.jsx"></script>
+  <script type="text/babel" src="cc-rx-list.jsx"></script>
+  <script type="text/babel" src="cc-print.jsx"></script>
+  <script type="text/babel" src="cc-medicine.jsx"></script>
+
+  <script type="text/babel">
+    const SAMPLE_CLINIC = LINKED_CLINICS[0];
+
+    function ScreenFrame({ label, children, withChrome = true, page, activeScreen }) {
+      return (
+        <div className="screen-page">
+          <div className="screen-label">{page} · {label}</div>
+          {withChrome ? (
+            <div style={{ display: 'flex', height: '100%', width: '100%', background: CC.bg }}>
+              <Sidebar role="doctor" active={activeScreen || 'dashboard'} onNav={() => {}} onLogout={() => {}} clinic={SAMPLE_CLINIC} onSwitchClinic={() => {}} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <TopBar role="doctor" screen={activeScreen || 'dashboard'} clinic={SAMPLE_CLINIC} onSwitchClinic={() => {}} />
+                <div style={{ flex: 1, overflowY: 'hidden', background: CC.bg }}>
+                  {children}
+                </div>
+              </div>
+            </div>
+          ) : children}
+        </div>
+      );
+    }
+
+    function PrintApp() {
+      const screens = [
+        { label: 'Login / Sign In', chrome: false, page: '01', active: null,
+          render: () => <LoginScreen onLogin={() => {}} onForgot={() => {}} /> },
+        { label: '2-Factor OTP Verification', chrome: false, page: '02', active: null,
+          render: () => <OTPScreen role="doctor" onVerify={() => {}} onBack={() => {}} /> },
+        { label: 'Forgot Password', chrome: false, page: '03', active: null,
+          render: () => <ForgotPasswordScreen onBack={() => {}} /> },
+        { label: 'Doctor – Multi-Clinic Landing', chrome: false, page: '04', active: null,
+          render: () => <DoctorClinicLanding onEnter={() => {}} onLogout={() => {}} /> },
+        { label: 'Doctor – Clinic Dashboard', chrome: true, page: '05', active: 'dashboard',
+          render: () => <DoctorDashboard onNav={() => {}} clinic={SAMPLE_CLINIC} /> },
+        { label: "Today's Appointments", chrome: true, page: '06', active: 'appointments',
+          render: () => <AppointmentsPage onNav={() => {}} /> },
+        { label: 'Prescriptions List with Filter', chrome: true, page: '07', active: 'prescriptions-list',
+          render: () => <PrescriptionsListPage onNav={() => {}} /> },
+        { label: 'Prescription Writer', chrome: true, page: '08', active: 'prescription',
+          render: () => <PrescriptionModule ctx={{ uhid: 'CC-20240042' }} onNav={() => {}} /> },
+        { label: 'Patient Registry', chrome: true, page: '09', active: 'patients',
+          render: () => <PatientRegistration /> },
+        { label: 'OPD Management', chrome: true, page: '10', active: 'opd',
+          render: () => <OPDModule onNav={() => {}} role="doctor" /> },
+        { label: 'IPD & Bed Management', chrome: true, page: '11', active: 'ipd',
+          render: () => <IPDModule /> },
+        { label: 'Medicine Management', chrome: true, page: '12', active: 'medicine',
+          render: () => <MedicineModule /> },
+        { label: 'Printable Prescription (A4)', chrome: false, page: '13', active: null,
+          render: () => <div style={{ height: '100%', overflow: 'hidden' }}><PrintPrescription rx={PRESCRIPTIONS_DB[0]} onBack={() => {}} /></div> },
+      ];
+
+      return (
+        <>
+          {screens.map((s, i) => (
+            <ScreenFrame key={i} label={s.label} withChrome={s.chrome} page={s.page} activeScreen={s.active}>
+              {s.render()}
+            </ScreenFrame>
+          ))}
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('screens'));
+    root.render(<PrintApp />);
+
+    // Auto-print after fonts + render settle
+    (async () => {
+      try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+      await new Promise(r => setTimeout(r, 1500));
+      window.print();
+    })();
+  </script>
+</body>
+</html>

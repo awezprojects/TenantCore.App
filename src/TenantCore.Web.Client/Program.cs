@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 using TenantCore.Web.Client;
-using TenantCore.Web.Client.Services;
 using TenantCore.Web.Client.Clients;
+using TenantCore.Web.Client.Services;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -15,6 +15,10 @@ builder.Services.AddScoped<TokenStorageService>();
 builder.Services.AddScoped<AuthStateService>();
 builder.Services.AddSingleton<RoleCacheService>();
 
+// Clinic context (persists selected clinic across pages)
+builder.Services.AddScoped<ClinicContextService>();
+builder.Services.AddTransient<ClinicAuthorizationHandler>();
+
 // Get API base URLs from configuration
 var tenantApiBaseUrl = builder.Configuration["TenantApiBaseUrl"] ?? "https://localhost:7246/";
 var authApiBaseUrl = builder.Configuration["AuthApiBaseUrl"] ?? tenantApiBaseUrl;
@@ -25,28 +29,34 @@ builder.Services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
     client.BaseAddress = new Uri(authApiBaseUrl);
 });
 
+// Register Doctor Profile API Client (doctor-level, no clinic context header)
+builder.Services.AddHttpClient<IDoctorProfileApiClient, DoctorProfileApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+});
+
 // Register Clinic API Client
 builder.Services.AddHttpClient<IClinicApiClient, ClinicApiClient>(client =>
 {
     client.BaseAddress = new Uri(tenantApiBaseUrl);
-});
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
 // Register Application API Client
 builder.Services.AddHttpClient<IApplicationApiClient, ApplicationApiClient>(client =>
 {
     client.BaseAddress = new Uri(tenantApiBaseUrl);
-});
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
 // Register Medicine API Client
 builder.Services.AddHttpClient<IMedicineApiClient, MedicineApiClient>(client =>
 {
     client.BaseAddress = new Uri(tenantApiBaseUrl);
-});
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
 // Register Prescription API Client
 builder.Services.AddHttpClient<IPrescriptionApiClient, PrescriptionApiClient>(client =>
 {
     client.BaseAddress = new Uri(tenantApiBaseUrl);
-});
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
 await builder.Build().RunAsync();

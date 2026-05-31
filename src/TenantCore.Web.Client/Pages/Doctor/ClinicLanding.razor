@@ -1,0 +1,338 @@
+@page "/doctor/home"
+@layout DoctorPortalLayout
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject IApplicationApiClient AppApi
+@inject IClinicApiClient ClinicApi
+@inject IPrescriptionApiClient PrescriptionApi
+@inject NavigationManager Nav
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Shared.Dtos.Auth
+
+<PageTitle>My Clinics - CloudClinic</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:60px 0;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else
+{
+    <div class="cc-fade-in">
+
+        <!-- Greeting -->
+        <div style="margin-bottom:28px;">
+            <div style="font-size:26px;font-weight:800;color:#0A1628;letter-spacing:-0.5px;">
+                Welcome back, Dr. @_lastName 👋
+            </div>
+            <div style="font-size:14px;color:#64748B;margin-top:4px;">
+                You're linked with
+                <strong style="color:#1565C0;">@_clinics.Count clinic@(_clinics.Count != 1 ? "s" : "")</strong>.
+                Select one to start your day.
+            </div>
+        </div>
+
+        <!-- Top Stats Row -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;">
+            <div class="cc-landing-stat">
+                <div class="cc-stat-label">LINKED CLINICS</div>
+                <div class="cc-stat-value">@_clinics.Count</div>
+                <div class="cc-stat-sub">Active practice locations</div>
+            </div>
+            <div class="cc-landing-stat">
+                <div class="cc-stat-label">TODAY'S APPOINTMENTS</div>
+                <div class="cc-stat-value" style="color:#1565C0;">@_totalAppts</div>
+                <div class="cc-stat-sub">Across all clinics</div>
+            </div>
+            <div class="cc-landing-stat">
+                <div class="cc-stat-label">PENDING RX</div>
+                <div class="cc-stat-value" style="color:#D97706;">@_totalPendingRx</div>
+                <div class="cc-stat-sub">Awaiting completion</div>
+            </div>
+            <div class="cc-landing-stat">
+                <div class="cc-stat-label">OWN PRACTICE</div>
+                <div class="cc-stat-value" style="color:@(_hasOwnClinic ? "#16A34A" : "#94A3B8");">
+                    @(_hasOwnClinic ? "✓" : "—")
+                </div>
+                <div class="cc-stat-sub">@(_hasOwnClinic ? "Registered" : "Not registered")</div>
+            </div>
+        </div>
+
+        <!-- Section Heading -->
+        <div style="margin-bottom:14px;">
+            <div style="font-size:17px;font-weight:800;color:#1E293B;">My Clinics</div>
+            <div style="font-size:12px;color:#94A3B8;margin-top:2px;">Click any card to enter that clinic</div>
+        </div>
+
+        <!-- Clinic Cards Grid -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;margin-bottom:32px;">
+
+            @foreach (var item in _clinics)
+            {
+                var color = GetClinicColor(item.Clinic.ApplicationId);
+                var role  = GetDoctorRole(item.Clinic.ApplicationId);
+                var logo  = GetClinicLogo(item.Clinic.ApplicationId);
+
+                <div class="cc-clinic-card" style="--clinic-color:@color;"
+                     @onclick="() => EnterClinic(item.Clinic.ApplicationId)">
+
+                    <!-- Banner -->
+                    <div style="height:70px;background:linear-gradient(135deg,@color,@(color)cc);
+                                padding:14px 18px;display:flex;align-items:center;
+                                justify-content:space-between;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:44px;height:44px;border-radius:12px;
+                                        background:rgba(255,255,255,0.25);
+                                        display:flex;align-items:center;justify-content:center;
+                                        font-size:22px;flex-shrink:0;">@logo</div>
+                            <div>
+                                <div style="color:#fff;font-weight:800;font-size:15px;line-height:1.2;">
+                                    @item.Clinic.ApplicationName
+                                </div>
+                                <div style="color:rgba(255,255,255,0.85);font-size:11px;margin-top:2px;">
+                                    @GetClinicType(item.Clinic.ApplicationType)
+                                </div>
+                            </div>
+                        </div>
+                        @if (item.Clinic.IsOwner)
+                        {
+                            <span style="padding:3px 8px;background:rgba(255,255,255,0.25);
+                                         border-radius:12px;font-size:10px;font-weight:700;
+                                         color:#fff;letter-spacing:0.5px;">OWNER</span>
+                        }
+                    </div>
+
+                    <!-- Card Body -->
+                    <div style="padding:18px;">
+
+                        <!-- Role -->
+                        <div style="margin-bottom:14px;">
+                            <div style="font-size:11px;color:#94A3B8;font-weight:600;
+                                        text-transform:uppercase;letter-spacing:0.4px;">My Role</div>
+                            <div style="font-size:13px;font-weight:700;color:#1E293B;margin-top:2px;">
+                                @role
+                            </div>
+                        </div>
+
+                        <!-- Address / Phone -->
+                        @if (!string.IsNullOrWhiteSpace(item.Clinic.Address))
+                        {
+                            <div style="display:flex;align-items:flex-start;gap:6px;
+                                        margin-bottom:6px;font-size:12px;color:#64748B;">
+                                <span style="margin-top:1px;flex-shrink:0;">📍</span>
+                                <span>@item.Clinic.Address</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.Clinic.ContactNumber))
+                        {
+                            <div style="display:flex;align-items:center;gap:6px;
+                                        font-size:12px;color:#64748B;">
+                                <span>📞</span><span>@item.Clinic.ContactNumber</span>
+                            </div>
+                        }
+                        <div style="margin-bottom:14px;"></div>
+
+                        <!-- Quick Stats -->
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+                                    margin-bottom:14px;padding:10px 0;
+                                    border-top:1px solid #E2E8F0;border-bottom:1px solid #E2E8F0;">
+                            <div style="text-align:center;">
+                                <div style="font-size:18px;font-weight:800;color:@color;">
+                                    @(item.TodayAppts?.ToString() ?? "—")
+                                </div>
+                                <div style="font-size:10px;color:#94A3B8;font-weight:600;">TODAY'S APPT</div>
+                            </div>
+                            <div style="text-align:center;border-left:1px solid #E2E8F0;border-right:1px solid #E2E8F0;">
+                                <div style="font-size:18px;font-weight:800;
+                                            color:@(item.PendingRx > 0 ? "#D97706" : "#94A3B8");">
+                                    @(item.PendingRx?.ToString() ?? "—")
+                                </div>
+                                <div style="font-size:10px;color:#94A3B8;font-weight:600;">PENDING RX</div>
+                            </div>
+                            <div style="text-align:center;">
+                                <div style="font-size:14px;font-weight:800;color:#1E293B;padding-top:4px;">N/A</div>
+                                <div style="font-size:10px;color:#94A3B8;font-weight:600;">BEDS</div>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;">
+                            <div style="font-size:11px;color:#94A3B8;">
+                                Joined @item.Clinic.CreatedDate.ToString("dd MMM yyyy")
+                            </div>
+                            <span style="display:inline-flex;align-items:center;gap:4px;
+                                         color:@color;font-weight:700;font-size:13px;">
+                                Enter Clinic <span style="font-size:14px;">→</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Register own clinic card -->
+            @if (!_hasOwnClinic)
+            {
+                <div class="cc-add-clinic-card" @onclick="RegisterClinic">
+                    <div style="width:64px;height:64px;border-radius:18px;
+                                background:linear-gradient(135deg,#1565C0,#42A5F5);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:30px;margin-bottom:14px;
+                                box-shadow:0 8px 20px rgba(21,101,192,0.25);">➕</div>
+                    <div style="font-size:17px;font-weight:800;color:#1E293B;margin-bottom:6px;">
+                        Register Your Own Clinic
+                    </div>
+                    <div style="font-size:12px;color:#94A3B8;max-width:280px;
+                                line-height:1.6;margin-bottom:14px;text-align:center;">
+                        Start your own practice on CloudClinic. Complete control over staff, patients, and operations.
+                    </div>
+                    <span style="padding:7px 18px;background:#1565C0;color:#fff;
+                                 border-radius:20px;font-size:12px;font-weight:700;">Register Now</span>
+                    <div style="font-size:10px;color:#94A3B8;margin-top:12px;font-style:italic;">
+                        * 1 application per doctor account
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (_hasOwnClinic)
+        {
+            <div style="background:#fff;border-radius:14px;padding:16px 20px;
+                        border:1px solid #E2E8F0;display:flex;
+                        justify-content:space-between;align-items:center;margin-bottom:24px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:#ECFDF5;
+                                color:#16A34A;display:flex;align-items:center;
+                                justify-content:center;font-size:18px;">✅</div>
+                    <div>
+                        <div style="font-size:13px;font-weight:700;">Your clinic is registered</div>
+                        <div style="font-size:11px;color:#94A3B8;">
+                            Doctors can register only 1 application per account. Contact support to add more.
+                        </div>
+                    </div>
+                </div>
+                <span style="font-size:11px;color:#94A3B8;font-weight:600;">1 of 1 used</span>
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    private bool   _loading        = true;
+    private string _lastName       = string.Empty;
+    private bool   _hasOwnClinic;
+    private int    _totalAppts;
+    private int    _totalPendingRx;
+
+    private List<ClinicItem> _clinics = [];
+
+    private static readonly string[] Colors =
+        ["#1565C0", "#DC2626", "#059669", "#7C3AED", "#D97706", "#0891B2"];
+
+    private Dictionary<Guid, string> _colorMap = [];
+    private Dictionary<Guid, string> _roleMap  = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+
+        if (!AuthState.IsAuthenticated)
+        {
+            Nav.NavigateTo("/auth/login", forceLoad: true);
+            return;
+        }
+
+        var user = AuthState.CurrentUser;
+        _lastName = user?.LastName ?? user?.FullName?.Split(' ').LastOrDefault() ?? "Doctor";
+
+        if (user?.UserRoles != null)
+            foreach (var ur in user.UserRoles)
+                _roleMap[ur.ApplicationId] = ur.RoleName;
+
+        await LoadClinicsAsync(user?.UserId ?? Guid.Empty);
+        _hasOwnClinic = _clinics.Any(c => c.Clinic.IsOwner);
+        _loading = false;
+    }
+
+    private async Task LoadClinicsAsync(Guid userId)
+    {
+        var appsResult = await AppApi.GetAllApplicationsAsync();
+        if (!appsResult.Success || appsResult.Data == null) return;
+
+        // Filter to only the apps the user is linked to
+        var linkedIds = new HashSet<Guid>(
+            AuthState.AvailableApplications.Select(a => a.ApplicationId));
+
+        if (linkedIds.Count == 0 && AuthState.CurrentUser?.UserApplications != null)
+            foreach (var ua in AuthState.CurrentUser.UserApplications)
+                linkedIds.Add(ua.ApplicationId);
+
+        var linked = linkedIds.Count > 0
+            ? appsResult.Data.Where(a => linkedIds.Contains(a.ApplicationId)).ToList()
+            : appsResult.Data;
+
+        for (var i = 0; i < linked.Count; i++)
+            _colorMap[linked[i].ApplicationId] = Colors[i % Colors.Length];
+
+        var today = DateTime.UtcNow.Date;
+
+        var tasks = linked.Select(async app =>
+        {
+            int? appts = null;
+            int? rx    = null;
+
+            if (userId != Guid.Empty)
+            {
+                var opdRes = await ClinicApi.GetOpdRegistrationsAsync(
+                    page: 1, pageSize: 1, doctorUserId: userId, todayOnly: true);
+                if (opdRes.Success && opdRes.Data != null) appts = opdRes.Data.TotalCount;
+
+                var rxRes = await PrescriptionApi.GetPrescriptionsAsync(
+                    page: 1, pageSize: 1, doctorUserId: userId,
+                    from: today, to: today.AddDays(1).AddSeconds(-1));
+                if (rxRes.Success && rxRes.Data != null) rx = rxRes.Data.TotalCount;
+            }
+
+            return new ClinicItem(app, appts, rx);
+        });
+
+        _clinics        = (await Task.WhenAll(tasks)).ToList();
+        _totalAppts     = _clinics.Sum(c => c.TodayAppts ?? 0);
+        _totalPendingRx = _clinics.Sum(c => c.PendingRx  ?? 0);
+    }
+
+    private async Task EnterClinic(Guid appId)
+    {
+        var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
+        await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ApplicationName ?? string.Empty);
+        Nav.NavigateTo("/dashboard");
+    }
+    private void RegisterClinic()           => Nav.NavigateTo("/doctor/register-clinic");
+
+    private string GetClinicColor(Guid id)
+        => _colorMap.TryGetValue(id, out var c) ? c : "#1565C0";
+
+    private string GetDoctorRole(Guid id)
+        => _roleMap.TryGetValue(id, out var r) ? r : "Doctor";
+
+    private static string GetClinicType(int type) => type switch
+    {
+        1 => "Hospital",
+        2 => "Speciality Clinic",
+        3 => "Polyclinic",
+        4 => "Diagnostic Centre",
+        _ => "Clinic",
+    };
+
+    private static string GetClinicLogo(Guid id)
+    {
+        var logos = new[] { "🏥", "❤️", "🌿", "👑", "🧬", "💊" };
+        return logos[Math.Abs(id.GetHashCode()) % logos.Length];
+    }
+
+    private record ClinicItem(
+        ApplicationResponseDto Clinic,
+        int? TodayAppts,
+        int? PendingRx);
+}

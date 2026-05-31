@@ -14,7 +14,16 @@ public class Prescription : AuditableEntity
     public string PrescriptionNumber { get; private set; } = string.Empty;
     public DateTime PrescribedDate { get; private set; }
     public DateTime? NextVisitDate { get; private set; }
+    public string? Diagnosis { get; private set; }
+    public string? Investigations { get; private set; }
     public string? Notes { get; private set; }
+    public string? VitalBP { get; private set; }
+    public int? VitalPulse { get; private set; }
+    public decimal? VitalTemp { get; private set; }
+    public decimal? VitalWeight { get; private set; }
+    public decimal? VitalSpO2 { get; private set; }
+    public int? VitalRR { get; private set; }
+    public decimal? VitalSugar { get; private set; }
     public PrescriptionStatus Status { get; private set; }
     public bool IsEmailSent { get; private set; }
 
@@ -34,7 +43,16 @@ public class Prescription : AuditableEntity
         string doctorName,
         string prescriptionNumber,
         DateTime? nextVisitDate,
+        string? diagnosis,
+        string? investigations,
         string? notes,
+        string? vitalBP,
+        int? vitalPulse,
+        decimal? vitalTemp,
+        decimal? vitalWeight,
+        decimal? vitalSpO2,
+        int? vitalRR,
+        decimal? vitalSugar,
         IEnumerable<PrescriptionItem> items)
     {
         var prescription = new Prescription
@@ -48,7 +66,16 @@ public class Prescription : AuditableEntity
             PrescriptionNumber = prescriptionNumber,
             PrescribedDate = DateTime.UtcNow,
             NextVisitDate = nextVisitDate,
+            Diagnosis = diagnosis,
+            Investigations = investigations,
             Notes = notes,
+            VitalBP = vitalBP,
+            VitalPulse = vitalPulse,
+            VitalTemp = vitalTemp,
+            VitalWeight = vitalWeight,
+            VitalSpO2 = vitalSpO2,
+            VitalRR = vitalRR,
+            VitalSugar = vitalSugar,
             Status = PrescriptionStatus.Draft,
             IsEmailSent = false,
             CreatedAt = DateTime.UtcNow
@@ -57,13 +84,34 @@ public class Prescription : AuditableEntity
         return prescription;
     }
 
-    public void Update(DateTime? nextVisitDate, string? notes, IEnumerable<PrescriptionItem> items)
+    public void Update(
+        DateTime? nextVisitDate,
+        string? diagnosis,
+        string? investigations,
+        string? notes,
+        string? vitalBP,
+        int? vitalPulse,
+        decimal? vitalTemp,
+        decimal? vitalWeight,
+        decimal? vitalSpO2,
+        int? vitalRR,
+        decimal? vitalSugar,
+        IEnumerable<PrescriptionItem> items)
     {
         if (Status == PrescriptionStatus.Submitted)
             throw new DomainValidationException("Cannot update a submitted prescription.");
 
         NextVisitDate = nextVisitDate;
+        Diagnosis = diagnosis;
+        Investigations = investigations;
         Notes = notes;
+        VitalBP = vitalBP;
+        VitalPulse = vitalPulse;
+        VitalTemp = vitalTemp;
+        VitalWeight = vitalWeight;
+        VitalSpO2 = vitalSpO2;
+        VitalRR = vitalRR;
+        VitalSugar = vitalSugar;
         _items.Clear();
         _items.AddRange(items);
         SetUpdatedAt();

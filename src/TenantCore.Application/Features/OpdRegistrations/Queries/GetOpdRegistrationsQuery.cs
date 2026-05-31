@@ -10,4 +10,8 @@ public sealed record GetOpdRegistrationsQuery(
     int PageSize = 20,
     string? Search = null,
     Guid? DoctorUserId = null,
-    bool TodayOnly = false) : IRequest<PagedResult<OpdRegistrationDto>>;
+    bool TodayOnly = false,
+    DateTime? FromDate = null,
+    DateTime? ToDate = null,
+    TenantCore.Shared.Enums.OpdStatus? StatusFilter = null,
+    bool NotVisited = false) : IRequest<PagedResult<OpdRegistrationDto>>;

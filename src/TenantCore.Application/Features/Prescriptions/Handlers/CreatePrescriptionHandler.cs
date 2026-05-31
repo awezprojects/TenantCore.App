@@ -37,11 +37,16 @@ public sealed class CreatePrescriptionHandler(
         var todayCount = await prescriptionRepository.CountTodayByApplicationAsync(request.ApplicationId, cancellationToken);
         var prescriptionNumber = $"RX-{DateTime.UtcNow:yyyyMMdd}-{(todayCount + 1):D4}";
 
+        var investigationsJson = request.Investigations.Count > 0
+            ? System.Text.Json.JsonSerializer.Serialize(request.Investigations)
+            : null;
+
         var items = request.Items.Select((dto, index) => PrescriptionItem.Create(
             Guid.Empty,
             dto.MedicineId,
             dto.MedicineName,
             dto.MedicineForm,
+            dto.Strength,
             dto.DosageUnit,
             dto.DosageMorning,
             dto.DosageAfternoon,
@@ -49,6 +54,9 @@ public sealed class CreatePrescriptionHandler(
             dto.DosageNight,
             dto.DurationDays,
             CalculateQuantity(dto),
+            dto.Frequency,
+            dto.Timing,
+            dto.Instructions,
             dto.RemarkEnglish,
             dto.RemarkHindi,
             dto.RemarkMarathi,
@@ -62,7 +70,16 @@ public sealed class CreatePrescriptionHandler(
             request.DoctorName,
             prescriptionNumber,
             request.NextVisitDate,
+            request.Diagnosis,
+            investigationsJson,
             request.Notes,
+            request.VitalBP,
+            request.VitalPulse,
+            request.VitalTemp,
+            request.VitalWeight,
+            request.VitalSpO2,
+            request.VitalRR,
+            request.VitalSugar,
             items);
 
         await prescriptionRepository.AddAsync(prescription, cancellationToken);

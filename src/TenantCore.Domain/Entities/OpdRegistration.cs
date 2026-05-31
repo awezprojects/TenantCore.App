@@ -43,7 +43,7 @@ public class OpdRegistration : AuditableEntity
         DoctorUserId = doctorUserId,
         DoctorName = doctorName,
         RegistrationNumber = registrationNumber,
-        RegistrationDate = DateTime.UtcNow,
+        RegistrationDate = DateTime.Now,
         Fee = fee,
         Status = OpdStatus.Pending,
         Notes = notes,

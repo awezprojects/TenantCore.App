@@ -1,0 +1,629 @@
+@page "/doctor/profile"
+@layout DoctorPortalLayout
+@inject AuthStateService AuthState
+@inject IDoctorProfileApiClient DoctorProfileApi
+@inject IAuthApiClient AuthClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Dtos.Auth
+
+<PageTitle>My Profile - CloudClinic</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:60px 0;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else
+{
+    <div class="cc-fade-in" style="max-width:780px;display:flex;flex-direction:column;gap:20px;">
+
+        <!-- ── 1. Personal Information ─────────────────────────────────── -->
+        <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
+            <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;
+                        display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:15px;font-weight:800;color:#1E293B;">Personal Information</div>
+                    <div style="font-size:12px;color:#94A3B8;margin-top:2px;">Name and contact details</div>
+                </div>
+                <div style="width:46px;height:46px;border-radius:14px;
+                            background:linear-gradient(135deg,#1565C0,#42A5F5);
+                            display:flex;align-items:center;justify-content:center;
+                            color:#fff;font-weight:800;font-size:17px;">@_initials</div>
+            </div>
+            <div style="padding:22px 24px;">
+                <EditForm Model="_basicModel" OnValidSubmit="SaveBasicInfo">
+                    <DataAnnotationsValidator />
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                        <MudTextField @bind-Value="_basicModel.FirstName"  Label="First Name"               Variant="Variant.Outlined" For="@(() => _basicModel.FirstName)"  Disabled="_savingBasic" />
+                        <MudTextField @bind-Value="_basicModel.LastName"   Label="Last Name"                Variant="Variant.Outlined" For="@(() => _basicModel.LastName)"   Disabled="_savingBasic" />
+                        <MudTextField @bind-Value="_basicModel.MiddleName" Label="Middle Name (optional)"   Variant="Variant.Outlined" Disabled="_savingBasic" />
+                        <MudTextField @bind-Value="_basicModel.MobileNo"   Label="Mobile Number"            Variant="Variant.Outlined" Disabled="_savingBasic" />
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;
+                                background:#F8FAFC;border-radius:10px;margin-bottom:14px;">
+                        <span>📧</span>
+                        <div style="flex:1;">
+                            <div style="font-size:11px;color:#94A3B8;font-weight:600;">Email Address</div>
+                            <div style="font-size:13px;font-weight:700;color:#1E293B;">@AuthState.CurrentUser?.EmailId</div>
+                        </div>
+                        @if (AuthState.CurrentUser?.IsEmailVerified == true)
+                        {
+                            <span style="padding:3px 8px;background:#ECFDF5;color:#16A34A;
+                                         border-radius:12px;font-size:11px;font-weight:700;">✓ Verified</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(_basicError))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@_basicError</MudAlert>
+                    }
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                               Disabled="_savingBasic" Style="min-width:130px;">
+                        @if (_savingBasic)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                            <span>Saving…</span>
+                        }
+                        else { <span>Save Changes</span> }
+                    </MudButton>
+                </EditForm>
+            </div>
+        </div>
+
+        <!-- ── 2. Professional Information ────────────────────────────── -->
+        <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
+            <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+                <div style="font-size:15px;font-weight:800;color:#1E293B;">Professional Information</div>
+                <div style="font-size:12px;color:#94A3B8;margin-top:2px;">
+                    Medical credentials visible to clinics you work with
+                </div>
+            </div>
+            <div style="padding:22px 24px;">
+                <EditForm Model="_profModel" OnValidSubmit="SaveProfessionalInfo">
+                    <DataAnnotationsValidator />
+                    <div style="margin-bottom:14px;">
+                        <MudTextField @bind-Value="_profModel.RegistrationNumber"
+                                      Label="Medical Registration Number *"
+                                      Variant="Variant.Outlined"
+                                      For="@(() => _profModel.RegistrationNumber)"
+                                      Disabled="_savingProf"
+                                      Placeholder="e.g. MH-2021-12345"
+                                      HelperText="Your official medical council registration number" />
+                    </div>
+                    @if (_profProfile != null)
+                    {
+                        <div style="display:flex;align-items:center;gap:8px;padding:9px 13px;
+                                    background:#ECFDF5;border-radius:10px;border:1px solid #BBF7D0;
+                                    margin-bottom:14px;">
+                            <span>✅</span>
+                            <div>
+                                <div style="font-size:12px;font-weight:700;color:#16A34A;">Registration Verified</div>
+                                <div style="font-size:11px;color:#64748B;">
+                                    Profile created @_profProfile.CreatedAt.ToString("dd MMM yyyy")
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                        <MudTextField @bind-Value="_profModel.Specialty"            Label="Specialty"       Variant="Variant.Outlined" Disabled="_savingProf" Placeholder="e.g. General Medicine" />
+                        <MudTextField @bind-Value="_profModel.QualificationDetails" Label="Qualifications"  Variant="Variant.Outlined" Disabled="_savingProf" Placeholder="e.g. MBBS, MD" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_profError))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@_profError</MudAlert>
+                    }
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                               Disabled="_savingProf" Style="min-width:160px;">
+                        @if (_savingProf)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                            <span>Saving…</span>
+                        }
+                        else { <span>Save Professional Info</span> }
+                    </MudButton>
+                </EditForm>
+            </div>
+        </div>
+
+        <!-- ── 3. Security ────────────────────────────────────────────── -->
+        <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
+            <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+                <div style="font-size:15px;font-weight:800;color:#1E293B;">Security</div>
+                <div style="font-size:12px;color:#94A3B8;margin-top:2px;">
+                    Manage your password, 2FA, and active sessions
+                </div>
+            </div>
+
+            <!-- 3a. Two-Factor Authentication -->
+            <div style="padding:20px 24px;border-bottom:1px solid #F1F5F9;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;">
+                    <div style="display:flex;align-items:flex-start;gap:14px;">
+                        <div style="width:42px;height:42px;border-radius:12px;
+                                    background:@(_twoFactorEnabled ? "#ECFDF5" : "#F8FAFC");
+                                    display:flex;align-items:center;justify-content:center;
+                                    font-size:20px;flex-shrink:0;">🔐</div>
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#1E293B;">
+                                Two-Factor Authentication
+                            </div>
+                            <div style="font-size:12px;color:#64748B;margin-top:2px;">
+                                @if (_twoFactorEnabled)
+                                {
+                                    <span style="color:#16A34A;font-weight:600;">● Enabled</span>
+                                    <span style="margin-left:6px;">— Your account is protected with TOTP.</span>
+                                }
+                                else
+                                {
+                                    <span style="color:#D97706;font-weight:600;">● Disabled</span>
+                                    <span style="margin-left:6px;">— Add an extra layer of security.</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    @if (_twoFactorEnabled)
+                    {
+                        <button @onclick="ShowDisable2FA"
+                                style="padding:8px 18px;background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;
+                                       border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
+                                       white-space:nowrap;flex-shrink:0;">
+                            Disable 2FA
+                        </button>
+                    }
+                    else
+                    {
+                        <button @onclick="Enable2FA"
+                                style="padding:8px 18px;background:#EFF6FF;color:#1565C0;border:1px solid #BFDBFE;
+                                       border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
+                                       white-space:nowrap;flex-shrink:0;">
+                            Enable 2FA
+                        </button>
+                    }
+                </div>
+
+                @if (_showDisable2FA)
+                {
+                    <div style="margin-top:16px;padding:16px;background:#FFF5F5;border-radius:10px;
+                                border:1px solid #FECACA;">
+                        <div style="font-size:13px;font-weight:700;color:#DC2626;margin-bottom:10px;">
+                            Confirm Disable — Enter your current authenticator code
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:flex-start;">
+                            <MudTextField @bind-Value="_disableOtpCode"
+                                          Label="6-Digit Code"
+                                          Variant="Variant.Outlined"
+                                          MaxLength="6"
+                                          Placeholder="000000"
+                                          Disabled="_disabling2FA"
+                                          Style="max-width:180px;" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Error"
+                                       OnClick="ConfirmDisable2FA" Disabled="_disabling2FA"
+                                       Style="height:56px;min-width:100px;">
+                                @if (_disabling2FA)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" />
+                                }
+                                else { <span>Confirm</span> }
+                            </MudButton>
+                            <MudButton Variant="Variant.Text" Color="Color.Default"
+                                       OnClick="() => { _showDisable2FA = false; _disableOtpCode = string.Empty; }"
+                                       Style="height:56px;">Cancel</MudButton>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_disable2FAError))
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_disable2FAError</MudAlert>
+                        }
+                    </div>
+                }
+
+                @if (_show2FASetup && !string.IsNullOrEmpty(_qrCode))
+                {
+                    <div style="margin-top:16px;padding:16px;background:#F0F9FF;border-radius:10px;
+                                border:1px solid #BAE6FD;">
+                        <div style="font-size:13px;font-weight:700;color:#1565C0;margin-bottom:10px;">
+                            Scan this QR code with your authenticator app, then enter the code to confirm
+                        </div>
+                        <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+                            <div style="background:#fff;padding:10px;border-radius:10px;border:1px solid #E2E8F0;">
+                                <img src="@($"data:image/png;base64,{_qrCode}")" alt="2FA QR Code"
+                                     style="width:160px;height:160px;" />
+                            </div>
+                            <div style="flex:1;min-width:200px;">
+                                <div style="font-size:12px;color:#64748B;margin-bottom:10px;">
+                                    Use Google Authenticator, Authy, or any TOTP app.
+                                </div>
+                                <div style="display:flex;gap:10px;align-items:flex-start;">
+                                    <MudTextField @bind-Value="_confirmOtpCode"
+                                                  Label="6-Digit Code"
+                                                  Variant="Variant.Outlined"
+                                                  MaxLength="6"
+                                                  Placeholder="000000"
+                                                  Disabled="_confirming2FA"
+                                                  Style="max-width:180px;" />
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                               OnClick="Confirm2FASetup" Disabled="_confirming2FA"
+                                               Style="height:56px;min-width:100px;">
+                                        @if (_confirming2FA)
+                                        {
+                                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" />
+                                        }
+                                        else { <span>Activate</span> }
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text" Color="Color.Default"
+                                               OnClick="() => { _show2FASetup = false; _qrCode = string.Empty; }"
+                                               Style="height:56px;">Cancel</MudButton>
+                                </div>
+                                @if (!string.IsNullOrEmpty(_enable2FAError))
+                                {
+                                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_enable2FAError</MudAlert>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- 3b. Change Password -->
+            <div style="padding:20px 24px;border-bottom:1px solid #F1F5F9;">
+                <div style="display:flex;justify-content:space-between;align-items:center;
+                            cursor:pointer;" @onclick="TogglePasswordForm">
+                    <div style="display:flex;align-items:center;gap:14px;">
+                        <div style="width:42px;height:42px;border-radius:12px;background:#F8FAFC;
+                                    display:flex;align-items:center;justify-content:center;font-size:20px;">🔑</div>
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#1E293B;">Change Password</div>
+                            <div style="font-size:12px;color:#64748B;margin-top:2px;">
+                                Update your account password
+                            </div>
+                        </div>
+                    </div>
+                    <span style="font-size:18px;color:#94A3B8;transition:transform 0.2s;
+                                 transform:rotate(@(_showPasswordForm ? "90deg" : "0deg"));">›</span>
+                </div>
+
+                @if (_showPasswordForm)
+                {
+                    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F1F5F9;">
+                        <EditForm Model="_pwModel" OnValidSubmit="SavePassword">
+                            <DataAnnotationsValidator />
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                                <div style="grid-column:1/-1;">
+                                    <MudTextField @bind-Value="_pwModel.CurrentPassword"
+                                                  Label="Current Password"
+                                                  Variant="Variant.Outlined"
+                                                  InputType="@(_showCurr ? InputType.Text : InputType.Password)"
+                                                  Adornment="Adornment.End"
+                                                  AdornmentIcon="@(_showCurr ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                                  OnAdornmentClick="@(() => _showCurr = !_showCurr)"
+                                                  For="@(() => _pwModel.CurrentPassword)"
+                                                  Disabled="_savingPw" />
+                                </div>
+                                <MudTextField @bind-Value="_pwModel.NewPassword"
+                                              Label="New Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="@(_showNew ? InputType.Text : InputType.Password)"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@(_showNew ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                              OnAdornmentClick="@(() => _showNew = !_showNew)"
+                                              For="@(() => _pwModel.NewPassword)"
+                                              HelperText="Minimum 8 characters"
+                                              Disabled="_savingPw" />
+                                <MudTextField @bind-Value="_pwModel.ConfirmPassword"
+                                              Label="Confirm New Password"
+                                              Variant="Variant.Outlined"
+                                              InputType="@(_showConfirm ? InputType.Text : InputType.Password)"
+                                              Adornment="Adornment.End"
+                                              AdornmentIcon="@(_showConfirm ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                              OnAdornmentClick="@(() => _showConfirm = !_showConfirm)"
+                                              For="@(() => _pwModel.ConfirmPassword)"
+                                              Disabled="_savingPw" />
+                            </div>
+                            @if (!string.IsNullOrEmpty(_pwError))
+                            {
+                                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@_pwError</MudAlert>
+                            }
+                            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                                       Disabled="_savingPw" Style="min-width:150px;">
+                                @if (_savingPw)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                                    <span>Updating…</span>
+                                }
+                                else { <span>Update Password</span> }
+                            </MudButton>
+                        </EditForm>
+                    </div>
+                }
+            </div>
+
+            <!-- 3c. Sign Out All Devices -->
+            <div style="padding:20px 24px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:20px;">
+                    <div style="display:flex;align-items:flex-start;gap:14px;">
+                        <div style="width:42px;height:42px;border-radius:12px;background:#FFF5F5;
+                                    display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🚪</div>
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#1E293B;">Sign Out All Devices</div>
+                            <div style="font-size:12px;color:#64748B;margin-top:2px;">
+                                End all active sessions across every device. You'll be signed out here too.
+                            </div>
+                        </div>
+                    </div>
+                    <button @onclick="SignOutAll" disabled="@_signingOut"
+                            style="padding:8px 18px;background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;
+                                   border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;
+                                   white-space:nowrap;flex-shrink:0;opacity:@(_signingOut ? "0.6" : "1");">
+                        @if (_signingOut)
+                        {
+                            <span>Signing out…</span>
+                        }
+                        else { <span>Sign Out All</span> }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private string _initials = "DR";
+
+    // Personal info
+    private UpdateUserProfileRequestDto _basicModel = new();
+    private bool _savingBasic;
+    private string? _basicError;
+
+    // Professional info
+    private UpsertDoctorProfileDto _profModel = new();
+    private DoctorProfileDto? _profProfile;
+    private bool _savingProf;
+    private string? _profError;
+
+    // 2FA
+    private bool _twoFactorEnabled;
+    private bool _showDisable2FA;
+    private string _disableOtpCode = string.Empty;
+    private bool _disabling2FA;
+    private string? _disable2FAError;
+    private bool _show2FASetup;
+    private string? _qrCode;
+    private string _confirmOtpCode = string.Empty;
+    private bool _confirming2FA;
+    private string? _enable2FAError;
+
+    // Change password
+    private bool _showPasswordForm;
+    private ChangePasswordRequestDto _pwModel = new();
+    private bool _savingPw;
+    private string? _pwError;
+    private bool _showCurr;
+    private bool _showNew;
+    private bool _showConfirm;
+
+    // Sign out all
+    private bool _signingOut;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        if (!AuthState.IsAuthenticated) return;
+
+        var user = AuthState.CurrentUser!;
+        _initials = string.Join("", user.FullName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Take(2).Select(p => p[0].ToString().ToUpper()));
+
+        _basicModel = new UpdateUserProfileRequestDto
+        {
+            FirstName  = user.FirstName,
+            MiddleName = user.MiddleName,
+            LastName   = user.LastName,
+            MobileNo   = user.MobileNo,
+        };
+
+        // Fetch fresh profile from API to get current 2FA status (localStorage may be stale)
+        var profileResult = await AuthClient.GetUserByIdAsync(user.UserId);
+        if (profileResult.Success && profileResult.Data != null)
+        {
+            AuthState.UpdateUserProfile(profileResult.Data);
+            _twoFactorEnabled = profileResult.Data.IsTwoFactorEnabled;
+        }
+        else
+        {
+            _twoFactorEnabled = user.IsTwoFactorEnabled;
+        }
+
+        var profResult = await DoctorProfileApi.GetMyProfileAsync();
+        if (profResult.Success && profResult.Data != null)
+        {
+            _profProfile = profResult.Data;
+            _profModel = new UpsertDoctorProfileDto
+            {
+                RegistrationNumber   = _profProfile.RegistrationNumber,
+                Specialty            = _profProfile.Specialty,
+                QualificationDetails = _profProfile.QualificationDetails,
+            };
+        }
+
+        _loading = false;
+    }
+
+    // ── Personal info ──────────────────────────────────────────────────
+
+    private async Task SaveBasicInfo()
+    {
+        _savingBasic = true;
+        _basicError  = null;
+        try
+        {
+            var result = await AuthClient.UpdateUserProfileAsync(AuthState.CurrentUser!.UserId, _basicModel);
+            if (result.Success && result.Data != null)
+            {
+                AuthState.UpdateUserProfile(result.Data);
+                Snackbar.Add("Personal information updated.", Severity.Success);
+            }
+            else _basicError = result.Message ?? "Failed to update profile.";
+        }
+        catch { _basicError = "An error occurred. Please try again."; }
+        finally  { _savingBasic = false; }
+    }
+
+    // ── Professional info ──────────────────────────────────────────────
+
+    private async Task SaveProfessionalInfo()
+    {
+        _savingProf = true;
+        _profError  = null;
+        try
+        {
+            var result = await DoctorProfileApi.UpsertMyProfileAsync(_profModel);
+            if (result.Success && result.Data != null)
+            {
+                _profProfile = result.Data;
+                Snackbar.Add("Professional information updated.", Severity.Success);
+            }
+            else _profError = result.Message ?? "Failed to update professional info.";
+        }
+        catch { _profError = "An error occurred. Please try again."; }
+        finally  { _savingProf = false; }
+    }
+
+    // ── 2FA ───────────────────────────────────────────────────────────
+
+    private void ShowDisable2FA()
+    {
+        _showDisable2FA  = true;
+        _disableOtpCode  = string.Empty;
+        _disable2FAError = null;
+    }
+
+    private async Task ConfirmDisable2FA()
+    {
+        if (string.IsNullOrWhiteSpace(_disableOtpCode) || _disableOtpCode.Length != 6) return;
+
+        _disabling2FA    = true;
+        _disable2FAError = null;
+        try
+        {
+            var result = await AuthClient.DisableTwoFactorAsync(
+                AuthState.CurrentUser!.UserId,
+                new DisableTwoFactorRequestDto { Code = _disableOtpCode });
+
+            if (result.Success)
+            {
+                _twoFactorEnabled = false;
+                _showDisable2FA   = false;
+                _disableOtpCode   = string.Empty;
+                Snackbar.Add("Two-factor authentication disabled.", Severity.Info);
+            }
+            else _disable2FAError = result.Message ?? "Invalid code. Please try again.";
+        }
+        catch { _disable2FAError = "An error occurred. Please try again."; }
+        finally  { _disabling2FA = false; }
+    }
+
+    private async Task Enable2FA()
+    {
+        _enable2FAError = null;
+        try
+        {
+            var result = await AuthClient.EnableTwoFactorAsync(AuthState.CurrentUser!.UserId);
+            if (result.Success && result.Data != null)
+            {
+                if (!string.IsNullOrEmpty(result.Data.QrCodeBase64))
+                {
+                    _qrCode        = result.Data.QrCodeBase64;
+                    _show2FASetup  = true;
+                    _confirmOtpCode = string.Empty;
+                }
+                else
+                {
+                    // Re-enabled without needing a new QR
+                    _twoFactorEnabled = true;
+                    Snackbar.Add("Two-factor authentication enabled.", Severity.Success);
+                }
+            }
+            else _enable2FAError = result.Message ?? "Failed to start 2FA setup.";
+        }
+        catch { _enable2FAError = "An error occurred. Please try again."; }
+    }
+
+    private async Task Confirm2FASetup()
+    {
+        if (string.IsNullOrWhiteSpace(_confirmOtpCode) || _confirmOtpCode.Length != 6) return;
+
+        _confirming2FA  = true;
+        _enable2FAError = null;
+        try
+        {
+            var result = await AuthClient.ConfirmEnableTwoFactorAsync(
+                AuthState.CurrentUser!.UserId,
+                new ValidateTwoFactorRequestDto { OtpCode = _confirmOtpCode });
+
+            if (result.Success)
+            {
+                _twoFactorEnabled = true;
+                _show2FASetup     = false;
+                _qrCode           = null;
+                _confirmOtpCode   = string.Empty;
+                Snackbar.Add("Two-factor authentication enabled successfully.", Severity.Success);
+            }
+            else _enable2FAError = result.Message ?? "Invalid code. Please try again.";
+        }
+        catch { _enable2FAError = "An error occurred. Please try again."; }
+        finally  { _confirming2FA = false; }
+    }
+
+    // ── Change password ────────────────────────────────────────────────
+
+    private void TogglePasswordForm()
+    {
+        _showPasswordForm = !_showPasswordForm;
+        if (!_showPasswordForm)
+        {
+            _pwModel  = new ChangePasswordRequestDto();
+            _pwError  = null;
+        }
+    }
+
+    private async Task SavePassword()
+    {
+        _savingPw = true;
+        _pwError  = null;
+        try
+        {
+            var result = await AuthClient.ChangePasswordAsync(AuthState.CurrentUser!.UserId, _pwModel);
+            if (result.Success)
+            {
+                Snackbar.Add("Password updated successfully.", Severity.Success);
+                _pwModel          = new ChangePasswordRequestDto();
+                _showPasswordForm = false;
+            }
+            else _pwError = result.Message ?? "Failed to update password.";
+        }
+        catch { _pwError = "An error occurred. Please try again."; }
+        finally  { _savingPw = false; }
+    }
+
+    // ── Sign out all ───────────────────────────────────────────────────
+
+    private async Task SignOutAll()
+    {
+        _signingOut = true;
+        try
+        {
+            await AuthClient.LogoutAllSessionsAsync();
+            await AuthState.ClearAuthStateAsync();
+            Nav.NavigateTo("/auth/login", forceLoad: true);
+        }
+        catch
+        {
+            Snackbar.Add("Failed to sign out all sessions.", Severity.Error);
+            _signingOut = false;
+        }
+    }
+}

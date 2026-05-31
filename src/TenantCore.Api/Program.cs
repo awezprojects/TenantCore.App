@@ -97,6 +97,7 @@ try
 
     app.UseCors("AllowAll");
     app.UseAuthentication();
+    app.UseMiddleware<ClinicContextMiddleware>();  // validates X-Application-Id header
     app.UseAuthorization();
     app.MapControllers();
     app.MapHealthChecks("/health");

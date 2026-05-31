@@ -8,81 +8,254 @@
 
 <PageTitle>Prescriptions - TenantCore</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Prescriptions</MudText>
-</MudStack>
+<!-- Page Header -->
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <div>
+        <div style="font-size:22px; font-weight:800; color:#0F172A;">Prescriptions</div>
+        <div style="font-size:13px; color:#64748B; margin-top:2px;">
+            @(_result?.TotalCount ?? 0) prescriptions found
+        </div>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick='() => Navigation.NavigateTo("/prescriptions/new")'>
+        New Prescription
+    </MudButton>
+</div>
 
-<MudPaper Class="pa-4 mb-4">
-    <MudGrid>
-        <MudItem xs="12" md="8">
-            <MudTextField @bind-Value="_search" Label="Search by prescription number or doctor name..."
-                          Variant="Variant.Outlined" Adornment="Adornment.End"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Clearable="true" @onkeyup="OnSearchKeyUp" />
-        </MudItem>
-        <MudItem xs="12" md="4" Class="d-flex align-end">
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
-                Refresh
-            </MudButton>
-        </MudItem>
-    </MudGrid>
+<!-- Filters Card -->
+<MudPaper Class="pa-3 mb-4" Elevation="1" Style="border-radius:12px;">
+    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+        <!-- Date Range Tabs -->
+        <div style="display:flex; gap:4px; background:#F1F5F9; border-radius:8px; padding:3px;">
+            @foreach (var (id, label) in _dateRanges)
+            {
+                var rangeId = id;
+                <button @onclick="() => ApplyRange(rangeId)" style="padding:6px 14px; border-radius:6px; border:none; cursor:pointer; font-size:12px; font-weight:@(_dateRange == rangeId ? "700" : "500"); color:@(_dateRange == rangeId ? "#2563EB" : "#64748B"); background:@(_dateRange == rangeId ? "#fff" : "transparent"); box-shadow:@(_dateRange == rangeId ? "0 1px 3px rgba(0,0,0,0.1)" : "none");">
+                    @label
+                </button>
+            }
+        </div>
+
+        <!-- From/To Date -->
+        <div style="display:flex; gap:8px; align-items:center;">
+            <span style="font-size:12px; color:#64748B; font-weight:600;">From</span>
+            <input type="date" value="@_fromDate?.ToString("yyyy-MM-dd")"
+                   @onchange="OnFromDateChanged"
+                   style="padding:7px 10px; border:1.5px solid #E2E8F0; border-radius:7px; font-size:12px; outline:none;" />
+            <span style="font-size:12px; color:#64748B; font-weight:600;">To</span>
+            <input type="date" value="@_toDate?.ToString("yyyy-MM-dd")"
+                   @onchange="OnToDateChanged"
+                   style="padding:7px 10px; border:1.5px solid #E2E8F0; border-radius:7px; font-size:12px; outline:none;" />
+        </div>
+
+        <!-- Search -->
+        <div style="flex:1; min-width:200px; position:relative;">
+            <MudTextField @bind-Value="_search" Placeholder="Search by patient name, Rx ID…"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          @onkeyup="OnSearchKeyUp" Style="font-size:12px;" />
+        </div>
+
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">
+            Refresh
+        </MudButton>
+    </div>
 </MudPaper>
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
 }
-else if (_result is not null)
-{
-    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
-              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
-        <HeaderContent>
-            <MudTh>Prescription No.</MudTh>
-            <MudTh>Patient</MudTh>
-            <MudTh>Doctor</MudTh>
-            <MudTh>Date</MudTh>
-            <MudTh>Next Visit</MudTh>
-            <MudTh>Status</MudTh>
-            <MudTh Style="width: 80px;">Actions</MudTh>
-        </HeaderContent>
-        <RowTemplate Context="rx">
-            <MudTd DataLabel="Prescription No.">
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
-                    @rx.PrescriptionNumber
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Patient">@rx.PatientName</MudTd>
-            <MudTd DataLabel="Doctor">@rx.DoctorName</MudTd>
-            <MudTd DataLabel="Date">@rx.PrescribedDate.ToString("dd MMM yyyy")</MudTd>
-            <MudTd DataLabel="Next Visit">@(rx.NextVisitDate?.ToString("dd MMM yyyy") ?? "—")</MudTd>
-            <MudTd DataLabel="Status">
-                <MudChip T="string" Size="Size.Small" Color="@(rx.Status == PrescriptionStatus.Submitted ? Color.Success : Color.Warning)">
-                    @rx.Status
-                </MudChip>
-            </MudTd>
-            <MudTd>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
-                               OnClick='() => Navigation.NavigateTo($"/prescriptions/{rx.Id}")' />
-            </MudTd>
-        </RowTemplate>
-        <PagerContent>
-            <MudTablePager />
-        </PagerContent>
-    </MudTable>
-}
+
+<!-- Table -->
+<MudPaper Elevation="1" Style="border-radius:12px; overflow:hidden;">
+    @if (_result?.Items?.Any() == true)
+    {
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+                <tr style="background:#F8FAFC; border-bottom:2px solid #E2E8F0;">
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Rx ID</th>
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Date</th>
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Patient</th>
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Diagnosis</th>
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Medicines</th>
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Follow-up</th>
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Status</th>
+                    <th style="padding:12px 16px; text-align:left; font-weight:700; color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rx in _result.Items)
+                {
+                    <tr style="border-bottom:1px solid #F1F5F9;" @onmouseenter="() => _hoveredId = rx.Id" @onmouseleave="() => _hoveredId = Guid.Empty"
+                        class="@(_hoveredId == rx.Id ? "rx-row-hover" : "")">
+                        <td style="padding:14px 16px;">
+                            <span style="font-weight:700; color:#2563EB; font-size:12px; background:#EFF6FF; padding:3px 8px; border-radius:5px;">@rx.PrescriptionNumber</span>
+                        </td>
+                        <td style="padding:14px 16px;">
+                            <div style="font-weight:600; font-size:12px; color:#0F172A;">@rx.PrescribedDate.ToString("dd MMM yyyy")</div>
+                            <div style="font-size:11px; color:#94A3B8;">@rx.PrescribedDate.ToString("HH:mm")</div>
+                        </td>
+                        <td style="padding:14px 16px;">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg,#2563EB,#60A5FA); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0;">
+                                    @(string.Join("", rx.PatientName.Split(' ').Take(2).Select(n => n.Length > 0 ? n[0].ToString() : "")))
+                                </div>
+                                <div>
+                                    <div style="font-weight:600; color:#0F172A;">@rx.PatientName</div>
+                                    <div style="font-size:11px; color:#94A3B8;">@rx.DoctorName</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="padding:14px 16px; max-width:180px;">
+                            <span style="font-size:12px; color:#334155;">
+                                @(rx.Diagnosis?.Length > 45 ? rx.Diagnosis[..45] + "…" : (rx.Diagnosis ?? "—"))
+                            </span>
+                        </td>
+                        <td style="padding:14px 16px;">
+                            <span style="background:#EFF6FF; color:#2563EB; font-weight:700; font-size:11px; padding:3px 10px; border-radius:14px;">
+                                @rx.Items.Count drug@(rx.Items.Count != 1 ? "s" : "")
+                            </span>
+                        </td>
+                        <td style="padding:14px 16px;">
+                            <span style="font-size:12px; color:#64748B;">
+                                @(rx.NextVisitDate.HasValue ? rx.NextVisitDate.Value.ToString("dd MMM yyyy") : "—")
+                            </span>
+                        </td>
+                        <td style="padding:14px 16px;">
+                            @if (rx.Status == PrescriptionStatus.Submitted)
+                            {
+                                <span style="background:#ECFDF5; color:#059669; font-weight:700; font-size:11px; padding:3px 10px; border-radius:14px;">Submitted</span>
+                            }
+                            else
+                            {
+                                <span style="background:#FFFBEB; color:#D97706; font-weight:700; font-size:11px; padding:3px 10px; border-radius:14px;">Draft</span>
+                            }
+                        </td>
+                        <td style="padding:14px 16px;">
+                            <div style="display:flex; gap:6px;">
+                                <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary"
+                                           OnClick='() => Navigation.NavigateTo($"/prescriptions/{rx.Id}")'>
+                                    Edit
+                                </MudButton>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                               Size="Size.Small" OnClick="() => ConfirmDelete(rx.Id, rx.PrescriptionNumber)" />
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-top:1px solid #F1F5F9; background:#FAFAFA;">
+            <div style="font-size:12px; color:#64748B;">
+                Showing @((_page - 1) * _pageSize + 1)–@(Math.Min(_page * _pageSize, _result.TotalCount)) of @_result.TotalCount
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small"
+                               Disabled="_page <= 1" OnClick="() => ChangePage(_page - 1)" />
+                <span style="font-size:12px; font-weight:600; color:#0F172A;">Page @_page of @((_result.TotalCount + _pageSize - 1) / _pageSize)</span>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small"
+                               Disabled="_page * _pageSize >= _result.TotalCount" OnClick="() => ChangePage(_page + 1)" />
+            </div>
+        </div>
+    }
+    else if (!_loading)
+    {
+        <div style="padding:60px 20px; text-align:center; color:#94A3B8;">
+            <div style="font-size:40px; margin-bottom:12px;">📋</div>
+            <div style="font-size:15px; font-weight:600; color:#64748B;">No prescriptions found</div>
+            <div style="font-size:13px; margin-top:4px;">Try changing the date range or search term</div>
+        </div>
+    }
+</MudPaper>
+
+<!-- Delete Confirmation Dialog -->
+<MudDialog @bind-Visible="_showDeleteDialog" Options='new DialogOptions { MaxWidth = MaxWidth.Small }'>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Delete Prescription?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <div style="text-align:center; padding:10px 0;">
+            <div style="width:56px; height:56px; border-radius:50%; background:#FEF2F2; display:flex; align-items:center; justify-content:center; margin:0 auto 14px;">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.body1" Class="mb-2">
+                Delete prescription <strong style="color:#2563EB;">@_deleteRxNumber</strong>?
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">This action cannot be undone.</MudText>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showDeleteDialog = false">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeleteAsync">Delete</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .rx-row-hover { background: #F8FAFC; }
+</style>
 
 @code {
     private string? _search;
     private bool _loading;
+    private string _dateRange = "today";
+    private DateTime? _fromDate = DateTime.Today;
+    private DateTime? _toDate = DateTime.Today;
+    private int _page = 1;
+    private int _pageSize = 20;
     private TenantCore.Shared.Common.PagedResult<TenantCore.Shared.Dtos.PrescriptionDto>? _result;
+    private Guid _hoveredId;
+    private bool _showDeleteDialog;
+    private Guid _deleteId;
+    private string? _deleteRxNumber;
+
+    private readonly (string id, string label)[] _dateRanges =
+    [
+        ("today", "Today"),
+        ("week", "Last 7d"),
+        ("month", "Last 30d"),
+        ("custom", "Custom")
+    ];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private void OnFromDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var d)) _fromDate = d;
+        _dateRange = "custom";
+    }
+
+    private void OnToDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var d)) _toDate = d;
+        _dateRange = "custom";
+    }
+
+    private void ApplyRange(string range)
+    {
+        _dateRange = range;
+        _toDate = DateTime.Today;
+        _fromDate = range switch
+        {
+            "today" => DateTime.Today,
+            "week" => DateTime.Today.AddDays(-7),
+            "month" => DateTime.Today.AddDays(-30),
+            _ => _fromDate
+        };
+    }
 
     private async Task LoadAsync()
     {
         _loading = true;
-        var response = await PrescriptionClient.GetPrescriptionsAsync(search: _search);
+        var response = await PrescriptionClient.GetPrescriptionsAsync(
+            page: _page, pageSize: _pageSize,
+            search: _search,
+            from: _fromDate,
+            to: _toDate?.AddDays(1).AddSeconds(-1));
         if (response.Success) _result = response.Data;
         else Snackbar.Add(response.Message ?? "Failed to load prescriptions.", Severity.Error);
         _loading = false;
@@ -90,6 +263,25 @@ else if (_result is not null)
 
     private async Task OnSearchKeyUp(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter") await LoadAsync();
+        if (e.Key == "Enter") { _page = 1; await LoadAsync(); }
+    }
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private void ConfirmDelete(Guid id, string rxNumber)
+    {
+        _deleteId = id;
+        _deleteRxNumber = rxNumber;
+        _showDeleteDialog = true;
+    }
+
+    private async Task DeleteAsync()
+    {
+        _showDeleteDialog = false;
+        Snackbar.Add("Delete not yet implemented via API.", Severity.Warning);
     }
 }

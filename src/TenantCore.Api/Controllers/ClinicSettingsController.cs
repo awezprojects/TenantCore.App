@@ -13,7 +13,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/clinic-settings")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class ClinicSettingsController(ISender sender) : ControllerBase
+public class ClinicSettingsController(ISender sender) : ClinicControllerBase
 {
     [HttpGet("fees")]
     [ProducesResponseType(typeof(ClinicFeeConfigDto), StatusCodes.Status200OK)]
@@ -33,11 +33,5 @@ public class ClinicSettingsController(ISender sender) : ControllerBase
     {
         var applicationId = GetApplicationId();
         return Ok(await sender.Send(new GetClinicDoctorsQuery(applicationId), ct));
-    }
-
-    private Guid GetApplicationId()
-    {
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 }

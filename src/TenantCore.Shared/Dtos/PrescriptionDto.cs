@@ -15,7 +15,16 @@ public class PrescriptionDto
     public string PrescriptionNumber { get; init; } = string.Empty;
     public DateTime PrescribedDate { get; init; }
     public DateTime? NextVisitDate { get; init; }
+    public string? Diagnosis { get; init; }
+    public IReadOnlyList<string> Investigations { get; init; } = [];
     public string? Notes { get; init; }
+    public string? VitalBP { get; init; }
+    public int? VitalPulse { get; init; }
+    public decimal? VitalTemp { get; init; }
+    public decimal? VitalWeight { get; init; }
+    public decimal? VitalSpO2 { get; init; }
+    public int? VitalRR { get; init; }
+    public decimal? VitalSugar { get; init; }
     public PrescriptionStatus Status { get; init; }
     public bool IsEmailSent { get; init; }
     public DateTime CreatedAt { get; init; }

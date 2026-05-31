@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TenantCore.Domain.Entities;
 using TenantCore.Shared.Dtos;
 
@@ -18,7 +19,16 @@ public static class PrescriptionTranslator
         PrescriptionNumber = prescription.PrescriptionNumber,
         PrescribedDate = prescription.PrescribedDate,
         NextVisitDate = prescription.NextVisitDate,
+        Diagnosis = prescription.Diagnosis,
+        Investigations = DeserializeInvestigations(prescription.Investigations),
         Notes = prescription.Notes,
+        VitalBP = prescription.VitalBP,
+        VitalPulse = prescription.VitalPulse,
+        VitalTemp = prescription.VitalTemp,
+        VitalWeight = prescription.VitalWeight,
+        VitalSpO2 = prescription.VitalSpO2,
+        VitalRR = prescription.VitalRR,
+        VitalSugar = prescription.VitalSugar,
         Status = prescription.Status,
         IsEmailSent = prescription.IsEmailSent,
         CreatedAt = prescription.CreatedAt,
@@ -33,6 +43,7 @@ public static class PrescriptionTranslator
         MedicineId = item.MedicineId,
         MedicineName = item.MedicineName,
         MedicineForm = item.MedicineForm,
+        Strength = item.Strength,
         DosageUnit = item.DosageUnit,
         DosageMorning = item.DosageMorning,
         DosageAfternoon = item.DosageAfternoon,
@@ -40,11 +51,21 @@ public static class PrescriptionTranslator
         DosageNight = item.DosageNight,
         DurationDays = item.DurationDays,
         Quantity = item.Quantity,
+        Frequency = item.Frequency,
+        Timing = item.Timing,
+        Instructions = item.Instructions,
         RemarkEnglish = item.RemarkEnglish,
         RemarkHindi = item.RemarkHindi,
         RemarkMarathi = item.RemarkMarathi,
         SortOrder = item.SortOrder
     };
+
+    private static IReadOnlyList<string> DeserializeInvestigations(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try { return JsonSerializer.Deserialize<List<string>>(json) ?? []; }
+        catch { return []; }
+    }
 
     public static PrescriptionReportDto ReportToDto(PrescriptionReport report) => new()
     {

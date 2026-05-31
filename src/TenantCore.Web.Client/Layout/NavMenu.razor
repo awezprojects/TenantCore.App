@@ -3,67 +3,77 @@
 @using TenantCore.Web.Client.Services
 @implements IDisposable
 
-<MudNavMenu>
-    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-    <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+<nav style="flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;">
+    <NavItem Href="/dashboard" Icon="▦" Label="Dashboard" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
-    <MudDivider Class="my-2" />
+    <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
     @if (_isDoctor)
     {
-        <MudNavGroup Title="Doctor" Icon="@Icons.Material.Filled.LocalHospital" Expanded="true">
-            <MudNavLink Href="/doctor/opd-queue" Icon="@Icons.Material.Filled.PeopleAlt">My OPD Queue</MudNavLink>
-            <MudNavLink Href="/prescriptions" Icon="@Icons.Material.Filled.Assignment">Prescriptions</MudNavLink>
-        </MudNavGroup>
-        <MudDivider Class="my-2" />
+        <NavItem Href="/opd"           Icon="🩺" Label="My OPD Queue"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/prescriptions" Icon="📋" Label="Prescriptions"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/patients"         Icon="👥" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/medicines"        Icon="💊" Label="Medicines"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+
+        <NavItem Href="/settings/prescription"      Icon="🌐" Label="Rx Language"          DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/settings/dosage-remarks"    Icon="📝" Label="Dosage Remarks"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
     }
+    else
+    {
+        <NavItem Href="/patients"  Icon="👥" Label="Patients"          DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/opd"       Icon="🩺" Label="OPD Registrations" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/ipd"       Icon="🛏️" Label="IPD / Beds"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/medicines" Icon="💊" Label="Medicines"         DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
-    <MudNavGroup Title="Clinic" Icon="@Icons.Material.Filled.MedicalServices" Expanded="false">
-        <MudNavLink Href="/patients" Icon="@Icons.Material.Filled.People">Patients</MudNavLink>
-        <MudNavLink Href="/opd" Icon="@Icons.Material.Filled.EventNote">OPD Registrations</MudNavLink>
-        <MudNavLink Href="/ipd" Icon="@Icons.Material.Filled.Bed">IPD Admissions</MudNavLink>
-    </MudNavGroup>
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
-    <MudDivider Class="my-2" />
-
-    <MudNavGroup Title="Medicines" Icon="@Icons.Material.Filled.LocalPharmacy" Expanded="false">
-        <MudNavLink Href="/medicines" Icon="@Icons.Material.Filled.MedicalServices">All Medicines</MudNavLink>
-        <MudNavLink Href="/medicine-types" Icon="@Icons.Material.Filled.Category">Medicine Types</MudNavLink>
-    </MudNavGroup>
-
-    <MudDivider Class="my-2" />
-
-    <MudNavGroup Title="Settings" Icon="@Icons.Material.Filled.Settings" Expanded="false">
-        <MudNavLink Href="/auth/profile" Icon="@Icons.Material.Filled.Person">Profile</MudNavLink>
-        <MudNavLink Href="/settings/preferences" Icon="@Icons.Material.Filled.Tune">Preferences</MudNavLink>
-        @if (_isDoctor)
-        {
-            <MudNavLink Href="/settings/prescription" Icon="@Icons.Material.Filled.Translate">Prescription Language</MudNavLink>
-            <MudNavLink Href="/settings/dosage-remarks" Icon="@Icons.Material.Filled.StickyNote2">Dosage Remarks</MudNavLink>
-        }
-    </MudNavGroup>
-</MudNavMenu>
+        <NavItem Href="/auth/profile"        Icon="👤" Label="Profile"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/settings/preferences" Icon="⚙️" Label="Preferences" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+    }
+</nav>
 
 @code {
+    [Parameter] public bool DrawerOpen { get; set; } = true;
+
     private bool _isDoctor;
+    private string _currentPath = "/dashboard";
 
     protected override void OnInitialized()
     {
         AuthState.OnAuthStateChanged += OnAuthChanged;
-        RefreshRoles();
+        NavigationManager.LocationChanged += OnLocationChanged;
+        RefreshState();
+        UpdatePath(NavigationManager.Uri);
     }
 
     private void OnAuthChanged()
     {
-        RefreshRoles();
+        RefreshState();
         InvokeAsync(StateHasChanged);
     }
 
-    private void RefreshRoles()
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        UpdatePath(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdatePath(string uri)
+    {
+        _currentPath = "/" + uri.Replace(NavigationManager.BaseUri, "").TrimStart('/').Split('?')[0];
+    }
+
+    private void RefreshState()
     {
         _isDoctor = AuthState.CurrentUser?.UserRoles
             .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
     }
 
-    public void Dispose() => AuthState.OnAuthStateChanged -= OnAuthChanged;
+    public void Dispose()
+    {
+        AuthState.OnAuthStateChanged -= OnAuthChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
 }

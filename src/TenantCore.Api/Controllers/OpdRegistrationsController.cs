@@ -14,7 +14,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/opd-registrations")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class OpdRegistrationsController(ISender sender) : ControllerBase
+public class OpdRegistrationsController(ISender sender) : ClinicControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<OpdRegistrationDto>), StatusCodes.Status200OK)]
@@ -24,8 +24,14 @@ public class OpdRegistrationsController(ISender sender) : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] Guid? doctorUserId = null,
         [FromQuery] bool todayOnly = false,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] TenantCore.Shared.Enums.OpdStatus? status = null,
+        [FromQuery] bool notVisited = false,
         CancellationToken ct = default)
-        => Ok(await sender.Send(new GetOpdRegistrationsQuery(GetApplicationId(), page, pageSize, search, doctorUserId, todayOnly), ct));
+        => Ok(await sender.Send(new GetOpdRegistrationsQuery(
+            GetApplicationId(), page, pageSize, search, doctorUserId,
+            todayOnly, fromDate, toDate, status, notVisited), ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(OpdRegistrationDto), StatusCodes.Status200OK)]
@@ -47,7 +53,7 @@ public class OpdRegistrationsController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
     [ProducesResponseType(typeof(OpdRegistrationDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateOpdRegistrationDto dto, CancellationToken ct)
         => Ok(await sender.Send(new UpdateOpdRegistrationCommand(
@@ -58,10 +64,4 @@ public class OpdRegistrationsController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDoctorCount([FromQuery] Guid doctorUserId, CancellationToken ct)
         => Ok(await sender.Send(new GetDoctorOpdCountQuery(GetApplicationId(), doctorUserId), ct));
-
-    private Guid GetApplicationId()
-    {
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
-    }
 }

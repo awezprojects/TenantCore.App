@@ -4,7 +4,14 @@
       "Bash(dotnet ef *)",
       "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/src/**)",
       "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\plan\\\\medicine-enrichment-service\")",
-      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\tools\\\\MedicineNormalizer\")"
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\tools\\\\MedicineNormalizer\")",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\Resource\\\\cloudClinic\" -Recurse)",
+      "Bash(Select-Object FullName, Extension)",
+      "Bash(find /mnt/c/Users/Dell/source/repos/awezprojects/TenantCore.App/src -name \"*.cs\" | grep -E \"\\(Prescription|OpdRegistration\\)\" | grep -v \"obj/\" | sort)",
+      "Read(//mnt/c/Users/Dell/source/repos/awezprojects/TenantCore.App/**)",
+      "PowerShell(cd \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\"; dotnet build src/TenantCore.Api 2>&1 | Where-Object { $_ -match \"error\" } | Select-Object -First 30)",
+      "PowerShell(cd \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\"; dotnet build src/TenantCore.Api 2>&1 | Where-Object { $_ -match \"error CS\" } | Select-Object -First 20)"
     ]
   }
 }

@@ -9,6 +9,7 @@ public class PrescriptionItemDto
     public Guid MedicineId { get; init; }
     public string MedicineName { get; init; } = string.Empty;
     public MedicineFormType MedicineForm { get; init; }
+    public string? Strength { get; init; }
     public string DosageUnit { get; init; } = string.Empty;
     public decimal? DosageMorning { get; init; }
     public decimal? DosageAfternoon { get; init; }
@@ -16,6 +17,9 @@ public class PrescriptionItemDto
     public decimal? DosageNight { get; init; }
     public int DurationDays { get; init; }
     public decimal Quantity { get; init; }
+    public string? Frequency { get; init; }
+    public string? Timing { get; init; }
+    public string? Instructions { get; init; }
     public string? RemarkEnglish { get; init; }
     public string? RemarkHindi { get; init; }
     public string? RemarkMarathi { get; init; }

@@ -1,0 +1,156 @@
+@page "/doctor/register-clinic"
+@layout DoctorPortalLayout
+@inject IApplicationApiClient AppClient
+@inject AuthStateService AuthState
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Shared.Dtos.Auth
+
+<PageTitle>Register Your Clinic - CloudClinic</PageTitle>
+
+<div style="max-width:760px;">
+
+    <!-- Info banner -->
+    <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:14px;
+                padding:18px 22px;margin-bottom:24px;border:1px solid #BFDBFE;
+                display:flex;align-items:flex-start;gap:14px;">
+        <div style="font-size:28px;flex-shrink:0;">🏥</div>
+        <div>
+            <div style="font-size:15px;font-weight:800;color:#1E293B;margin-bottom:4px;">
+                Register Your Own Practice
+            </div>
+            <div style="font-size:13px;color:#64748B;line-height:1.6;">
+                Create your clinic on CloudClinic and gain full control over patients, staff, OPD queues, and
+                prescriptions. Each doctor can register up to <strong>1 clinic</strong> per account.
+            </div>
+        </div>
+    </div>
+
+    <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
+        <div style="padding:20px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;">Clinic Details</div>
+        </div>
+        <div style="padding:24px;">
+            <MudForm @ref="_form" @bind-IsValid="_formValid">
+
+                <!-- Basic info -->
+                <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
+                            text-transform:uppercase;letter-spacing:0.5px;">Basic Information</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                    <MudTextField @bind-Value="_model.ApplicationName"
+                                  Label="Clinic Name *"
+                                  Required="true"
+                                  RequiredError="Clinic name is required."
+                                  Variant="Variant.Outlined"
+                                  Disabled="_submitting" />
+                    <MudTextField @bind-Value="_model.ApplicationCode"
+                                  Label="Clinic Code *"
+                                  Required="true"
+                                  RequiredError="Clinic code is required."
+                                  Variant="Variant.Outlined"
+                                  HelperText="Unique short code (e.g. DMC001)"
+                                  Disabled="_submitting" />
+                    <MudSelect T="int" @bind-Value="_model.ApplicationType"
+                               Label="Clinic Type *"
+                               Required="true"
+                               Variant="Variant.Outlined"
+                               Disabled="_submitting">
+                        <MudSelectItem Value="0">General Clinic</MudSelectItem>
+                        <MudSelectItem Value="1">Hospital</MudSelectItem>
+                        <MudSelectItem Value="2">Speciality Clinic</MudSelectItem>
+                        <MudSelectItem Value="3">Polyclinic</MudSelectItem>
+                        <MudSelectItem Value="4">Diagnostic Centre</MudSelectItem>
+                    </MudSelect>
+                    <MudTextField @bind-Value="_model.RegistrationNumber"
+                                  Label="Clinic Registration No."
+                                  Variant="Variant.Outlined"
+                                  Disabled="_submitting"
+                                  Placeholder="Official license or registration number" />
+                </div>
+
+                <!-- Contact info -->
+                <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
+                            text-transform:uppercase;letter-spacing:0.5px;">Contact Information</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                    <MudTextField @bind-Value="_model.ContactNumber"
+                                  Label="Contact Number"
+                                  Variant="Variant.Outlined"
+                                  Disabled="_submitting" />
+                    <MudTextField @bind-Value="_model.OfficialEmail"
+                                  Label="Official Email"
+                                  InputType="InputType.Email"
+                                  Variant="Variant.Outlined"
+                                  Disabled="_submitting" />
+                    <MudTextField @bind-Value="_model.Website"
+                                  Label="Website"
+                                  Variant="Variant.Outlined"
+                                  Disabled="_submitting" />
+                    <MudTextField @bind-Value="_model.ContactPerson"
+                                  Label="Contact Person"
+                                  Variant="Variant.Outlined"
+                                  Disabled="_submitting" />
+                </div>
+
+                <MudTextField @bind-Value="_model.Address"
+                              Label="Address"
+                              Lines="2"
+                              Variant="Variant.Outlined"
+                              Class="mb-6"
+                              Disabled="_submitting" />
+
+                <div style="display:flex;gap:12px;justify-content:flex-end;">
+                    <MudButton Variant="Variant.Text" Color="Color.Default"
+                               OnClick='() => Nav.NavigateTo("/doctor/home")'>
+                        Cancel
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               OnClick="SubmitAsync" Disabled="_submitting"
+                               Style="min-width:160px;">
+                        @if (_submitting)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                            <span>Creating...</span>
+                        }
+                        else { <span>Register Clinic</span> }
+                    </MudButton>
+                </div>
+            </MudForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private MudForm _form = null!;
+    private bool _formValid;
+    private bool _submitting;
+    private ApplicationCreationRequestDto _model = new();
+
+    private async Task SubmitAsync()
+    {
+        await _form.Validate();
+        if (!_formValid) return;
+
+        if (AuthState.CurrentUser is null) return;
+
+        _submitting = true;
+        try
+        {
+            var result = await AppClient.CreateApplicationAsync(AuthState.CurrentUser.UserId, _model);
+            if (result.Success)
+            {
+                Snackbar.Add($"Clinic '{result.Data?.ApplicationName}' registered! Redirecting…", Severity.Success);
+                Nav.NavigateTo("/doctor/home");
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to register clinic.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally { _submitting = false; }
+    }
+}
