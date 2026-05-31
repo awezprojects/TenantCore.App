@@ -18,6 +18,11 @@ public static class PatientTranslator
         AadhaarNumber = MaskAadhaar(entity.AadhaarNumber, showFullAadhaar),
         PhotoUrl = entity.PhotoUrl,
         Address = entity.Address,
+        BloodGroup = entity.BloodGroup,
+        EmergencyContactName = entity.EmergencyContactName,
+        EmergencyContactPhone = entity.EmergencyContactPhone,
+        KnownAllergies = entity.KnownAllergies,
+        MedicalHistory = entity.MedicalHistory,
         IsActive = entity.IsActive,
         CreatedAt = entity.CreatedAt
     };

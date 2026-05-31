@@ -269,91 +269,175 @@ else if (_isDoctor)
 }
 else
 {
-    <!-- Generic Dashboard for non-doctor roles -->
-    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
-    <MudGrid>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">OPD Registrations</MudText>
-                        <MudText Typo="Typo.h4">—</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
-                    </MudAvatar>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">IPD Admissions</MudText>
-                        <MudText Typo="Typo.h4">—</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Success" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.Bed" />
-                    </MudAvatar>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Patients</MudText>
-                        <MudText Typo="Typo.h4">—</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Info" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.People" />
-                    </MudAvatar>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
-                    <MudStack Spacing="1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">Today's Revenue</MudText>
-                        <MudText Typo="Typo.h4">—</MudText>
-                    </MudStack>
-                    <MudAvatar Color="Color.Warning" Variant="Variant.Filled" Size="Size.Large">
-                        <MudIcon Icon="@Icons.Material.Filled.CurrencyRupee" />
-                    </MudAvatar>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="8">
-            <MudPaper Elevation="2" Class="pa-4">
-                <MudText Typo="Typo.h6" Class="mb-4">Quick Actions</MudText>
-                <MudStack Spacing="2">
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                               StartIcon="@Icons.Material.Filled.Add" Href="/opd">New OPD Registration</MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Success" FullWidth="true"
-                               StartIcon="@Icons.Material.Filled.Add" Href="/ipd">New IPD Admission</MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true"
-                               StartIcon="@Icons.Material.Filled.PersonAdd" Href="/patients">Register Patient</MudButton>
-                </MudStack>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
+    <!-- Reception Dashboard -->
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Greeting Row -->
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#1E293B;">
+                    Good @_greeting, @_receptionFirstName 👋
+                </div>
+                <div style="font-size:13px;color:#64748B;margin-top:3px;">
+                    Front Desk &nbsp;·&nbsp; @_rTotalCount patients registered in OPD today
+                </div>
+            </div>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                       Href="/patients"
+                       Style="border-radius:8px;font-weight:600;text-transform:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
+                + Register Patient
+            </MudButton>
+        </div>
+
+        <!-- Stat Cards -->
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#EFF6FF;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">TODAY'S OPD</div>
+                            <div class="cc-stat-value">@_rTotalCount</div>
+                            <div class="cc-stat-sub">All registrations</div>
+                        </div>
+                        <div class="cc-stat-icon">📋</div>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#FFFBEB;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">WAITING</div>
+                            <div class="cc-stat-value" style="color:#D97706;">@_rWaitingCount</div>
+                            <div class="cc-stat-sub">In queue</div>
+                        </div>
+                        <div class="cc-stat-icon">⏳</div>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#EFF6FF;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">IN PROGRESS</div>
+                            <div class="cc-stat-value" style="color:#1565C0;">@_rInProgressCount</div>
+                            <div class="cc-stat-sub">Being seen</div>
+                        </div>
+                        <div class="cc-stat-icon">🩺</div>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#ECFDF5;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">COMPLETED</div>
+                            <div class="cc-stat-value" style="color:#16A34A;">@_rCompletedCount</div>
+                            <div class="cc-stat-sub">Visits done</div>
+                        </div>
+                        <div class="cc-stat-icon">✅</div>
+                    </div>
+                </div>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Today's OPD Queue -->
+        <div class="cc-card">
+            <div class="cc-card-header">
+                <div class="cc-card-title">📅 Today's OPD Queue</div>
+                <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>
+                    View all →
+                </button>
+            </div>
+            <div>
+                @if (!_rTodayOpd.Any())
+                {
+                    <div class="cc-empty">No OPD registrations today</div>
+                }
+                else
+                {
+                    @foreach (var (opd, idx) in _rTodayOpd.Take(8).Select((o, i) => (o, i)))
+                    {
+                        var (badgeColor, badgeBg, badgeLabel) = GetStatusStyle(opd.Status);
+                        var isLast = idx == Math.Min(7, _rTodayOpd.Count - 1);
+                        <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;
+                                    border-bottom:@(isLast ? "none" : "1px solid #E2E8F0");
+                                    background:@(opd.Status == OpdStatus.InProgress ? "#F0F7FF" : "transparent");">
+                            <div style="width:44px;text-align:center;flex-shrink:0;">
+                                <div style="font-size:12px;font-weight:800;color:#1E293B;">
+                                    @opd.RegistrationDate.ToLocalTime().ToString("hh:mm")
+                                </div>
+                                <div style="font-size:10px;color:#94A3B8;">
+                                    @opd.RegistrationDate.ToLocalTime().ToString("tt")
+                                </div>
+                            </div>
+                            <div class="cc-avatar cc-avatar-blue">
+                                @GetInitials(opd.PatientName)
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:13px;font-weight:600;color:#1E293B;
+                                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                    @opd.PatientName
+                                </div>
+                                <div style="font-size:11px;color:#94A3B8;">
+                                    @opd.RegistrationNumber
+                                    @if (!string.IsNullOrWhiteSpace(opd.DoctorName))
+                                    {
+                                        <span> &nbsp;·&nbsp; @opd.DoctorName</span>
+                                    }
+                                </div>
+                            </div>
+                            <span class="cc-badge" style="color:@badgeColor;background:@badgeBg;">
+                                @badgeLabel
+                            </span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                       Href="/patients"
+                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+                Register Patient
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.LocalHospital"
+                       Href="/opd"
+                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+                OPD Queue
+            </MudButton>
+        </div>
+
+    </div>
 }
 
 @code {
     private bool _loading = true;
     private bool _isDoctor;
     private string _doctorFirstName = string.Empty;
+    private string _receptionFirstName = string.Empty;
     private string _greeting = "morning";
 
+    // Doctor dashboard state
     private List<OpdRegistrationDto> _todayOpd = [];
     private List<OpdRegistrationDto> _visitedOpd = [];
     private List<PrescriptionDto> _recentRx = [];
-
     private int _totalCount;
     private int _visitedCount;
     private int _pendingCount;
     private int _rxCount;
+
+    // Reception dashboard state
+    private List<OpdRegistrationDto> _rTodayOpd = [];
+    private int _rTotalCount;
+    private int _rWaitingCount;
+    private int _rInProgressCount;
+    private int _rCompletedCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -370,14 +454,19 @@ else
             return;
         }
 
-        var fullName = AuthState.CurrentUser?.FullName ?? "Doctor";
-        _doctorFirstName = fullName.Split(' ').FirstOrDefault() ?? fullName;
+        var fullName = AuthState.CurrentUser?.FullName ?? "User";
         _greeting = GetGreeting();
 
         if (_isDoctor)
         {
+            _doctorFirstName = fullName.Split(' ').FirstOrDefault() ?? fullName;
             var userId = AuthState.CurrentUser?.UserId ?? Guid.Empty;
             await LoadDoctorDashboardAsync(userId);
+        }
+        else
+        {
+            _receptionFirstName = fullName.Split(' ').FirstOrDefault() ?? fullName;
+            await LoadReceptionDashboardAsync();
         }
 
         _loading = false;
@@ -410,6 +499,24 @@ else
         {
             _recentRx = rxResult.Data.Items.ToList();
             _rxCount = _recentRx.Count;
+        }
+    }
+
+    private async Task LoadReceptionDashboardAsync()
+    {
+        var today = DateTime.Today;
+        var opdResult = await ClinicApi.GetOpdRegistrationsAsync(
+            page: 1, pageSize: 50, todayOnly: true);
+
+        if (opdResult.Success && opdResult.Data != null)
+        {
+            _rTodayOpd = opdResult.Data.Items
+                .OrderBy(o => o.RegistrationDate)
+                .ToList();
+            _rTotalCount = _rTodayOpd.Count;
+            _rWaitingCount    = _rTodayOpd.Count(o => o.Status == OpdStatus.Pending);
+            _rInProgressCount = _rTodayOpd.Count(o => o.Status == OpdStatus.InProgress);
+            _rCompletedCount  = _rTodayOpd.Count(o => o.Status == OpdStatus.Completed);
         }
     }
 

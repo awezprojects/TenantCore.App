@@ -21,7 +21,9 @@ public sealed class RegisterPatientHandler(
         var patient = Patient.Create(
             request.ApplicationId, request.FirstName, request.LastName,
             request.DateOfBirth, request.Gender, request.PhoneNumber,
-            request.Email, request.AadhaarNumber, request.PhotoUrl, request.Address);
+            request.Email, request.AadhaarNumber, request.PhotoUrl, request.Address,
+            request.BloodGroup, request.EmergencyContactName, request.EmergencyContactPhone,
+            request.KnownAllergies, request.MedicalHistory);
 
         await repository.AddAsync(patient, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);

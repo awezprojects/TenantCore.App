@@ -199,14 +199,24 @@
                                 </td>
                                 <td>
                                     <div class="opd-actions">
-                                        @if (reg.Status == OpdStatus.Pending && !notVisited)
+                                        @if (_isDoctor)
                                         {
-                                            <button class="opd-btn start" @onclick="() => StartAsync(reg)" disabled="@_updating">Start</button>
+                                            @if (reg.Status == OpdStatus.Pending && !notVisited)
+                                            {
+                                                <button class="opd-btn start" @onclick="() => StartAsync(reg)" disabled="@_updating">Start</button>
+                                            }
+                                            @if (reg.Status == OpdStatus.InProgress)
+                                            {
+                                                <button class="opd-btn rx" @onclick="() => OpenPrescription(reg)">Rx</button>
+                                                <button class="opd-btn done-btn" @onclick="() => MarkDoneAsync(reg)" disabled="@_updating">Done</button>
+                                            }
                                         }
-                                        @if (reg.Status == OpdStatus.InProgress)
+                                        else
                                         {
-                                            <button class="opd-btn rx" @onclick="() => OpenPrescription(reg)">Rx</button>
-                                            <button class="opd-btn done-btn" @onclick="() => MarkDoneAsync(reg)" disabled="@_updating">Done</button>
+                                            @if (reg.Status != OpdStatus.Cancelled && reg.Status != OpdStatus.Completed)
+                                            {
+                                                <button class="opd-btn cancelled" @onclick="() => CancelAsync(reg)" disabled="@_updating">Cancel</button>
+                                            }
                                         }
                                         <button class="opd-btn more" @onclick="() => OpenViewModal(reg)">···</button>
                                     </div>
@@ -306,20 +316,34 @@
             </div>
 
             <div class="opd-modal-actions">
-                @if (_selected.Status == OpdStatus.InProgress)
+                @if (_isDoctor)
                 {
-                    <button class="opd-modal-btn-filled"
-                            @onclick="() => { CloseViewModal(); OpenPrescription(_selected); }">
-                        Write Prescription
-                    </button>
+                    @if (_selected.Status == OpdStatus.InProgress)
+                    {
+                        <button class="opd-modal-btn-filled"
+                                @onclick="() => { CloseViewModal(); OpenPrescription(_selected); }">
+                            Write Prescription
+                        </button>
+                    }
+                    @if (_selected.Status == OpdStatus.Completed)
+                    {
+                        <button class="opd-modal-btn-filled" style="background:#059669;"
+                                disabled="@_checkingRx"
+                                @onclick="() => ViewPrescription(_selected)">
+                            @(_checkingRx ? "Loading..." : "View Prescription")
+                        </button>
+                    }
                 }
-                @if (_selected.Status == OpdStatus.Completed)
+                else
                 {
-                    <button class="opd-modal-btn-filled" style="background:#059669;"
-                            disabled="@_checkingRx"
-                            @onclick="() => ViewPrescription(_selected)">
-                        @(_checkingRx ? "Loading..." : "View Prescription")
-                    </button>
+                    @if (_selected.Status != OpdStatus.Cancelled && _selected.Status != OpdStatus.Completed)
+                    {
+                        <button class="opd-modal-btn-filled" style="background:#EF4444;"
+                                @onclick="async () => { CloseViewModal(); await CancelAsync(_selected); }"
+                                disabled="@_updating">
+                            Cancel Appointment
+                        </button>
+                    }
                 }
                 <button class="opd-modal-btn-outline" @onclick="CloseViewModal">Close</button>
             </div>
@@ -639,6 +663,16 @@
         var dto = new UpdateOpdRegistrationDto(reg.DoctorUserId, reg.DoctorName, reg.Fee, OpdStatus.Completed, reg.Notes);
         var result = await ClinicClient.UpdateOpdRegistrationAsync(reg.Id, dto);
         if (result.Success) { Snackbar.Add("Visit marked as completed.", Severity.Success); await ReloadAll(); }
+        else Snackbar.Add(result.Message, Severity.Error);
+        _updating = false;
+    }
+
+    private async Task CancelAsync(OpdRegistrationDto reg)
+    {
+        _updating = true;
+        var dto = new UpdateOpdRegistrationDto(reg.DoctorUserId, reg.DoctorName, reg.Fee, OpdStatus.Cancelled, reg.Notes);
+        var result = await ClinicClient.UpdateOpdRegistrationAsync(reg.Id, dto);
+        if (result.Success) { Snackbar.Add("Appointment cancelled.", Severity.Success); await ReloadAll(); }
         else Snackbar.Add(result.Message, Severity.Error);
         _updating = false;
     }

@@ -22,8 +22,13 @@ internal sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.Property(p => p.PhoneNumber).IsRequired().HasMaxLength(20);
         builder.Property(p => p.Email).HasMaxLength(256);
         builder.Property(p => p.AadhaarNumber).HasMaxLength(12);
-        builder.Property(p => p.PhotoUrl).HasMaxLength(500);
+        builder.Property(p => p.PhotoUrl).HasMaxLength(1000);
         builder.Property(p => p.Address).HasMaxLength(500);
+        builder.Property(p => p.BloodGroup).HasMaxLength(5);
+        builder.Property(p => p.EmergencyContactName).HasMaxLength(100);
+        builder.Property(p => p.EmergencyContactPhone).HasMaxLength(20);
+        builder.Property(p => p.KnownAllergies).HasMaxLength(1000);
+        builder.Property(p => p.MedicalHistory).HasMaxLength(2000);
         builder.Property(p => p.IsActive).IsRequired().HasDefaultValue(true);
 
         builder.Property(p => p.CreatedAt).IsRequired();

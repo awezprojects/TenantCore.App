@@ -329,6 +329,14 @@ html, body {
 .opd-btn.done-btn:hover{ background: #047857; }
 .opd-btn.more    { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; padding: 6px 10px; }
 .opd-btn.more:hover { background: #E2E8F0; }
+.opd-btn.cancelled { background: #FEF2F2; color: #EF4444; border: 1px solid #FECACA; }
+.opd-btn.cancelled:hover { background: #FEE2E2; }
+.opd-btn.view-btn   { background: transparent; color: #64748B; border: 1px solid #E2E8F0; }
+.opd-btn.view-btn:hover { background: #F8FAFC; color: #1E293B; border-color: #CBD5E1; }
+.opd-btn.edit-btn   { background: transparent; color: #1565C0; border: 1px solid #BFDBFE; }
+.opd-btn.edit-btn:hover { background: #EFF6FF; border-color: #93C5FD; }
+.opd-btn.delete-btn { background: transparent; color: #EF4444; border: 1px solid #FECACA; }
+.opd-btn.delete-btn:hover { background: #FEF2F2; border-color: #FCA5A5; }
 
 /* OPD Detail Modal */
 .opd-modal-overlay {

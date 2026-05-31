@@ -11,7 +11,9 @@
       "Bash(find /mnt/c/Users/Dell/source/repos/awezprojects/TenantCore.App/src -name \"*.cs\" | grep -E \"\\(Prescription|OpdRegistration\\)\" | grep -v \"obj/\" | sort)",
       "Read(//mnt/c/Users/Dell/source/repos/awezprojects/TenantCore.App/**)",
       "PowerShell(cd \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\"; dotnet build src/TenantCore.Api 2>&1 | Where-Object { $_ -match \"error\" } | Select-Object -First 30)",
-      "PowerShell(cd \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\"; dotnet build src/TenantCore.Api 2>&1 | Where-Object { $_ -match \"error CS\" } | Select-Object -First 20)"
+      "PowerShell(cd \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\"; dotnet build src/TenantCore.Api 2>&1 | Where-Object { $_ -match \"error CS\" } | Select-Object -First 20)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\src\\\\\" -Directory | Select-Object Name)",
+      "Bash(dotnet add *)"
     ]
   }
 }

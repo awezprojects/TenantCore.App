@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IDoctorProfileRepository, DoctorProfileRepository>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IPdfConversionService, PdfConversionService>();
 

@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Components.Forms;
 using TenantCore.Shared.Common;
 using TenantCore.Shared.Dtos;
 using TenantCore.Shared.Dtos.Auth;
@@ -74,6 +75,40 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
         }
         catch (Exception ex) { return Fail<PatientDto>(ex.Message); }
     }
+
+    public async Task<ApiResponse<bool>> DeletePatientAsync(Guid id)
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.DeleteAsync($"api/patients/{id}");
+            return response.IsSuccessStatusCode
+                ? new ApiResponse<bool> { Success = true, Data = true }
+                : new ApiResponse<bool> { Success = false, Message = await response.Content.ReadAsStringAsync() };
+        }
+        catch (Exception ex) { return Fail<bool>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<string>> UploadPatientPhotoAsync(Guid id, IBrowserFile file)
+    {
+        try
+        {
+            SetAuth();
+            using var content = new MultipartFormDataContent();
+            var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            var streamContent = new StreamContent(stream);
+            streamContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+            content.Add(streamContent, "photo", file.Name);
+            var response = await httpClient.PostAsync($"api/patients/{id}/upload-photo", content);
+            if (!response.IsSuccessStatusCode)
+                return new ApiResponse<string> { Success = false, Message = await response.Content.ReadAsStringAsync() };
+            var result = await response.Content.ReadFromJsonAsync<PhotoUploadResult>(JsonOptions);
+            return new ApiResponse<string> { Success = true, Data = result?.Url };
+        }
+        catch (Exception ex) { return Fail<string>(ex.Message); }
+    }
+
+    private sealed record PhotoUploadResult(string Url);
 
     // --- OPD Registrations ---
 

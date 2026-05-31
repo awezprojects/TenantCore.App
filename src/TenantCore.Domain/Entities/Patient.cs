@@ -15,6 +15,11 @@ public class Patient : AuditableEntity
     public string? AadhaarNumber { get; private set; }
     public string? PhotoUrl { get; private set; }
     public string? Address { get; private set; }
+    public string? BloodGroup { get; private set; }
+    public string? EmergencyContactName { get; private set; }
+    public string? EmergencyContactPhone { get; private set; }
+    public string? KnownAllergies { get; private set; }
+    public string? MedicalHistory { get; private set; }
     public bool IsActive { get; private set; }
 
     private Patient() { }
@@ -29,7 +34,12 @@ public class Patient : AuditableEntity
         string? email,
         string? aadhaarNumber,
         string? photoUrl,
-        string? address) => new()
+        string? address,
+        string? bloodGroup = null,
+        string? emergencyContactName = null,
+        string? emergencyContactPhone = null,
+        string? knownAllergies = null,
+        string? medicalHistory = null) => new()
     {
         Id = Guid.NewGuid(),
         ApplicationId = applicationId,
@@ -42,6 +52,11 @@ public class Patient : AuditableEntity
         AadhaarNumber = aadhaarNumber,
         PhotoUrl = photoUrl,
         Address = address,
+        BloodGroup = bloodGroup,
+        EmergencyContactName = emergencyContactName,
+        EmergencyContactPhone = emergencyContactPhone,
+        KnownAllergies = knownAllergies,
+        MedicalHistory = medicalHistory,
         IsActive = true,
         CreatedAt = DateTime.UtcNow
     };
@@ -55,7 +70,12 @@ public class Patient : AuditableEntity
         string? email,
         string? aadhaarNumber,
         string? photoUrl,
-        string? address)
+        string? address,
+        string? bloodGroup = null,
+        string? emergencyContactName = null,
+        string? emergencyContactPhone = null,
+        string? knownAllergies = null,
+        string? medicalHistory = null)
     {
         FirstName = firstName;
         LastName = lastName;
@@ -66,6 +86,17 @@ public class Patient : AuditableEntity
         AadhaarNumber = aadhaarNumber;
         PhotoUrl = photoUrl;
         Address = address;
+        BloodGroup = bloodGroup;
+        EmergencyContactName = emergencyContactName;
+        EmergencyContactPhone = emergencyContactPhone;
+        KnownAllergies = knownAllergies;
+        MedicalHistory = medicalHistory;
+        SetUpdatedAt();
+    }
+
+    public void UpdatePhotoUrl(string photoUrl)
+    {
+        PhotoUrl = photoUrl;
         SetUpdatedAt();
     }
 

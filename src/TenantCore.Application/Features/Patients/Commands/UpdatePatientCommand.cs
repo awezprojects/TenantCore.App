@@ -16,4 +16,9 @@ public sealed record UpdatePatientCommand(
     string? AadhaarNumber,
     string? PhotoUrl,
     string? Address,
+    string? BloodGroup = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null,
+    string? KnownAllergies = null,
+    string? MedicalHistory = null,
     bool ShowFullAadhaar = false) : IRequest<PatientDto>;

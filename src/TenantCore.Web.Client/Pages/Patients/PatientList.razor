@@ -2,147 +2,620 @@
 @layout AuthorizedLayout
 @inject IClinicApiClient ClinicClient
 @inject ISnackbar Snackbar
+@using Microsoft.AspNetCore.Components.Forms
+@using TenantCore.Shared.Enums
 
-<PageTitle>Patients - TenantCore</PageTitle>
+<PageTitle>Patients - CloudClinic</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Patients</MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.PersonAdd"
-               OnClick="OpenRegisterDialog">
-        Register Patient
-    </MudButton>
-</MudStack>
-
-<MudPaper Class="pa-4 mb-4">
-    <MudGrid>
-        <MudItem xs="12" md="8">
-            <MudTextField @bind-Value="_search" Label="Search by name or phone..." Variant="Variant.Outlined"
-                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Immediate="false" Clearable="true" @onkeyup="OnSearchKeyUp" />
-        </MudItem>
-        <MudItem xs="12" md="4" Class="d-flex align-end">
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
-                Refresh
-            </MudButton>
-        </MudItem>
-    </MudGrid>
-</MudPaper>
-
-@if (_loading)
+@if (_view == "list")
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+                <div style="font-size:18px;font-weight:800;color:#1E293B;">Patient Registry</div>
+                <div style="font-size:13px;color:#64748B;margin-top:2px;">
+                    @(_result?.TotalCount ?? 0) patients registered
+                </div>
+            </div>
+            <button class="opd-btn-primary" @onclick="GoToRegister">+ Register New Patient</button>
+        </div>
+
+        <!-- Search bar -->
+        <div class="cc-card" style="padding:16px;">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;position:relative;">
+                    <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8;">🔍</span>
+                    <input class="opd-search-input" style="padding-left:36px;"
+                           placeholder="Search by name or phone..."
+                           @bind="_search" @bind:event="oninput"
+                           @onkeyup="OnSearchKeyUp" />
+                </div>
+                <button class="opd-btn start" style="padding:8px 16px;white-space:nowrap;" @onclick="LoadAsync">↻ Refresh</button>
+            </div>
+        </div>
+
+        <!-- Table -->
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <div class="opd-table-card">
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Phone</th>
+                            <th>DOB / Age</th>
+                            <th>Gender</th>
+                            <th>Blood</th>
+                            <th>Status</th>
+                            <th>Registered</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!(_result?.Items.Any() ?? false))
+                        {
+                            <tr><td colspan="8" class="opd-empty">No patients found.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var p in _result!.Items)
+                            {
+                                <tr>
+                                    <td>
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            @if (!string.IsNullOrEmpty(p.PhotoUrl))
+                                            {
+                                                <img src="@p.PhotoUrl" alt="@p.FullName"
+                                                     style="width:32px;height:32px;border-radius:8px;object-fit:cover;flex-shrink:0;" />
+                                            }
+                                            else
+                                            {
+                                                <div class="cc-avatar cc-avatar-blue" style="font-size:11px;flex-shrink:0;">
+                                                    @GetInitials(p.FullName)
+                                                </div>
+                                            }
+                                            <div>
+                                                <div style="font-weight:600;font-size:13px;color:#1E293B;">@p.FullName</div>
+                                                <div style="font-size:11px;color:#94A3B8;">@p.PhoneNumber</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style="font-size:13px;color:#475569;">@p.PhoneNumber</td>
+                                    <td style="font-size:13px;color:#475569;">
+                                        @if (p.DateOfBirth.HasValue)
+                                        {
+                                            <div>@p.DateOfBirth.Value.ToString("dd MMM yyyy")</div>
+                                            <div style="font-size:11px;color:#94A3B8;">@GetAge(p.DateOfBirth.Value) yrs</div>
+                                        }
+                                        else { <span>—</span> }
+                                    </td>
+                                    <td style="font-size:13px;color:#475569;">@p.Gender</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(p.BloodGroup))
+                                        {
+                                            <span style="padding:3px 8px;background:#FEF2F2;color:#EF4444;border-radius:6px;font-size:12px;font-weight:700;">@p.BloodGroup</span>
+                                        }
+                                        else { <span style="color:#94A3B8;">—</span> }
+                                    </td>
+                                    <td>
+                                        @if (p.IsActive)
+                                        {
+                                            <span class="opd-badge done">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="opd-badge cancelled">Inactive</span>
+                                        }
+                                    </td>
+                                    <td style="font-size:12px;color:#64748B;">
+                                        @p.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")
+                                    </td>
+                                    <td>
+                                        <div class="opd-actions">
+                                            <button class="opd-btn view-btn" @onclick="() => GoToView(p)">View</button>
+                                            <button class="opd-btn edit-btn" @onclick="() => GoToEdit(p)">Edit</button>
+                                            <button class="opd-btn delete-btn"
+                                                    @onclick="() => ConfirmDelete(p)"
+                                                    disabled="@_deleting">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="opd-pagination">
+                <span>
+                    Showing @((_page - 1) * PageSize + 1)–@(Math.Min(_page * PageSize, _result?.TotalCount ?? 0))
+                    of @(_result?.TotalCount ?? 0) patients
+                </span>
+                <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" Color="Color.Primary" />
+            </div>
+        }
+
+    </div>
 }
-else if (_result is not null)
+else if (_view == "view" && _viewingPatient is not null)
 {
-    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
-              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
-        <HeaderContent>
-            <MudTh>Name</MudTh>
-            <MudTh>Phone</MudTh>
-            <MudTh>Date of Birth</MudTh>
-            <MudTh>Gender</MudTh>
-            <MudTh>Status</MudTh>
-            <MudTh Style="width: 100px;">Actions</MudTh>
-        </HeaderContent>
-        <RowTemplate Context="patient">
-            <MudTd DataLabel="Name">
-                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudAvatar Size="Size.Small" Color="Color.Primary">
-                        @(patient.FirstName.Length > 0 ? patient.FirstName[0] : '?')
-                    </MudAvatar>
-                    <MudText>@patient.FullName</MudText>
-                </MudStack>
-            </MudTd>
-            <MudTd DataLabel="Phone">@patient.PhoneNumber</MudTd>
-            <MudTd DataLabel="DOB">@(patient.DateOfBirth.HasValue ? patient.DateOfBirth.Value.ToString("MMM dd, yyyy") : "—")</MudTd>
-            <MudTd DataLabel="Gender">@patient.Gender</MudTd>
-            <MudTd DataLabel="Status">
-                <MudChip T="string" Color="@(patient.IsActive ? Color.Success : Color.Error)"
-                         Size="Size.Small" Variant="Variant.Text">
-                    @(patient.IsActive ? "Active" : "Inactive")
-                </MudChip>
-            </MudTd>
-            <MudTd>
-                <MudTooltip Text="Edit">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
-                                   OnClick="@(() => OpenEditDialog(patient))" />
-                </MudTooltip>
-            </MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudText Color="Color.Secondary">No patients found.</MudText>
-        </NoRecordsContent>
-    </MudTable>
+    var vp = _viewingPatient;
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
 
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Showing @_result.Items.Count() of @_result.TotalCount patients
-        </MudText>
-        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
-    </MudStack>
+        <!-- Back + Actions -->
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <button @onclick="BackToList"
+                    style="background:none;border:none;color:#64748B;cursor:pointer;font-size:14px;font-weight:500;">
+                ← Back
+            </button>
+            <div style="font-size:18px;font-weight:800;color:#1E293B;">Patient Details</div>
+            <div style="margin-left:auto;display:flex;gap:8px;">
+                <button class="opd-btn edit-btn" style="padding:8px 18px;" @onclick="() => GoToEdit(vp)">Edit Patient</button>
+            </div>
+        </div>
+
+        <!-- Header Card -->
+        <div class="cc-card" style="padding:24px;">
+            <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+                @if (!string.IsNullOrEmpty(vp.PhotoUrl))
+                {
+                    <img src="@vp.PhotoUrl" alt="@vp.FullName"
+                         style="width:80px;height:80px;border-radius:14px;object-fit:cover;flex-shrink:0;" />
+                }
+                else
+                {
+                    <div class="cc-avatar cc-avatar-blue"
+                         style="width:80px;height:80px;font-size:26px;border-radius:14px;flex-shrink:0;">
+                        @GetInitials(vp.FullName)
+                    </div>
+                }
+                <div style="flex:1;min-width:200px;">
+                    <div style="font-size:22px;font-weight:800;color:#1E293B;">@vp.FullName</div>
+                    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+                        @if (!string.IsNullOrEmpty(vp.BloodGroup))
+                        {
+                            <span style="padding:3px 10px;background:#FEF2F2;color:#EF4444;border-radius:6px;font-size:13px;font-weight:700;">@vp.BloodGroup</span>
+                        }
+                        @if (vp.IsActive)
+                        {
+                            <span class="opd-badge done">Active</span>
+                        }
+                        else
+                        {
+                            <span class="opd-badge cancelled">Inactive</span>
+                        }
+                        <span style="font-size:13px;color:#64748B;">
+                            @vp.Gender · @(vp.DateOfBirth.HasValue ? $"{GetAge(vp.DateOfBirth.Value)} yrs" : "—")
+                        </span>
+                    </div>
+                    <div style="margin-top:8px;font-size:13px;color:#475569;display:flex;gap:16px;flex-wrap:wrap;">
+                        <span>📞 @vp.PhoneNumber</span>
+                        @if (!string.IsNullOrEmpty(vp.Email))
+                        {
+                            <span>✉️ @vp.Email</span>
+                        }
+                    </div>
+                </div>
+                <div style="text-align:right;font-size:12px;color:#94A3B8;flex-shrink:0;">
+                    <div style="margin-bottom:4px;">Registered</div>
+                    <div style="font-weight:600;color:#64748B;font-size:13px;">@vp.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</div>
+                    <div style="margin-top:6px;font-family:monospace;font-size:11px;">@vp.Id.ToString()[..8]…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail Grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+            <!-- Personal Info -->
+            <div class="cc-card" style="padding:20px;">
+                <div style="font-weight:700;font-size:14px;color:#1E293B;margin-bottom:14px;">Personal Information</div>
+                <div style="display:flex;flex-direction:column;gap:0;">
+                    @ViewRow("Date of Birth", vp.DateOfBirth?.ToString("dd MMM yyyy") ?? "—")
+                    @ViewRow("Age", vp.DateOfBirth.HasValue ? $"{GetAge(vp.DateOfBirth.Value)} years" : "—")
+                    @ViewRow("Gender", vp.Gender.ToString())
+                    @ViewRow("Blood Group", vp.BloodGroup ?? "—")
+                    @ViewRow("Aadhaar", vp.AadhaarNumber ?? "—")
+                </div>
+            </div>
+
+            <!-- Contact -->
+            <div class="cc-card" style="padding:20px;">
+                <div style="font-weight:700;font-size:14px;color:#1E293B;margin-bottom:14px;">Contact & Address</div>
+                <div style="display:flex;flex-direction:column;gap:0;">
+                    @ViewRow("Phone", vp.PhoneNumber)
+                    @ViewRow("Email", vp.Email ?? "—")
+                    @ViewRow("Address", vp.Address ?? "—")
+                    @ViewRow("Emergency Contact", vp.EmergencyContactName ?? "—")
+                    @ViewRow("Emergency Phone", vp.EmergencyContactPhone ?? "—")
+                </div>
+            </div>
+
+            <!-- Medical - full width -->
+            <div class="cc-card" style="padding:20px;grid-column:span 2;">
+                <div style="font-weight:700;font-size:14px;color:#1E293B;margin-bottom:16px;">Medical Information</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;margin-bottom:8px;">KNOWN ALLERGIES</div>
+                        <div style="font-size:13px;color:#1E293B;background:#FFF7ED;border-radius:8px;padding:12px;min-height:60px;line-height:1.6;">
+                            @(string.IsNullOrWhiteSpace(vp.KnownAllergies) ? "None recorded" : vp.KnownAllergies)
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;margin-bottom:8px;">PAST MEDICAL HISTORY</div>
+                        <div style="font-size:13px;color:#1E293B;background:#F0FDF4;border-radius:8px;padding:12px;min-height:60px;white-space:pre-wrap;line-height:1.6;">
+                            @(string.IsNullOrWhiteSpace(vp.MedicalHistory) ? "None recorded" : vp.MedicalHistory)
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+else if (_view == "register" || _view == "edit")
+{
+    var isEdit = _view == "edit";
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:0;">
+
+        <!-- Back + Header -->
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
+            <button @onclick="BackToList"
+                    style="background:none;border:none;color:#64748B;cursor:pointer;font-size:14px;font-weight:500;">
+                ← Back
+            </button>
+            <div style="font-size:18px;font-weight:800;color:#1E293B;">
+                @(isEdit ? "Edit Patient" : "New Patient Registration")
+            </div>
+            @if (!isEdit)
+            {
+                <div style="margin-left:auto;padding:4px 12px;background:#EFF6FF;border-radius:20px;font-size:12px;font-weight:700;color:#1565C0;">
+                    Step @_step of 3
+                </div>
+            }
+        </div>
+
+        <!-- Step Indicator (register only) -->
+        @if (!isEdit)
+        {
+            <div style="display:flex;gap:0;margin-bottom:28px;">
+                @foreach (var (label, idx) in new[] { "Personal Info", "Contact & Address", "Medical History" }.Select((l, i) => (l, i + 1)))
+                {
+                    <div style="flex:1;display:flex;align-items:center;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;transition:all 0.3s;
+                                        background:@(_step > idx ? "#16A34A" : _step == idx ? "#1565C0" : "#E2E8F0");
+                                        color:@(_step >= idx ? "#fff" : "#64748B");">
+                                @if (_step > idx) { <span>✓</span> } else { <span>@idx</span> }
+                            </div>
+                            <span style="font-size:13px;font-weight:@(_step == idx ? "700" : "400");color:@(_step == idx ? "#1565C0" : "#64748B");">@label</span>
+                        </div>
+                        @if (idx < 3)
+                        {
+                            <div style="flex:1;height:2px;background:@(_step > idx ? "#16A34A" : "#E2E8F0");margin:0 12px;transition:background 0.3s;"></div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- Success Banner -->
+        @if (_saved)
+        {
+            <div style="background:#ECFDF5;border:1px solid #16A34A;border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:10px;margin-bottom:20px;color:#16A34A;font-weight:600;">
+                ✅ Patient @(isEdit ? "updated" : "registered") successfully!
+            </div>
+        }
+
+        <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start;">
+
+            <!-- Form Card -->
+            <div class="cc-card" style="padding:24px;">
+
+                @if (!isEdit && _step == 1 || isEdit)
+                {
+                    <div class="cc-fade-in">
+                        @if (!isEdit)
+                        {
+                            <div style="font-weight:700;margin-bottom:20px;font-size:15px;color:#1E293B;">Personal Information</div>
+                        }
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_form.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_form.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudDatePicker @bind-Date="_dob" Label="Date of Birth" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudSelect T="string" @bind-Value="_gender" Label="Gender" Variant="Variant.Outlined">
+                                    <MudSelectItem Value="@("Male")">Male</MudSelectItem>
+                                    <MudSelectItem Value="@("Female")">Female</MudSelectItem>
+                                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="3">
+                                <MudSelect T="string" @bind-Value="_form.BloodGroup" Label="Blood Group" Variant="Variant.Outlined">
+                                    <MudSelectItem Value="@("")">— Select —</MudSelectItem>
+                                    @foreach (var bg in new[] { "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-" })
+                                    {
+                                        <MudSelectItem Value="@bg">@bg</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_form.PhoneNumber" Label="Phone Number" Variant="Variant.Outlined" Required="true" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_form.AadhaarNumber" Label="Aadhaar Number (optional)" Variant="Variant.Outlined" />
+                            </MudItem>
+                        </MudGrid>
+                        @if (isEdit)
+                        {
+                            <div style="font-weight:700;margin:24px 0 16px;font-size:15px;color:#1E293B;">Contact & Address</div>
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_form.Email" Label="Email (optional)" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField @bind-Value="_form.Address" Label="Address (optional)" Variant="Variant.Outlined" Lines="2" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_form.EmergencyContactName" Label="Emergency Contact Name" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_form.EmergencyContactPhone" Label="Emergency Contact Phone" Variant="Variant.Outlined" />
+                                </MudItem>
+                            </MudGrid>
+                            <div style="font-weight:700;margin:24px 0 16px;font-size:15px;color:#1E293B;">Medical History</div>
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12">
+                                    <MudTextField @bind-Value="_form.KnownAllergies" Label="Known Allergies" Variant="Variant.Outlined" Lines="2"
+                                                  Placeholder="e.g. Penicillin, Sulfa drugs, Peanuts..." />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField @bind-Value="_form.MedicalHistory" Label="Past Medical History" Variant="Variant.Outlined" Lines="3"
+                                                  Placeholder="Diabetes, Hypertension, previous surgeries..." />
+                                </MudItem>
+                            </MudGrid>
+                        }
+                    </div>
+                }
+
+                @if (!isEdit && _step == 2)
+                {
+                    <div class="cc-fade-in">
+                        <div style="font-weight:700;margin-bottom:20px;font-size:15px;color:#1E293B;">Contact & Address</div>
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="_form.Email" Label="Email Address" Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_form.Address" Label="Address" Variant="Variant.Outlined" Lines="2"
+                                              Placeholder="Street, locality..." />
+                            </MudItem>
+                        </MudGrid>
+                        <div style="margin-top:16px;padding:14px 16px;background:#F8FAFC;border-radius:10px;border:1px solid #E2E8F0;">
+                            <div style="font-weight:700;font-size:13px;margin-bottom:12px;color:#1E293B;">Emergency Contact</div>
+                            <MudGrid Spacing="3">
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_form.EmergencyContactName" Label="Contact Name" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_form.EmergencyContactPhone" Label="Contact Phone" Variant="Variant.Outlined" />
+                                </MudItem>
+                            </MudGrid>
+                        </div>
+                    </div>
+                }
+
+                @if (!isEdit && _step == 3)
+                {
+                    <div class="cc-fade-in">
+                        <div style="font-weight:700;margin-bottom:20px;font-size:15px;color:#1E293B;">Medical History</div>
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_form.KnownAllergies" Label="Known Allergies" Variant="Variant.Outlined" Lines="2"
+                                              Placeholder="e.g. Penicillin, Sulfa drugs, Peanuts..." />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="_form.MedicalHistory" Label="Past Medical History" Variant="Variant.Outlined" Lines="4"
+                                              Placeholder="Diabetes, Hypertension, previous surgeries..." />
+                            </MudItem>
+                        </MudGrid>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;">
+                            @foreach (var condition in _conditions)
+                            {
+                                var c = condition;
+                                <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px 10px;border:1px solid @(_selectedConditions.Contains(c) ? "#1565C0" : "#E2E8F0");border-radius:8px;background:@(_selectedConditions.Contains(c) ? "#EFF6FF" : "#fff");">
+                                    <input type="checkbox" checked="@_selectedConditions.Contains(c)"
+                                           @onchange="() => ToggleCondition(c)"
+                                           style="accent-color:#1565C0;" />
+                                    @c
+                                </label>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Navigation buttons -->
+                <div style="display:flex;justify-content:space-between;margin-top:24px;">
+                    @if (isEdit)
+                    {
+                        <div></div>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving"
+                                   Style="border-radius:8px;font-weight:600;text-transform:none;">
+                            @(_saving ? "Saving..." : "Save Changes")
+                        </MudButton>
+                    }
+                    else
+                    {
+                        @if (_step > 1)
+                        {
+                            <button class="opd-btn start" style="padding:9px 18px;" @onclick="PrevStep">← Previous</button>
+                        }
+                        else
+                        {
+                            <div></div>
+                        }
+                        @if (_step < 3)
+                        {
+                            <button class="opd-btn-primary" @onclick="NextStep">Next →</button>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving"
+                                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+                                @(_saving ? "Registering..." : "✅ Register Patient")
+                            </MudButton>
+                        }
+                    }
+                </div>
+            </div>
+
+            <!-- Side Panel: Photo + Info -->
+            <div style="display:flex;flex-direction:column;gap:16px;">
+
+                <!-- Photo Upload -->
+                <div class="cc-card" style="padding:20px;">
+                    <div style="font-weight:700;margin-bottom:14px;font-size:14px;">Patient Photo</div>
+                    <InputFile id="photoFileInput" OnChange="OnPhotoSelected" accept=".jpg,.jpeg,.png,.webp"
+                               style="display:none;" />
+                    <label for="photoFileInput" style="display:block;cursor:pointer;">
+                        <div style="position:relative;width:100%;padding-top:100%;background:#EFF6FF;border-radius:12px;border:2px dashed #1565C0;overflow:hidden;">
+                            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#1565C0;">
+                                @if (!string.IsNullOrEmpty(_previewUrl))
+                                {
+                                    <img src="@_previewUrl" alt="Preview" style="width:100%;height:100%;object-fit:cover;" />
+                                }
+                                else if (!string.IsNullOrEmpty(_form.PhotoUrl))
+                                {
+                                    <img src="@_form.PhotoUrl" alt="Photo" style="width:100%;height:100%;object-fit:cover;" />
+                                }
+                                else
+                                {
+                                    <div style="font-size:32px;">📷</div>
+                                    <div style="font-size:12px;font-weight:600;margin-top:8px;">Click to upload</div>
+                                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">JPG, PNG, WEBP · max 5 MB</div>
+                                }
+                            </div>
+                        </div>
+                    </label>
+                    @if (_photoFile is not null)
+                    {
+                        <div style="margin-top:8px;font-size:12px;color:#16A34A;font-weight:600;">
+                            ✓ @_photoFile.Name selected
+                        </div>
+                    }
+                    @if (_uploadingPhoto)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Style="margin-top:8px;" />
+                    }
+                </div>
+
+                <!-- Registration Info -->
+                <div class="cc-card" style="padding:20px;">
+                    <div style="font-weight:700;margin-bottom:12px;font-size:14px;">
+                        @(isEdit ? "Patient Info" : "Registration Info")
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+                        @if (isEdit && _editingPatient is not null)
+                        {
+                            <div style="display:flex;justify-content:space-between;">
+                                <span style="color:#64748B;">Patient ID</span>
+                                <span style="font-weight:600;color:#1565C0;font-size:11px;">@_editingPatient.Id.ToString()[..8]…</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;">
+                                <span style="color:#64748B;">Registered</span>
+                                <span style="font-weight:600;">@_editingPatient.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</span>
+                            </div>
+                        }
+                        <div style="display:flex;justify-content:space-between;">
+                            <span style="color:#64748B;">Date</span>
+                            <span style="font-weight:600;">@DateTime.Today.ToString("dd MMM yyyy")</span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(_form.BloodGroup))
+                        {
+                            <div style="display:flex;justify-content:space-between;">
+                                <span style="color:#64748B;">Blood Group</span>
+                                <span style="padding:2px 8px;background:#FEF2F2;color:#EF4444;border-radius:6px;font-weight:700;">@_form.BloodGroup</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
 }
 
-<!-- Register / Edit Dialog -->
-<MudDialog @bind-Visible="_dialogVisible">
+<!-- Delete Confirmation Dialog -->
+<MudDialog @bind-Visible="_deleteDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
     <TitleContent>
-        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit Patient" : "Register Patient")</MudText>
+        <MudText Typo="Typo.h6">Delete Patient</MudText>
     </TitleContent>
     <DialogContent>
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudDatePicker @bind-Date="_dob" Label="Date of Birth" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="string" @bind-Value="_gender" Label="Gender" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("Male")">Male</MudSelectItem>
-                    <MudSelectItem Value="@("Female")">Female</MudSelectItem>
-                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.PhoneNumber" Label="Phone Number" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Email" Label="Email (optional)" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.AadhaarNumber" Label="Aadhaar Number (optional)" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_form.Address" Label="Address (optional)" Variant="Variant.Outlined" Lines="2" />
-            </MudItem>
-        </MudGrid>
+        <MudText>
+            Are you sure you want to deactivate <strong>@_deleteTarget?.FullName</strong>?
+            This will remove them from active patient lists.
+        </MudText>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="CloseDialog">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">
-            @(_saving ? "Saving..." : "Save")
+        <MudButton OnClick="@(() => _deleteDialogOpen = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="ExecuteDelete" Disabled="_deleting">
+            @(_deleting ? "Deleting..." : "Delete")
         </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
+    // ── View state ───────────────────────────────────────────────────────────
+    private string _view = "list";
+    private int _step = 1;
+
+    // ── List state ───────────────────────────────────────────────────────────
     private bool _loading = true;
-    private bool _dialogVisible;
-    private bool _saving;
     private string? _search;
     private int _page = 1;
     private const int PageSize = 20;
     private TenantCore.Shared.Common.PagedResult<PatientDto>? _result;
-    private Guid? _editingId;
+    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+
+    // ── Form state ───────────────────────────────────────────────────────────
+    private bool _saving;
+    private bool _saved;
     private PatientFormModel _form = new();
     private DateTime? _dob;
     private string _gender = "Male";
+    private PatientDto? _editingPatient;
 
-    private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
+    // ── Photo upload state ───────────────────────────────────────────────────
+    private IBrowserFile? _photoFile;
+    private string? _previewUrl;
+    private bool _uploadingPhoto;
+
+    // ── View state ────────────────────────────────────────────────────────────
+    private PatientDto? _viewingPatient;
+
+    // ── Delete state ─────────────────────────────────────────────────────────
+    private bool _deleting;
+    private bool _deleteDialogOpen;
+    private PatientDto? _deleteTarget;
+
+    // ── Medical conditions ───────────────────────────────────────────────────
+    private readonly string[] _conditions = ["Diabetes", "Hypertension", "Heart Disease", "Asthma", "Thyroid", "Cancer"];
+    private readonly HashSet<string> _selectedConditions = [];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -150,36 +623,35 @@ else if (_result is not null)
     {
         _loading = true;
         var response = await ClinicClient.GetPatientsAsync(_page, PageSize, _search);
-        if (response.Success)
-            _result = response.Data;
-        else
-            Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) _result = response.Data;
+        else Snackbar.Add(response.Message, Severity.Error);
         _loading = false;
     }
 
-    private async Task OnPageChanged(int page)
+    // ── Navigation ────────────────────────────────────────────────────────────
+    private void GoToRegister()
     {
-        _page = page;
-        await LoadAsync();
-    }
-
-    private async Task OnSearchKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") { _page = 1; await LoadAsync(); }
-    }
-
-    private void OpenRegisterDialog()
-    {
-        _editingId = null;
+        _editingPatient = null;
         _form = new();
         _dob = null;
         _gender = "Male";
-        _dialogVisible = true;
+        _step = 1;
+        _saved = false;
+        _photoFile = null;
+        _previewUrl = null;
+        _selectedConditions.Clear();
+        _view = "register";
     }
 
-    private void OpenEditDialog(PatientDto patient)
+    private void GoToView(PatientDto patient)
     {
-        _editingId = patient.Id;
+        _viewingPatient = patient;
+        _view = "view";
+    }
+
+    private void GoToEdit(PatientDto patient)
+    {
+        _editingPatient = patient;
         _form = new PatientFormModel
         {
             FirstName = patient.FirstName,
@@ -187,52 +659,214 @@ else if (_result is not null)
             PhoneNumber = patient.PhoneNumber,
             Email = patient.Email,
             AadhaarNumber = patient.AadhaarNumber,
-            Address = patient.Address
+            Address = patient.Address,
+            BloodGroup = patient.BloodGroup ?? string.Empty,
+            EmergencyContactName = patient.EmergencyContactName,
+            EmergencyContactPhone = patient.EmergencyContactPhone,
+            KnownAllergies = patient.KnownAllergies,
+            MedicalHistory = patient.MedicalHistory,
+            PhotoUrl = patient.PhotoUrl
         };
         _dob = patient.DateOfBirth.HasValue ? patient.DateOfBirth.Value.ToDateTime(TimeOnly.MinValue) : null;
         _gender = patient.Gender.ToString();
-        _dialogVisible = true;
+        _saved = false;
+        _photoFile = null;
+        _previewUrl = null;
+        _view = "edit";
     }
 
-    private void CloseDialog() => _dialogVisible = false;
+    private void BackToList()
+    {
+        _view = "list";
+        _step = 1;
+    }
 
+    // ── Steps ─────────────────────────────────────────────────────────────────
+    private void NextStep()
+    {
+        if (_step == 1 && (string.IsNullOrWhiteSpace(_form.FirstName) || string.IsNullOrWhiteSpace(_form.LastName) || string.IsNullOrWhiteSpace(_form.PhoneNumber)))
+        {
+            Snackbar.Add("First name, last name, and phone number are required.", Severity.Warning);
+            return;
+        }
+        if (_step < 3) _step++;
+    }
+
+    private void PrevStep() { if (_step > 1) _step--; }
+
+    // ── Photo ─────────────────────────────────────────────────────────────────
+    private async Task OnPhotoSelected(InputFileChangeEventArgs e)
+    {
+        _photoFile = e.File;
+        _previewUrl = null;
+
+        // Generate data URL preview
+        try
+        {
+            using var stream = _photoFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+            _previewUrl = $"data:{_photoFile.ContentType};base64,{base64}";
+        }
+        catch
+        {
+            // Preview generation failed — file still uploaded on save
+        }
+    }
+
+    // ── Save ──────────────────────────────────────────────────────────────────
     private async Task SaveAsync()
     {
         if (string.IsNullOrWhiteSpace(_form.FirstName) || string.IsNullOrWhiteSpace(_form.LastName) ||
             string.IsNullOrWhiteSpace(_form.PhoneNumber))
         {
-            Snackbar.Add("First name, last name and phone number are required.", Severity.Warning);
+            Snackbar.Add("First name, last name, and phone number are required.", Severity.Warning);
             return;
         }
+
         _saving = true;
         var dob = _dob.HasValue ? DateOnly.FromDateTime(_dob.Value) : (DateOnly?)null;
-        var gender = Enum.Parse<TenantCore.Shared.Enums.Gender>(_gender);
+        var gender = Enum.Parse<Gender>(_gender);
+
+        // Append selected conditions to medical history
+        var historyNote = _selectedConditions.Any()
+            ? (_form.MedicalHistory ?? "") + (string.IsNullOrWhiteSpace(_form.MedicalHistory) ? "" : "\n") + string.Join(", ", _selectedConditions)
+            : _form.MedicalHistory;
 
         ApiResponse<PatientDto> response;
-        if (_editingId.HasValue)
+
+        if (_editingPatient is not null)
         {
-            var dto = new UpdatePatientDto(_form.FirstName, _form.LastName, dob, gender,
-                _form.PhoneNumber, _form.Email, _form.AadhaarNumber, null, _form.Address);
-            response = await ClinicClient.UpdatePatientAsync(_editingId.Value, dto);
+            var dto = new UpdatePatientDto(
+                _form.FirstName, _form.LastName, dob, gender,
+                _form.PhoneNumber, _form.Email, _form.AadhaarNumber, _form.PhotoUrl, _form.Address,
+                string.IsNullOrEmpty(_form.BloodGroup) ? null : _form.BloodGroup,
+                _form.EmergencyContactName, _form.EmergencyContactPhone,
+                _form.KnownAllergies, historyNote);
+            response = await ClinicClient.UpdatePatientAsync(_editingPatient.Id, dto);
         }
         else
         {
-            var dto = new CreatePatientDto(_form.FirstName, _form.LastName, dob, gender,
-                _form.PhoneNumber, _form.Email, _form.AadhaarNumber, null, _form.Address);
+            var dto = new CreatePatientDto(
+                _form.FirstName, _form.LastName, dob, gender,
+                _form.PhoneNumber, _form.Email, _form.AadhaarNumber, null, _form.Address,
+                string.IsNullOrEmpty(_form.BloodGroup) ? null : _form.BloodGroup,
+                _form.EmergencyContactName, _form.EmergencyContactPhone,
+                _form.KnownAllergies, historyNote);
             response = await ClinicClient.CreatePatientAsync(dto);
         }
 
+        if (response.Success && response.Data is not null)
+        {
+            var savedPatient = response.Data;
+
+            // Upload photo if selected
+            if (_photoFile is not null)
+            {
+                _uploadingPhoto = true;
+                var photoResult = await ClinicClient.UploadPatientPhotoAsync(savedPatient.Id, _photoFile);
+                _uploadingPhoto = false;
+                if (photoResult.Success && photoResult.Data is not null)
+                {
+                    _form.PhotoUrl = photoResult.Data;
+                    _previewUrl = null;
+                    _photoFile = null;
+                }
+                else
+                {
+                    Snackbar.Add($"Patient saved but photo upload failed: {photoResult.Message}", Severity.Warning);
+                }
+            }
+
+            _saved = true;
+            Snackbar.Add(_editingPatient is not null ? "Patient updated." : "Patient registered.", Severity.Success);
+
+            await Task.Delay(1400);
+            _saved = false;
+
+            if (_editingPatient is null)
+            {
+                _view = "list";
+                await LoadAsync();
+            }
+            else
+            {
+                // Re-fetch to pick up the latest PhotoUrl written by the upload handler
+                var refreshed = await ClinicClient.GetPatientByIdAsync(savedPatient.Id);
+                _editingPatient = refreshed.Success && refreshed.Data is not null ? refreshed.Data : savedPatient;
+                _form.PhotoUrl = _editingPatient.PhotoUrl;
+                // Refresh the list so View page shows updated data when user navigates back
+                await LoadAsync();
+            }
+        }
+        else
+        {
+            Snackbar.Add(response.Message, Severity.Error);
+        }
+
+        _saving = false;
+    }
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+    private void ConfirmDelete(PatientDto patient)
+    {
+        _deleteTarget = patient;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task ExecuteDelete()
+    {
+        if (_deleteTarget is null) return;
+        _deleting = true;
+        var response = await ClinicClient.DeletePatientAsync(_deleteTarget.Id);
         if (response.Success)
         {
-            Snackbar.Add(_editingId.HasValue ? "Patient updated." : "Patient registered.", Severity.Success);
-            CloseDialog();
+            Snackbar.Add("Patient deactivated.", Severity.Success);
+            _deleteDialogOpen = false;
+            _deleteTarget = null;
             await LoadAsync();
         }
         else
         {
             Snackbar.Add(response.Message, Severity.Error);
         }
-        _saving = false;
+        _deleting = false;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAsync(); } }
+    private void ToggleCondition(string c) { if (!_selectedConditions.Remove(c)) _selectedConditions.Add(c); }
+
+    private RenderFragment ViewRow(string label, string? value) => __builder =>
+    {
+        __builder.OpenElement(0, "div");
+        __builder.AddAttribute(1, "style", "display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F1F5F9;font-size:13px;");
+        __builder.OpenElement(2, "span");
+        __builder.AddAttribute(3, "style", "color:#64748B;");
+        __builder.AddContent(4, label);
+        __builder.CloseElement();
+        __builder.OpenElement(5, "span");
+        __builder.AddAttribute(6, "style", "font-weight:600;color:#1E293B;max-width:60%;text-align:right;");
+        __builder.AddContent(7, value);
+        __builder.CloseElement();
+        __builder.CloseElement();
+    };
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0][0]}{parts[^1][0]}".ToUpper() : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private static int GetAge(DateOnly dob)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var age = today.Year - dob.Year;
+        if (dob > today.AddYears(-age)) age--;
+        return age;
     }
 
     private class PatientFormModel
@@ -243,5 +877,11 @@ else if (_result is not null)
         public string? Email { get; set; }
         public string? AadhaarNumber { get; set; }
         public string? Address { get; set; }
+        public string BloodGroup { get; set; } = string.Empty;
+        public string? EmergencyContactName { get; set; }
+        public string? EmergencyContactPhone { get; set; }
+        public string? KnownAllergies { get; set; }
+        public string? MedicalHistory { get; set; }
+        public string? PhotoUrl { get; set; }
     }
 }

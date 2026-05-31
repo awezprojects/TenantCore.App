@@ -38,8 +38,9 @@ public class PatientsController(ISender sender) : ClinicControllerBase
     {
         var result = await sender.Send(new RegisterPatientCommand(
             GetApplicationId(), dto.FirstName, dto.LastName, dto.DateOfBirth,
-            dto.Gender, dto.PhoneNumber, dto.Email,
-            dto.AadhaarNumber, dto.PhotoUrl, dto.Address, CanViewFullAadhaar()), ct);
+            dto.Gender, dto.PhoneNumber, dto.Email, dto.AadhaarNumber, dto.PhotoUrl,
+            dto.Address, dto.BloodGroup, dto.EmergencyContactName, dto.EmergencyContactPhone,
+            dto.KnownAllergies, dto.MedicalHistory, CanViewFullAadhaar()), ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -49,8 +50,45 @@ public class PatientsController(ISender sender) : ClinicControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePatientDto dto, CancellationToken ct)
         => Ok(await sender.Send(new UpdatePatientCommand(
             id, GetApplicationId(), dto.FirstName, dto.LastName, dto.DateOfBirth,
-            dto.Gender, dto.PhoneNumber, dto.Email,
-            dto.AadhaarNumber, dto.PhotoUrl, dto.Address, CanViewFullAadhaar()), ct));
+            dto.Gender, dto.PhoneNumber, dto.Email, dto.AadhaarNumber, dto.PhotoUrl,
+            dto.Address, dto.BloodGroup, dto.EmergencyContactName, dto.EmergencyContactPhone,
+            dto.KnownAllergies, dto.MedicalHistory, CanViewFullAadhaar()), ct));
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await sender.Send(new DeletePatientCommand(id, GetApplicationId()), ct);
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/upload-photo")]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UploadPhoto(Guid id, IFormFile photo, CancellationToken ct)
+    {
+        if (photo is null || photo.Length == 0)
+            return BadRequest("No photo file provided.");
+
+        if (photo.Length > 5 * 1024 * 1024)
+            return BadRequest("Photo file must not exceed 5 MB.");
+
+        var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        var ext = Path.GetExtension(photo.FileName).ToLowerInvariant();
+        if (!allowed.Contains(ext))
+            return BadRequest("Only JPG, PNG, and WEBP images are allowed.");
+
+        await using var stream = photo.OpenReadStream();
+        var url = await sender.Send(
+            new UploadPatientPhotoCommand(id, GetApplicationId(), GetApplicationName(), stream, photo.FileName, photo.ContentType), ct);
+
+        return Ok(new { url });
+    }
 
     private bool CanViewFullAadhaar() =>
         AppRoles.ReceptionRoles.Any(User.IsInRole);

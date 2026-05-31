@@ -10,6 +10,8 @@ public interface IClinicApiClient
     Task<ApiResponse<PatientDto>> GetPatientByIdAsync(Guid id);
     Task<ApiResponse<PatientDto>> CreatePatientAsync(CreatePatientDto dto);
     Task<ApiResponse<PatientDto>> UpdatePatientAsync(Guid id, UpdatePatientDto dto);
+    Task<ApiResponse<bool>> DeletePatientAsync(Guid id);
+    Task<ApiResponse<string>> UploadPatientPhotoAsync(Guid id, Microsoft.AspNetCore.Components.Forms.IBrowserFile file);
 
     Task<ApiResponse<PagedResult<OpdRegistrationDto>>> GetOpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null, Guid? doctorUserId = null, bool todayOnly = false, DateTime? fromDate = null, DateTime? toDate = null, TenantCore.Shared.Enums.OpdStatus? status = null, bool notVisited = false);
     Task<ApiResponse<OpdRegistrationDto>> GetOpdRegistrationByIdAsync(Guid id);

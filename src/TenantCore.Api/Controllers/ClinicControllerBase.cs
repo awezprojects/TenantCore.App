@@ -1,28 +1,48 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using TenantCore.Api.Middleware;
 
 namespace TenantCore.Api.Controllers;
 
-/// <summary>
-/// Base controller for all clinic-scoped endpoints.
-/// Resolves the active ApplicationId from:
-///   1. HttpContext.Items["SelectedApplicationId"] — set by ClinicContextMiddleware
-///      when the X-Application-Id header is present and validated against JWT claims.
-///   2. Fallback: first app_ids JWT claim (single-clinic users / legacy callers).
-/// </summary>
 public abstract class ClinicControllerBase : ControllerBase
 {
+    private static readonly JsonSerializerOptions _jsonOpts = new(JsonSerializerDefaults.Web);
+
     protected Guid GetApplicationId()
     {
-        // Primary: middleware-validated header value
         if (HttpContext.Items.TryGetValue(ClinicContextMiddleware.ContextKey, out var item)
             && item is Guid id && id != Guid.Empty)
             return id;
 
-        // Fallback: first app_ids claim in JWT (single-clinic scenario)
         var claim = User.FindFirst("app_ids");
         return claim is not null && Guid.TryParse(claim.Value, out var fallback)
             ? fallback
             : Guid.Empty;
     }
+
+    // Reads appName from the app_roles JWT claim: [{"appId":"...","appName":"..."}]
+    protected string GetApplicationName()
+    {
+        var appId = GetApplicationId();
+        var claim = User.FindFirst("app_roles");
+        if (claim is not null)
+        {
+            try
+            {
+                var entries = JsonSerializer.Deserialize<AppRoleEntry[]>(claim.Value, _jsonOpts);
+                var name = entries?.FirstOrDefault(e => e.AppId == appId)?.AppName;
+                if (!string.IsNullOrWhiteSpace(name))
+                    return Slugify(name);
+            }
+            catch { /* malformed claim — fall through */ }
+        }
+        return appId.ToString();
+    }
+
+    private static string Slugify(string name) =>
+        System.Text.RegularExpressions.Regex
+            .Replace(name.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-")
+            .Trim('-');
+
+    private sealed record AppRoleEntry(Guid AppId, string AppName, Guid RoleId, string RoleName);
 }

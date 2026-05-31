@@ -16,6 +16,11 @@ public class PatientDto
     public string? AadhaarNumber { get; init; }
     public string? PhotoUrl { get; init; }
     public string? Address { get; init; }
+    public string? BloodGroup { get; init; }
+    public string? EmergencyContactName { get; init; }
+    public string? EmergencyContactPhone { get; init; }
+    public string? KnownAllergies { get; init; }
+    public string? MedicalHistory { get; init; }
     public bool IsActive { get; init; }
     public DateTime CreatedAt { get; init; }
 }
@@ -29,7 +34,12 @@ public sealed record CreatePatientDto(
     string? Email,
     string? AadhaarNumber,
     string? PhotoUrl,
-    string? Address);
+    string? Address,
+    string? BloodGroup = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null,
+    string? KnownAllergies = null,
+    string? MedicalHistory = null);
 
 public sealed record UpdatePatientDto(
     string FirstName,
@@ -40,4 +50,9 @@ public sealed record UpdatePatientDto(
     string? Email,
     string? AadhaarNumber,
     string? PhotoUrl,
-    string? Address);
+    string? Address,
+    string? BloodGroup = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null,
+    string? KnownAllergies = null,
+    string? MedicalHistory = null);

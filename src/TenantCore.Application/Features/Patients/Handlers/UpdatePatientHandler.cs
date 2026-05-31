@@ -22,7 +22,9 @@ public sealed class UpdatePatientHandler(IPatientRepository repository)
         patient.Update(
             request.FirstName, request.LastName, request.DateOfBirth,
             request.Gender, request.PhoneNumber, request.Email,
-            request.AadhaarNumber, request.PhotoUrl, request.Address);
+            request.AadhaarNumber, request.PhotoUrl, request.Address,
+            request.BloodGroup, request.EmergencyContactName, request.EmergencyContactPhone,
+            request.KnownAllergies, request.MedicalHistory);
 
         repository.Update(patient);
         await repository.SaveChangesAsync(cancellationToken);

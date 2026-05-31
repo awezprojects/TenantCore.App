@@ -3,7 +3,13 @@
     "allow": [
       "Bash(dotnet build *)",
       "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/src/TenantCore.Auth.API/Controllers/**)",
-      "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/**)"
+      "Read(//c/Users/Dell/source/repos/awezprojects/TenantCore.Auth/**)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\src\\\\TenantCore.Shared\\\\Dtos\\\\\" -Name | Select-String \"Patient)",
+      "Bash(Create)",
+      "Bash(Update\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\src\\\\TenantCore.Api\\\\Middleware\\\\\" -Name)",
+      "Bash(Get-Content \"c:\\\\Users\\\\Dell\\\\source\\\\repos\\\\awezprojects\\\\TenantCore.App\\\\src\\\\TenantCore.Application\\\\Features\\\\Patients\\\\Commands\\\\RegisterPatientCommand.cs\")",
+      "Bash(Select-Object -First 1)"
     ]
   }
 }
