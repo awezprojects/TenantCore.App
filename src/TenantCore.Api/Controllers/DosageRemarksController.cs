@@ -14,7 +14,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/dosage-remarks")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class DosageRemarksController(ISender sender) : ControllerBase
+public class DosageRemarksController(ISender sender) : ClinicControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<DosageRemarkDto>), StatusCodes.Status200OK)]
@@ -57,11 +57,5 @@ public class DosageRemarksController(ISender sender) : ControllerBase
     {
         await sender.Send(new DeleteDosageRemarkCommand(id, GetApplicationId()), ct);
         return NoContent();
-    }
-
-    private Guid GetApplicationId()
-    {
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 }

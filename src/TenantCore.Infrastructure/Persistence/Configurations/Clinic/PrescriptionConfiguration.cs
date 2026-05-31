@@ -23,7 +23,16 @@ internal sealed class PrescriptionConfiguration : IEntityTypeConfiguration<Presc
         builder.HasIndex(p => new { p.ApplicationId, p.PrescriptionNumber }).IsUnique();
         builder.Property(p => p.PrescribedDate).IsRequired();
         builder.Property(p => p.NextVisitDate);
+        builder.Property(p => p.Diagnosis).HasMaxLength(1000);
+        builder.Property(p => p.Investigations);
         builder.Property(p => p.Notes).HasMaxLength(2000);
+        builder.Property(p => p.VitalBP).HasMaxLength(20);
+        builder.Property(p => p.VitalPulse);
+        builder.Property(p => p.VitalTemp).HasPrecision(4, 1);
+        builder.Property(p => p.VitalWeight).HasPrecision(5, 1);
+        builder.Property(p => p.VitalSpO2).HasPrecision(4, 1);
+        builder.Property(p => p.VitalRR);
+        builder.Property(p => p.VitalSugar).HasPrecision(6, 1);
         builder.Property(p => p.Status).IsRequired();
         builder.Property(p => p.IsEmailSent).IsRequired().HasDefaultValue(false);
 

@@ -97,3 +97,640 @@ html, body {
 .loading-progress-text:after {
     content: var(--blazor-load-percentage-text, "Loading");
 }
+
+/* ============================================================
+   OPD MANAGEMENT PAGE — CloudClinic Design
+   ============================================================ */
+.opd-page {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    font-family: 'Plus Jakarta Sans', 'Roboto', sans-serif;
+}
+
+/* Header */
+.opd-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.opd-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: #1E293B;
+    line-height: 1.2;
+}
+.opd-subtitle {
+    font-size: 13px;
+    color: #64748B;
+    margin-top: 3px;
+}
+
+/* Stat Cards */
+.opd-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+}
+.opd-stat-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px 20px 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+.opd-stat-card.waiting  { background: #FFFBEB; }
+.opd-stat-card.progress { background: #EFF6FF; }
+.opd-stat-card.done     { background: #ECFDF5; }
+.opd-stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: #64748B;
+    text-transform: uppercase;
+}
+.opd-stat-icon {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 26px;
+    opacity: .85;
+}
+.opd-stat-value {
+    font-size: 36px;
+    font-weight: 800;
+    color: #1E293B;
+    margin-top: 10px;
+    line-height: 1;
+}
+
+/* Filter & Search bar */
+.opd-filter-bar {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.opd-filter-tabs {
+    display: flex;
+    gap: 6px;
+}
+.opd-tab {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1.5px solid #E2E8F0;
+    background: #fff;
+    color: #64748B;
+    font-weight: 500;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+}
+.opd-tab.active {
+    border-color: #3B82F6;
+    background: #EFF6FF;
+    color: #3B82F6;
+    font-weight: 700;
+}
+.opd-search-wrap {
+    flex: 1;
+    position: relative;
+    min-width: 200px;
+}
+.opd-search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    font-size: 14px;
+    pointer-events: none;
+}
+.opd-search-input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    font-family: inherit;
+    color: #1E293B;
+    transition: border-color .15s;
+}
+.opd-search-input:focus { border-color: #3B82F6; }
+
+/* Table Card */
+.opd-table-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    overflow: hidden;
+}
+.opd-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.opd-table thead th {
+    padding: 11px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    color: #64748B;
+    text-transform: uppercase;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    text-align: left;
+    white-space: nowrap;
+}
+.opd-table tbody tr {
+    border-bottom: 1px solid #F1F5F9;
+    transition: background .12s;
+}
+.opd-table tbody tr:last-child { border-bottom: none; }
+.opd-table tbody tr:hover { background: #F8FAFC; }
+.opd-table td {
+    padding: 13px 16px;
+    font-size: 13px;
+    color: #1E293B;
+    vertical-align: middle;
+}
+
+/* Token cell */
+.opd-token {
+    font-weight: 800;
+    color: #3B82F6;
+    font-size: 13px;
+}
+
+/* Patient cell */
+.opd-patient-name  { font-weight: 600; font-size: 13px; }
+.opd-patient-meta  { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+
+/* Doctor/dept cell */
+.opd-doctor-name   { font-weight: 600; font-size: 12px; }
+.opd-doctor-dept   { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+
+/* Status badges */
+.opd-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.opd-badge.waiting    { color: #D97706; background: #FFFBEB; }
+.opd-badge.progress   { color: #3B82F6; background: #EFF6FF; }
+.opd-badge.done       { color: #059669; background: #ECFDF5; }
+.opd-badge.cancelled  { color: #EF4444; background: #FEF2F2; }
+.opd-badge.notvisited { color: #7C3AED; background: #F5F3FF; }
+
+/* Action buttons */
+.opd-actions { display: flex; gap: 6px; align-items: center; }
+.opd-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.opd-btn-primary {
+    background: #3B82F6;
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background .15s;
+    font-family: inherit;
+}
+.opd-btn-primary:hover { background: #2563EB; }
+.opd-btn.start   { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+.opd-btn.start:hover { background: #E2E8F0; }
+.opd-btn.rx      { background: #3B82F6; color: #fff; }
+.opd-btn.rx:hover{ background: #2563EB; }
+.opd-btn.done-btn{ background: #059669; color: #fff; }
+.opd-btn.done-btn:hover{ background: #047857; }
+.opd-btn.more    { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; padding: 6px 10px; }
+.opd-btn.more:hover { background: #E2E8F0; }
+
+/* OPD Detail Modal */
+.opd-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeInOverlay .18s ease;
+}
+@keyframes fadeInOverlay { from { opacity:0; } to { opacity:1; } }
+.opd-modal {
+    background: #fff;
+    border-radius: 20px;
+    width: 540px;
+    max-width: 95vw;
+    padding: 28px;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,.18);
+    animation: slideUp .22s ease;
+}
+@keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+.opd-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #94A3B8;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 6px;
+}
+.opd-modal-close:hover { background: #F1F5F9; color: #475569; }
+.opd-modal-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #1E293B;
+    margin-bottom: 20px;
+}
+.opd-modal-patient-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+}
+.opd-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: #3B82F6;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.opd-modal-name { font-size: 17px; font-weight: 800; color: #1E293B; }
+.opd-modal-meta { font-size: 12px; color: #64748B; margin-top: 2px; }
+.opd-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 22px;
+}
+.opd-modal-field {
+    background: #F8FAFC;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.opd-modal-field-label { font-size: 11px; color: #94A3B8; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.opd-modal-field-value { font-size: 14px; font-weight: 600; color: #1E293B; }
+.opd-modal-actions {
+    display: flex;
+    gap: 10px;
+}
+.opd-modal-btn-outline {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1.5px solid #E2E8F0;
+    background: #fff;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+}
+.opd-modal-btn-outline:hover { background: #F1F5F9; }
+.opd-modal-btn-filled {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    background: #3B82F6;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s;
+}
+.opd-modal-btn-filled:hover { background: #2563EB; }
+
+/* Pagination row */
+.opd-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #64748B;
+    padding: 4px 0;
+}
+
+/* Empty / loading state */
+.opd-empty {
+    padding: 48px;
+    text-align: center;
+    color: #94A3B8;
+    font-size: 14px;
+}
+
+@media (max-width: 900px) {
+    .opd-stats { grid-template-columns: repeat(2, 1fr); }
+    .opd-modal-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+    .opd-stats { grid-template-columns: 1fr 1fr; }
+    .opd-page { padding: 14px; }
+}
+
+/* ── CloudClinic Clinic Landing Page ──────────────────────────────────────── */
+
+.cc-landing-stat {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    border: 1px solid #E2E8F0;
+}
+
+.cc-clinic-card {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.05);
+    border: 1px solid #E2E8F0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.cc-clinic-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border-color: var(--clinic-color, #1565C0);
+}
+
+.cc-add-clinic-card {
+    border-radius: 16px;
+    border: 2px dashed #1565C0;
+    background: rgba(21, 101, 192, 0.03);
+    cursor: pointer;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 320px;
+    text-align: center;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.cc-add-clinic-card:hover {
+    background: rgba(21, 101, 192, 0.08);
+    transform: translateY(-3px);
+}
+
+/* ── CloudClinic Sidebar Navigation ───────────────────────────────────────── */
+
+.cc-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+    font-weight: 500;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.15s;
+    position: relative;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.cc-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.cc-nav-active {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+}
+
+.cc-nav-logout:hover {
+    color: #FF6B6B !important;
+}
+
+/* Override MudBlazor drawer inner background */
+.mud-drawer-content {
+    background: transparent !important;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* ── CloudClinic Dashboard Components ─────────────────────────────────────── */
+
+@keyframes ccFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.cc-fade-in {
+    animation: ccFadeIn 0.3s ease forwards;
+}
+
+/* Stat card */
+.cc-stat-card {
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    height: 100%;
+}
+
+.cc-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(0,0,0,0.45);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cc-stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1E293B;
+    line-height: 1.1;
+}
+
+.cc-stat-sub {
+    font-size: 12px;
+    color: #94A3B8;
+    margin-top: 4px;
+}
+
+.cc-stat-icon {
+    font-size: 28px;
+    opacity: 0.8;
+}
+
+/* Card */
+.cc-card {
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+
+.cc-card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cc-card-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1E293B;
+}
+
+/* Avatar */
+.cc-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 11px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+.cc-avatar-blue {
+    background: linear-gradient(135deg, #1565C0, #42A5F5);
+    color: #fff;
+}
+
+.cc-avatar-green {
+    background: #ECFDF5;
+    color: #16A34A;
+}
+
+/* Badge */
+.cc-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Buttons */
+.cc-btn-light {
+    padding: 6px 14px;
+    background: #EFF6FF;
+    color: #1565C0;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+
+.cc-btn-light:hover {
+    background: #DBEAFE;
+}
+
+.cc-btn-sm {
+    padding: 5px 12px;
+    font-size: 11px;
+}
+
+/* Table */
+.cc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.cc-table thead tr {
+    background: #F8FAFC;
+}
+
+.cc-table th {
+    padding: 11px 14px;
+    text-align: left;
+    font-weight: 700;
+    color: #94A3B8;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #E2E8F0;
+    white-space: nowrap;
+}
+
+.cc-table td {
+    padding: 12px 14px;
+    color: #1E293B;
+    vertical-align: middle;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.cc-table-row {
+    transition: background 0.12s;
+    cursor: pointer;
+}
+
+.cc-table-row:hover {
+    background: #F8FAFC;
+}
+
+.cc-table-row:last-child td {
+    border-bottom: none;
+}
+
+/* Empty state */
+.cc-empty {
+    padding: 32px 20px;
+    text-align: center;
+    color: #94A3B8;
+    font-size: 13px;
+}

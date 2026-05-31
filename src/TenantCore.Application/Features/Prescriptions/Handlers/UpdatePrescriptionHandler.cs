@@ -25,11 +25,16 @@ public sealed class UpdatePrescriptionHandler(
         if (prescription.ApplicationId != request.ApplicationId)
             throw new NotFoundException(nameof(Prescription), request.Id);
 
+        var investigationsJson = request.Investigations.Count > 0
+            ? System.Text.Json.JsonSerializer.Serialize(request.Investigations)
+            : null;
+
         var newItems = request.Items.Select((dto, index) => PrescriptionItem.Create(
             prescription.Id,
             dto.MedicineId,
             dto.MedicineName,
             dto.MedicineForm,
+            dto.Strength,
             dto.DosageUnit,
             dto.DosageMorning,
             dto.DosageAfternoon,
@@ -37,12 +42,27 @@ public sealed class UpdatePrescriptionHandler(
             dto.DosageNight,
             dto.DurationDays,
             CalculateQuantity(dto),
+            dto.Frequency,
+            dto.Timing,
+            dto.Instructions,
             dto.RemarkEnglish,
             dto.RemarkHindi,
             dto.RemarkMarathi,
             index)).ToList();
 
-        prescription.Update(request.NextVisitDate, request.Notes, newItems);
+        prescription.Update(
+            request.NextVisitDate,
+            request.Diagnosis,
+            investigationsJson,
+            request.Notes,
+            request.VitalBP,
+            request.VitalPulse,
+            request.VitalTemp,
+            request.VitalWeight,
+            request.VitalSpO2,
+            request.VitalRR,
+            request.VitalSugar,
+            newItems);
         prescriptionRepository.Update(prescription);
         await prescriptionRepository.SaveChangesAsync(cancellationToken);
 

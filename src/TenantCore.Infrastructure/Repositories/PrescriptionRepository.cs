@@ -57,7 +57,7 @@ public class PrescriptionRepository(ClinicDbContext dbContext)
 
     public async Task<int> CountTodayByApplicationAsync(Guid applicationId, CancellationToken ct = default)
     {
-        var today = DateTime.UtcNow.Date;
+        var today = DateTime.Now.Date;
         return await DbSet.CountAsync(
             p => p.ApplicationId == applicationId && p.PrescribedDate.Date == today, ct);
     }

@@ -13,7 +13,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/[controller]")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class PatientsController(ISender sender) : ControllerBase
+public class PatientsController(ISender sender) : ClinicControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<PatientDto>), StatusCodes.Status200OK)]
@@ -51,12 +51,6 @@ public class PatientsController(ISender sender) : ControllerBase
             id, GetApplicationId(), dto.FirstName, dto.LastName, dto.DateOfBirth,
             dto.Gender, dto.PhoneNumber, dto.Email,
             dto.AadhaarNumber, dto.PhotoUrl, dto.Address, CanViewFullAadhaar()), ct));
-
-    private Guid GetApplicationId()
-    {
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
-    }
 
     private bool CanViewFullAadhaar() =>
         AppRoles.ReceptionRoles.Any(User.IsInRole);

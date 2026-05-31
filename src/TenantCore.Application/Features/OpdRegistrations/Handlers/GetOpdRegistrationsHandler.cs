@@ -16,7 +16,9 @@ public sealed class GetOpdRegistrationsHandler(IOpdRegistrationRepository reposi
         var pageSize = Math.Min(request.PageSize, 100);
         var (items, total) = await repository.GetPagedAsync(
             request.ApplicationId, request.Page, pageSize, request.Search,
-            request.DoctorUserId, request.TodayOnly, cancellationToken);
+            request.DoctorUserId, request.TodayOnly,
+            request.FromDate, request.ToDate,
+            request.StatusFilter, request.NotVisited, cancellationToken);
 
         return new PagedResult<OpdRegistrationDto>
         {

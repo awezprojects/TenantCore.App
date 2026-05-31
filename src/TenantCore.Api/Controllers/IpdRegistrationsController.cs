@@ -13,7 +13,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/ipd-registrations")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class IpdRegistrationsController(ISender sender) : ControllerBase
+public class IpdRegistrationsController(ISender sender) : ClinicControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<IpdRegistrationDto>), StatusCodes.Status200OK)]
@@ -58,10 +58,4 @@ public class IpdRegistrationsController(ISender sender) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Discharge(Guid id, [FromBody] DischargePatientDto dto, CancellationToken ct)
         => Ok(await sender.Send(new DischargePatientCommand(id, GetApplicationId(), dto.DischargeNotes), ct));
-
-    private Guid GetApplicationId()
-    {
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
-    }
 }

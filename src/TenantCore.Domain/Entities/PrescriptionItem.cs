@@ -9,6 +9,7 @@ public class PrescriptionItem : BaseEntity
     public Guid MedicineId { get; private set; }
     public string MedicineName { get; private set; } = string.Empty;
     public MedicineFormType MedicineForm { get; private set; }
+    public string? Strength { get; private set; }
     public string DosageUnit { get; private set; } = string.Empty;
     public decimal? DosageMorning { get; private set; }
     public decimal? DosageAfternoon { get; private set; }
@@ -16,6 +17,9 @@ public class PrescriptionItem : BaseEntity
     public decimal? DosageNight { get; private set; }
     public int DurationDays { get; private set; }
     public decimal Quantity { get; private set; }
+    public string? Frequency { get; private set; }
+    public string? Timing { get; private set; }
+    public string? Instructions { get; private set; }
     public string? RemarkEnglish { get; private set; }
     public string? RemarkHindi { get; private set; }
     public string? RemarkMarathi { get; private set; }
@@ -28,6 +32,7 @@ public class PrescriptionItem : BaseEntity
         Guid medicineId,
         string medicineName,
         MedicineFormType medicineForm,
+        string? strength,
         string dosageUnit,
         decimal? dosageMorning,
         decimal? dosageAfternoon,
@@ -35,6 +40,9 @@ public class PrescriptionItem : BaseEntity
         decimal? dosageNight,
         int durationDays,
         decimal quantity,
+        string? frequency,
+        string? timing,
+        string? instructions,
         string? remarkEnglish,
         string? remarkHindi,
         string? remarkMarathi,
@@ -45,6 +53,7 @@ public class PrescriptionItem : BaseEntity
         MedicineId = medicineId,
         MedicineName = medicineName,
         MedicineForm = medicineForm,
+        Strength = strength,
         DosageUnit = dosageUnit,
         DosageMorning = dosageMorning,
         DosageAfternoon = dosageAfternoon,
@@ -52,6 +61,9 @@ public class PrescriptionItem : BaseEntity
         DosageNight = dosageNight,
         DurationDays = durationDays,
         Quantity = quantity,
+        Frequency = frequency,
+        Timing = timing,
+        Instructions = instructions,
         RemarkEnglish = remarkEnglish,
         RemarkHindi = remarkHindi,
         RemarkMarathi = remarkMarathi,

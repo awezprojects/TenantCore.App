@@ -12,7 +12,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/prescription-config")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class PrescriptionConfigController(ISender sender) : ControllerBase
+public class PrescriptionConfigController(ISender sender) : ClinicControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PrescriptionConfigDto), StatusCodes.Status200OK)]
@@ -24,10 +24,4 @@ public class PrescriptionConfigController(ISender sender) : ControllerBase
     [ProducesResponseType(typeof(PrescriptionConfigDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Upsert([FromBody] UpdatePrescriptionConfigDto dto, CancellationToken ct)
         => Ok(await sender.Send(new UpsertPrescriptionConfigCommand(GetApplicationId(), dto.DefaultLanguage), ct));
-
-    private Guid GetApplicationId()
-    {
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
-    }
 }

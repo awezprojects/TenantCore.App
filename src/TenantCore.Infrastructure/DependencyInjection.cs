@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
         services.AddScoped<IDosageRemarkRepository, DosageRemarkRepository>();
         services.AddScoped<IPrescriptionConfigRepository, PrescriptionConfigRepository>();
+        services.AddScoped<IDoctorProfileRepository, DoctorProfileRepository>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IEmailService, EmailService>();

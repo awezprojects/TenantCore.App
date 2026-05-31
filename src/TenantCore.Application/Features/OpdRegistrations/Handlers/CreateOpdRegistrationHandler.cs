@@ -32,7 +32,7 @@ public sealed class CreateOpdRegistrationHandler(
         }
 
         var todayCount = await opdRepository.CountTodayAsync(request.ApplicationId, cancellationToken);
-        var registrationNumber = $"OPD-{DateTime.UtcNow:yyyyMMdd}-{(todayCount + 1):D4}";
+        var registrationNumber = $"OPD-{DateTime.Now:yyyyMMdd}-{(todayCount + 1):D4}";
 
         var registration = OpdRegistration.Create(
             request.ApplicationId, request.PatientId, request.DoctorUserId,

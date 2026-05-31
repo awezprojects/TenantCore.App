@@ -13,7 +13,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/prescriptions")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class PrescriptionsController(ISender sender) : ControllerBase
+public class PrescriptionsController(ISender sender) : ClinicControllerBase
 {
     private static readonly HashSet<string> AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".jpg", ".jpeg", ".png", ".bmp" };
@@ -53,7 +53,9 @@ public class PrescriptionsController(ISender sender) : ControllerBase
     {
         var result = await sender.Send(new CreatePrescriptionCommand(
             GetApplicationId(), dto.OpdRegistrationId, dto.DoctorUserId,
-            dto.DoctorName, dto.NextVisitDate, dto.Notes, dto.Items), ct);
+            dto.DoctorName, dto.NextVisitDate, dto.Diagnosis, dto.Investigations, dto.Notes,
+            dto.VitalBP, dto.VitalPulse, dto.VitalTemp, dto.VitalWeight, dto.VitalSpO2, dto.VitalRR, dto.VitalSugar,
+            dto.Items), ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -61,7 +63,10 @@ public class PrescriptionsController(ISender sender) : ControllerBase
     [Authorize(Policy = AuthPolicies.RequireClinical)]
     [ProducesResponseType(typeof(PrescriptionDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePrescriptionDto dto, CancellationToken ct)
-        => Ok(await sender.Send(new UpdatePrescriptionCommand(id, GetApplicationId(), dto.NextVisitDate, dto.Notes, dto.Items), ct));
+        => Ok(await sender.Send(new UpdatePrescriptionCommand(
+            id, GetApplicationId(), dto.NextVisitDate, dto.Diagnosis, dto.Investigations, dto.Notes,
+            dto.VitalBP, dto.VitalPulse, dto.VitalTemp, dto.VitalWeight, dto.VitalSpO2, dto.VitalRR, dto.VitalSugar,
+            dto.Items), ct));
 
     [HttpPost("{id:guid}/submit")]
     [Authorize(Policy = AuthPolicies.RequireClinical)]
@@ -94,11 +99,5 @@ public class PrescriptionsController(ISender sender) : ControllerBase
             id, GetApplicationId(), file.FileName, fileBytes, ext), ct);
 
         return CreatedAtAction(nameof(GetById), new { id }, result);
-    }
-
-    private Guid GetApplicationId()
-    {
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 }

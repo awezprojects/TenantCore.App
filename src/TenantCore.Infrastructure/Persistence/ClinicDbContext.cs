@@ -17,6 +17,7 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<PrescriptionReport> PrescriptionReports => Set<PrescriptionReport>();
     public DbSet<DosageRemark> DosageRemarks => Set<DosageRemark>();
     public DbSet<PrescriptionConfig> PrescriptionConfigs => Set<PrescriptionConfig>();
+    public DbSet<DoctorProfile> DoctorProfiles => Set<DoctorProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

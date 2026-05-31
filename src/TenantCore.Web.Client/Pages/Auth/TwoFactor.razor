@@ -137,12 +137,17 @@
 
                 if (!string.IsNullOrEmpty(ReturnUrl))
                 {
-                    NavigationManager.NavigateTo(Uri.UnescapeDataString(ReturnUrl));
+                    var decoded = Uri.UnescapeDataString(ReturnUrl);
+                    if (!decoded.StartsWith("/auth/login", StringComparison.OrdinalIgnoreCase))
+                    {
+                        NavigationManager.NavigateTo(decoded);
+                        return;
+                    }
                 }
-                else
-                {
-                    NavigationManager.NavigateTo("/");
-                }
+
+                var isDoctor = AuthState.CurrentUser?.UserRoles
+                    .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
+                NavigationManager.NavigateTo(isDoctor ? "/doctor/home" : "/dashboard");
             }
             else
             {

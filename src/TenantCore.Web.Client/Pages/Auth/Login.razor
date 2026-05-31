@@ -105,13 +105,10 @@
 
             <!-- Footer -->
             <MudStack AlignItems="AlignItems.Center" Class="mt-6">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    Protected by enterprise-grade security
-                </MudText>
                 <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
                     <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" Color="Color.Secondary" />
                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Two-Factor Authentication Enabled
+                        Protected by enterprise-grade security
                     </MudText>
                 </MudStack>
             </MudStack>
@@ -204,16 +201,20 @@
             try
             {
                 var decodedUrl = Uri.UnescapeDataString(ReturnUrl);
-                NavigationManager.NavigateTo(decodedUrl);
+                // Don't loop back to login
+                if (!decodedUrl.StartsWith("/auth/login", StringComparison.OrdinalIgnoreCase))
+                {
+                    NavigationManager.NavigateTo(decodedUrl);
+                    return;
+                }
             }
-            catch
-            {
-                NavigationManager.NavigateTo("/");
-            }
+            catch { }
         }
-        else
-        {
-            NavigationManager.NavigateTo("/");
-        }
+
+        // Role-based default landing
+        var isDoctor = AuthState.CurrentUser?.UserRoles
+            .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
+
+        NavigationManager.NavigateTo(isDoctor ? "/doctor/home" : "/dashboard");
     }
 }

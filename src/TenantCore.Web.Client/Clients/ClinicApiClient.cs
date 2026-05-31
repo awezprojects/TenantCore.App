@@ -77,15 +77,19 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
 
     // --- OPD Registrations ---
 
-    public async Task<ApiResponse<PagedResult<OpdRegistrationDto>>> GetOpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null, Guid? doctorUserId = null, bool todayOnly = false)
+    public async Task<ApiResponse<PagedResult<OpdRegistrationDto>>> GetOpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null, Guid? doctorUserId = null, bool todayOnly = false, DateTime? fromDate = null, DateTime? toDate = null, TenantCore.Shared.Enums.OpdStatus? status = null, bool notVisited = false)
     {
         try
         {
             SetAuth();
             var url = $"api/opd-registrations?page={page}&pageSize={pageSize}";
-            if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
+            if (!string.IsNullOrWhiteSpace(search)) url += $"&search={Uri.EscapeDataString(search)}";
             if (doctorUserId.HasValue) url += $"&doctorUserId={doctorUserId}";
-            if (todayOnly) url += "&todayOnly=true";
+            if (todayOnly)         url += "&todayOnly=true";
+            if (fromDate.HasValue) url += $"&fromDate={fromDate.Value:yyyy-MM-dd}";
+            if (toDate.HasValue)   url += $"&toDate={toDate.Value:yyyy-MM-dd}";
+            if (status.HasValue)   url += $"&status={(int)status.Value}";
+            if (notVisited)        url += "&notVisited=true";
             return await Ok<PagedResult<OpdRegistrationDto>>(await httpClient.GetAsync(url));
         }
         catch (Exception ex) { return Fail<PagedResult<OpdRegistrationDto>>(ex.Message); }

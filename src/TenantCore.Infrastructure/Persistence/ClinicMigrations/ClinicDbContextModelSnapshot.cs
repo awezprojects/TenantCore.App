@@ -53,6 +53,50 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("ClinicFeeConfigs", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.DoctorProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRegistrationVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("QualificationDetails")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Specialty")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("DoctorProfiles");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.DosageRemark", b =>
                 {
                     b.Property<Guid>("Id")
@@ -777,6 +821,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("Diagnosis")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("DoctorName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -784,6 +832,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.Property<Guid>("DoctorUserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Investigations")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsEmailSent")
                         .ValueGeneratedOnAdd()
@@ -823,6 +874,32 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("VitalBP")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("VitalPulse")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("VitalRR")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("VitalSpO2")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("decimal(4,1)");
+
+                    b.Property<decimal?>("VitalSugar")
+                        .HasPrecision(6, 1)
+                        .HasColumnType("decimal(6,1)");
+
+                    b.Property<decimal?>("VitalTemp")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("decimal(4,1)");
+
+                    b.Property<decimal?>("VitalWeight")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
 
                     b.HasKey("Id");
 
@@ -898,6 +975,14 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<int>("DurationDays")
                         .HasColumnType("int");
 
+                    b.Property<string>("Frequency")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int>("MedicineForm")
                         .HasColumnType("int");
 
@@ -933,6 +1018,14 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
+
+                    b.Property<string>("Strength")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Timing")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
