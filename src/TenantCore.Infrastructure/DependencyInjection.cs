@@ -33,6 +33,9 @@ public static class DependencyInjection
         services.AddScoped<IDosageRemarkRepository, DosageRemarkRepository>();
         services.AddScoped<IPrescriptionConfigRepository, PrescriptionConfigRepository>();
         services.AddScoped<IDoctorProfileRepository, DoctorProfileRepository>();
+        services.AddScoped<IWardRepository, WardRepository>();
+        services.AddScoped<IRoomRepository, RoomRepository>();
+        services.AddScoped<IBedRepository, BedRepository>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();

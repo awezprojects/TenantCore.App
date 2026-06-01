@@ -19,6 +19,7 @@ const NAV_ITEMS = {
     { id: 'patients', label: 'Patients', icon: '👥' },
     { id: 'opd', label: 'OPD', icon: '🩺' },
     { id: 'ipd', label: 'IPD / Beds', icon: '🛏️' },
+    { id: 'admin-wards', label: 'Wards & Beds', icon: '🏥' },
     { id: 'medicine', label: 'Medicines', icon: '💊' },
     { id: 'prescription', label: 'Prescriptions', icon: '📋' },
   ],
@@ -156,7 +157,7 @@ function TopBar({ role, screen, onNotif, clinic, onSwitchClinic }) {
   const [time] = useState(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
   const titles = {
     dashboard: 'Dashboard', patients: 'Patient Management', opd: 'OPD Management',
-    ipd: 'IPD & Bed Management', prescription: 'Prescription Writer', medicine: 'Medicine Management',
+    ipd: 'IPD & Bed Management', 'admin-wards': 'Wards, Rooms & Beds', prescription: 'Prescription Writer', medicine: 'Medicine Management',
     appointments: "Today's Appointments", 'prescriptions-list': 'Prescriptions',
   };
   return (

@@ -38,6 +38,12 @@ public class IpdRegistrationRepository(ClinicDbContext dbContext)
             i => i.ApplicationId == applicationId && i.AdmissionDate.Date == today, ct);
     }
 
+    public async Task<bool> HasActiveAdmissionAsync(Guid patientId, Guid applicationId, CancellationToken ct = default)
+        => await DbSet.AnyAsync(
+            i => i.PatientId == patientId &&
+                 i.ApplicationId == applicationId &&
+                 i.Status == TenantCore.Shared.Enums.IpdStatus.Admitted, ct);
+
     public override async Task<IpdRegistration?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await DbSet
             .Include(i => i.Patient)

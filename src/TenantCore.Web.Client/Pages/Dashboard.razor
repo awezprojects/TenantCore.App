@@ -444,8 +444,19 @@ else
         await AuthState.InitializeAsync();
         await ClinicContext.InitializeAsync();
 
-        _isDoctor = AuthState.CurrentUser?.UserRoles
-            .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var roles = AuthState.CurrentUser?.UserRoles ?? [];
+        var isAdmin = roles.Any(r =>
+            r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+            r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+
+        _isDoctor = roles.Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+
+        // Admins who are not doctors go to the admin dashboard
+        if (isAdmin && !_isDoctor)
+        {
+            Nav.NavigateTo("/admin/dashboard", forceLoad: true);
+            return;
+        }
 
         // Doctors must select a clinic first
         if (_isDoctor && ClinicContext.SelectedApplicationId == Guid.Empty)

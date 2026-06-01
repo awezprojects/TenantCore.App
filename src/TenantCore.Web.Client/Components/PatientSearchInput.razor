@@ -1,0 +1,185 @@
+@inject IClinicApiClient ClinicClient
+@using TenantCore.Web.Client.Clients
+@implements IDisposable
+
+<div style="position:relative;width:100%;">
+    <!-- Input -->
+    <div style="position:relative;">
+        <input style="width:100%;padding:10px 36px 10px 14px;border:1.5px solid #E2E8F0;
+                       border-radius:8px;font-size:14px;color:#1E293B;outline:none;
+                       background:#fff;box-sizing:border-box;
+                       @(_selectedPatient != null ? "border-color:#22C55E;background:#F0FDF4;" : _focused ? "border-color:#1565C0;" : "")"
+               placeholder="@Placeholder"
+               value="@_query"
+               @oninput="OnInput"
+               @onfocus="@(() => { _focused = true; if (_results.Any()) _showResults = true; })"
+               @onblur="OnBlurDelayed"
+               autocomplete="off" />
+
+        @if (_loading)
+        {
+            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         font-size:12px;color:#94A3B8;">⏳</span>
+        }
+        else if (_selectedPatient != null)
+        {
+            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         cursor:pointer;font-size:14px;color:#94A3B8;"
+                  @onmousedown:preventDefault
+                  @onclick="Clear">✕</span>
+        }
+        else
+        {
+            <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         font-size:14px;color:#94A3B8;">🔍</span>
+        }
+    </div>
+
+    <!-- Results dropdown -->
+    @if (_showResults)
+    {
+        <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:9999;
+                     background:#fff;border:1.5px solid #E2E8F0;border-radius:10px;
+                     box-shadow:0 8px 24px rgba(0,0,0,0.12);overflow:hidden;max-height:240px;overflow-y:auto;">
+            @if (_results.Any())
+            {
+                @foreach (var p in _results)
+                {
+                    <div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F1F5F9;
+                                 display:flex;justify-content:space-between;align-items:center;
+                                 transition:background 0.1s;"
+                         @onmousedown:preventDefault
+                         @onclick="@(() => SelectPatient(p))"
+                         @onmouseover="@((e) => { })"
+                         class="patient-result-item">
+                        <div>
+                            <div style="font-size:13px;font-weight:700;color:#1E293B;">@p.FullName</div>
+                            <div style="font-size:11px;color:#64748B;">@p.PhoneNumber</div>
+                        </div>
+                        <span style="font-size:11px;color:#94A3B8;padding:2px 8px;
+                                     background:#F1F5F9;border-radius:6px;">Select</span>
+                    </div>
+                }
+            }
+            else if (_searched)
+            {
+                <div style="padding:14px;text-align:center;">
+                    <div style="font-size:13px;color:#94A3B8;margin-bottom:4px;">No patients found for "@_query"</div>
+                    <div style="font-size:11px;color:#CBD5E1;">
+                        Register the patient in
+                        <a href="/patients" style="color:#1565C0;font-weight:600;">Patient Registry</a> first.
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Selected patient chip -->
+    @if (_selectedPatient != null)
+    {
+        <div style="margin-top:6px;display:flex;align-items:center;gap:8px;
+                     padding:7px 12px;background:#F0FDF4;border-radius:8px;
+                     border:1px solid #A7F3D0;">
+            <span style="font-size:18px;">👤</span>
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:#16A34A;
+                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    @_selectedPatient.FullName
+                </div>
+                <div style="font-size:11px;color:#64748B;">@_selectedPatient.PhoneNumber</div>
+            </div>
+            <button style="background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;padding:0;"
+                    @onclick="Clear" type="button">✕</button>
+        </div>
+    }
+</div>
+
+<style>
+    .patient-result-item:hover { background: #F8FAFC !important; }
+</style>
+
+@code {
+    [Parameter] public EventCallback<PatientDto?> OnPatientSelected { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Type patient name or phone…";
+
+    private string _query = string.Empty;
+    private List<PatientDto> _results = [];
+    private PatientDto? _selectedPatient;
+    private bool _loading;
+    private bool _searched;
+    private bool _showResults;
+    private bool _focused;
+    private CancellationTokenSource? _debounce;
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? string.Empty;
+        _selectedPatient = null;
+        await OnPatientSelected.InvokeAsync(null);
+
+        _debounce?.Cancel();
+        _debounce = new CancellationTokenSource();
+
+        if (_query.Length < 2)
+        {
+            _results  = [];
+            _searched = false;
+            _showResults = false;
+            return;
+        }
+
+        try
+        {
+            _loading = true;
+            StateHasChanged();
+            await Task.Delay(300, _debounce.Token);
+            var r = await ClinicClient.GetPatientsAsync(1, 15, _query);
+            if (r.Success) _results = r.Data?.Items.ToList() ?? [];
+            _searched    = true;
+            _showResults = true;
+        }
+        catch (TaskCanceledException) { }
+        finally { _loading = false; StateHasChanged(); }
+    }
+
+    private async Task SelectPatient(PatientDto patient)
+    {
+        _selectedPatient = patient;
+        _query           = patient.FullName;
+        _showResults     = false;
+        await OnPatientSelected.InvokeAsync(patient);
+        StateHasChanged();
+    }
+
+    private async Task Clear()
+    {
+        _selectedPatient = null;
+        _query           = string.Empty;
+        _results         = [];
+        _searched        = false;
+        _showResults     = false;
+        await OnPatientSelected.InvokeAsync(null);
+        StateHasChanged();
+    }
+
+    private void OnBlurDelayed()
+    {
+        _focused = false;
+        Task.Delay(200).ContinueWith(_ => InvokeAsync(() =>
+        {
+            _showResults = false;
+            StateHasChanged();
+        }));
+    }
+
+    public void Reset()
+    {
+        _selectedPatient = null;
+        _query           = string.Empty;
+        _results         = [];
+        _searched        = false;
+        _showResults     = false;
+    }
+
+    public void Dispose() => _debounce?.Dispose();
+}

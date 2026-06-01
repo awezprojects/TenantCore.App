@@ -1,0 +1,300 @@
+@page "/admin/dashboard"
+@layout AuthorizedLayout
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject IClinicApiClient ClinicApi
+@inject NavigationManager Nav
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Shared.Enums
+
+<PageTitle>Admin Dashboard - CloudClinic</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;align-items:center;padding:60px 0;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else
+{
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Greeting -->
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#1E293B;">
+                    Good @_greeting, @_firstName 👋
+                </div>
+                <div style="font-size:13px;color:#64748B;margin-top:3px;">
+                    Clinic Admin &nbsp;·&nbsp; Managing @_totalWards wards, @_totalRooms rooms, @_totalBeds beds
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.HolidayVillage"
+                           Href="/admin/wards"
+                           Style="border-radius:8px;font-weight:600;text-transform:none;">
+                    Manage Wards
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Bed"
+                           Href="/ipd"
+                           Style="border-radius:8px;font-weight:600;text-transform:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
+                    IPD & Beds
+                </MudButton>
+            </div>
+        </div>
+
+        <!-- Stat Cards -->
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#EFF6FF;cursor:pointer;" @onclick='() => Nav.NavigateTo("/admin/wards")'>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">TOTAL WARDS</div>
+                            <div class="cc-stat-value">@_totalWards</div>
+                            <div class="cc-stat-sub">Active wards</div>
+                        </div>
+                        <div class="cc-stat-icon">🏨</div>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#FAF5FF;cursor:pointer;" @onclick='() => Nav.NavigateTo("/admin/wards")'>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">TOTAL ROOMS</div>
+                            <div class="cc-stat-value" style="color:#7C3AED;">@_totalRooms</div>
+                            <div class="cc-stat-sub">Across all wards</div>
+                        </div>
+                        <div class="cc-stat-icon">🚪</div>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#ECFDF5;cursor:pointer;" @onclick='() => Nav.NavigateTo("/ipd")'>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">AVAILABLE BEDS</div>
+                            <div class="cc-stat-value" style="color:#16A34A;">@_availableBeds</div>
+                            <div class="cc-stat-sub">Ready for patients</div>
+                        </div>
+                        <div class="cc-stat-icon">🛏</div>
+                    </div>
+                </div>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#FEF3C7;cursor:pointer;" @onclick='() => Nav.NavigateTo("/ipd")'>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">OCCUPIED BEDS</div>
+                            <div class="cc-stat-value" style="color:#D97706;">@_occupiedBeds</div>
+                            <div class="cc-stat-sub">Currently in use</div>
+                        </div>
+                        <div class="cc-stat-icon">🩺</div>
+                    </div>
+                </div>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Ward Overview -->
+        <div class="cc-card">
+            <div class="cc-card-header">
+                <div class="cc-card-title">🏨 Ward Overview</div>
+                <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/admin/wards")'>
+                    Manage Wards →
+                </button>
+            </div>
+            @if (!_wards.Any())
+            {
+                <div class="cc-empty">
+                    <div>No wards configured yet.</div>
+                    <button class="cc-btn-light" style="margin-top:8px;" @onclick='() => Nav.NavigateTo("/admin/wards")'>
+                        Create your first ward →
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div style="overflow-x:auto;">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Ward</th>
+                                <th>Rooms</th>
+                                <th>Total Beds</th>
+                                <th>Available</th>
+                                <th>Occupied</th>
+                                <th>Occupancy</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var ward in _wards)
+                            {
+                                var occupancyPct = ward.BedCount == 0 ? 0 : (int)((ward.BedCount - ward.AvailableBeds) * 100.0 / ward.BedCount);
+                                var barColor = occupancyPct >= 90 ? "#EF4444" : occupancyPct >= 70 ? "#D97706" : "#16A34A";
+                                <tr class="cc-table-row">
+                                    <td>
+                                        <div style="font-weight:700;color:#1E293B;">@ward.Name</div>
+                                        @if (!string.IsNullOrEmpty(ward.Description))
+                                        {
+                                            <div style="font-size:11px;color:#94A3B8;">@ward.Description</div>
+                                        }
+                                    </td>
+                                    <td><span style="font-weight:600;">@ward.RoomCount</span></td>
+                                    <td><span style="font-weight:600;">@ward.BedCount</span></td>
+                                    <td><span style="color:#16A34A;font-weight:600;">@ward.AvailableBeds</span></td>
+                                    <td><span style="color:#D97706;font-weight:600;">@(ward.BedCount - ward.AvailableBeds)</span></td>
+                                    <td style="min-width:120px;">
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <div style="flex:1;height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">
+                                                <div style="width:@(occupancyPct)%;height:100%;background:@barColor;border-radius:3px;transition:width 0.3s;"></div>
+                                            </div>
+                                            <span style="font-size:11px;font-weight:700;color:@barColor;min-width:30px;">@occupancyPct%</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <button class="cc-btn-light cc-btn-sm" @onclick='() => Nav.NavigateTo("/admin/wards")'>
+                                            Manage
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <!-- Today's IPD Admissions -->
+        <div class="cc-card">
+            <div class="cc-card-header">
+                <div class="cc-card-title">🛏 Today's IPD Admissions</div>
+                <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/ipd")'>
+                    View all →
+                </button>
+            </div>
+            @if (!_todayIpd.Any())
+            {
+                <div class="cc-empty">No IPD admissions today</div>
+            }
+            else
+            {
+                @foreach (var (ipd, idx) in _todayIpd.Take(6).Select((i, n) => (i, n)))
+                {
+                    var isLast = idx == Math.Min(5, _todayIpd.Count - 1);
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;
+                                border-bottom:@(isLast ? "none" : "1px solid #E2E8F0");">
+                        <div class="cc-avatar cc-avatar-blue">@GetInitials(ipd.PatientName)</div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:13px;font-weight:600;color:#1E293B;
+                                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                @ipd.PatientName
+                            </div>
+                            <div style="font-size:11px;color:#94A3B8;">
+                                @ipd.AdmissionNumber
+                                @if (!string.IsNullOrEmpty(ipd.WardName))
+                                {
+                                    <span> &nbsp;·&nbsp; @ipd.WardName</span>
+                                }
+                                @if (!string.IsNullOrEmpty(ipd.BedNumber))
+                                {
+                                    <span> / Bed @ipd.BedNumber</span>
+                                }
+                            </div>
+                        </div>
+                        <span class="cc-badge" style="color:#1565C0;background:#EFF6FF;">Admitted</span>
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Quick Actions -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.HolidayVillage"
+                       Href="/admin/wards"
+                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+                Manage Wards &amp; Rooms
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Bed"
+                       Href="/ipd"
+                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+                IPD &amp; Bed Management
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.People"
+                       Href="/patients"
+                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+                Patient Registry
+            </MudButton>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private string _firstName = string.Empty;
+    private string _greeting = "morning";
+
+    private List<TenantCore.Shared.Dtos.WardDto> _wards = [];
+    private List<TenantCore.Shared.Dtos.IpdRegistrationDto> _todayIpd = [];
+
+    private int _totalWards;
+    private int _totalRooms;
+    private int _totalBeds;
+    private int _availableBeds;
+    private int _occupiedBeds;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+
+        _firstName = AuthState.CurrentUser?.FullName.Split(' ').FirstOrDefault() ?? "Admin";
+        _greeting = GetGreeting();
+
+        var wardsTask = ClinicApi.GetWardsAsync();
+        var ipdTask = ClinicApi.GetIpdRegistrationsAsync(page: 1, pageSize: 20);
+
+        await Task.WhenAll(wardsTask, ipdTask);
+
+        var wardsResult = await wardsTask;
+        if (wardsResult.Success && wardsResult.Data != null)
+        {
+            _wards = wardsResult.Data.ToList();
+            _totalWards = _wards.Count;
+            _totalRooms = _wards.Sum(w => w.RoomCount);
+            _totalBeds = _wards.Sum(w => w.BedCount);
+            _availableBeds = _wards.Sum(w => w.AvailableBeds);
+            _occupiedBeds = _totalBeds - _availableBeds;
+        }
+
+        var ipdResult = await ipdTask;
+        if (ipdResult.Success && ipdResult.Data != null)
+        {
+            _todayIpd = ipdResult.Data.Items
+                .Where(i => i.AdmissionDate.Date == DateTime.Today && i.Status == IpdStatus.Admitted)
+                .ToList();
+        }
+
+        _loading = false;
+    }
+
+    private static string GetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        return hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+    }
+
+    private static string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}"
+            : parts.Length == 1 ? parts[0][0].ToString() : "?";
+    }
+}

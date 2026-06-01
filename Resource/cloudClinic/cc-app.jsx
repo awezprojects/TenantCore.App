@@ -88,6 +88,7 @@ function App() {
       case 'patients':     return <PatientRegistration />;
       case 'opd':          return <OPDModule onNav={handleNav} role={role} />;
       case 'ipd':          return <IPDModule />;
+      case 'admin-wards':  return <AdminWardsModule />;
       case 'prescription': return <PrescriptionModule ctx={pageCtx} onNav={handleNav} />;
       case 'medicine':     return <MedicineModule />;
       default:             return <DoctorDashboard onNav={handleNav} clinic={activeClinic} />;

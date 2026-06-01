@@ -28,4 +28,19 @@ public interface IClinicApiClient
     Task<ApiResponse<ClinicFeeConfigDto>> UpdateFeesAsync(UpdateClinicFeeConfigDto dto);
     Task<ApiResponse<IEnumerable<DoctorDto>>> GetDoctorsAsync();
     Task<ApiResponse<int>> GetDoctorOpdCountAsync(Guid doctorUserId, CancellationToken ct = default);
+
+    Task<ApiResponse<IEnumerable<WardDto>>> GetWardsAsync();
+    Task<ApiResponse<WardDto>> CreateWardAsync(CreateWardDto dto);
+    Task<ApiResponse<WardDto>> UpdateWardAsync(Guid id, UpdateWardDto dto);
+    Task<ApiResponse<bool>> DeleteWardAsync(Guid id);
+
+    Task<ApiResponse<IEnumerable<RoomDto>>> GetRoomsByWardAsync(Guid wardId);
+    Task<ApiResponse<RoomDto>> CreateRoomAsync(CreateRoomDto dto);
+    Task<ApiResponse<RoomDto>> UpdateRoomAsync(Guid id, UpdateRoomDto dto);
+    Task<ApiResponse<bool>> DeleteRoomAsync(Guid id);
+
+    Task<ApiResponse<IEnumerable<BedDto>>> GetBedsByRoomAsync(Guid roomId);
+    Task<ApiResponse<IEnumerable<BedDto>>> GetAvailableBedsAsync(Guid? wardId = null);
+    Task<ApiResponse<BedDto>> CreateBedAsync(CreateBedDto dto);
+    Task<ApiResponse<bool>> DeleteBedAsync(Guid id);
 }
