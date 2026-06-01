@@ -22,6 +22,62 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.Bed", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BedNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsOccupied")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("WardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("WardId");
+
+                    b.HasIndex("RoomId", "BedNumber")
+                        .IsUnique();
+
+                    b.ToTable("Beds", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicFeeConfig", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1104,6 +1160,130 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("PrescriptionReports", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.Room", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("PricePerDay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("RoomNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("RoomType")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("WardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WardId");
+
+                    b.HasIndex("WardId", "RoomNumber")
+                        .IsUnique();
+
+                    b.ToTable("Rooms", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.Ward", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId");
+
+                    b.HasIndex("ApplicationId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Wards", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.Bed", b =>
+                {
+                    b.HasOne("TenantCore.Domain.Entities.Room", "Room")
+                        .WithMany("Beds")
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TenantCore.Domain.Entities.Ward", "Ward")
+                        .WithMany()
+                        .HasForeignKey("WardId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Room");
+
+                    b.Navigation("Ward");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.IpdRegistration", b =>
                 {
                     b.HasOne("TenantCore.Domain.Entities.Patient", "Patient")
@@ -1182,11 +1362,32 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.Room", b =>
+                {
+                    b.HasOne("TenantCore.Domain.Entities.Ward", "Ward")
+                        .WithMany("Rooms")
+                        .HasForeignKey("WardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ward");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.Prescription", b =>
                 {
                     b.Navigation("Items");
 
                     b.Navigation("Reports");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.Room", b =>
+                {
+                    b.Navigation("Beds");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.Ward", b =>
+                {
+                    b.Navigation("Rooms");
                 });
 #pragma warning restore 612, 618
         }

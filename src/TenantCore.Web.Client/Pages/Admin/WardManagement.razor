@@ -1,0 +1,530 @@
+@page "/admin/wards"
+@layout AuthorizedLayout
+@inject IClinicApiClient ClinicApi
+@inject ISnackbar Snackbar
+@inject AuthStateService AuthState
+@using TenantCore.Web.Client.Clients
+
+<PageTitle>Wards, Rooms & Beds - CloudClinic</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;align-items:center;padding:80px 0;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else
+{
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- ── Header ── -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#1E293B;">Wards, Rooms &amp; Beds</div>
+                <div style="font-size:13px;color:#64748B;margin-top:3px;">Facility setup · Build your bed hierarchy</div>
+            </div>
+            <button style="@BtnPrimary" @onclick="OpenCreateWard">＋ New Ward</button>
+        </div>
+
+        <!-- ── Summary stat row ── -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+            <div style="background:#EFF6FF;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">WARDS</div>
+                    <div style="font-size:32px;font-weight:800;color:#1E293B;line-height:1;">@_wards.Count</div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">🏥</div>
+            </div>
+            <div style="background:#F5F3FF;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">ROOMS</div>
+                    <div style="font-size:32px;font-weight:800;color:#1E293B;line-height:1;">@_wards.Sum(w => w.RoomCount)</div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">🚪</div>
+            </div>
+            <div style="background:#ECFDF5;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">BEDS</div>
+                    <div style="font-size:32px;font-weight:800;color:#1E293B;line-height:1;">@_wards.Sum(w => w.BedCount)</div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">🛏️</div>
+            </div>
+            <div style="background:#FEF2F2;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">OCCUPIED</div>
+                    <div style="font-size:32px;font-weight:800;color:#EF4444;line-height:1;">
+                        @(_wards.Sum(w => w.BedCount - w.AvailableBeds))/@_wards.Sum(w => w.BedCount)
+                    </div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">👤</div>
+            </div>
+        </div>
+
+        <!-- ── Ward list ── -->
+        @if (!_wards.Any())
+        {
+            <div style="background:#fff;border-radius:14px;padding:56px 24px;text-align:center;border:1px solid #E2E8F0;">
+                <div style="font-size:42px;margin-bottom:12px;">🏥</div>
+                <div style="font-size:16px;font-weight:700;color:#1E293B;margin-bottom:6px;">No wards configured</div>
+                <div style="font-size:13px;color:#64748B;margin-bottom:20px;">Start by creating your first ward.</div>
+                <button style="@BtnPrimary" @onclick="OpenCreateWard">＋ New Ward</button>
+            </div>
+        }
+        else
+        {
+            <div style="display:flex;flex-direction:column;gap:14px;">
+                @foreach (var (ward, wi) in _wards.Select((w, i) => (w, i)))
+                {
+                    var color    = WardColor(wi);
+                    var isOpen   = _expandedWards.Contains(ward.Id);
+                    var occ      = ward.BedCount - ward.AvailableBeds;
+                    var pct      = ward.BedCount == 0 ? 0 : (int)(occ * 100.0 / ward.BedCount);
+
+                    <!-- Ward card -->
+                    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:visible;">
+
+                        <!-- Ward header row -->
+                        <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer;
+                                     border-bottom:@(isOpen ? "1px solid #E2E8F0" : "none");
+                                     border-radius:@(isOpen ? "16px 16px 0 0" : "16px");"
+                             @onclick="() => ToggleWard(ward.Id)">
+
+                            <!-- Color indicator -->
+                            <div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;
+                                         background:@($"{color}18");
+                                         display:flex;align-items:center;justify-content:center;">
+                                <div style="width:16px;height:16px;border-radius:5px;background:@color;"></div>
+                            </div>
+
+                            <!-- Ward info -->
+                            <div style="flex:1;min-width:0;">
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                    <span style="font-size:15px;font-weight:800;color:#1E293B;">@ward.Name</span>
+                                    @if (!string.IsNullOrEmpty(ward.Description))
+                                    {
+                                        <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;
+                                                     color:@color;background:@($"{color}15");">
+                                            @ward.Description
+                                        </span>
+                                    }
+                                </div>
+                                <div style="font-size:12px;color:#94A3B8;margin-top:3px;">
+                                    @ward.RoomCount room@(ward.RoomCount != 1 ? "s" : "")
+                                    &nbsp;·&nbsp; @ward.BedCount bed@(ward.BedCount != 1 ? "s" : "")
+                                    &nbsp;·&nbsp; @occ occupied (@pct%)
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div style="display:flex;gap:8px;align-items:center;" @onclick:stopPropagation="true">
+                                <button style="@BtnLight" @onclick="() => OpenCreateRoom(ward)">＋ Room</button>
+                                <button style="@BtnGhost" @onclick="() => OpenEditWard(ward)">Edit</button>
+                                <button style="@BtnIcon" title="Delete ward"
+                                        @onmouseenter="@(e => { })" @onmouseleave="@(e => { })"
+                                        @onclick="() => OpenDeleteWard(ward)">🗑</button>
+                                <span style="font-size:13px;color:#94A3B8;transition:transform 0.2s;
+                                             transform:@(isOpen ? "rotate(90deg)" : "none");display:inline-block;">▸</span>
+                            </div>
+                        </div>
+
+                        <!-- Rooms (expanded) -->
+                        @if (isOpen)
+                        {
+                            <div style="padding:@(ward.Rooms.Any() ? "8px 20px 18px" : "0");">
+                                @if (!ward.Rooms.Any())
+                                {
+                                    <div style="padding:28px 20px;text-align:center;color:#94A3B8;">
+                                        <div style="font-size:13px;margin-bottom:10px;">No rooms in this ward yet.</div>
+                                        <button style="@BtnGhost;font-size:12px;" @onclick="() => OpenCreateRoom(ward)">
+                                            ＋ Add first room
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @foreach (var room in ward.Rooms)
+                                    {
+                                        var rOcc = room.BedCount - room.AvailableBeds;
+
+                                        <div style="border:1px solid #E2E8F0;border-radius:12px;padding:14px 16px;margin-top:12px;">
+                                            <!-- Room header -->
+                                            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                                                <span style="font-size:14px;font-weight:700;color:#1E293B;">@room.RoomNumber</span>
+                                                @if (!string.IsNullOrEmpty(room.RoomType))
+                                                {
+                                                    <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;
+                                                                 color:@color;background:@($"{color}12");">
+                                                        @room.RoomType
+                                                    </span>
+                                                }
+                                                <span style="font-size:11px;color:#94A3B8;">@rOcc/@room.BedCount occupied</span>
+                                                @if (room.PricePerDay > 0)
+                                                {
+                                                    <span style="font-size:11px;font-weight:600;color:#1565C0;">
+                                                        ₹@room.PricePerDay.ToString("N0")/day
+                                                    </span>
+                                                }
+                                                <div style="flex:1;"></div>
+                                                <button style="@BtnLight;font-size:12px;padding:5px 12px;" @onclick="() => OpenAddBed(room, ward)">＋ Bed</button>
+                                                <button style="@BtnGhost;font-size:12px;padding:5px 12px;" @onclick="() => OpenEditRoom(room, ward)">Edit</button>
+                                                <button style="@BtnIcon;width:28px;height:28px;" title="Delete room"
+                                                        @onclick="() => OpenDeleteRoom(room, ward)">🗑</button>
+                                            </div>
+
+                                            <!-- Bed chips -->
+                                            <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                                                @if (!room.Beds.Any())
+                                                {
+                                                    <span style="font-size:12px;color:#CBD5E1;font-style:italic;">No beds — add one →</span>
+                                                }
+                                                @foreach (var bed in room.Beds.OrderBy(b => b.BedNumber))
+                                                {
+                                                    var dotColor = bed.IsOccupied ? "#3B82F6" : "#16A34A";
+                                                    <div style="display:flex;align-items:center;gap:6px;
+                                                                 padding:5px 8px 5px 10px;
+                                                                 border:1px solid #E2E8F0;border-radius:8px;
+                                                                 background:#fff;font-size:12px;"
+                                                         title="@(bed.IsOccupied ? "Occupied" : "Available")">
+                                                        <span style="width:8px;height:8px;border-radius:50%;
+                                                                     background:@dotColor;flex-shrink:0;"></span>
+                                                        <span style="font-weight:700;color:#1E293B;">@bed.BedNumber</span>
+                                                        @if (!bed.IsOccupied)
+                                                        {
+                                                            <button style="border:none;background:transparent;cursor:pointer;
+                                                                           color:#CBD5E1;font-size:15px;line-height:1;padding:0;
+                                                                           margin-left:2px;"
+                                                                    title="Remove bed"
+                                                                    @onmouseover="@((e) => { })"
+                                                                    @onclick:stopPropagation="true"
+                                                                    @onclick="() => ConfirmDeleteBed(bed, room, ward)">×</button>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+    </div>
+}
+
+<!-- ── Create / Edit Ward Dialog ── -->
+<MudDialog @bind-Visible="_wardDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:17px;font-weight:700;color:#1E293B;">
+            @(_editingWard == null ? "New Ward" : "Edit Ward")
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:14px;padding-top:4px;">
+            <MudTextField @bind-Value="_wardName" Label="Ward Name *" Variant="Variant.Outlined"
+                          Placeholder="e.g. General Ward, ICU, Maternity" Disabled="_saving" />
+            <MudTextField @bind-Value="_wardDescription" Label="Description (optional)"
+                          Variant="Variant.Outlined" Lines="2" Disabled="_saving" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _wardDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_wardName) || _saving ? "opacity:0.5;cursor:not-allowed;" : "")"
+                    @onclick="SaveWard" disabled="@(string.IsNullOrWhiteSpace(_wardName) || _saving)">
+                @(_saving ? "Saving…" : (_editingWard == null ? "Create Ward" : "Save Changes"))
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ── Create / Edit Room Dialog ── -->
+<MudDialog @bind-Visible="_roomDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:17px;font-weight:700;color:#1E293B;">
+            @(_editingRoom == null ? $"New Room · {_targetWard?.Name}" : "Edit Room")
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:14px;padding-top:4px;">
+            <MudTextField @bind-Value="_roomNumber" Label="Room Number *" Variant="Variant.Outlined"
+                          Placeholder="e.g. 101, A-1, ICU Bay A" Disabled="_saving" />
+            <MudSelect @bind-Value="_roomType" Label="Room Type" Variant="Variant.Outlined" Disabled="_saving">
+                <MudSelectItem T="string?" Value="@((string?)null)">— Select type —</MudSelectItem>
+                @foreach (var t in _roomTypes)
+                {
+                    <MudSelectItem T="string?" Value="t">@t</MudSelectItem>
+                }
+            </MudSelect>
+            <MudNumericField @bind-Value="_roomPrice" Label="Price Per Day (₹) *"
+                             Variant="Variant.Outlined" Min="0m" Disabled="_saving" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _roomDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_roomNumber) || _saving ? "opacity:0.5;cursor:not-allowed;" : "")"
+                    @onclick="SaveRoom" disabled="@(string.IsNullOrWhiteSpace(_roomNumber) || _saving)">
+                @(_saving ? "Saving…" : (_editingRoom == null ? "Create Room" : "Save Changes"))
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ── Add Bed Dialog ── -->
+<MudDialog @bind-Visible="_bedDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:17px;font-weight:700;color:#1E293B;">
+            Add Bed · Room @_targetRoom?.RoomNumber
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div style="padding-top:4px;">
+            <MudTextField @bind-Value="_bedNumber" Label="Bed Number *" Variant="Variant.Outlined"
+                          Placeholder="e.g. B1, 1, A" Disabled="_saving"
+                          @onkeyup="@(async (e) => { if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_bedNumber)) await SaveBed(); })" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _bedDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_bedNumber) || _saving ? "opacity:0.5;cursor:not-allowed;" : "")"
+                    @onclick="SaveBed" disabled="@(string.IsNullOrWhiteSpace(_bedNumber) || _saving)">
+                @(_saving ? "Saving…" : "Add Bed")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ── Delete Confirm Dialog ── -->
+<MudDialog @bind-Visible="_deleteDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:17px;font-weight:700;color:#EF4444;">⚠ Confirm Delete</div>
+    </TitleContent>
+    <DialogContent>
+        <div style="font-size:14px;color:#1E293B;line-height:1.6;padding-top:4px;">@_deleteMessage</div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _deleteDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@BtnDanger" @onclick="ExecuteDelete" disabled="@_saving">
+                @(_saving ? "Deleting…" : "Delete")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // ── Button style constants ────────────────────────────────────────────────
+    private const string BtnPrimary = "background:#1565C0;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;";
+    private const string BtnLight   = "background:#EFF6FF;color:#1565C0;border:1.5px solid #BFDBFE;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;";
+    private const string BtnGhost   = "background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;";
+    private const string BtnIcon    = "width:32px;height:32px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center;";
+    private const string BtnDanger  = "background:#EF4444;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;";
+
+    private static readonly string[] WardColors = ["#3B82F6", "#10B981", "#EF4444", "#EC4899", "#8B5CF6", "#F59E0B", "#0891B2", "#6366F1"];
+    private static string WardColor(int index) => WardColors[index % WardColors.Length];
+
+    private static readonly string[] _roomTypes = ["Private", "Semi-Private", "General (4-bed)", "General (6-bed)", "Critical Care", "Delivery Suite", "Isolation"];
+
+    // ── State ────────────────────────────────────────────────────────────────
+    private bool _loading = true;
+    private bool _saving;
+    private List<WardDto> _wards = [];
+    private HashSet<Guid> _expandedWards = [];
+
+    // Ward dialog
+    private bool _wardDialogVisible;
+    private WardDto? _editingWard;
+    private string _wardName = string.Empty;
+    private string? _wardDescription;
+
+    // Room dialog
+    private bool _roomDialogVisible;
+    private RoomDto? _editingRoom;
+    private WardDto? _targetWard;
+    private string _roomNumber = string.Empty;
+    private string? _roomType;
+    private decimal _roomPrice;
+
+    // Bed dialog
+    private bool _bedDialogVisible;
+    private RoomDto? _targetRoom;
+    private string _bedNumber = string.Empty;
+
+    // Delete dialog
+    private bool _deleteDialogVisible;
+    private string _deleteMessage = string.Empty;
+    private Func<Task>? _deleteAction;
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await ClinicApi.GetWardsAsync();
+        if (result.Success && result.Data != null)
+        {
+            _wards = result.Data.ToList();
+            // auto-expand first ward
+            if (_expandedWards.Count == 0 && _wards.Any())
+                _expandedWards.Add(_wards[0].Id);
+        }
+        else Snackbar.Add(result.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private void ToggleWard(Guid id)
+    {
+        if (!_expandedWards.Remove(id)) _expandedWards.Add(id);
+    }
+
+    // ── Ward CRUD ─────────────────────────────────────────────────────────────
+    private void OpenCreateWard()
+    {
+        _editingWard = null; _wardName = string.Empty; _wardDescription = null;
+        _wardDialogVisible = true;
+    }
+
+    private void OpenEditWard(WardDto ward)
+    {
+        _editingWard = ward; _wardName = ward.Name; _wardDescription = ward.Description;
+        _wardDialogVisible = true;
+    }
+
+    private void OpenDeleteWard(WardDto ward)
+    {
+        _deleteMessage = $"Delete ward \"{ward.Name}\"? All rooms and beds inside will also be permanently removed.";
+        _deleteAction  = () => DeleteWardAsync(ward.Id);
+        _deleteDialogVisible = true;
+    }
+
+    private async Task SaveWard()
+    {
+        if (string.IsNullOrWhiteSpace(_wardName)) return;
+        _saving = true;
+        ApiResponse<WardDto> result;
+        if (_editingWard == null)
+            result = await ClinicApi.CreateWardAsync(new CreateWardDto(_wardName, _wardDescription));
+        else
+            result = await ClinicApi.UpdateWardAsync(_editingWard.Id, new UpdateWardDto(_wardName, _wardDescription));
+
+        if (result.Success)
+        {
+            Snackbar.Add(_editingWard == null ? "Ward created." : "Ward updated.", Severity.Success);
+            _wardDialogVisible = false;
+            await LoadAsync();
+        }
+        else Snackbar.Add(result.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private async Task DeleteWardAsync(Guid id)
+    {
+        var r = await ClinicApi.DeleteWardAsync(id);
+        if (r.Success) { Snackbar.Add("Ward deleted.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(r.Message, Severity.Error);
+    }
+
+    // ── Room CRUD ─────────────────────────────────────────────────────────────
+    private void OpenCreateRoom(WardDto ward)
+    {
+        _editingRoom = null; _targetWard = ward;
+        _roomNumber  = string.Empty; _roomType = null; _roomPrice = 0;
+        _roomDialogVisible = true;
+    }
+
+    private void OpenEditRoom(RoomDto room, WardDto ward)
+    {
+        _editingRoom = room; _targetWard = ward;
+        _roomNumber  = room.RoomNumber; _roomType = room.RoomType; _roomPrice = room.PricePerDay;
+        _roomDialogVisible = true;
+    }
+
+    private void OpenDeleteRoom(RoomDto room, WardDto ward)
+    {
+        _deleteMessage = $"Delete room \"{room.RoomNumber}\" from {ward.Name}? All beds inside will also be removed.";
+        _deleteAction  = () => DeleteRoomAsync(room.Id);
+        _deleteDialogVisible = true;
+    }
+
+    private async Task SaveRoom()
+    {
+        if (string.IsNullOrWhiteSpace(_roomNumber)) return;
+        _saving = true;
+        ApiResponse<RoomDto> result;
+        if (_editingRoom == null)
+            result = await ClinicApi.CreateRoomAsync(new CreateRoomDto(_targetWard!.Id, _roomNumber, _roomType, _roomPrice));
+        else
+            result = await ClinicApi.UpdateRoomAsync(_editingRoom.Id, new UpdateRoomDto(_roomNumber, _roomType, _roomPrice));
+
+        if (result.Success)
+        {
+            Snackbar.Add(_editingRoom == null ? "Room created." : "Room updated.", Severity.Success);
+            _roomDialogVisible = false;
+            await LoadAsync();
+        }
+        else Snackbar.Add(result.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private async Task DeleteRoomAsync(Guid id)
+    {
+        var r = await ClinicApi.DeleteRoomAsync(id);
+        if (r.Success) { Snackbar.Add("Room deleted.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(r.Message, Severity.Error);
+    }
+
+    // ── Bed CRUD ──────────────────────────────────────────────────────────────
+    private void OpenAddBed(RoomDto room, WardDto ward)
+    {
+        _targetRoom  = room; _targetWard = ward; _bedNumber = string.Empty;
+        _bedDialogVisible = true;
+    }
+
+    private void ConfirmDeleteBed(BedDto bed, RoomDto room, WardDto ward)
+    {
+        _deleteMessage = $"Remove bed \"{bed.BedNumber}\" from room {room.RoomNumber}?";
+        _deleteAction  = () => DeleteBedAsync(bed.Id);
+        _deleteDialogVisible = true;
+    }
+
+    private async Task SaveBed()
+    {
+        if (string.IsNullOrWhiteSpace(_bedNumber)) return;
+        _saving = true;
+        var r = await ClinicApi.CreateBedAsync(new CreateBedDto(_targetRoom!.Id, _bedNumber));
+        if (r.Success)
+        {
+            Snackbar.Add("Bed added.", Severity.Success);
+            _bedDialogVisible = false;
+            await LoadAsync();
+        }
+        else Snackbar.Add(r.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private async Task DeleteBedAsync(Guid id)
+    {
+        var r = await ClinicApi.DeleteBedAsync(id);
+        if (r.Success) { Snackbar.Add("Bed removed.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(r.Message, Severity.Error);
+    }
+
+    // ── Delete executor ───────────────────────────────────────────────────────
+    private async Task ExecuteDelete()
+    {
+        if (_deleteAction == null) return;
+        _saving = true;
+        _deleteDialogVisible = false;
+        try { await _deleteAction(); }
+        finally { _saving = false; _deleteAction = null; }
+    }
+}

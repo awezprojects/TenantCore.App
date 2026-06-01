@@ -123,7 +123,7 @@ else if (_isAuthenticated)
                         }
                         else
                         {
-                            <MudMenuItem Href="/auth/profile" Icon="@Icons.Material.Filled.Person">Profile</MudMenuItem>
+                            <MudMenuItem Href="/auth/profile" Icon="@Icons.Material.Filled.Person">My Profile</MudMenuItem>
                         }
                         <MudDivider />
                         <MudMenuItem OnClick="Logout" Icon="@Icons.Material.Filled.Logout">Sign Out</MudMenuItem>
@@ -146,6 +146,7 @@ else if (_isAuthenticated)
     private bool _isAuthenticated;
     private bool _isDarkMode;
     private bool _isDoctor;
+    private bool _isAdmin;
     private string _currentTime = DateTime.Now.ToString("hh:mm tt");
     private string _roleLabel = string.Empty;
     private string _screenTitle = "Dashboard";
@@ -172,18 +173,20 @@ else if (_isAuthenticated)
 
     private static readonly Dictionary<string, string> _titles = new()
     {
-        ["/dashboard"]           = "Dashboard",
-        ["/doctor/opd-queue"]    = "My OPD Queue",
-        ["/prescriptions"]       = "Prescriptions",
-        ["/patients"]            = "Patient Registry",
-        ["/opd"]                 = "OPD Management",
-        ["/ipd"]                 = "IPD & Bed Management",
-        ["/medicines"]           = "Medicine Management",
-        ["/medicine-types"]      = "Medicine Types",
-        ["/auth/profile"]        = "Profile",
-        ["/settings/preferences"]= "Preferences",
-        ["/settings/prescription"] = "Prescription Settings",
-        ["/settings/dosage-remarks"] = "Dosage Remarks",
+        ["/dashboard"]              = "Dashboard",
+        ["/admin/dashboard"]        = "Admin Dashboard",
+        ["/admin/wards"]            = "Ward & Room Management",
+        ["/doctor/opd-queue"]       = "My OPD Queue",
+        ["/prescriptions"]          = "Prescriptions",
+        ["/patients"]               = "Patient Registry",
+        ["/opd"]                    = "OPD Management",
+        ["/ipd"]                    = "IPD & Bed Management",
+        ["/medicines"]              = "Medicine Management",
+        ["/medicine-types"]         = "Medicine Types",
+        ["/auth/profile"]           = "My Profile",
+        ["/settings/preferences"]   = "Preferences",
+        ["/settings/prescription"]  = "Prescription Settings",
+        ["/settings/dosage-remarks"]= "Dosage Remarks",
     };
 
     protected override void OnInitialized()
@@ -226,6 +229,9 @@ else if (_isAuthenticated)
                     .FirstOrDefault()?.RoleName ?? "User";
                 _isDoctor = AuthState.CurrentUser.UserRoles
                     .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+                _isAdmin = AuthState.CurrentUser.UserRoles
+                    .Any(r => r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase)
+                           || r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
             }
         }
         catch
@@ -252,9 +258,23 @@ else if (_isAuthenticated)
         {
             if (path.StartsWith("/auth/login"))
             {
-                var isDoctor = AuthState.CurrentUser?.UserRoles
-                    .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
-                NavigationManager.NavigateTo(isDoctor ? "/doctor/home" : "/dashboard", forceLoad: true);
+                var roles = AuthState.CurrentUser?.UserRoles ?? [];
+                var isAdminUser = roles.Any(r =>
+                    r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+                    r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+                var isDoctorUser = roles.Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+
+                string target;
+                if (isAdminUser && isDoctorUser)
+                    target = "/doctor/home"; // admin-doctors select clinic first
+                else if (isDoctorUser)
+                    target = "/doctor/home";
+                else if (isAdminUser)
+                    target = "/admin/dashboard";
+                else
+                    target = "/dashboard";
+
+                NavigationManager.NavigateTo(target, forceLoad: true);
                 return;
             }
         }

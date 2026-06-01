@@ -22,15 +22,62 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
     {
         if (!response.IsSuccessStatusCode)
         {
-            var err = await response.Content.ReadAsStringAsync();
-            return new ApiResponse<T> { Success = false, Message = err };
+            var message = await ExtractUserMessage(response);
+            return new ApiResponse<T> { Success = false, Message = message };
         }
         var data = await response.Content.ReadFromJsonAsync<T>(JsonOptions);
         return new ApiResponse<T> { Success = true, Data = data };
     }
 
-    private static ApiResponse<T> Fail<T>(string message) =>
-        new() { Success = false, Message = message, Errors = [message] };
+    // Parses the ProblemDetails JSON returned by the API and extracts the
+    // user-facing "detail" field. Falls back to a status-code-based default
+    // so the raw JSON / GUIDs / routes never reach the UI.
+    private static async Task<string> ExtractUserMessage(HttpResponseMessage response)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                if (root.TryGetProperty("detail", out var detail))
+                {
+                    var text = detail.GetString();
+                    if (!string.IsNullOrWhiteSpace(text)) return text;
+                }
+
+                // FluentValidation errors come as extensions["errors"]
+                if (root.TryGetProperty("errors", out var errors))
+                {
+                    var messages = new List<string>();
+                    foreach (var field in errors.EnumerateObject())
+                        foreach (var msg in field.Value.EnumerateArray())
+                        {
+                            var s = msg.GetString();
+                            if (!string.IsNullOrWhiteSpace(s)) messages.Add(s);
+                        }
+                    if (messages.Count > 0) return string.Join(" ", messages);
+                }
+            }
+        }
+        catch { /* fall through to default */ }
+
+        return response.StatusCode switch
+        {
+            System.Net.HttpStatusCode.BadRequest           => "Please check your input and try again.",
+            System.Net.HttpStatusCode.Unauthorized         => "Your session has expired. Please log in again.",
+            System.Net.HttpStatusCode.Forbidden            => "You don't have permission to perform this action.",
+            System.Net.HttpStatusCode.NotFound             => "The requested record was not found.",
+            System.Net.HttpStatusCode.Conflict             => "This action conflicts with existing data.",
+            System.Net.HttpStatusCode.InternalServerError  => "A server error occurred. Please try again.",
+            _                                              => "Something went wrong. Please try again."
+        };
+    }
+
+    private static ApiResponse<T> Fail<T>(string _) =>
+        new() { Success = false, Message = "Could not connect to the server. Please check your connection and try again." };
 
     // --- Patients ---
 
@@ -269,5 +316,88 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
             return await Ok<int>(await httpClient.GetAsync($"api/opd-registrations/doctor-count?doctorUserId={doctorUserId}", ct));
         }
         catch (Exception ex) { return Fail<int>(ex.Message); }
+    }
+
+    // --- Wards ---
+
+    public async Task<ApiResponse<IEnumerable<WardDto>>> GetWardsAsync()
+    {
+        try { SetAuth(); return await Ok<IEnumerable<WardDto>>(await httpClient.GetAsync("api/wards")); }
+        catch (Exception ex) { return Fail<IEnumerable<WardDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<WardDto>> CreateWardAsync(CreateWardDto dto)
+    {
+        try { SetAuth(); return await Ok<WardDto>(await httpClient.PostAsJsonAsync("api/wards", dto, JsonOptions)); }
+        catch (Exception ex) { return Fail<WardDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<WardDto>> UpdateWardAsync(Guid id, UpdateWardDto dto)
+    {
+        try { SetAuth(); return await Ok<WardDto>(await httpClient.PutAsJsonAsync($"api/wards/{id}", dto, JsonOptions)); }
+        catch (Exception ex) { return Fail<WardDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteWardAsync(Guid id)
+    {
+        try { SetAuth(); var r = await httpClient.DeleteAsync($"api/wards/{id}"); return new ApiResponse<bool> { Success = r.IsSuccessStatusCode, Data = r.IsSuccessStatusCode }; }
+        catch (Exception ex) { return Fail<bool>(ex.Message); }
+    }
+
+    // --- Rooms ---
+
+    public async Task<ApiResponse<IEnumerable<RoomDto>>> GetRoomsByWardAsync(Guid wardId)
+    {
+        try { SetAuth(); return await Ok<IEnumerable<RoomDto>>(await httpClient.GetAsync($"api/rooms?wardId={wardId}")); }
+        catch (Exception ex) { return Fail<IEnumerable<RoomDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<RoomDto>> CreateRoomAsync(CreateRoomDto dto)
+    {
+        try { SetAuth(); return await Ok<RoomDto>(await httpClient.PostAsJsonAsync("api/rooms", dto, JsonOptions)); }
+        catch (Exception ex) { return Fail<RoomDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<RoomDto>> UpdateRoomAsync(Guid id, UpdateRoomDto dto)
+    {
+        try { SetAuth(); return await Ok<RoomDto>(await httpClient.PutAsJsonAsync($"api/rooms/{id}", dto, JsonOptions)); }
+        catch (Exception ex) { return Fail<RoomDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteRoomAsync(Guid id)
+    {
+        try { SetAuth(); var r = await httpClient.DeleteAsync($"api/rooms/{id}"); return new ApiResponse<bool> { Success = r.IsSuccessStatusCode, Data = r.IsSuccessStatusCode }; }
+        catch (Exception ex) { return Fail<bool>(ex.Message); }
+    }
+
+    // --- Beds ---
+
+    public async Task<ApiResponse<IEnumerable<BedDto>>> GetBedsByRoomAsync(Guid roomId)
+    {
+        try { SetAuth(); return await Ok<IEnumerable<BedDto>>(await httpClient.GetAsync($"api/beds?roomId={roomId}")); }
+        catch (Exception ex) { return Fail<IEnumerable<BedDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IEnumerable<BedDto>>> GetAvailableBedsAsync(Guid? wardId = null)
+    {
+        try
+        {
+            SetAuth();
+            var url = "api/beds/available" + (wardId.HasValue ? $"?wardId={wardId}" : "");
+            return await Ok<IEnumerable<BedDto>>(await httpClient.GetAsync(url));
+        }
+        catch (Exception ex) { return Fail<IEnumerable<BedDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<BedDto>> CreateBedAsync(CreateBedDto dto)
+    {
+        try { SetAuth(); return await Ok<BedDto>(await httpClient.PostAsJsonAsync("api/beds", dto, JsonOptions)); }
+        catch (Exception ex) { return Fail<BedDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteBedAsync(Guid id)
+    {
+        try { SetAuth(); var r = await httpClient.DeleteAsync($"api/beds/{id}"); return new ApiResponse<bool> { Success = r.IsSuccessStatusCode, Data = r.IsSuccessStatusCode }; }
+        catch (Exception ex) { return Fail<bool>(ex.Message); }
     }
 }

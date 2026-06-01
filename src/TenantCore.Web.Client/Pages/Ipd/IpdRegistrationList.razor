@@ -2,337 +2,1224 @@
 @page "/ipd/new"
 @layout AuthorizedLayout
 @inject IClinicApiClient ClinicClient
+@inject AuthStateService AuthState
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@using TenantCore.Web.Client.Services
+@using TenantCore.Shared.Enums
+@implements IDisposable
 
-<PageTitle>IPD Admissions - TenantCore</PageTitle>
-
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">IPD Admissions</MudText>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-               StartIcon="@Icons.Material.Filled.Add"
-               OnClick="OpenAdmitDialog">
-        Admit Patient
-    </MudButton>
-</MudStack>
-
-<MudPaper Class="pa-4 mb-4">
-    <MudGrid>
-        <MudItem xs="12" md="8">
-            <MudTextField @bind-Value="_search" Label="Search by patient name or admission number..."
-                          Variant="Variant.Outlined" Adornment="Adornment.End"
-                          AdornmentIcon="@Icons.Material.Filled.Search"
-                          Clearable="true" @onkeyup="OnSearchKeyUp" />
-        </MudItem>
-        <MudItem xs="12" md="4" Class="d-flex align-end">
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
-                       OnClick="LoadAsync" StartIcon="@Icons.Material.Filled.Refresh">
-                Refresh
-            </MudButton>
-        </MudItem>
-    </MudGrid>
-</MudPaper>
+<PageTitle>IPD & Bed Management - CloudClinic</PageTitle>
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <div style="display:flex;justify-content:center;align-items:center;padding:60px 0;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
 }
-else if (_result is not null)
+else if (_isAdmin)
 {
-    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
-              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
-        <HeaderContent>
-            <MudTh>Admission No.</MudTh>
-            <MudTh>Patient</MudTh>
-            <MudTh>Doctor</MudTh>
-            <MudTh>Ward / Bed</MudTh>
-            <MudTh>Admitted</MudTh>
-            <MudTh>Status</MudTh>
-            <MudTh Style="width: 100px;">Actions</MudTh>
-        </HeaderContent>
-        <RowTemplate Context="reg">
-            <MudTd DataLabel="Admission No.">
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Info">
-                    @reg.AdmissionNumber
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Patient">@reg.PatientName</MudTd>
-            <MudTd DataLabel="Doctor">@(reg.DoctorName ?? "—")</MudTd>
-            <MudTd DataLabel="Ward / Bed">
-                @(reg.WardName ?? "—") @(reg.RoomNumber is not null ? $"/ Rm {reg.RoomNumber}" : "") @(reg.BedNumber is not null ? $"/ Bed {reg.BedNumber}" : "")
-            </MudTd>
-            <MudTd DataLabel="Admitted">@reg.AdmissionDate.ToString("MMM dd, yyyy")</MudTd>
-            <MudTd DataLabel="Status">
-                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(reg.Status)" Variant="Variant.Text">
-                    @reg.Status
-                </MudChip>
-            </MudTd>
-            <MudTd>
-                <MudStack Row="true" Spacing="0">
-                    <MudTooltip Text="View">
-                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Color="Color.Info" Size="Size.Small"
-                                       OnClick="@(() => OpenViewDialog(reg))" />
-                    </MudTooltip>
-                    @if (reg.Status == TenantCore.Shared.Enums.IpdStatus.Admitted)
-                    {
-                        <MudTooltip Text="Discharge">
-                            <MudIconButton Icon="@Icons.Material.Filled.ExitToApp" Color="Color.Warning" Size="Size.Small"
-                                           OnClick="@(() => OpenDischargeDialog(reg))" />
-                        </MudTooltip>
-                    }
-                </MudStack>
-            </MudTd>
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudText Color="Color.Secondary">No IPD admissions found.</MudText>
-        </NoRecordsContent>
-    </MudTable>
+    <!-- ═══════════════════════════════════════════════════
+         ADMIN VIEW — stats + ward grid + admissions table
+         ═══════════════════════════════════════════════════ -->
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
 
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Showing @_result.Items.Count() of @_result.TotalCount admissions
-        </MudText>
-        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
-    </MudStack>
-}
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#1E293B;">IPD &amp; Bed Management</div>
+                <div style="font-size:13px;color:#64748B;margin-top:3px;">
+                    @_totalBeds beds total &nbsp;·&nbsp; @_availableBeds available &nbsp;·&nbsp; @_occupiedBeds occupied
+                </div>
+            </div>
+            <button class="cc-btn-primary" @onclick="OpenAdminAdmitDialog">+ Admit Patient</button>
+        </div>
 
-<!-- Admit Dialog -->
-<MudDialog @bind-Visible="_admitDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Admit Patient (IPD)</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudGrid>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_patientSearch" Label="Search patient by name or phone..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
-                              Immediate="true"
-                              @onkeyup="OnPatientSearchKeyUp" />
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#EFF6FF;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">TOTAL BEDS</div>
+                            <div class="cc-stat-value">@_totalBeds</div>
+                            <div class="cc-stat-sub">Across all wards</div>
+                        </div>
+                        <div class="cc-stat-icon">🛏</div>
+                    </div>
+                </div>
             </MudItem>
-            @if (_patients.Any())
-            {
-                <MudItem xs="12">
-                    <MudSelect T="Guid" @bind-Value="_selectedPatientId" Label="Select Patient" Variant="Variant.Outlined">
-                        @foreach (var p in _patients)
-                        {
-                            <MudSelectItem Value="p.Id">@p.FullName — @p.PhoneNumber</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-            }
-            <MudItem xs="12">
-                <MudSelect T="Guid?" @bind-Value="_selectedDoctorId" Label="Select Doctor (optional)" Variant="Variant.Outlined">
-                    <MudSelectItem T="Guid?" Value="null">— No Doctor —</MudSelectItem>
-                    @foreach (var d in _doctors)
-                    {
-                        <MudSelectItem T="Guid?" Value="d.UserId">@d.FullName</MudSelectItem>
-                    }
-                </MudSelect>
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#ECFDF5;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">AVAILABLE</div>
+                            <div class="cc-stat-value" style="color:#16A34A;">@_availableBeds</div>
+                            <div class="cc-stat-sub">Ready for patients</div>
+                        </div>
+                        <div class="cc-stat-icon">✅</div>
+                    </div>
+                </div>
             </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudTextField @bind-Value="_wardName" Label="Ward Name" Variant="Variant.Outlined" />
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#FEF3C7;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">OCCUPIED</div>
+                            <div class="cc-stat-value" style="color:#D97706;">@_occupiedBeds</div>
+                            <div class="cc-stat-sub">Currently in use</div>
+                        </div>
+                        <div class="cc-stat-icon">🩺</div>
+                    </div>
+                </div>
             </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudTextField @bind-Value="_roomNumber" Label="Room Number" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="4">
-                <MudTextField @bind-Value="_bedNumber" Label="Bed Number" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudNumericField @bind-Value="_initialFee" Label="Initial Fee (₹)" Variant="Variant.Outlined" Min="0" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_admissionNotes" Label="Admission Notes (optional)" Variant="Variant.Outlined" Lines="2" />
+            <MudItem xs="12" sm="6" md="3">
+                <div class="cc-stat-card" style="background:#FFF1F2;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <div class="cc-stat-label">OCCUPANCY</div>
+                            <div class="cc-stat-value" style="color:#E11D48;">@_overallOccupancy%</div>
+                            <div class="cc-stat-sub">Overall rate</div>
+                        </div>
+                        <div class="cc-stat-icon">📊</div>
+                    </div>
+                </div>
             </MudItem>
         </MudGrid>
+
+        <!-- Ward availability grid -->
+        @if (_wards.Any())
+        {
+            <div class="cc-card">
+                <div class="cc-card-header">
+                    <div class="cc-card-title">🏨 Ward Bed Availability</div>
+                    <button class="cc-btn-light" @onclick='() => Navigation.NavigateTo("/admin/wards")'>Manage Wards →</button>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:4px;">
+                    @foreach (var ward in _wards)
+                    {
+                        var occ = ward.BedCount == 0 ? 0 : (int)((ward.BedCount - ward.AvailableBeds) * 100.0 / ward.BedCount);
+                        var barColor = occ >= 90 ? "#EF4444" : occ >= 70 ? "#D97706" : "#16A34A";
+                        <div style="border:1px solid #E2E8F0;border-radius:12px;padding:16px;background:#fff;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                                <div>
+                                    <div style="font-size:14px;font-weight:700;color:#1E293B;">@ward.Name</div>
+                                    <div style="font-size:11px;color:#94A3B8;">@ward.RoomCount rooms · @ward.BedCount beds</div>
+                                </div>
+                                <span style="font-size:12px;font-weight:700;color:@barColor;
+                                             background:@(occ>=90?"#FEF2F2":occ>=70?"#FFFBEB":"#F0FDF4");
+                                             padding:3px 10px;border-radius:20px;">@occ%</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">
+                                <span style="color:#16A34A;font-weight:600;">@ward.AvailableBeds available</span>
+                                <span style="color:#D97706;font-weight:600;">@(ward.BedCount - ward.AvailableBeds) occupied</span>
+                            </div>
+                            <div style="height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">
+                                <div style="width:@(occ)%;height:100%;background:@barColor;border-radius:3px;transition:width 0.3s;"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Admissions table -->
+        <div class="cc-card">
+            <div class="cc-card-header">
+                <div class="cc-card-title">🛏 IPD Admissions</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input class="cc-search" placeholder="Search patient or admission no..."
+                           value="@_search" @oninput="OnSearchInput" @onkeyup="OnSearchKeyUp"
+                           style="width:240px;" />
+                    <button class="cc-btn-light" @onclick="LoadAdmissionsAsync">↻ Refresh</button>
+                </div>
+            </div>
+            @if (_admissionsLoading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_result != null && _result.Items.Any())
+            {
+                <div style="overflow-x:auto;">
+                    <table class="cc-table">
+                        <thead>
+                            <tr>
+                                <th>Admission No.</th>
+                                <th>Patient</th>
+                                <th>Doctor</th>
+                                <th>Ward / Room / Bed</th>
+                                <th>Admitted</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var reg in _result.Items)
+                            {
+                                <tr class="cc-table-row">
+                                    <td>
+                                        <span class="cc-badge" style="color:#1565C0;background:#EFF6FF;font-family:monospace;">
+                                            @reg.AdmissionNumber
+                                        </span>
+                                    </td>
+                                    <td style="font-weight:600;color:#1E293B;">@reg.PatientName</td>
+                                    <td style="color:#64748B;">@(reg.DoctorName ?? "—")</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(reg.WardName))
+                                        {
+                                            <div style="font-size:12px;">
+                                                <span style="font-weight:600;">@reg.WardName</span>
+                                                @if (!string.IsNullOrEmpty(reg.RoomNumber))
+                                                {<span style="color:#64748B;"> / Rm @reg.RoomNumber</span>}
+                                                @if (!string.IsNullOrEmpty(reg.BedNumber))
+                                                {<span style="color:#64748B;"> / Bed @reg.BedNumber</span>}
+                                            </div>
+                                        }
+                                        else
+                                        {<span style="color:#94A3B8;">—</span>}
+                                    </td>
+                                    <td style="color:#64748B;font-size:12px;">@reg.AdmissionDate.ToString("MMM dd, yyyy")</td>
+                                    <td>
+                                        @{ var (bc, bbg) = GetStatusBadge(reg.Status); }
+                                        <span class="cc-badge" style="color:@bc;background:@bbg;">@reg.Status</span>
+                                    </td>
+                                    <td>
+                                        <div style="display:flex;gap:4px;">
+                                            <button class="cc-btn-light cc-btn-sm" @onclick="@(() => OpenViewDialog(reg))">View</button>
+                                            @if (reg.Status == IpdStatus.Admitted)
+                                            {
+                                                <button class="cc-btn-light cc-btn-sm" style="color:#D97706;"
+                                                        @onclick="@(() => OpenDischargeDialog(reg))">Discharge</button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;
+                             padding:12px 18px;border-top:1px solid #E2E8F0;">
+                    <span style="font-size:12px;color:#64748B;">
+                        Showing @_result.Items.Count() of @_result.TotalCount admissions
+                    </span>
+                    <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
+                </div>
+            }
+            else
+            {
+                <div class="cc-empty">No IPD admissions found.</div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <!-- ═══════════════════════════════════════════════════
+         RECEPTION / DOCTOR VIEW — new design
+         ═══════════════════════════════════════════════════ -->
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:16px;">
+
+        <!-- Page header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#1E293B;">IPD &amp; Bed Management</div>
+                <div style="font-size:12px;color:#94A3B8;margin-top:3px;">
+                    Inpatient Department · Wards › Rooms › Beds
+                    <span style="color:#16A34A;font-weight:600;margin-left:8px;">● Live</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:2px;background:#F1F5F9;border-radius:8px;padding:3px;">
+                <div style="padding:6px 14px;border-radius:6px;background:#fff;
+                             font-size:12px;font-weight:600;color:#1565C0;
+                             box-shadow:0 1px 3px rgba(0,0,0,0.08);">⊞ Grid</div>
+                <div style="padding:6px 14px;border-radius:6px;
+                             font-size:12px;font-weight:600;color:#94A3B8;">≡ List</div>
+            </div>
+        </div>
+
+        @if (!_wards.Any())
+        {
+            <div class="cc-empty">No wards configured. Contact your administrator.</div>
+        }
+        else
+        {
+            <!-- Ward tabs: responsive grid — auto-fit fills row, max ~4 per row, last row fills width -->
+            <div style="display:grid;
+                         grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+                         gap:10px;">
+                @foreach (var ward in _wards)
+                {
+                    var occ      = ward.BedCount == 0 ? 0 : (int)((ward.BedCount - ward.AvailableBeds) * 100.0 / ward.BedCount);
+                    var barColor = occ >= 75 ? "#EF4444" : occ >= 50 ? "#D97706" : "#22C55E";
+                    var active   = _selectedWard?.Id == ward.Id;
+                    <div style="padding:14px 16px;border-radius:12px;cursor:pointer;
+                                border:2px solid @(active ? "#1565C0" : "#E2E8F0");
+                                background:@(active ? "#EFF6FF" : "#fff");
+                                transition:border-color 0.15s,background 0.15s;"
+                         @onclick="@(() => SelectWardAsync(ward))">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:14px;font-weight:700;
+                                         color:@(active ? "#1565C0" : "#1E293B");">@ward.Name</span>
+                            <span style="font-size:14px;font-weight:800;color:@barColor;">@occ%</span>
+                        </div>
+                        <div style="height:4px;background:#E2E8F0;border-radius:2px;overflow:hidden;margin-bottom:8px;">
+                            <div style="width:@(occ)%;height:100%;background:@barColor;border-radius:2px;transition:width 0.3s;"></div>
+                        </div>
+                        <div style="font-size:11px;color:#94A3B8;">
+                            @ward.RoomCount rooms · @(ward.BedCount - ward.AvailableBeds)/@ward.BedCount beds
+                        </div>
+                    </div>
+                }
+            </div>
+
+            @if (_selectedWard != null)
+            {
+                <!-- Room filter pills -->
+                @if (!_loadingBedMap && _selectedWardRooms.Any())
+                {
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:12px;font-weight:600;color:#64748B;">Rooms:</span>
+                        <button style="padding:5px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;
+                                       border:1.5px solid @(_selectedRoomFilter == null ? "#1565C0" : "#E2E8F0");
+                                       background:@(_selectedRoomFilter == null ? "#1565C0" : "#fff");
+                                       color:@(_selectedRoomFilter == null ? "#fff" : "#64748B");"
+                                @onclick="@(() => { _selectedRoomFilter = null; })">
+                            All Rooms
+                        </button>
+                        @foreach (var rp in _selectedWardRooms.OrderBy(r => r.RoomNumber))
+                        {
+                            var rpActive = _selectedRoomFilter == rp.Id;
+                            var rpOcc    = rp.BedCount - rp.AvailableBeds;
+                            <button style="padding:5px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;
+                                           border:1.5px solid @(rpActive ? "#1565C0" : "#E2E8F0");
+                                           background:@(rpActive ? "#EFF6FF" : "#fff");
+                                           color:@(rpActive ? "#1565C0" : "#64748B");"
+                                    @onclick="@(() => { _selectedRoomFilter = rp.Id; })">
+                                Room @rp.RoomNumber
+                                <span style="opacity:0.65;margin-left:4px;font-size:11px;">@rpOcc/@rp.BedCount</span>
+                            </button>
+                        }
+                    </div>
+                }
+
+                <!-- Stats row -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;">
+                    <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;margin-bottom:4px;">ROOMS</div>
+                        <div style="font-size:28px;font-weight:800;color:#475569;line-height:1;">@_selectedWardRooms.Count</div>
+                        <div style="font-size:20px;margin-top:4px;">🚪</div>
+                    </div>
+                    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:14px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;margin-bottom:4px;">TOTAL BEDS</div>
+                        <div style="font-size:28px;font-weight:800;color:#1E293B;line-height:1;">@WardBeds</div>
+                        <div style="font-size:20px;margin-top:4px;">🛏</div>
+                    </div>
+                    <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:14px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;margin-bottom:4px;">OCCUPIED</div>
+                        <div style="font-size:28px;font-weight:800;color:#D97706;line-height:1;">@WardOccupied</div>
+                        <div style="font-size:20px;margin-top:4px;">👤</div>
+                    </div>
+                    <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:14px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;margin-bottom:4px;">AVAILABLE</div>
+                        <div style="font-size:28px;font-weight:800;color:#16A34A;line-height:1;">@WardAvailable</div>
+                        <div style="font-size:20px;margin-top:4px;">✅</div>
+                    </div>
+                    <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:14px;padding:14px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;margin-bottom:4px;">CLEANING</div>
+                        <div style="font-size:28px;font-weight:800;color:#B45309;line-height:1;">@WardCleaning</div>
+                        <div style="font-size:20px;margin-top:4px;">🧹</div>
+                    </div>
+                </div>
+
+                <!-- Bed Map Card -->
+                <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:hidden;">
+
+                    <!-- Map header + legend -->
+                    <div style="padding:16px 20px;border-bottom:1px solid #E2E8F0;
+                                display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <div style="font-size:15px;font-weight:800;color:#1E293B;">
+                            @_selectedWard.Name – Bed Map
+                        </div>
+                        <div style="display:flex;gap:14px;font-size:11px;color:#64748B;align-items:center;flex-wrap:wrap;">
+                            <span style="display:flex;align-items:center;gap:4px;">
+                                <span style="width:12px;height:12px;border:2px solid #3B82F6;border-radius:3px;background:#EFF6FF;display:inline-block;"></span>Occupied
+                            </span>
+                            <span style="display:flex;align-items:center;gap:4px;">
+                                <span style="width:12px;height:12px;border:2px solid #22C55E;border-radius:3px;background:#F0FDF4;display:inline-block;"></span>Available
+                            </span>
+                            <span style="display:flex;align-items:center;gap:4px;">
+                                <span style="width:12px;height:12px;border:2px solid #F59E0B;border-radius:3px;background:#FFFBEB;display:inline-block;"></span>Cleaning
+                            </span>
+                            <span style="display:flex;align-items:center;gap:4px;">
+                                <span style="width:12px;height:12px;border:2px solid #EF4444;border-radius:3px;background:#FEF2F2;display:inline-block;"></span>Critical
+                            </span>
+                        </div>
+                    </div>
+
+                    @if (_loadingBedMap)
+                    {
+                        <div style="padding:32px;"><MudProgressLinear Indeterminate="true" Color="Color.Primary" /></div>
+                    }
+                    else if (!_selectedWardRooms.Any())
+                    {
+                        <div class="cc-empty">No rooms configured for this ward.</div>
+                    }
+                    else
+                    {
+                        <!-- Each room is a full-width section; beds as flex-wrap tiles -->
+                        @foreach (var room in FilteredRooms)
+                        {
+                            var rBeds     = room.Beds.Where(b => b.IsActive).OrderBy(b => b.BedNumber).ToList();
+                            var rOccupied = rBeds.Count(b => b.IsOccupied);
+                            var dotColor  = rOccupied == rBeds.Count && rBeds.Any() ? "#EF4444"
+                                          : rOccupied > 0 ? "#F59E0B" : "#22C55E";
+
+                            <div style="padding:16px 20px;border-bottom:1px solid #F1F5F9;">
+                                <!-- Room header row -->
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                                    <div style="display:flex;align-items:center;gap:10px;">
+                                        <span style="width:9px;height:9px;border-radius:50%;
+                                                     background:@dotColor;display:inline-block;flex-shrink:0;"></span>
+                                        <span style="font-size:14px;font-weight:700;color:#1E293B;">Room @room.RoomNumber</span>
+                                        @if (!string.IsNullOrEmpty(room.RoomType))
+                                        {
+                                            <span style="font-size:11px;font-weight:600;color:#1565C0;
+                                                         background:#EFF6FF;padding:3px 10px;border-radius:12px;">
+                                                @room.RoomType (@rBeds.Count-bed)
+                                            </span>
+                                        }
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:16px;">
+                                        <span style="font-size:12px;font-weight:600;color:#64748B;">
+                                            @rOccupied/@rBeds.Count beds occupied
+                                        </span>
+                                        <span style="font-size:12px;font-weight:600;color:#94A3B8;">
+                                            ₹@room.PricePerDay.ToString("N0")/day
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Bed tiles -->
+                                @if (!rBeds.Any())
+                                {
+                                    <div style="padding:20px 0;text-align:center;color:#CBD5E1;font-size:12px;">
+                                        No beds configured in this room.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                                        @foreach (var bed in rBeds)
+                                        {
+                                            var adm      = GetAdmissionForBed(room.RoomNumber, bed.BedNumber);
+                                            var occupied = bed.IsOccupied;
+                                            var bdrClr   = occupied ? "#3B82F6" : "#22C55E";
+                                            var bgClr    = occupied ? "#EFF6FF" : "#F0FDF4";
+                                            var numClr   = occupied ? "#1D4ED8" : "#16A34A";
+                                            var days     = adm != null
+                                                ? (int)(DateTime.Today - adm.AdmissionDate.Date).TotalDays + 1
+                                                : 0;
+
+                                            <div style="width:90px;min-height:112px;
+                                                         border:2px solid @bdrClr;border-radius:12px;
+                                                         background:@bgClr;padding:10px 6px 8px;
+                                                         text-align:center;cursor:pointer;
+                                                         display:flex;flex-direction:column;
+                                                         align-items:center;justify-content:center;gap:3px;
+                                                         transition:box-shadow 0.15s;"
+                                                 title="@(occupied ? $"Occupied – {adm?.PatientName}" : "Click to admit")"
+                                                 @onclick="@(() => OnBedClick(bed, room, adm))">
+
+                                                <div style="font-size:26px;line-height:1;">
+                                                    @(occupied ? "👤" : "🛏")
+                                                </div>
+                                                <div style="font-size:12px;font-weight:800;color:@numClr;margin-top:2px;">
+                                                    @bed.BedNumber
+                                                </div>
+
+                                                @if (occupied && adm != null)
+                                                {
+                                                    <div style="font-size:10px;font-weight:600;color:#1E293B;
+                                                                 white-space:nowrap;overflow:hidden;
+                                                                 text-overflow:ellipsis;max-width:78px;">
+                                                        @GetShortName(adm.PatientName)
+                                                    </div>
+                                                    <div style="font-size:9px;color:#64748B;">Day @days</div>
+                                                }
+                                                else if (occupied)
+                                                {
+                                                    <div style="font-size:10px;color:#64748B;">Occupied</div>
+                                                }
+                                                else
+                                                {
+                                                    <div style="font-size:10px;color:#16A34A;font-weight:700;">+ Admit</div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        }
+    </div>
+}
+
+<!-- ════════════════════════════════════════════════════════
+     DIALOG: Admin – Admit Patient (cascading dropdowns)
+     ════════════════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_adminAdmitVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:18px;font-weight:700;color:#1E293B;">Admit Patient (IPD)</div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:16px;padding-top:4px;">
+            <PatientSearchInput OnPatientSelected="OnAdminPatientSelected"
+                                Placeholder="Type patient name or phone to search…" />
+            <MudSelect T="Guid?" @bind-Value="_selectedDoctorId"
+                       Label="Attending Doctor (optional)" Variant="Variant.Outlined" Dense="true">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">— No Doctor —</MudSelectItem>
+                @foreach (var d in _doctors)
+                {<MudSelectItem T="Guid?" Value="d.UserId">@d.FullName</MudSelectItem>}
+            </MudSelect>
+
+            <div style="border-top:1px solid #E2E8F0;padding-top:14px;">
+                <div style="font-size:11px;font-weight:700;color:#64748B;letter-spacing:0.5px;margin-bottom:10px;">BED ASSIGNMENT</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                    <MudSelect T="Guid?" Value="_selectedWardId" Label="Ward"
+                               Variant="Variant.Outlined" Dense="true"
+                               ValueChanged="OnAdminWardSelected">
+                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">— Select Ward —</MudSelectItem>
+                        @foreach (var w in _wards)
+                        {<MudSelectItem T="Guid?" Value="w.Id">@w.Name</MudSelectItem>}
+                    </MudSelect>
+                    <MudSelect T="Guid?" Value="_selectedRoomId" Label="Room"
+                               Variant="Variant.Outlined" Dense="true"
+                               Disabled="@(_selectedWardId == null || !_dialogRooms.Any())"
+                               ValueChanged="OnAdminRoomSelected">
+                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">— Select Room —</MudSelectItem>
+                        @foreach (var r in _dialogRooms)
+                        {
+                            <MudSelectItem T="Guid?" Value="r.Id">
+                                Rm @r.RoomNumber @(!string.IsNullOrEmpty(r.RoomType) ? $"({r.RoomType})" : "")
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="Guid?" Value="_selectedBedId" Label="Bed"
+                               Variant="Variant.Outlined" Dense="true"
+                               Disabled="@(_selectedRoomId == null || !_dialogBeds.Any())"
+                               ValueChanged="@((Guid? v) => _selectedBedId = v)">
+                        <MudSelectItem T="Guid?" Value="@((Guid?)null)">— Select Bed —</MudSelectItem>
+                        @foreach (var b in _dialogBeds)
+                        {<MudSelectItem T="Guid?" Value="b.Id">Bed @b.BedNumber</MudSelectItem>}
+                    </MudSelect>
+                </div>
+                @if (_selectedRoomDto != null)
+                {
+                    <div style="margin-top:8px;padding:8px 12px;background:#F0FDF4;border-radius:8px;
+                                font-size:12px;color:#16A34A;font-weight:600;display:flex;gap:16px;">
+                        <span>Room @_selectedRoomDto.RoomNumber</span>
+                        @if (!string.IsNullOrEmpty(_selectedRoomDto.RoomType))
+                        {<span>@_selectedRoomDto.RoomType</span>}
+                        <span>₹@_selectedRoomDto.PricePerDay.ToString("N0")/day</span>
+                        <span>@_dialogBeds.Count available bed(s)</span>
+                    </div>
+                }
+                @if (_loadingRooms || _loadingBeds)
+                {<MudProgressLinear Indeterminate="true" Color="Color.Primary" Style="margin-top:6px;" />}
+            </div>
+
+            <MudNumericField @bind-Value="_initialFee" Label="Initial Fee (₹)" Variant="Variant.Outlined" Min="0" />
+            <MudTextField @bind-Value="_admissionNotes" Label="Admission Notes (optional)"
+                          Variant="Variant.Outlined" Lines="2" />
+        </div>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _admitDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AdmitAsync" Disabled="_saving">
-            @(_saving ? "Admitting..." : "Admit")
-        </MudButton>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button class="cc-btn-light" @onclick="@(() => _adminAdmitVisible = false)">Cancel</button>
+            <button class="cc-btn-primary" @onclick="AdminAdmitAsync" disabled="@_saving">
+                @(_saving ? "Admitting..." : "Admit Patient")
+            </button>
+        </div>
     </DialogActions>
 </MudDialog>
 
-<!-- View Dialog -->
-<MudDialog @bind-Visible="_viewDialogVisible">
+<!-- ════════════════════════════════════════════════════════
+     DIALOG: Reception – Admit from bed click
+     ════════════════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_bedAdmitVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
     <TitleContent>
-        <MudText Typo="Typo.h6">IPD Admission — @_selected?.AdmissionNumber</MudText>
+        <div>
+            <div style="font-size:18px;font-weight:700;color:#1E293B;">Admit Patient</div>
+            @if (_admitToBed != null && _admitToRoom != null && _selectedWard != null)
+            {
+                <div style="font-size:12px;color:#64748B;margin-top:3px;display:flex;gap:10px;">
+                    <span style="background:#EFF6FF;color:#1565C0;padding:2px 8px;border-radius:6px;font-weight:600;">
+                        @_selectedWard.Name
+                    </span>
+                    <span style="background:#F1F5F9;color:#475569;padding:2px 8px;border-radius:6px;font-weight:600;">
+                        Room @_admitToRoom.RoomNumber
+                    </span>
+                    <span style="background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:6px;font-weight:600;">
+                        Bed @_admitToBed.BedNumber
+                    </span>
+                </div>
+            }
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:16px;padding-top:8px;">
+
+            @if (_admitToRoom != null)
+            {
+                <div style="padding:10px 14px;background:#F0FDF4;border-radius:10px;
+                             font-size:12px;color:#16A34A;font-weight:600;display:flex;gap:20px;">
+                    @if (!string.IsNullOrEmpty(_admitToRoom.RoomType))
+                    {<span>Room Type: @_admitToRoom.RoomType</span>}
+                    <span>₹@_admitToRoom.PricePerDay.ToString("N0") / day</span>
+                </div>
+            }
+
+            <!-- Patient search -->
+            <PatientSearchInput OnPatientSelected="OnBedPatientSelected"
+                                Placeholder="Type patient name or phone to search…" />
+
+            <MudSelect T="Guid?" @bind-Value="_bedSelectedDoctorId"
+                       Label="Attending Doctor (optional)" Variant="Variant.Outlined" Dense="true">
+                <MudSelectItem T="Guid?" Value="@((Guid?)null)">— No Doctor —</MudSelectItem>
+                @foreach (var d in _doctors)
+                {<MudSelectItem T="Guid?" Value="d.UserId">@d.FullName</MudSelectItem>}
+            </MudSelect>
+
+            <MudNumericField @bind-Value="_bedInitialFee" Label="Initial Fee (₹)"
+                             Variant="Variant.Outlined" Min="0" />
+            <MudTextField @bind-Value="_bedAdmissionNotes" Label="Admission Notes (optional)"
+                          Variant="Variant.Outlined" Lines="2" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button class="cc-btn-light" @onclick="@(() => _bedAdmitVisible = false)">Cancel</button>
+            <button class="cc-btn-primary" @onclick="BedAdmitAsync" disabled="@_saving">
+                @(_saving ? "Admitting..." : "Confirm Admission")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ════════════════════════════════════════════════════════
+     DIALOG: Reception – Occupied bed detail / discharge
+     ════════════════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_bedDetailVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:700;color:#1E293B;">Bed Details</div>
+    </TitleContent>
+    <DialogContent>
+        @if (_bedDetailAdm != null && _bedDetailBed != null && _bedDetailRoom != null)
+        {
+            <div style="display:flex;flex-direction:column;gap:14px;padding-top:6px;">
+                <!-- Bed location badges -->
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <span style="background:#EFF6FF;color:#1565C0;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:700;">
+                        @_selectedWard?.Name
+                    </span>
+                    <span style="background:#F1F5F9;color:#475569;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:700;">
+                        Room @_bedDetailRoom.RoomNumber
+                    </span>
+                    <span style="background:#FEF3C7;color:#D97706;padding:3px 10px;border-radius:8px;font-size:12px;font-weight:700;">
+                        Bed @_bedDetailBed.BedNumber
+                    </span>
+                </div>
+
+                <!-- Patient card -->
+                <div style="background:#F8FAFC;border-radius:12px;padding:16px;">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                        <div style="width:44px;height:44px;border-radius:12px;background:#EFF6FF;
+                                    display:flex;align-items:center;justify-content:center;
+                                    font-size:18px;font-weight:800;color:#1565C0;flex-shrink:0;">
+                            @GetInitials(_bedDetailAdm.PatientName)
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:700;color:#1E293B;">@_bedDetailAdm.PatientName</div>
+                            <div style="font-size:11px;color:#64748B;">@_bedDetailAdm.AdmissionNumber</div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div>
+                            <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">DOCTOR</div>
+                            <div style="font-size:13px;color:#1E293B;">@(_bedDetailAdm.DoctorName ?? "—")</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">ADMITTED</div>
+                            <div style="font-size:13px;color:#1E293B;">@_bedDetailAdm.AdmissionDate.ToString("MMM dd, yyyy")</div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">DAYS IN</div>
+                            <div style="font-size:13px;font-weight:700;color:#D97706;">
+                                Day @((int)(DateTime.Today - _bedDetailAdm.AdmissionDate.Date).TotalDays + 1)
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">INITIAL FEE</div>
+                            <div style="font-size:13px;color:#1E293B;">₹@_bedDetailAdm.InitialFee.ToString("N0")</div>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_bedDetailAdm.AdmissionNotes))
+                    {
+                        <div style="margin-top:10px;border-top:1px solid #E2E8F0;padding-top:10px;">
+                            <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:4px;">NOTES</div>
+                            <div style="font-size:12px;color:#475569;">@_bedDetailAdm.AdmissionNotes</div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Discharge section -->
+                @if (!_showDischargeFields)
+                {
+                    <button class="cc-btn-light" style="color:#D97706;border-color:#D97706;width:100%;"
+                            @onclick="@(() => _showDischargeFields = true)">
+                        Discharge Patient
+                    </button>
+                }
+                else
+                {
+                    <div style="border:1px solid #FDE68A;border-radius:10px;padding:14px;background:#FFFBEB;">
+                        <div style="font-size:12px;font-weight:700;color:#D97706;margin-bottom:10px;">
+                            Confirm Discharge
+                        </div>
+                        <MudTextField @bind-Value="_dischargeNotes" Label="Discharge Notes (optional)"
+                                      Variant="Variant.Outlined" Lines="2" />
+                        <div style="display:flex;gap:8px;margin-top:10px;">
+                            <button class="cc-btn-light" style="flex:1;"
+                                    @onclick="@(() => _showDischargeFields = false)">Cancel</button>
+                            <button class="cc-btn-light" style="flex:1;color:#D97706;border-color:#D97706;"
+                                    @onclick="BedDischargeAsync" disabled="@_saving">
+                                @(_saving ? "Discharging..." : "Confirm")
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <button class="cc-btn-light" @onclick="@(() => _bedDetailVisible = false)">Close</button>
+    </DialogActions>
+</MudDialog>
+
+<!-- ════════════════════════════════════════════════════════
+     DIALOG: Admin – View admission detail
+     ════════════════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_viewDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:700;color:#1E293B;">
+            IPD Details — @_selected?.AdmissionNumber
+        </div>
     </TitleContent>
     <DialogContent>
         @if (_selected is not null)
         {
-            <MudGrid>
-                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Patient</MudText><MudText>@_selected.PatientName</MudText></MudItem>
-                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Doctor</MudText><MudText>@(_selected.DoctorName ?? "—")</MudText></MudItem>
-                <MudItem xs="4"><MudText Typo="Typo.caption" Color="Color.Secondary">Ward</MudText><MudText>@(_selected.WardName ?? "—")</MudText></MudItem>
-                <MudItem xs="4"><MudText Typo="Typo.caption" Color="Color.Secondary">Room</MudText><MudText>@(_selected.RoomNumber ?? "—")</MudText></MudItem>
-                <MudItem xs="4"><MudText Typo="Typo.caption" Color="Color.Secondary">Bed</MudText><MudText>@(_selected.BedNumber ?? "—")</MudText></MudItem>
-                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Admitted</MudText><MudText>@_selected.AdmissionDate.ToString("MMM dd, yyyy")</MudText></MudItem>
-                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Status</MudText><MudText>@_selected.Status</MudText></MudItem>
-                <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Initial Fee</MudText><MudText>₹@_selected.InitialFee.ToString("N2")</MudText></MudItem>
+            <div style="display:flex;flex-direction:column;gap:12px;padding-top:6px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">PATIENT</div>
+                         <div style="font-weight:600;color:#1E293B;">@_selected.PatientName</div></div>
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">DOCTOR</div>
+                         <div style="color:#1E293B;">@(_selected.DoctorName ?? "—")</div></div>
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">WARD</div>
+                         <div style="color:#1E293B;">@(_selected.WardName ?? "—")</div></div>
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">ROOM</div>
+                         <div style="color:#1E293B;">@(_selected.RoomNumber ?? "—")</div></div>
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">BED</div>
+                         <div style="color:#1E293B;">@(_selected.BedNumber ?? "—")</div></div>
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">ADMITTED</div>
+                         <div style="color:#1E293B;">@_selected.AdmissionDate.ToString("MMM dd, yyyy")</div></div>
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">STATUS</div>
+                         @{ var (vc,vbg)=GetStatusBadge(_selected.Status); }
+                         <span class="cc-badge" style="color:@vc;background:@vbg;">@_selected.Status</span></div>
+                    <div><div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">INITIAL FEE</div>
+                         <div style="font-weight:600;color:#1E293B;">₹@_selected.InitialFee.ToString("N2")</div></div>
+                </div>
                 @if (_selected.DischargeDate.HasValue)
                 {
-                    <MudItem xs="6"><MudText Typo="Typo.caption" Color="Color.Secondary">Discharged</MudText><MudText>@_selected.DischargeDate.Value.ToString("MMM dd, yyyy")</MudText></MudItem>
-                    <MudItem xs="12"><MudText Typo="Typo.caption" Color="Color.Secondary">Discharge Notes</MudText><MudText>@(_selected.DischargeNotes ?? "—")</MudText></MudItem>
+                    <div style="border-top:1px solid #E2E8F0;padding-top:10px;">
+                        <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">DISCHARGED</div>
+                        <div style="color:#1E293B;">@_selected.DischargeDate.Value.ToString("MMM dd, yyyy")</div>
+                        @if (!string.IsNullOrEmpty(_selected.DischargeNotes))
+                        {
+                            <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-top:8px;margin-bottom:2px;">DISCHARGE NOTES</div>
+                            <div style="color:#475569;font-size:13px;">@_selected.DischargeNotes</div>
+                        }
+                    </div>
                 }
-                <MudItem xs="12"><MudText Typo="Typo.caption" Color="Color.Secondary">Admission Notes</MudText><MudText>@(_selected.AdmissionNotes ?? "—")</MudText></MudItem>
-            </MudGrid>
+                @if (!string.IsNullOrEmpty(_selected.AdmissionNotes))
+                {
+                    <div style="border-top:1px solid #E2E8F0;padding-top:10px;">
+                        <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-bottom:2px;">ADMISSION NOTES</div>
+                        <div style="color:#475569;font-size:13px;">@_selected.AdmissionNotes</div>
+                    </div>
+                }
+            </div>
         }
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _viewDialogVisible = false)">Close</MudButton>
+        <button class="cc-btn-light" @onclick="@(() => _viewDialogVisible = false)">Close</button>
     </DialogActions>
 </MudDialog>
 
-<!-- Discharge Dialog -->
-<MudDialog @bind-Visible="_dischargeDialogVisible">
+<!-- ════════════════════════════════════════════════════════
+     DIALOG: Admin – Discharge confirmation
+     ════════════════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_dischargeDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
     <TitleContent>
-        <MudText Typo="Typo.h6">Discharge — @_discharging?.PatientName</MudText>
+        <div style="font-size:16px;font-weight:700;color:#1E293B;">
+            Discharge — @_discharging?.PatientName
+        </div>
     </TitleContent>
     <DialogContent>
-        <MudTextField @bind-Value="_dischargeNotes" Label="Discharge Notes (optional)" Variant="Variant.Outlined" Lines="3" />
+        <div style="padding-top:4px;">
+            <MudTextField @bind-Value="_dischargeNotes" Label="Discharge Notes (optional)"
+                          Variant="Variant.Outlined" Lines="3" />
+        </div>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="@(() => _dischargeDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="DischargeAsync" Disabled="_saving">
-            @(_saving ? "Discharging..." : "Discharge")
-        </MudButton>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button class="cc-btn-light" @onclick="@(() => _dischargeDialogVisible = false)">Cancel</button>
+            <button class="cc-btn-light" style="color:#D97706;border-color:#D97706;"
+                    @onclick="AdminDischargeAsync" disabled="@_saving">
+                @(_saving ? "Discharging..." : "Confirm Discharge")
+            </button>
+        </div>
     </DialogActions>
 </MudDialog>
 
 @code {
+    // ── page-level state ─────────────────────────────────────────────────────
     private bool _loading = true;
-    private bool _admitDialogVisible;
-    private bool _viewDialogVisible;
-    private bool _dischargeDialogVisible;
-    private bool _saving;
+    private bool _isAdmin;
+
+    // ── wards (shared) ───────────────────────────────────────────────────────
+    private List<WardDto> _wards = [];
+    private int _totalBeds, _availableBeds, _occupiedBeds, _overallOccupancy;
+
+    // ── doctors (shared) ─────────────────────────────────────────────────────
+    private List<DoctorDto> _doctors = [];
+
+    // ── admin view ────────────────────────────────────────────────────────────
+    private bool _admissionsLoading;
     private string? _search;
     private int _page = 1;
     private const int PageSize = 20;
     private TenantCore.Shared.Common.PagedResult<IpdRegistrationDto>? _result;
-    private IpdRegistrationDto? _selected;
-    private IpdRegistrationDto? _discharging;
-    private List<PatientDto> _patients = [];
-    private List<DoctorDto> _doctors = [];
-    private string? _patientSearch;
+
+    // admin admit dialog
+    private bool _adminAdmitVisible;
+    private bool _saving;
     private Guid _selectedPatientId;
     private Guid? _selectedDoctorId;
-    private string? _wardName;
-    private string? _roomNumber;
-    private string? _bedNumber;
+    private Guid? _selectedWardId;
+    private Guid? _selectedRoomId;
+    private Guid? _selectedBedId;
+    private List<RoomDto> _dialogRooms = [];
+    private List<BedDto> _dialogBeds = [];
+    private RoomDto? _selectedRoomDto;
+    private bool _loadingRooms, _loadingBeds;
     private decimal _initialFee;
     private string? _admissionNotes;
+
+    // admin view/discharge dialogs
+    private bool _viewDialogVisible, _dischargeDialogVisible;
+    private IpdRegistrationDto? _selected, _discharging;
     private string? _dischargeNotes;
+
+    // ── reception / bed map view ─────────────────────────────────────────────
+    private WardDto? _selectedWard;
+    private List<RoomDto> _selectedWardRooms = [];
+    private List<(BedDto Bed, RoomDto Room)> _flatBeds = [];
+    private bool _loadingBedMap;
+    private Dictionary<string, IpdRegistrationDto> _admissionsByBed = new();
+    private Guid? _selectedRoomFilter;
+
+    // auto-refresh (reception only)
+    private CancellationTokenSource? _refreshCts;
+
+    // reception: bed admit dialog (bed pre-selected)
+    private bool _bedAdmitVisible;
+    private BedDto? _admitToBed;
+    private RoomDto? _admitToRoom;
+    private List<PatientDto> _bedPatients = [];
+    private Guid _bedSelectedPatientId;
+    private Guid? _bedSelectedDoctorId;
+    private decimal _bedInitialFee;
+    private string? _bedAdmissionNotes;
+
+    // reception: occupied bed detail dialog
+    private bool _bedDetailVisible;
+    private bool _showDischargeFields;
+    private BedDto? _bedDetailBed;
+    private RoomDto? _bedDetailRoom;
+    private IpdRegistrationDto? _bedDetailAdm;
 
     private int TotalPages => _result is null ? 1 : (int)Math.Ceiling(_result.TotalCount / (double)PageSize);
 
+    private int WardBeds => _selectedWardRooms.Any()
+        ? _selectedWardRooms.Sum(r => r.Beds.Count(b => b.IsActive))
+        : _selectedWard?.BedCount ?? 0;
+
+    private int WardOccupied => _selectedWardRooms.Any()
+        ? _selectedWardRooms.Sum(r => r.Beds.Count(b => b.IsActive && b.IsOccupied))
+        : (_selectedWard?.BedCount ?? 0) - (_selectedWard?.AvailableBeds ?? 0);
+
+    private int WardAvailable => WardBeds - WardOccupied;
+
+    private int WardCleaning => _selectedWardRooms.Sum(r => r.Beds.Count(b => !b.IsActive));
+
+    private List<RoomDto> FilteredRooms => _selectedRoomFilter == null
+        ? _selectedWardRooms.OrderBy(r => r.RoomNumber).ToList()
+        : _selectedWardRooms.Where(r => r.Id == _selectedRoomFilter).ToList();
+
+    // ── lifecycle ────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
-        await LoadAsync();
-        await LoadDoctorsAsync();
-        if (Navigation.Uri.EndsWith("/ipd/new", StringComparison.OrdinalIgnoreCase))
-            OpenAdmitDialog();
-    }
+        await AuthState.InitializeAsync();
+        var roles = AuthState.CurrentUser?.UserRoles ?? [];
+        _isAdmin = roles.Any(r =>
+            r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+            r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
 
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        var response = await ClinicClient.GetIpdRegistrationsAsync(_page, PageSize, _search);
-        if (response.Success) _result = response.Data;
-        else Snackbar.Add(response.Message, Severity.Error);
+        var wardsTask   = ClinicClient.GetWardsAsync();
+        var doctorsTask = ClinicClient.GetDoctorsAsync();
+        await Task.WhenAll(wardsTask, doctorsTask);
+
+        var wr = await wardsTask;
+        if (wr.Success && wr.Data != null)
+        {
+            _wards = wr.Data.ToList();
+            _totalBeds       = _wards.Sum(w => w.BedCount);
+            _availableBeds   = _wards.Sum(w => w.AvailableBeds);
+            _occupiedBeds    = _totalBeds - _availableBeds;
+            _overallOccupancy = _totalBeds == 0 ? 0 : (int)(_occupiedBeds * 100.0 / _totalBeds);
+        }
+
+        var dr = await doctorsTask;
+        if (dr.Success) _doctors = dr.Data?.ToList() ?? [];
+
+        if (_isAdmin)
+        {
+            await LoadAdmissionsAsync();
+        }
+        else
+        {
+            // pre-select the first ward and load its bed map
+            if (_wards.Any())
+                await SelectWardAsync(_wards[0]);
+
+            // start 10-second live refresh for reception
+            _refreshCts = new CancellationTokenSource();
+            _ = AutoRefreshBedMapAsync(_refreshCts.Token);
+        }
+
         _loading = false;
+
+        if (Navigation.Uri.EndsWith("/ipd/new", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_isAdmin) OpenAdminAdmitDialog();
+        }
     }
 
-    private async Task LoadDoctorsAsync()
+    // ── admin: admissions list ───────────────────────────────────────────────
+    private async Task LoadAdmissionsAsync()
     {
-        var response = await ClinicClient.GetDoctorsAsync();
-        if (response.Success) _doctors = response.Data?.ToList() ?? [];
-        else Snackbar.Add($"Could not load doctors: {response.Message}", Severity.Warning);
+        _admissionsLoading = true;
+        var r = await ClinicClient.GetIpdRegistrationsAsync(_page, PageSize, _search);
+        if (r.Success) _result = r.Data;
+        else Snackbar.Add(r.Message, Severity.Error);
+        _admissionsLoading = false;
     }
 
-    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
-    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAsync(); } }
+    private void OnSearchInput(ChangeEventArgs e) => _search = e.Value?.ToString();
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAdmissionsAsync(); } }
+    private async Task OnPageChanged(int page) { _page = page; await LoadAdmissionsAsync(); }
 
-    private void OpenAdmitDialog()
+    // ── admin: admit dialog ──────────────────────────────────────────────────
+    private void OnAdminPatientSelected(PatientDto? p) => _selectedPatientId     = p?.Id ?? Guid.Empty;
+    private void OnBedPatientSelected(PatientDto? p)   => _bedSelectedPatientId = p?.Id ?? Guid.Empty;
+
+    private void OpenAdminAdmitDialog()
     {
-        _patientSearch = null;
-        _patients = [];
         _selectedPatientId = Guid.Empty;
-        _selectedDoctorId = null;
-        _wardName = null;
-        _roomNumber = null;
-        _bedNumber = null;
-        _initialFee = 0;
-        _admissionNotes = null;
-        _admitDialogVisible = true;
+        _selectedDoctorId  = null; _initialFee = 0; _admissionNotes = null;
+        _selectedWardId    = null; _selectedRoomId = null; _selectedBedId = null;
+        _selectedRoomDto   = null; _dialogRooms = []; _dialogBeds = [];
+        _adminAdmitVisible = true;
     }
 
+    private async Task OnAdminWardSelected(Guid? wardId)
+    {
+        _selectedWardId  = wardId;
+        _selectedRoomId  = null; _selectedBedId = null;
+        _selectedRoomDto = null; _dialogRooms   = []; _dialogBeds = [];
+        if (wardId == null) return;
+        _loadingRooms = true;
+        var r = await ClinicClient.GetRoomsByWardAsync(wardId.Value);
+        if (r.Success && r.Data != null)
+            _dialogRooms = r.Data.Where(x => x.IsActive && x.AvailableBeds > 0).ToList();
+        _loadingRooms = false;
+    }
+
+    private async Task OnAdminRoomSelected(Guid? roomId)
+    {
+        _selectedRoomId  = roomId;
+        _selectedBedId   = null; _dialogBeds = [];
+        _selectedRoomDto = roomId == null ? null : _dialogRooms.FirstOrDefault(r => r.Id == roomId);
+        if (roomId == null || _selectedWardId == null) return;
+        _loadingBeds = true;
+        var r = await ClinicClient.GetAvailableBedsAsync(_selectedWardId);
+        if (r.Success && r.Data != null)
+            _dialogBeds = r.Data.Where(b => b.RoomId == roomId).ToList();
+        _loadingBeds = false;
+    }
+
+    private async Task AdminAdmitAsync()
+    {
+        if (_selectedPatientId == Guid.Empty)
+        { Snackbar.Add("Please select a patient.", Severity.Warning); return; }
+        _saving = true;
+        var ward   = _selectedWardId.HasValue ? _wards.FirstOrDefault(w => w.Id == _selectedWardId) : null;
+        var bed    = _selectedBedId.HasValue  ? _dialogBeds.FirstOrDefault(b => b.Id == _selectedBedId) : null;
+        var doctor = _selectedDoctorId.HasValue ? _doctors.FirstOrDefault(d => d.UserId == _selectedDoctorId) : null;
+        var dto = new CreateIpdRegistrationDto(
+            _selectedPatientId, _selectedDoctorId ?? Guid.Empty, doctor?.FullName ?? string.Empty,
+            ward?.Name, _selectedRoomDto?.RoomNumber, bed?.BedNumber, _initialFee, _admissionNotes);
+        var r = await ClinicClient.CreateIpdRegistrationAsync(dto);
+        if (r.Success)
+        {
+            Snackbar.Add($"Patient admitted — {r.Data?.AdmissionNumber}", Severity.Success);
+            _adminAdmitVisible = false;
+            await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync());
+        }
+        else Snackbar.Add(r.Message, Severity.Error);
+        _saving = false;
+    }
+
+    // ── admin: view / discharge ──────────────────────────────────────────────
     private void OpenViewDialog(IpdRegistrationDto reg) { _selected = reg; _viewDialogVisible = true; }
 
     private void OpenDischargeDialog(IpdRegistrationDto reg)
-    {
-        _discharging = reg;
-        _dischargeNotes = null;
-        _dischargeDialogVisible = true;
-    }
+    { _discharging = reg; _dischargeNotes = null; _dischargeDialogVisible = true; }
 
-    private async Task OnPatientSearchKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_patientSearch))
-        {
-            var response = await ClinicClient.GetPatientsAsync(1, 20, _patientSearch);
-            if (response.Success) _patients = response.Data?.Items.ToList() ?? [];
-        }
-    }
-
-    private async Task AdmitAsync()
-    {
-        if (_selectedPatientId == Guid.Empty) { Snackbar.Add("Please select a patient.", Severity.Warning); return; }
-        _saving = true;
-        var doctor = _selectedDoctorId.HasValue ? _doctors.FirstOrDefault(d => d.UserId == _selectedDoctorId) : null;
-        var dto = new CreateIpdRegistrationDto(
-            _selectedPatientId,
-            _selectedDoctorId ?? Guid.Empty,
-            doctor?.FullName ?? string.Empty,
-            _wardName,
-            _roomNumber,
-            _bedNumber,
-            _initialFee,
-            _admissionNotes);
-        var response = await ClinicClient.CreateIpdRegistrationAsync(dto);
-        if (response.Success)
-        {
-            Snackbar.Add($"Patient admitted as {response.Data?.AdmissionNumber}.", Severity.Success);
-            _admitDialogVisible = false;
-            await LoadAsync();
-        }
-        else Snackbar.Add(response.Message, Severity.Error);
-        _saving = false;
-    }
-
-    private async Task DischargeAsync()
+    private async Task AdminDischargeAsync()
     {
         if (_discharging is null) return;
         _saving = true;
-        var response = await ClinicClient.DischargePatientAsync(_discharging.Id, new DischargePatientDto(_dischargeNotes));
-        if (response.Success)
+        var r = await ClinicClient.DischargePatientAsync(_discharging.Id, new DischargePatientDto(_dischargeNotes));
+        if (r.Success)
         {
-            Snackbar.Add("Patient discharged successfully.", Severity.Success);
+            Snackbar.Add("Patient discharged.", Severity.Success);
             _dischargeDialogVisible = false;
-            await LoadAsync();
+            await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync());
         }
-        else Snackbar.Add(response.Message, Severity.Error);
+        else Snackbar.Add(r.Message, Severity.Error);
         _saving = false;
     }
 
-    private static Color GetStatusColor(TenantCore.Shared.Enums.IpdStatus status) => status switch
+    // ── reception: ward tab selection ────────────────────────────────────────
+    private async Task SelectWardAsync(WardDto ward)
     {
-        TenantCore.Shared.Enums.IpdStatus.Admitted => Color.Info,
-        TenantCore.Shared.Enums.IpdStatus.Discharged => Color.Success,
-        TenantCore.Shared.Enums.IpdStatus.Transferred => Color.Warning,
-        TenantCore.Shared.Enums.IpdStatus.Cancelled => Color.Error,
-        _ => Color.Default
+        _selectedWard      = ward;
+        _selectedWardRooms = [];
+        _flatBeds          = [];
+        _admissionsByBed   = new();
+        _loadingBedMap    = true;
+        StateHasChanged();
+
+        var roomsTask = ClinicClient.GetRoomsByWardAsync(ward.Id);
+        var admTask   = ClinicClient.GetIpdRegistrationsAsync(1, 200, null);
+        await Task.WhenAll(roomsTask, admTask);
+
+        var rr = await roomsTask;
+        if (rr.Success && rr.Data != null)
+        {
+            _selectedWardRooms = rr.Data.ToList();
+            _flatBeds = _selectedWardRooms
+                .OrderBy(r => r.RoomNumber)
+                .SelectMany(r => r.Beds
+                    .Where(b => b.IsActive)
+                    .OrderBy(b => b.BedNumber)
+                    .Select(b => (Bed: b, Room: r)))
+                .ToList();
+        }
+        else
+        {
+            _flatBeds = [];
+        }
+
+        var ar = await admTask;
+        if (ar.Success && ar.Data != null)
+        {
+            _admissionsByBed = ar.Data.Items
+                .Where(a => a.Status == IpdStatus.Admitted &&
+                            a.WardName?.Equals(ward.Name, StringComparison.OrdinalIgnoreCase) == true)
+                .GroupBy(
+                    a => $"{a.RoomNumber?.Trim()}|{a.BedNumber?.Trim()}",
+                    StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(a => a.AdmissionDate).First(),
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        _loadingBedMap = false;
+    }
+
+    // ── reception: bed click handler ─────────────────────────────────────────
+    private void OnBedClick(BedDto bed, RoomDto room, IpdRegistrationDto? adm)
+    {
+        if (bed.IsOccupied)
+        {
+            _bedDetailBed    = bed;
+            _bedDetailRoom   = room;
+            _bedDetailAdm    = adm;
+            _showDischargeFields = false;
+            _dischargeNotes  = null;
+            _bedDetailVisible = true;
+        }
+        else
+        {
+            OpenBedAdmitDialog(bed, room);
+        }
+    }
+
+    private void OpenBedAdmitDialog(BedDto bed, RoomDto room)
+    {
+        _admitToBed           = bed;
+        _admitToRoom          = room;
+        _bedPatients          = [];
+        _bedSelectedPatientId = Guid.Empty;
+        _bedSelectedDoctorId  = null;
+        _bedInitialFee        = room.PricePerDay;
+        _bedAdmissionNotes    = null;
+        _bedAdmitVisible      = true;
+    }
+
+
+    private async Task BedAdmitAsync()
+    {
+        if (_bedSelectedPatientId == Guid.Empty)
+        { Snackbar.Add("Please select a patient.", Severity.Warning); return; }
+        if (_admitToBed == null || _admitToRoom == null || _selectedWard == null) return;
+
+        _saving = true;
+        var doctor = _bedSelectedDoctorId.HasValue
+            ? _doctors.FirstOrDefault(d => d.UserId == _bedSelectedDoctorId)
+            : null;
+        var dto = new CreateIpdRegistrationDto(
+            _bedSelectedPatientId,
+            _bedSelectedDoctorId ?? Guid.Empty,
+            doctor?.FullName ?? string.Empty,
+            _selectedWard.Name,
+            _admitToRoom.RoomNumber,
+            _admitToBed.BedNumber,
+            _bedInitialFee,
+            _bedAdmissionNotes);
+
+        var r = await ClinicClient.CreateIpdRegistrationAsync(dto);
+        if (r.Success)
+        {
+            Snackbar.Add($"Patient admitted — {r.Data?.AdmissionNumber}", Severity.Success);
+            _bedAdmitVisible = false;
+            await Task.WhenAll(RefreshWardsAsync(), SelectWardAsync(_selectedWard));
+        }
+        else Snackbar.Add(r.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private async Task BedDischargeAsync()
+    {
+        if (_bedDetailAdm is null) return;
+        _saving = true;
+        var r = await ClinicClient.DischargePatientAsync(_bedDetailAdm.Id, new DischargePatientDto(_dischargeNotes));
+        if (r.Success)
+        {
+            Snackbar.Add("Patient discharged.", Severity.Success);
+            _bedDetailVisible = false;
+            if (_selectedWard != null)
+                await Task.WhenAll(RefreshWardsAsync(), SelectWardAsync(_selectedWard));
+        }
+        else Snackbar.Add(r.Message, Severity.Error);
+        _saving = false;
+    }
+
+    // ── shared helpers ───────────────────────────────────────────────────────
+    private async Task RefreshWardsAsync()
+    {
+        var r = await ClinicClient.GetWardsAsync();
+        if (r.Success && r.Data != null)
+        {
+            _wards           = r.Data.ToList();
+            _totalBeds       = _wards.Sum(w => w.BedCount);
+            _availableBeds   = _wards.Sum(w => w.AvailableBeds);
+            _occupiedBeds    = _totalBeds - _availableBeds;
+            _overallOccupancy = _totalBeds == 0 ? 0 : (int)(_occupiedBeds * 100.0 / _totalBeds);
+            // keep _selectedWard in sync
+            if (_selectedWard != null)
+                _selectedWard = _wards.FirstOrDefault(w => w.Id == _selectedWard.Id) ?? _selectedWard;
+        }
+    }
+
+    private IpdRegistrationDto? GetAdmissionForBed(string roomNumber, string bedNumber)
+        => _admissionsByBed.GetValueOrDefault($"{roomNumber.Trim()}|{bedNumber.Trim()}");
+
+    private static string GetShortName(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2 ? $"{parts[0]} {parts[1][0]}." : name;
+    }
+
+    private static string GetInitials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}"
+            : parts.Length == 1 ? parts[0][0].ToString() : "?";
+    }
+
+    private static (string color, string bg) GetStatusBadge(IpdStatus status) => status switch
+    {
+        IpdStatus.Admitted    => ("#1565C0", "#EFF6FF"),
+        IpdStatus.Discharged  => ("#16A34A", "#ECFDF5"),
+        IpdStatus.Transferred => ("#D97706", "#FFFBEB"),
+        IpdStatus.Cancelled   => ("#EF4444", "#FEF2F2"),
+        _                     => ("#64748B", "#F1F5F9"),
     };
+
+    // ── auto-refresh (reception only) ────────────────────────────────────────
+    private async Task AutoRefreshBedMapAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(30_000, ct);
+                if (_selectedWard != null && !ct.IsCancellationRequested)
+                {
+                    await SelectWardAsync(_selectedWard);
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (TaskCanceledException) { break; }
+            catch { /* swallow transient network errors */ }
+        }
+    }
+
+    public void Dispose()
+    {
+        _refreshCts?.Cancel();
+        _refreshCts?.Dispose();
+    }
 }

@@ -8,7 +8,9 @@ using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Application.Features.IpdRegistrations.Handlers;
 
-public sealed class DischargePatientHandler(IIpdRegistrationRepository repository)
+public sealed class DischargePatientHandler(
+    IIpdRegistrationRepository repository,
+    IBedRepository bedRepository)
     : IRequestHandler<DischargePatientCommand, IpdRegistrationDto>
 {
     public async Task<IpdRegistrationDto> Handle(
@@ -19,6 +21,16 @@ public sealed class DischargePatientHandler(IIpdRegistrationRepository repositor
 
         if (registration.ApplicationId != request.ApplicationId)
             throw new UnauthorizedAccessException("Access denied.");
+
+        // Free the bed before discharging
+        if (!string.IsNullOrWhiteSpace(registration.WardName) &&
+            !string.IsNullOrWhiteSpace(registration.RoomNumber) &&
+            !string.IsNullOrWhiteSpace(registration.BedNumber))
+        {
+            var bed = await bedRepository.FindByLocationAsync(
+                registration.ApplicationId, registration.WardName, registration.RoomNumber, registration.BedNumber, cancellationToken);
+            bed?.MarkAvailable();
+        }
 
         registration.Discharge(request.DischargeNotes);
         repository.Update(registration);

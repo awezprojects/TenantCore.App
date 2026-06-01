@@ -4,30 +4,58 @@
 @implements IDisposable
 
 <nav style="flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;">
-    <NavItem Href="/dashboard" Icon="▦" Label="Dashboard" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
-    <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
-
-    @if (_isDoctor)
+    @if (_isAdmin)
     {
-        <NavItem Href="/opd"           Icon="🩺" Label="My OPD Queue"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/prescriptions" Icon="📋" Label="Prescriptions"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/patients"         Icon="👥" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/medicines"        Icon="💊" Label="Medicines"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/admin/dashboard" Icon="▦" Label="Dashboard" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
-        <NavItem Href="/settings/prescription"      Icon="🌐" Label="Rx Language"          DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/settings/dosage-remarks"    Icon="📝" Label="Dosage Remarks"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/admin/wards"  Icon="🏨" Label="Wards & Rooms"  DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/ipd"          Icon="🛏" Label="IPD & Beds"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/patients"     Icon="👥" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/opd"          Icon="🩺" Label="OPD Queue"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+
+        @if (_isDoctor)
+        {
+            <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+            <NavItem Href="/prescriptions" Icon="📋" Label="Prescriptions"  DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/medicines"     Icon="💊" Label="Medicines"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        }
+
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+        <NavItem Href="/auth/profile" Icon="👤" Label="My Profile" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+    }
+    else if (_isDoctor)
+    {
+        <NavItem Href="/dashboard"     Icon="▦" Label="Dashboard"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+
+        <NavItem Href="/opd"           Icon="🩺" Label="My OPD Queue"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/ipd"           Icon="🛏" Label="IPD & Beds"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/prescriptions" Icon="📋" Label="Prescriptions"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/patients"      Icon="👥" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/medicines"     Icon="💊" Label="Medicines"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+
+        <NavItem Href="/settings/prescription"   Icon="🌐" Label="Rx Language"    DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/settings/dosage-remarks" Icon="📝" Label="Dosage Remarks" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
     }
     else
     {
-        <NavItem Href="/patients" Icon="👥" Label="Patient Reg."  DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/opd"      Icon="🩺" Label="OPD Queue"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/dashboard" Icon="▦" Label="Dashboard"    DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
-        <NavItem Href="/auth/profile" Icon="👤" Label="Profile" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/patients" Icon="👥" Label="Patient Reg."  DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/opd"      Icon="🩺" Label="OPD Queue"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/ipd"      Icon="🛏" Label="IPD & Beds"    DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+
+        <NavItem Href="/auth/profile" Icon="👤" Label="My Profile" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
     }
 </nav>
 
@@ -35,6 +63,7 @@
     [Parameter] public bool DrawerOpen { get; set; } = true;
 
     private bool _isDoctor;
+    private bool _isAdmin;
     private string _currentPath = "/dashboard";
 
     protected override void OnInitialized()
@@ -64,8 +93,11 @@
 
     private void RefreshState()
     {
-        _isDoctor = AuthState.CurrentUser?.UserRoles
-            .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
+        var roles = AuthState.CurrentUser?.UserRoles ?? [];
+        _isAdmin = roles.Any(r =>
+            r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+            r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+        _isDoctor = roles.Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
     }
 
     public void Dispose()

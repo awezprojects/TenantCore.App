@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using TenantCore.Domain.Exceptions;
+using TenantCore.Shared.Errors;
 using System.Net;
 
 namespace TenantCore.Api.Middleware;
@@ -25,18 +26,21 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
 
         logger.LogError(exception, "Unhandled exception. CorrelationId: {CorrelationId}", correlationId);
 
+        // Detail is the user-facing message shown in the UI.
+        // Technical context (exception type, stack trace) stays in the log above.
         var (statusCode, title, detail) = exception switch
         {
             ValidationException ve => (
                 HttpStatusCode.BadRequest,
                 "Validation Error",
-                string.Join("; ", ve.Errors.Select(e => e.ErrorMessage))),
-            NotFoundException ne => (HttpStatusCode.NotFound, "Not Found", ne.Message),
-            DomainValidationException dve => (HttpStatusCode.BadRequest, "Domain Validation Error", dve.Message),
-            DomainException de => (HttpStatusCode.BadRequest, "Domain Error", de.Message),
-            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Unauthorized", "You are not authorized."),
-            InvalidOperationException ioe => (HttpStatusCode.Conflict, "Conflict", ioe.Message),
-            _ => (HttpStatusCode.InternalServerError, "Internal Server Error", "An unexpected error occurred.")
+                string.Join(" ", ve.Errors.Select(e => e.ErrorMessage))),
+
+            NotFoundException       => (HttpStatusCode.NotFound,            "Not Found",    UserMessages.NotFound),
+            DomainValidationException dve => (HttpStatusCode.BadRequest,    "Invalid Input", dve.Message),
+            DomainException de      => (HttpStatusCode.BadRequest,          "Request Error", de.Message),
+            UnauthorizedAccessException => (HttpStatusCode.Unauthorized,    "Unauthorized",  UserMessages.Unauthorized),
+            InvalidOperationException ioe => (HttpStatusCode.Conflict,      "Conflict",      ioe.Message),
+            _ => (HttpStatusCode.InternalServerError, "Server Error",       UserMessages.ServerError)
         };
 
         var problemDetails = new ProblemDetails
