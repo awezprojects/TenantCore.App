@@ -5,35 +5,30 @@
 
 <nav style="flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;">
 
-    @if (_isAdmin)
+    @if (_isAdmin && (!_isDoctor || _currentPath.StartsWith("/admin")))
     {
+        @* Clinic Admin panel — Wards & IPD stay here, not in doctor panel *@
         <NavItem Href="/admin/dashboard" Icon="▦" Label="Dashboard" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
         <NavItem Href="/admin/wards"  Icon="🏨" Label="Wards & Rooms"  DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/admin/users"  Icon="👥" Label="User Management" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/ipd"          Icon="🛏" Label="IPD & Beds"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/patients"     Icon="👥" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/opd"          Icon="🩺" Label="OPD Queue"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-
-        @if (_isDoctor)
-        {
-            <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
-            <NavItem Href="/prescriptions" Icon="📋" Label="Prescriptions"  DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-            <NavItem Href="/medicines"     Icon="💊" Label="Medicines"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        }
+        <NavItem Href="/patients"     Icon="🩺" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/opd"          Icon="📋" Label="OPD Queue"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
         <NavItem Href="/auth/profile" Icon="👤" Label="My Profile" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
     }
     else if (_isDoctor)
     {
+        @* Doctor panel — no ward management, no IPD & beds *@
         <NavItem Href="/dashboard"     Icon="▦" Label="Dashboard"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
         <NavItem Href="/opd"           Icon="🩺" Label="My OPD Queue"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/ipd"           Icon="🛏" Label="IPD & Beds"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/prescriptions" Icon="📋" Label="Prescriptions"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/patients"      Icon="👥" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/medicines"     Icon="💊" Label="Medicines"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />

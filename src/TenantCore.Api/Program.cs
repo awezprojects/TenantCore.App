@@ -93,7 +93,23 @@ try
     }
 
     app.UseBlazorFrameworkFiles();
-    app.UseStaticFiles();
+
+    // Serve static files. index.html must never be cached by the browser —
+    // if it were cached from a time when an API route didn't exist yet, the browser
+    // would keep serving the cached HTML for that URL even after the route is added,
+    // and no server-side code would ever be reached.
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = ctx =>
+        {
+            if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+                ctx.Context.Response.Headers["Pragma"]        = "no-cache";
+                ctx.Context.Response.Headers["Expires"]       = "0";
+            }
+        }
+    });
 
     app.UseCors("AllowAll");
     app.UseAuthentication();

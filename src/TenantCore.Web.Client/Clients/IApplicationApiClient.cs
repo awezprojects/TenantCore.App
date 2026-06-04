@@ -25,4 +25,11 @@ public interface IApplicationApiClient
     Task<ApiResponse> ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, ChangeUserRoleRequestDto request);
     Task<ApiResponse> InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request);
     Task<ApiResponse<List<ApplicationUserResponseDto>>> GetDeactivatedApplicationUsersAsync(Guid applicationId);
+    Task<ApiResponse<List<InvitationResponseDto>>> GetApplicationInvitationsAsync(Guid applicationId);
+    Task<ApiResponse> ReinviteUserAsync(Guid applicationId, Guid invitationId, Guid reinvitedBy);
+    Task<ApiResponse> DeleteInvitationAsync(Guid applicationId, Guid invitationId);
+
+    // Clinic-specific endpoints (enforces one-clinic rule + dual role assignment)
+    Task<ApiResponse<ApplicationResponseDto>> CreateClinicAsync(CreateClinicRequestDto request);
+    Task<ApiResponse<List<ClinicDashboardItemDto>>> GetClinicDashboardAsync();
 }

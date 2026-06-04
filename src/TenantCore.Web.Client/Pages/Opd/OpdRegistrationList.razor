@@ -4,6 +4,7 @@
 @inject IClinicApiClient ClinicClient
 @inject IPrescriptionApiClient PrescriptionClient
 @inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @using TenantCore.Shared.Enums
@@ -77,6 +78,18 @@
                        @bind:event="oninput"
                        @onkeyup="OnSearchKeyUp" />
             </div>
+
+            @if (!_isDoctor && _doctors.Count > 0)
+            {
+                <select class="opd-search-input" style="min-width:160px;max-width:220px;cursor:pointer;"
+                        @onchange="OnDoctorFilterChanged">
+                    <option value="">All Doctors</option>
+                    @foreach (var doc in _doctors)
+                    {
+                        <option value="@doc.UserId">Dr. @doc.FullName</option>
+                    }
+                </select>
+            }
 
             <button class="opd-btn start" style="white-space:nowrap;padding:8px 14px;" @onclick="ReloadAll">↻ Refresh</button>
         </div>
@@ -159,14 +172,14 @@
                                 <td><span class="opd-token">@reg.RegistrationNumber</span></td>
                                 <td>
                                     <div class="opd-patient-name">@reg.PatientName</div>
-                                    <div class="opd-patient-meta">@reg.RegistrationDate.ToLocalTime().ToString("dd MMM yyyy")</div>
+                                    <div class="opd-patient-meta">@reg.RegistrationDate.ToString("dd MMM yyyy")</div>
                                 </td>
                                 <td>
                                     <div class="opd-doctor-name">@(string.IsNullOrWhiteSpace(reg.DoctorName) ? "—" : reg.DoctorName)</div>
                                 </td>
                                 <td style="font-size:12px;color:#475569;">
-                                    <div style="font-weight:600;">@reg.RegistrationDate.ToLocalTime().ToString("dd MMM yyyy")</div>
-                                    <div>@reg.RegistrationDate.ToLocalTime().ToString("hh:mm tt")</div>
+                                    <div style="font-weight:600;">@reg.RegistrationDate.ToString("dd MMM yyyy")</div>
+                                    <div>@reg.RegistrationDate.ToString("hh:mm tt")</div>
                                 </td>
                                 @if (_isDoctor)
                                 {
@@ -289,7 +302,7 @@
                 </div>
                 <div class="opd-modal-field">
                     <div class="opd-modal-field-label">Appointment</div>
-                    <div class="opd-modal-field-value">@_selected.RegistrationDate.ToLocalTime().ToString("hh:mm tt")</div>
+                    <div class="opd-modal-field-value">@_selected.RegistrationDate.ToString("hh:mm tt")</div>
                 </div>
                 <div class="opd-modal-field">
                     <div class="opd-modal-field-label">Fee</div>
@@ -418,6 +431,8 @@
     private string? _search;
     private DateTime _customFrom = DateTime.Today;
     private DateTime _customTo   = DateTime.Today;
+    private Guid? _filterDoctorId;
+    private Guid? _clinicAppId;   // resolved once in OnInitializedAsync, passed explicitly on every API call
 
     // ── Data ──────────────────────────────────────────────────────────────────
     private bool _loading    = true;
@@ -465,14 +480,41 @@
     };
 
     private static bool IsNotVisited(OpdRegistrationDto r)
-        => r.Status == OpdStatus.Pending && r.RegistrationDate.ToLocalTime().Date < DateTime.Today;
+        => r.Status == OpdStatus.Pending && r.RegistrationDate.Date < DateTime.Today;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
-        var user = AuthState.CurrentUser;
-        _isDoctor     = user?.UserRoles.Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
-        _doctorUserId = _isDoctor ? user?.UserId : null;
+        // Both services must be initialised from storage before any role or API call
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+
+        var appId = ClinicContext.SelectedApplicationId;
+
+        // Resolve role for the SELECTED clinic only — prevents cross-clinic role bleed.
+        var clinicRoles = appId != Guid.Empty
+            ? AuthState.GetRolesForApplication(appId)
+            : (AuthState.CurrentUser?.UserRoles
+                .Where(r => r.IsActive)
+                .Select(r => r.RoleName)
+                .ToList() ?? []);
+
+        _isDoctor     = clinicRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+        _doctorUserId = _isDoctor ? AuthState.CurrentUser?.UserId : null;
+
+        // Non-doctor staff: auto-set clinic context from JWT if not already set
+        if (!_isDoctor && appId == Guid.Empty)
+        {
+            var apps = AuthState.AvailableApplications;
+            if (apps.Count > 0)
+            {
+                await ClinicContext.SetClinicAsync(apps[0].ApplicationId, apps[0].ApplicationName);
+                appId = apps[0].ApplicationId;
+            }
+        }
+
+        // Store for use in LoadPageAsync / LoadCountsAsync so all calls are explicit
+        _clinicAppId = appId != Guid.Empty ? appId : null;
 
         BuildPresets();
         await Task.WhenAll(LoadPageAsync(), LoadCountsAsync());
@@ -505,9 +547,10 @@
         var response = await ClinicClient.GetOpdRegistrationsAsync(
             page: _page, pageSize: _pageSize,
             search: string.IsNullOrWhiteSpace(_search) ? null : _search,
-            doctorUserId: _doctorUserId,
+            doctorUserId: _isDoctor ? _doctorUserId : _filterDoctorId,
             fromDate: from, toDate: to,
-            status: status, notVisited: nv);
+            status: status, notVisited: nv,
+            applicationId: _clinicAppId);
 
         if (response.Success) _result = response.Data;
         else Snackbar.Add(response.Message, Severity.Error);
@@ -526,9 +569,10 @@
             var r = await ClinicClient.GetOpdRegistrationsAsync(
                 page: 1, pageSize: 1,
                 search: search,
-                doctorUserId: _doctorUserId,
+                doctorUserId: _isDoctor ? _doctorUserId : _filterDoctorId,
                 fromDate: from, toDate: to,
-                status: s, notVisited: nv);
+                status: s, notVisited: nv,
+                applicationId: _clinicAppId);
             return r.Success ? r.Data?.TotalCount ?? 0 : 0;
         }
 
@@ -723,5 +767,11 @@
         return parts.Length >= 2
             ? $"{parts[0][0]}{parts[^1][0]}".ToUpper()
             : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private async Task OnDoctorFilterChanged(ChangeEventArgs e)
+    {
+        _filterDoctorId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
+        await ReloadAll();
     }
 }

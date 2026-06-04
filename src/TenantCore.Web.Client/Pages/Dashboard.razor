@@ -97,7 +97,7 @@ else if (_isDoctor)
                 <div class="cc-card">
                     <div class="cc-card-header">
                         <div class="cc-card-title">📅 Today's Appointments</div>
-                        <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/doctor/opd-queue")'>
+                        <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>
                             View all →
                         </button>
                     </div>
@@ -150,7 +150,7 @@ else if (_isDoctor)
                 <div class="cc-card">
                     <div class="cc-card-header">
                         <div class="cc-card-title">✅ Today's Visited Patients</div>
-                        <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/doctor/opd-queue")'>
+                        <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>
                             View all →
                         </button>
                     </div>
@@ -366,10 +366,10 @@ else
                                     background:@(opd.Status == OpdStatus.InProgress ? "#F0F7FF" : "transparent");">
                             <div style="width:44px;text-align:center;flex-shrink:0;">
                                 <div style="font-size:12px;font-weight:800;color:#1E293B;">
-                                    @opd.RegistrationDate.ToLocalTime().ToString("hh:mm")
+                                    @opd.RegistrationDate.ToString("hh:mm")
                                 </div>
                                 <div style="font-size:10px;color:#94A3B8;">
-                                    @opd.RegistrationDate.ToLocalTime().ToString("tt")
+                                    @opd.RegistrationDate.ToString("tt")
                                 </div>
                             </div>
                             <div class="cc-avatar cc-avatar-blue">
@@ -444,14 +444,26 @@ else
         await AuthState.InitializeAsync();
         await ClinicContext.InitializeAsync();
 
-        var roles = AuthState.CurrentUser?.UserRoles ?? [];
-        var isAdmin = roles.Any(r =>
-            r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
-            r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+        var selectedAppId = ClinicContext.SelectedApplicationId;
 
-        _isDoctor = roles.Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+        // Resolve the user's roles for the SELECTED clinic only.
+        // This ensures a user who is "Clinic Admin" in Clinic A and "Doctor" in Clinic B
+        // sees the correct dashboard when entering Clinic B.
+        // Falls back to all active roles when no clinic is selected (e.g. first load).
+        var clinicRoles = selectedAppId != Guid.Empty
+            ? AuthState.GetRolesForApplication(selectedAppId)
+            : (AuthState.CurrentUser?.UserRoles
+                .Where(r => r.IsActive)
+                .Select(r => r.RoleName)
+                .ToList() ?? []);
 
-        // Admins who are not doctors go to the admin dashboard
+        var isAdmin = clinicRoles.Any(r =>
+            r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+            r.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+
+        _isDoctor = clinicRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+
+        // Admins who are not doctors in this clinic → admin dashboard
         if (isAdmin && !_isDoctor)
         {
             Nav.NavigateTo("/admin/dashboard", forceLoad: true);
@@ -459,10 +471,22 @@ else
         }
 
         // Doctors must select a clinic first
-        if (_isDoctor && ClinicContext.SelectedApplicationId == Guid.Empty)
+        if (_isDoctor && selectedAppId == Guid.Empty)
         {
             Nav.NavigateTo("/doctor/home", forceLoad: true);
             return;
+        }
+
+        // Non-doctor staff (reception, nurse, etc.) may not have gone through clinic selection.
+        // Auto-set their clinic context from their JWT so all API calls hit the correct clinic.
+        if (!_isDoctor && selectedAppId == Guid.Empty)
+        {
+            var apps = AuthState.AvailableApplications;
+            if (apps.Count > 0)
+            {
+                await ClinicContext.SetClinicAsync(apps[0].ApplicationId, apps[0].ApplicationName);
+                selectedAppId = apps[0].ApplicationId;
+            }
         }
 
         var fullName = AuthState.CurrentUser?.FullName ?? "User";
@@ -485,39 +509,64 @@ else
 
     private async Task LoadDoctorDashboardAsync(Guid userId)
     {
-        var opdTask = ClinicApi.GetOpdRegistrationsAsync(
-            page: 1, pageSize: 50, doctorUserId: userId, todayOnly: true);
+        var appId = ClinicContext.SelectedApplicationId;
+        var today = DateTime.Today;
+        // Pass applicationId explicitly so the correct clinic's data is fetched
+        // regardless of in-memory delegating-handler state timing.
+        Guid? explicitApp = appId != Guid.Empty ? appId : null;
 
-        var today = DateTime.UtcNow.Date;
+        var todayTask = ClinicApi.GetOpdRegistrationsAsync(
+            page: 1, pageSize: 100, doctorUserId: userId,
+            fromDate: today, toDate: today,
+            applicationId: explicitApp);
+
+        var notVisitedTask = ClinicApi.GetOpdRegistrationsAsync(
+            page: 1, pageSize: 50, doctorUserId: userId, notVisited: true,
+            applicationId: explicitApp);
+
         var rxTask = PrescriptionApi.GetPrescriptionsAsync(
             page: 1, pageSize: 10, doctorUserId: userId,
-            from: today, to: today.AddDays(1).AddSeconds(-1));
+            from: today, to: today.AddDays(1).AddSeconds(-1),
+            applicationId: explicitApp);
 
-        await Task.WhenAll(opdTask, rxTask);
+        await Task.WhenAll(todayTask, notVisitedTask, rxTask);
 
-        var opdResult = await opdTask;
-        if (opdResult.Success && opdResult.Data != null)
+        var todayResult = await todayTask;
+        var nvResult    = await notVisitedTask;
+
+        if (todayResult.Success && todayResult.Data != null)
         {
-            _todayOpd = opdResult.Data.Items.ToList();
-            _visitedOpd = _todayOpd.Where(o => o.Status == OpdStatus.Completed).ToList();
-            _totalCount = _todayOpd.Count;
+            var todayItems = todayResult.Data.Items.ToList();
+            var nvItems    = nvResult.Success && nvResult.Data != null
+                ? nvResult.Data.Items.ToList()
+                : [];
+
+            _visitedOpd   = todayItems.Where(o => o.Status == OpdStatus.Completed).ToList();
+            _todayOpd     = todayItems
+                .Where(o => o.Status is OpdStatus.Pending or OpdStatus.InProgress)
+                .Concat(nvItems)
+                .ToList();
+
+            _totalCount   = todayItems.Count;
             _visitedCount = _visitedOpd.Count;
-            _pendingCount = _todayOpd.Count(o => o.Status is OpdStatus.Pending or OpdStatus.InProgress);
+            _pendingCount = _todayOpd.Count;
         }
 
         var rxResult = await rxTask;
         if (rxResult.Success && rxResult.Data != null)
         {
             _recentRx = rxResult.Data.Items.ToList();
-            _rxCount = _recentRx.Count;
+            _rxCount  = _recentRx.Count;
         }
     }
 
     private async Task LoadReceptionDashboardAsync()
     {
-        var today = DateTime.Today;
+        var appId = ClinicContext.SelectedApplicationId;
+        Guid? explicitApp = appId != Guid.Empty ? appId : null;
         var opdResult = await ClinicApi.GetOpdRegistrationsAsync(
-            page: 1, pageSize: 50, todayOnly: true);
+            page: 1, pageSize: 50, todayOnly: true,
+            applicationId: explicitApp);
 
         if (opdResult.Success && opdResult.Data != null)
         {

@@ -141,4 +141,18 @@ public class AuthStateService
         _currentUser = user;
         OnAuthStateChanged?.Invoke();
     }
+
+    /// <summary>
+    /// Returns the active role names the current user holds in a specific clinic application.
+    /// Always reads from the JWT-backed UserProfile — never from localStorage — so it cannot
+    /// be spoofed by a client-side state change.
+    /// </summary>
+    public IReadOnlyList<string> GetRolesForApplication(Guid applicationId)
+    {
+        if (_currentUser == null || applicationId == Guid.Empty) return [];
+        return _currentUser.UserRoles
+            .Where(r => r.ApplicationId == applicationId && r.IsActive)
+            .Select(r => r.RoleName)
+            .ToList();
+    }
 }

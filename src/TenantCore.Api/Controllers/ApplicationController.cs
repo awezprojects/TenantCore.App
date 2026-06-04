@@ -203,6 +203,55 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
+    // DELETE /api/Application/{applicationId}/invitations/{invitationId}
+    [HttpDelete("{applicationId}/invitations/{invitationId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteInvitationAsync(
+        Guid applicationId,
+        Guid invitationId,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new DeleteInvitationCommand(applicationId, invitationId), cancellationToken);
+        return Ok(new ApiResponse { Success = true, Message = "Invitation deleted." });
+    }
+
+    // GET /api/Application/{applicationId}/invitations
+    [HttpGet("{applicationId}/invitations")]
+    [ProducesResponseType(typeof(List<InvitationResponseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetApplicationInvitationsAsync(Guid applicationId, CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetApplicationInvitationsQuery(applicationId), cancellationToken);
+        var response = new ApiResponse<List<InvitationResponseDto>>
+        {
+            Success = true,
+            Data = result,
+            Message = $"{result.Count} invitation(s) found"
+        };
+        return Ok(response);
+    }
+
+    // POST /api/Application/{applicationId}/invitations/{invitationId}/reinvite?reinvitedBy={guid}
+    [HttpPost("{applicationId}/invitations/{invitationId}/reinvite")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ReinviteUserAsync(
+        Guid applicationId,
+        Guid invitationId,
+        [FromQuery] Guid reinvitedBy,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ReinviteUserCommand(applicationId, invitationId, reinvitedBy), cancellationToken);
+        var response = new ApiResponse
+        {
+            Success = true,
+            Message = "Invitation resent successfully. New link valid for 7 days."
+        };
+        return Ok(response);
+    }
+
     // POST /api/Application/{applicationId}/users/{userId}/assign?roleId={guid}&assignedBy={guid}
     [HttpPost("{applicationId:guid}/users/{userId:guid}/assign")]
     [ProducesResponseType(StatusCodes.Status200OK)]

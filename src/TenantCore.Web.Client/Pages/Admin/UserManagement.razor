@@ -1,0 +1,1334 @@
+@page "/admin/users"
+@layout AuthorizedLayout
+@inject IApplicationApiClient AppClient
+@inject IAuthApiClient AuthClient
+@inject ISnackbar Snackbar
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@using TenantCore.Web.Client.Services
+@using TenantCore.Shared.Dtos.Auth
+
+<PageTitle>User Management - CloudClinic</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;align-items:center;padding:80px 0;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    </div>
+}
+else if (_applicationId == Guid.Empty)
+{
+    <div style="background:#fff;border-radius:16px;padding:60px 24px;text-align:center;border:1px solid #E2E8F0;">
+        <div style="font-size:48px;margin-bottom:16px;">🏥</div>
+        <div style="font-size:17px;font-weight:700;color:#1E293B;margin-bottom:8px;">No clinic assigned</div>
+        <div style="font-size:13px;color:#64748B;">Your account is not linked to any clinic application. Please contact a system administrator.</div>
+    </div>
+}
+else
+{
+    <div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- ── Header ── -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#1E293B;">User Management</div>
+                <div style="font-size:13px;color:#64748B;margin-top:3px;">
+                    @_applicationName &nbsp;·&nbsp; Manage team members and access
+                </div>
+            </div>
+            <button style="@BtnPrimary" @onclick="OpenInviteDialog">＋ Add Member</button>
+        </div>
+
+        <!-- ── Stat cards ── -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+            <div style="background:#EFF6FF;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">TOTAL MEMBERS</div>
+                    <div style="font-size:32px;font-weight:800;color:#1E293B;line-height:1;">@((_users?.Count ?? 0) + (_deactivatedUsers?.Count ?? 0))</div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">👥</div>
+            </div>
+            <div style="background:#ECFDF5;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">ACTIVE</div>
+                    <div style="font-size:32px;font-weight:800;color:#16A34A;line-height:1;">@(_users?.Count ?? 0)</div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">✅</div>
+            </div>
+            <div style="background:#FEF2F2;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">DEACTIVATED</div>
+                    <div style="font-size:32px;font-weight:800;color:#EF4444;line-height:1;">@(_deactivatedUsers?.Count ?? 0)</div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">🚫</div>
+            </div>
+            <div style="background:#FFFBEB;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">PENDING INVITES</div>
+                    <div style="font-size:32px;font-weight:800;color:#D97706;line-height:1;">@(_invitations?.Count(i => !i.IsAccepted && !i.IsExpired) ?? 0)</div>
+                </div>
+                <div style="font-size:30px;opacity:0.6;">✉</div>
+            </div>
+        </div>
+
+        <!-- ── Tabs ── -->
+        <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
+
+            <!-- Tab bar -->
+            <div style="display:flex;border-bottom:1px solid #E2E8F0;padding:0 4px;">
+                <button style="@TabStyle(_activeTab == 0)"
+                        @onclick="@(() => _activeTab = 0)">
+                    👤 Active Members (@(_users?.Count ?? 0))
+                </button>
+                <button style="@TabStyle(_activeTab == 1)"
+                        @onclick="@(() => _activeTab = 1)">
+                    🚫 Deactivated (@(_deactivatedUsers?.Count ?? 0))
+                </button>
+                <button style="@TabStyle(_activeTab == 2)"
+                        @onclick="@(() => _activeTab = 2)">
+                    ✉ Invitations
+                    @{ var pendingCount = _invitations?.Count(i => !i.IsAccepted && !i.IsExpired) ?? 0; }
+                    @if (pendingCount > 0)
+                    {
+                        <span style="margin-left:5px;background:#DBEAFE;color:#1D4ED8;font-size:10px;
+                                     font-weight:800;padding:1px 6px;border-radius:20px;">@pendingCount</span>
+                    }
+                </button>
+            </div>
+
+            <!-- Tab content -->
+            <div style="padding:16px 20px;">
+
+                @if (_activeTab == 0)
+                {
+                    <!-- Search bar -->
+                    <div style="margin-bottom:16px;">
+                        <div style="position:relative;max-width:360px;">
+                            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:#94A3B8;">🔍</span>
+                            <input type="text"
+                                   placeholder="Search members by name or email..."
+                                   @bind="_searchQuery" @bind:event="oninput"
+                                   style="width:100%;padding:9px 12px 9px 36px;border:1.5px solid #E2E8F0;border-radius:10px;
+                                          font-size:13px;color:#1E293B;background:#F8FAFC;outline:none;
+                                          transition:border-color 0.15s;" />
+                        </div>
+                    </div>
+
+                    @if (_usersLoading)
+                    {
+                        <div style="padding:40px;text-align:center;">
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                        </div>
+                    }
+                    else if (!FilteredUsers.Any())
+                    {
+                        <div style="padding:48px 24px;text-align:center;">
+                            <div style="font-size:36px;margin-bottom:12px;">👤</div>
+                            <div style="font-size:15px;font-weight:700;color:#1E293B;margin-bottom:6px;">No members found</div>
+                            <div style="font-size:13px;color:#64748B;margin-bottom:20px;">
+                                @if (string.IsNullOrWhiteSpace(_searchQuery))
+                                {
+                                    <span>No active members yet. Add your first team member.</span>
+                                }
+                                else
+                                {
+                                    <span>No results for "@_searchQuery"</span>
+                                }
+                            </div>
+                            @if (string.IsNullOrWhiteSpace(_searchQuery))
+                            {
+                                <button style="@BtnPrimary" @onclick="OpenInviteDialog">＋ Add Member</button>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Table -->
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr style="border-bottom:1.5px solid #E2E8F0;">
+                                        <th style="@ThStyle;width:40%;">Member</th>
+                                        <th style="@ThStyle;width:20%;">Role</th>
+                                        <th style="@ThStyle;width:15%;">Status</th>
+                                        <th style="@ThStyle;width:15%;">Joined</th>
+                                        <th style="@ThStyle;width:10%;text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in FilteredUsers)
+                                    {
+                                        var initials = GetInitials(user.FirstName, user.LastName);
+                                        var avatarColor = GetAvatarColor(user.UserId);
+
+                                        <tr style="border-bottom:1px solid #F1F5F9;transition:background 0.15s;"
+                                            @onmouseenter="@(e => { })" @onmouseleave="@(e => { })">
+                                            <td style="@TdStyle;padding:14px 12px;">
+                                                <div style="display:flex;align-items:center;gap:12px;">
+                                                    <div style="width:40px;height:40px;border-radius:12px;flex-shrink:0;
+                                                                background:@avatarColor;display:flex;align-items:center;
+                                                                justify-content:center;font-size:14px;font-weight:800;
+                                                                color:#fff;letter-spacing:-0.5px;">
+                                                        @initials
+                                                    </div>
+                                                    <div>
+                                                        <div style="font-size:14px;font-weight:700;color:#1E293B;">
+                                                            @user.FullName
+                                                            @if (user.IsOwner)
+                                                            {
+                                                                <span style="font-size:10px;font-weight:700;padding:2px 7px;
+                                                                             border-radius:20px;background:#FEF3C7;color:#D97706;
+                                                                             margin-left:6px;">OWNER</span>
+                                                            }
+                                                        </div>
+                                                        <div style="font-size:12px;color:#94A3B8;margin-top:2px;">@user.EmailId</div>
+                                                        @if (!string.IsNullOrEmpty(user.MobileNo))
+                                                        {
+                                                            <div style="font-size:11px;color:#CBD5E1;">📞 @user.MobileNo</div>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td style="@TdStyle">
+                                                @if (!string.IsNullOrEmpty(user.RoleName))
+                                                {
+                                                    var roleColor = GetRoleColor(user.RoleName);
+                                                    <span style="font-size:12px;font-weight:700;padding:4px 10px;
+                                                                 border-radius:20px;color:@roleColor.fg;
+                                                                 background:@roleColor.bg;white-space:nowrap;">
+                                                        @user.RoleName
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="font-size:12px;color:#CBD5E1;">—</span>
+                                                }
+                                            </td>
+                                            <td style="@TdStyle">
+                                                <span style="font-size:12px;font-weight:700;padding:4px 10px;
+                                                             border-radius:20px;
+                                                             color:@(user.IsActive ? "#16A34A" : "#EF4444");
+                                                             background:@(user.IsActive ? "#DCFCE7" : "#FEE2E2");">
+                                                    @(user.IsActive ? "Active" : "Inactive")
+                                                </span>
+                                            </td>
+                                            <td style="@TdStyle">
+                                                <div style="font-size:12px;color:#64748B;">
+                                                    @user.JoinedDate.ToString("dd MMM yyyy")
+                                                </div>
+                                            </td>
+                                            <td style="@TdStyle;text-align:right;">
+                                                @if (!user.IsOwner)
+                                                {
+                                                    <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                                        <button style="@BtnIconSm" title="Change role"
+                                                                @onclick="() => OpenChangeRoleDialog(user)">🔑</button>
+                                                        <button style="@BtnIconSm" title="@(user.IsActive ? "Deactivate" : "Activate")"
+                                                                @onclick="() => OpenToggleDialog(user)">
+                                                            @(user.IsActive ? "🚫" : "✅")
+                                                        </button>
+                                                        <button style="@BtnIconSm" title="Remove from clinic"
+                                                                @onclick="() => OpenRemoveDialog(user)">🗑</button>
+                                                    </div>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
+                else if (_activeTab == 1)
+                {
+                    <!-- Deactivated tab -->
+                    @if (_deactivatedLoading)
+                    {
+                        <div style="padding:40px;text-align:center;">
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                        </div>
+                    }
+                    else if (!(_deactivatedUsers?.Any() ?? false))
+                    {
+                        <div style="padding:48px 24px;text-align:center;">
+                            <div style="font-size:36px;margin-bottom:12px;">✅</div>
+                            <div style="font-size:15px;font-weight:700;color:#1E293B;margin-bottom:6px;">No deactivated members</div>
+                            <div style="font-size:13px;color:#64748B;">All team members are currently active.</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr style="border-bottom:1.5px solid #E2E8F0;">
+                                        <th style="@ThStyle;width:45%;">Member</th>
+                                        <th style="@ThStyle;width:25%;">Last Role</th>
+                                        <th style="@ThStyle;width:20%;">Deactivated On</th>
+                                        <th style="@ThStyle;width:10%;text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in _deactivatedUsers!)
+                                    {
+                                        var initials = GetInitials(user.FirstName, user.LastName);
+                                        <tr style="border-bottom:1px solid #F1F5F9;opacity:0.75;">
+                                            <td style="@TdStyle;padding:14px 12px;">
+                                                <div style="display:flex;align-items:center;gap:12px;">
+                                                    <div style="width:40px;height:40px;border-radius:12px;flex-shrink:0;
+                                                                background:#E2E8F0;display:flex;align-items:center;
+                                                                justify-content:center;font-size:14px;font-weight:800;color:#94A3B8;">
+                                                        @initials
+                                                    </div>
+                                                    <div>
+                                                        <div style="font-size:14px;font-weight:700;color:#64748B;">@user.FullName</div>
+                                                        <div style="font-size:12px;color:#94A3B8;margin-top:2px;">@user.EmailId</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td style="@TdStyle">
+                                                @if (!string.IsNullOrEmpty(user.RoleName))
+                                                {
+                                                    <span style="font-size:12px;font-weight:600;padding:4px 10px;
+                                                                 border-radius:20px;color:#64748B;background:#F1F5F9;">
+                                                        @user.RoleName
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="font-size:12px;color:#CBD5E1;">—</span>
+                                                }
+                                            </td>
+                                            <td style="@TdStyle">
+                                                <div style="font-size:12px;color:#94A3B8;">@user.ModifiedDate.ToString("dd MMM yyyy")</div>
+                                            </td>
+                                            <td style="@TdStyle;text-align:right;">
+                                                <button style="@BtnReactivate" @onclick="() => OpenReactivateDialog(user)">
+                                                    ↩ Re-Activate
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <!-- Invitations tab -->
+                    @if (_invitationsLoading)
+                    {
+                        <div style="padding:40px;text-align:center;">
+                            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Small" />
+                        </div>
+                    }
+                    else if (!(_invitations?.Any() ?? false))
+                    {
+                        <div style="padding:48px 24px;text-align:center;">
+                            <div style="font-size:36px;margin-bottom:12px;">✉</div>
+                            <div style="font-size:15px;font-weight:700;color:#1E293B;margin-bottom:6px;">No invitations sent yet</div>
+                            <div style="font-size:13px;color:#64748B;margin-bottom:20px;">Invitations will appear here once you add members.</div>
+                            <button style="@BtnPrimary" @onclick="OpenInviteDialog">＋ Add Member</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;">
+                                <thead>
+                                    <tr style="border-bottom:1.5px solid #E2E8F0;">
+                                        <th style="@ThStyle;width:30%;">Invitee</th>
+                                        <th style="@ThStyle;width:18%;">Role</th>
+                                        <th style="@ThStyle;width:12%;">Type</th>
+                                        <th style="@ThStyle;width:15%;">Status</th>
+                                        <th style="@ThStyle;width:15%;">Expires</th>
+                                        <th style="@ThStyle;width:10%;text-align:right;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var inv in _invitations!.OrderByDescending(i => i.CreatedDate))
+                                    {
+                                        var (statusText, statusFg, statusBg) = GetInvitationStatus(inv);
+
+                                        <tr style="border-bottom:1px solid #F1F5F9;">
+                                            <td style="@TdStyle;padding:12px;">
+                                                <div style="font-size:13px;font-weight:700;color:#1E293B;">@inv.FullName</div>
+                                                <div style="font-size:11px;color:#94A3B8;margin-top:2px;">@inv.EmailId</div>
+                                                <div style="font-size:10px;color:#CBD5E1;margin-top:1px;">
+                                                    Sent @inv.CreatedDate.ToString("dd MMM yyyy")
+                                                </div>
+                                            </td>
+                                            <td style="@TdStyle">
+                                                @if (!string.IsNullOrEmpty(inv.RoleName))
+                                                {
+                                                    var rc = GetRoleColor(inv.RoleName);
+                                                    <span style="font-size:11px;font-weight:700;padding:3px 8px;
+                                                                 border-radius:20px;color:@rc.fg;background:@rc.bg;">
+                                                        @inv.RoleName
+                                                    </span>
+                                                }
+                                                else { <span style="font-size:12px;color:#CBD5E1;">—</span> }
+                                            </td>
+                                            <td style="@TdStyle">
+                                                <span style="font-size:11px;font-weight:600;padding:3px 8px;
+                                                             border-radius:20px;
+                                                             color:@(inv.IsExistingUser ? "#0891B2" : "#7C3AED");
+                                                             background:@(inv.IsExistingUser ? "#ECFEFF" : "#F5F3FF");">
+                                                    @(inv.IsExistingUser ? "Existing" : "New")
+                                                </span>
+                                            </td>
+                                            <td style="@TdStyle">
+                                                <span style="font-size:11px;font-weight:700;padding:3px 8px;
+                                                             border-radius:20px;color:@statusFg;background:@statusBg;">
+                                                    @statusText
+                                                </span>
+                                            </td>
+                                            <td style="@TdStyle">
+                                                @if (inv.IsAccepted)
+                                                {
+                                                    <div style="font-size:11px;color:#94A3B8;">Accepted</div>
+                                                }
+                                                else
+                                                {
+                                                    var daysLeft = (int)(inv.ExpiresAt - DateTime.UtcNow).TotalDays;
+                                                    <div style="font-size:11px;color:@(inv.IsExpired ? "#EF4444" : "#64748B");">
+                                                        @if (inv.IsExpired)
+                                                        {
+                                                            <span>Expired @inv.ExpiresAt.ToString("dd MMM")</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>@daysLeft day@(daysLeft != 1 ? "s" : "") left</span>
+                                                        }
+                                                    </div>
+                                                }
+                                            </td>
+                                            <td style="@TdStyle;text-align:right;">
+                                                <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center;">
+                                                    @if (!inv.IsAccepted)
+                                                    {
+                                                        <button style="@(inv.IsExpired ? BtnReactivate : BtnGhostSm)"
+                                                                title="@(inv.IsExpired ? "Resend invitation" : "Resend")"
+                                                                @onclick="() => OpenReinviteDialog(inv)"
+                                                                disabled="@_reinviting">
+                                                            @(inv.IsExpired ? "↩ Re-invite" : "↺ Resend")
+                                                        </button>
+                                                        <button style="@BtnIconSm" title="Delete invitation"
+                                                                @onclick="() => OpenDeleteInvitationDialog(inv)">🗑</button>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+    </div>
+}
+
+<!-- ══════════════════════════════════════════════
+     Add Member Dialog
+═══════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_inviteDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:36px;height:36px;border-radius:10px;background:#EFF6FF;
+                        display:flex;align-items:center;justify-content:center;font-size:18px;">👤</div>
+            <div>
+                <div style="font-size:16px;font-weight:800;color:#1E293B;">Add Team Member</div>
+                <div style="font-size:11px;color:#94A3B8;">Search for existing user or send a new invitation</div>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:16px;padding-top:4px;">
+
+            <!-- Mode toggle -->
+            <div style="display:flex;gap:8px;background:#F8FAFC;border-radius:10px;padding:4px;">
+                <button style="@ModeTabStyle(_inviteMode == 0)"
+                        @onclick="@(() => { _inviteMode = 0; ResetInviteForm(); })">
+                    🔍 Search Existing
+                </button>
+                <button style="@ModeTabStyle(_inviteMode == 1)"
+                        @onclick="@(() => { _inviteMode = 1; ResetInviteForm(); })">
+                    ✉ New Invitation
+                </button>
+            </div>
+
+            @if (_inviteMode == 0)
+            {
+                <!-- Search existing user -->
+                <div>
+                    <div style="font-size:12px;font-weight:600;color:#64748B;margin-bottom:6px;">Search by email address</div>
+                    <MudTextField @bind-Value="_searchEmail"
+                                  Placeholder="Type email to search..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  Immediate="true"
+                                  DebounceInterval="350"
+                                  OnDebounceIntervalElapsed="OnSearchEmailChanged"
+                                  Disabled="_saving" />
+                </div>
+
+                @if (_searching)
+                {
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;color:#94A3B8;font-size:13px;">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                        Searching...
+                    </div>
+                }
+                else if (_searchResults != null && _searchResults.Count > 0 && _selectedExistingUser == null)
+                {
+                    <div style="border:1.5px solid #E2E8F0;border-radius:10px;overflow:hidden;max-height:220px;overflow-y:auto;">
+                        @foreach (var u in _searchResults)
+                        {
+                            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
+                                        border-bottom:1px solid #F1F5F9;transition:background 0.1s;"
+                                 @onclick="() => SelectExistingUser(u)">
+                                <div style="width:34px;height:34px;border-radius:9px;background:#EFF6FF;flex-shrink:0;
+                                            display:flex;align-items:center;justify-content:center;
+                                            font-size:13px;font-weight:800;color:#1565C0;">
+                                    @GetInitials(u.FirstName, u.LastName)
+                                </div>
+                                <div style="flex:1;min-width:0;">
+                                    <div style="font-size:13px;font-weight:700;color:#1E293B;">@u.FullName</div>
+                                    <div style="font-size:11px;color:#94A3B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@u.EmailId</div>
+                                </div>
+                                <span style="font-size:11px;font-weight:600;color:#1565C0;">Select →</span>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_searchResults != null && _searchResults.Count == 0 && !string.IsNullOrWhiteSpace(_searchEmail) && _searchEmail.Length >= 3)
+                {
+                    <div style="padding:14px;background:#FFFBEB;border-radius:10px;border:1px solid #FDE68A;
+                                font-size:13px;color:#92400E;display:flex;align-items:center;gap:8px;">
+                        <span>⚠</span>
+                        <span>No user found with that email. Switch to <b>New Invitation</b> to invite them.</span>
+                    </div>
+                }
+
+                @if (_selectedExistingUser != null)
+                {
+                    <div style="background:#F0FDF4;border-radius:10px;border:1.5px solid #86EFAC;padding:12px 14px;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="width:38px;height:38px;border-radius:10px;background:#16A34A;flex-shrink:0;
+                                        display:flex;align-items:center;justify-content:center;
+                                        font-size:14px;font-weight:800;color:#fff;">
+                                @GetInitials(_selectedExistingUser.FirstName, _selectedExistingUser.LastName)
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:13px;font-weight:700;color:#15803D;">@_selectedExistingUser.FullName</div>
+                                <div style="font-size:11px;color:#4ADE80;">@_selectedExistingUser.EmailId</div>
+                            </div>
+                            <button style="border:none;background:transparent;cursor:pointer;color:#94A3B8;font-size:18px;padding:0;"
+                                    @onclick="ClearSelectedUser">×</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="font-size:12px;font-weight:600;color:#64748B;margin-bottom:6px;">Assign Role *</div>
+                        <MudSelect T="Guid" @bind-Value="_selectedRoleId"
+                                   Variant="Variant.Outlined"
+                                   Label="Select role"
+                                   Disabled="_rolesLoading || _roles.Count == 0 || _saving">
+                            @if (_rolesLoading)
+                            {
+                                <MudSelectItem Value="@Guid.Empty">Loading roles…</MudSelectItem>
+                            }
+                            else
+                            {
+                                @foreach (var r in _roles)
+                                {
+                                    <MudSelectItem Value="@r.RoleId">@r.RoleName</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    </div>
+                }
+            }
+            else
+            {
+                <!-- New invitation form -->
+                <MudForm @ref="_inviteForm" @bind-IsValid="_inviteFormValid">
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <MudTextField @bind-Value="_inviteModel.FirstName"
+                                          Label="First Name *" Variant="Variant.Outlined"
+                                          Required="true" RequiredError="Required."
+                                          Disabled="_saving" />
+                            <MudTextField @bind-Value="_inviteModel.LastName"
+                                          Label="Last Name *" Variant="Variant.Outlined"
+                                          Required="true" RequiredError="Required."
+                                          Disabled="_saving" />
+                        </div>
+                        <MudTextField @bind-Value="_inviteModel.EmailId"
+                                      Label="Email Address *" Variant="Variant.Outlined"
+                                      InputType="InputType.Email"
+                                      Required="true" RequiredError="Required."
+                                      Disabled="_saving" />
+                        <MudTextField @bind-Value="_inviteModel.MobileNo"
+                                      Label="Mobile Number" Variant="Variant.Outlined"
+                                      Placeholder="Optional"
+                                      Disabled="_saving" />
+                        <div>
+                            <div style="font-size:12px;font-weight:600;color:#64748B;margin-bottom:6px;">Assign Role *</div>
+                            <MudSelect T="Guid" @bind-Value="_selectedRoleId"
+                                       Variant="Variant.Outlined"
+                                       Label="Select role"
+                                       Disabled="_rolesLoading || _roles.Count == 0 || _saving">
+                                @if (_rolesLoading)
+                                {
+                                    <MudSelectItem Value="@Guid.Empty">Loading roles…</MudSelectItem>
+                                }
+                                else
+                                {
+                                    @foreach (var r in _roles)
+                                    {
+                                        <MudSelectItem Value="@r.RoleId">@r.RoleName</MudSelectItem>
+                                    }
+                                }
+                            </MudSelect>
+                        </div>
+                    </div>
+                </MudForm>
+
+                <div style="padding:12px;background:#EFF6FF;border-radius:10px;
+                            font-size:12px;color:#1565C0;display:flex;align-items:flex-start;gap:8px;">
+                    <span>ℹ</span>
+                    <span>An invitation email will be sent. The user will have 7 days to accept it and set their password.</span>
+                </div>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="CloseInviteDialog" disabled="@_saving">Cancel</button>
+            @if (_inviteMode == 0 && _selectedExistingUser != null)
+            {
+                <button style="@(_saving || _selectedRoleId == Guid.Empty ? BtnPrimaryDisabled : BtnPrimary)"
+                        @onclick="AddExistingUserAsync"
+                        disabled="@(_saving || _selectedRoleId == Guid.Empty)">
+                    @(_saving ? "Adding…" : "Add Member")
+                </button>
+            }
+            else if (_inviteMode == 1)
+            {
+                <button style="@(_saving ? BtnPrimaryDisabled : BtnPrimary)"
+                        @onclick="InviteNewUserAsync"
+                        disabled="@_saving">
+                    @(_saving ? "Sending…" : "Send Invitation")
+                </button>
+            }
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ══════════════════════════════════════════════
+     Change Role Dialog
+═══════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_changeRoleDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:800;color:#1E293B;">Change Role</div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:14px;padding-top:4px;">
+            @if (_userToChangeRole != null)
+            {
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                            background:#F8FAFC;border-radius:10px;">
+                    <div style="width:36px;height:36px;border-radius:10px;
+                                background:@GetAvatarColor(_userToChangeRole.UserId);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:13px;font-weight:800;color:#fff;flex-shrink:0;">
+                        @GetInitials(_userToChangeRole.FirstName, _userToChangeRole.LastName)
+                    </div>
+                    <div>
+                        <div style="font-size:13px;font-weight:700;color:#1E293B;">@_userToChangeRole.FullName</div>
+                        <div style="font-size:11px;color:#94A3B8;">@_userToChangeRole.RoleName</div>
+                    </div>
+                </div>
+            }
+            <MudSelect T="Guid" @bind-Value="_newRoleId"
+                       Label="New Role" Variant="Variant.Outlined"
+                       Disabled="_rolesLoading || _roles.Count == 0 || _saving">
+                @foreach (var r in _roles)
+                {
+                    <MudSelectItem Value="@r.RoleId">@r.RoleName</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _changeRoleDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@(_saving || _newRoleId == Guid.Empty ? BtnPrimaryDisabled : BtnPrimary)"
+                    @onclick="ChangeUserRoleAsync"
+                    disabled="@(_saving || _newRoleId == Guid.Empty)">
+                @(_saving ? "Saving…" : "Change Role")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ══════════════════════════════════════════════
+     Toggle Status Dialog
+═══════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_toggleDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:800;color:@(_userToToggle?.IsActive == true ? "#EF4444" : "#16A34A");">
+            @(_userToToggle?.IsActive == true ? "⚠ Deactivate Member" : "✅ Activate Member")
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div style="font-size:14px;color:#1E293B;line-height:1.7;padding-top:4px;">
+            @if (_userToToggle?.IsActive == true)
+            {
+                <span>Deactivate <b>@_userToToggle?.FullName</b>? They will lose access to the clinic immediately.</span>
+            }
+            else
+            {
+                <span>Re-activate <b>@_userToToggle?.FullName</b>? They will regain access to the clinic.</span>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _toggleDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@(_userToToggle?.IsActive == true ? BtnDanger : BtnSuccess)"
+                    @onclick="ExecuteToggleAsync" disabled="@_saving">
+                @(_saving ? "Saving…" : (_userToToggle?.IsActive == true ? "Deactivate" : "Activate"))
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ══════════════════════════════════════════════
+     Remove Dialog
+═══════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_removeDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:800;color:#EF4444;">⚠ Remove Member</div>
+    </TitleContent>
+    <DialogContent>
+        <div style="font-size:14px;color:#1E293B;line-height:1.7;padding-top:4px;">
+            Remove <b>@_userToRemove?.FullName</b> from this clinic? They will lose all access immediately.
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _removeDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@BtnDanger" @onclick="ExecuteRemoveAsync" disabled="@_saving">
+                @(_saving ? "Removing…" : "Remove")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ══════════════════════════════════════════════
+     Re-Activate Dialog
+═══════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_reactivateDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:800;color:#16A34A;">✅ Re-Activate Member</div>
+    </TitleContent>
+    <DialogContent>
+        <div style="font-size:14px;color:#1E293B;line-height:1.7;padding-top:4px;">
+            Re-activate <b>@_userToReactivate?.FullName</b>? They will regain full access to the clinic.
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _reactivateDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@BtnSuccess" @onclick="ExecuteReactivateAsync" disabled="@_saving">
+                @(_saving ? "Activating…" : "Re-Activate")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ══════════════════════════════════════════════
+     Delete Invitation Dialog
+═══════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_deleteInvitationDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:800;color:#EF4444;">🗑 Delete Invitation</div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px;">
+            @if (_invitationToDelete != null)
+            {
+                <div style="background:#F8FAFC;border-radius:10px;padding:10px 12px;">
+                    <div style="font-size:13px;font-weight:700;color:#1E293B;">@_invitationToDelete.FullName</div>
+                    <div style="font-size:11px;color:#94A3B8;">@_invitationToDelete.EmailId</div>
+                </div>
+            }
+            <div style="font-size:13px;color:#1E293B;line-height:1.6;">
+                Delete this invitation? The invitation link will be invalidated and the user cannot use it to join. This cannot be undone.
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _deleteInvitationDialogVisible = false)" disabled="@_saving">Cancel</button>
+            <button style="@BtnDanger" @onclick="ExecuteDeleteInvitationAsync" disabled="@_saving">
+                @(_saving ? "Deleting…" : "Delete")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<!-- ══════════════════════════════════════════════
+     Re-Invite Dialog
+═══════════════════════════════════════════════ -->
+<MudDialog @bind-Visible="_reinviteDialogVisible"
+           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
+    <TitleContent>
+        <div style="font-size:16px;font-weight:800;color:#1565C0;">✉ @(_invitationToReinvite?.IsExpired == true ? "Re-invite User" : "Resend Invitation")</div>
+    </TitleContent>
+    <DialogContent>
+        <div style="display:flex;flex-direction:column;gap:10px;padding-top:4px;">
+            @if (_invitationToReinvite != null)
+            {
+                <div style="background:#F8FAFC;border-radius:10px;padding:10px 12px;">
+                    <div style="font-size:13px;font-weight:700;color:#1E293B;">@_invitationToReinvite.FullName</div>
+                    <div style="font-size:11px;color:#94A3B8;">@_invitationToReinvite.EmailId</div>
+                </div>
+            }
+            <div style="font-size:13px;color:#1E293B;line-height:1.6;">
+                @if (_invitationToReinvite?.IsExpired == true)
+                {
+                    <span>This invitation expired. A new invitation link will be sent — valid for 7 days.</span>
+                }
+                else
+                {
+                    <span>Resend the invitation email with a refreshed link valid for 7 days.</span>
+                }
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <div style="display:flex;gap:10px;padding:4px;">
+            <button style="@BtnGhost" @onclick="@(() => _reinviteDialogVisible = false)" disabled="@_reinviting">Cancel</button>
+            <button style="@BtnPrimary" @onclick="ExecuteReinviteAsync" disabled="@_reinviting">
+                @(_reinviting ? "Sending…" : "Send New Invitation")
+            </button>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // ── Style constants ──────────────────────────────────────────────────────
+    private const string BtnPrimary        = "background:#1565C0;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;";
+    private const string BtnPrimaryDisabled= "background:#93C5FD;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:not-allowed;opacity:0.7;";
+    private const string BtnGhost          = "background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer;";
+    private const string BtnDanger         = "background:#EF4444;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;";
+    private const string BtnSuccess        = "background:#16A34A;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;";
+    private const string BtnReactivate     = "background:#ECFDF5;color:#16A34A;border:1.5px solid #86EFAC;border-radius:8px;padding:5px 12px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;";
+    private const string BtnGhostSm        = "background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:7px;padding:4px 10px;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;";
+    private const string BtnIconSm         = "width:30px;height:30px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;justify-content:center;";
+    private const string ThStyle           = "padding:10px 12px;font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.5px;text-align:left;";
+    private const string TdStyle           = "padding:10px 12px;vertical-align:middle;";
+
+    private static string TabStyle(bool active) =>
+        active
+        ? "flex:1;padding:8px;border:none;border-radius:8px;background:#fff;font-size:13px;font-weight:700;color:#1565C0;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.08);"
+        : "flex:1;padding:8px;border:none;border-radius:8px;background:transparent;font-size:13px;font-weight:600;color:#94A3B8;cursor:pointer;";
+
+    private static string ModeTabStyle(bool active) =>
+        active
+        ? "flex:1;padding:7px;border:none;border-radius:7px;background:#1565C0;font-size:12px;font-weight:700;color:#fff;cursor:pointer;"
+        : "flex:1;padding:7px;border:none;border-radius:7px;background:transparent;font-size:12px;font-weight:600;color:#64748B;cursor:pointer;";
+
+    private static readonly string[] AvatarColors = ["#1565C0","#7C3AED","#DB2777","#D97706","#059669","#0891B2","#DC2626","#65A30D"];
+    private static string GetAvatarColor(Guid id) => AvatarColors[Math.Abs(id.GetHashCode()) % AvatarColors.Length];
+    private static string GetInitials(string first, string last) =>
+        $"{(first.Length > 0 ? first[0] : '?')}{(last.Length > 0 ? last[0] : '?')}".ToUpper();
+
+    private static (string fg, string bg) GetRoleColor(string role) => role.ToLowerInvariant() switch
+    {
+        "clinic admin"   => ("#7C3AED", "#F5F3FF"),
+        "admin"          => ("#7C3AED", "#F5F3FF"),
+        "doctor"         => ("#0891B2", "#ECFEFF"),
+        "nurse"          => ("#059669", "#ECFDF5"),
+        "reception"      => ("#D97706", "#FFFBEB"),
+        _                => ("#64748B", "#F1F5F9")
+    };
+
+    // ── State ────────────────────────────────────────────────────────────────
+    private bool _loading            = true;
+    private bool _usersLoading       = true;
+    private bool _deactivatedLoading;
+    private bool _invitationsLoading;
+    private bool _rolesLoading;
+    private bool _saving;
+    private bool _reinviting;
+
+    private Guid   _applicationId   = Guid.Empty;
+    private string _applicationName = string.Empty;
+
+    private List<ApplicationUserResponseDto>? _users;
+    private List<ApplicationUserResponseDto>? _deactivatedUsers;
+    private List<InvitationResponseDto>? _invitations;
+    private List<RoleResponseDto> _roles = [];
+
+    private int    _activeTab   = 0;
+    private string _searchQuery = string.Empty;
+
+    private IEnumerable<ApplicationUserResponseDto> FilteredUsers =>
+        (_users ?? []).Where(u =>
+            string.IsNullOrWhiteSpace(_searchQuery) ||
+            u.FullName.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+            u.EmailId.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase));
+
+    // ── Invite dialog ────────────────────────────────────────────────────────
+    private bool   _inviteDialogVisible;
+    private int    _inviteMode = 0;       // 0 = search existing, 1 = new invite
+    private bool   _inviteFormValid;
+    private MudForm _inviteForm = null!;
+    private InviteUserRequestDto _inviteModel = new();
+    private Guid   _selectedRoleId = Guid.Empty;
+
+    private string? _searchEmail;
+    private bool    _searching;
+    private List<UserSearchResultDto>? _searchResults;
+    private UserSearchResultDto? _selectedExistingUser;
+
+    // ── Change role dialog ───────────────────────────────────────────────────
+    private bool   _changeRoleDialogVisible;
+    private ApplicationUserResponseDto? _userToChangeRole;
+    private Guid   _newRoleId = Guid.Empty;
+
+    // ── Toggle dialog ────────────────────────────────────────────────────────
+    private bool   _toggleDialogVisible;
+    private ApplicationUserResponseDto? _userToToggle;
+
+    // ── Remove dialog ────────────────────────────────────────────────────────
+    private bool   _removeDialogVisible;
+    private ApplicationUserResponseDto? _userToRemove;
+
+    // ── Re-activate dialog ───────────────────────────────────────────────────
+    private bool   _reactivateDialogVisible;
+    private ApplicationUserResponseDto? _userToReactivate;
+
+    // ── Re-invite dialog ─────────────────────────────────────────────────────
+    private bool   _reinviteDialogVisible;
+    private InvitationResponseDto? _invitationToReinvite;
+
+    // ── Delete invitation dialog ──────────────────────────────────────────────
+    private bool   _deleteInvitationDialogVisible;
+    private InvitationResponseDto? _invitationToDelete;
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+
+        ResolveApplicationId();
+
+        _loading = false;
+
+        if (_applicationId != Guid.Empty)
+        {
+            await Task.WhenAll(LoadUsersAsync(), LoadDeactivatedUsersAsync(), LoadRolesAsync(), LoadInvitationsAsync());
+        }
+    }
+
+    private void ResolveApplicationId()
+    {
+        // 1. Doctor selected a clinic via ClinicContextService (most reliable)
+        if (ClinicContext.SelectedApplicationId != Guid.Empty)
+        {
+            _applicationId   = ClinicContext.SelectedApplicationId;
+            _applicationName = ClinicContext.SelectedApplicationName;
+            return;
+        }
+
+        // 2. UserApplications populated in the profile
+        var app = AuthState.CurrentUser?.UserApplications.FirstOrDefault(a => a.IsActive);
+        if (app != null)
+        {
+            _applicationId   = app.ApplicationId;
+            _applicationName = app.ApplicationName;
+            return;
+        }
+
+        // 3. Fall back to ApplicationId from UserRoles (always populated)
+        var role = AuthState.CurrentUser?.UserRoles.FirstOrDefault(r => r.IsActive && r.ApplicationId != Guid.Empty);
+        if (role != null)
+        {
+            _applicationId   = role.ApplicationId;
+            _applicationName = AuthState.CurrentUser?.UserApplications
+                .FirstOrDefault(a => a.ApplicationId == role.ApplicationId)?.ApplicationName
+                ?? "My Clinic";
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _usersLoading = true;
+        try
+        {
+            var result = await AppClient.GetApplicationUsersAsync(_applicationId);
+            _users = result.Success ? result.Data ?? [] : [];
+        }
+        catch { _users = []; }
+        finally { _usersLoading = false; }
+    }
+
+    private async Task LoadDeactivatedUsersAsync()
+    {
+        _deactivatedLoading = true;
+        try
+        {
+            var result = await AppClient.GetDeactivatedApplicationUsersAsync(_applicationId);
+            _deactivatedUsers = result.Success ? result.Data ?? [] : [];
+        }
+        catch { _deactivatedUsers = []; }
+        finally { _deactivatedLoading = false; }
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        _rolesLoading = true;
+        try
+        {
+            var result = await AppClient.GetRolesByApplicationAsync(_applicationId);
+            _roles = result.Success && result.Data != null ? result.Data.Roles : [];
+            if (_roles.Count > 0) _selectedRoleId = _roles[0].RoleId;
+        }
+        catch { _roles = []; }
+        finally { _rolesLoading = false; }
+    }
+
+    private async Task LoadInvitationsAsync()
+    {
+        _invitationsLoading = true;
+        try
+        {
+            var result = await AppClient.GetApplicationInvitationsAsync(_applicationId);
+            if (result.Success)
+                _invitations = result.Data ?? [];
+            else
+            {
+                _invitations = [];
+                Snackbar.Add($"Invitations: {result.Message}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _invitations = [];
+            Snackbar.Add($"Failed to load invitations: {ex.Message}", Severity.Error);
+        }
+        finally { _invitationsLoading = false; }
+    }
+
+    // ── Invite dialog ─────────────────────────────────────────────────────────
+    private void OpenInviteDialog()
+    {
+        _inviteMode = 0;
+        ResetInviteForm();
+        _inviteDialogVisible = true;
+    }
+
+    private void CloseInviteDialog()
+    {
+        _inviteDialogVisible = false;
+        ResetInviteForm();
+    }
+
+    private void ResetInviteForm()
+    {
+        _searchEmail          = null;
+        _searchResults        = null;
+        _selectedExistingUser = null;
+        _inviteModel          = new();
+        _selectedRoleId       = _roles.Count > 0 ? _roles[0].RoleId : Guid.Empty;
+    }
+
+    private async Task OnSearchEmailChanged(string value)
+    {
+        _searchEmail          = value;
+        _selectedExistingUser = null;
+
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 3)
+        {
+            _searchResults = null;
+            return;
+        }
+
+        _searching = true;
+        StateHasChanged();
+        try
+        {
+            var result = await AuthClient.SearchUsersByEmailAsync(value);
+            _searchResults = result.Success ? result.Data ?? [] : [];
+        }
+        catch { _searchResults = []; }
+        finally { _searching = false; StateHasChanged(); }
+    }
+
+    private void SelectExistingUser(UserSearchResultDto user)
+    {
+        _selectedExistingUser = user;
+        _searchResults        = null;
+        _selectedRoleId       = _roles.Count > 0 ? _roles[0].RoleId : Guid.Empty;
+        StateHasChanged();
+    }
+
+    private void ClearSelectedUser()
+    {
+        _selectedExistingUser = null;
+        _searchEmail          = null;
+        _searchResults        = null;
+    }
+
+    private async Task AddExistingUserAsync()
+    {
+        if (_selectedExistingUser is null || AuthState.CurrentUser is null || _selectedRoleId == Guid.Empty) return;
+        _saving = true;
+        try
+        {
+            var req = new InviteExistingUserRequestDto
+            {
+                UserId        = _selectedExistingUser.UserId,
+                ApplicationId = _applicationId,
+                RoleId        = _selectedRoleId
+            };
+            var result = await AppClient.InviteExistingUserAsync(AuthState.CurrentUser.UserId, req);
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? $"{_selectedExistingUser.FullName} added to the clinic.", Severity.Success);
+                CloseInviteDialog();
+                await Task.WhenAll(LoadUsersAsync(), LoadDeactivatedUsersAsync(), LoadInvitationsAsync());
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to add user.", Severity.Error);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private async Task InviteNewUserAsync()
+    {
+        await _inviteForm.Validate();
+        if (!_inviteFormValid) return;
+        if (_selectedRoleId == Guid.Empty) { Snackbar.Add("Please select a role.", Severity.Warning); return; }
+        if (AuthState.CurrentUser is null) return;
+
+        _inviteModel.ApplicationId = _applicationId;
+        _inviteModel.RoleId        = _selectedRoleId;
+        _saving = true;
+        try
+        {
+            var result = await AppClient.InviteUserAsync(AuthState.CurrentUser.UserId, _inviteModel);
+            if (result.Success)
+            {
+                Snackbar.Add($"Invitation sent to {_inviteModel.EmailId}.", Severity.Success);
+                CloseInviteDialog();
+                await Task.WhenAll(LoadUsersAsync(), LoadInvitationsAsync());
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Failed to send invitation.", Severity.Error);
+            }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    // ── Change role ────────────────────────────────────────────────────────────
+    private void OpenChangeRoleDialog(ApplicationUserResponseDto user)
+    {
+        _userToChangeRole    = user;
+        _newRoleId           = user.RoleId ?? Guid.Empty;
+        _changeRoleDialogVisible = true;
+    }
+
+    private async Task ChangeUserRoleAsync()
+    {
+        if (_userToChangeRole is null || AuthState.CurrentUser is null || _newRoleId == Guid.Empty) return;
+        _saving = true;
+        try
+        {
+            var result = await AppClient.ChangeUserRoleAsync(_applicationId, _userToChangeRole.UserId,
+                AuthState.CurrentUser.UserId, new ChangeUserRoleRequestDto { NewRoleId = _newRoleId });
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? "Role changed.", Severity.Success);
+                _changeRoleDialogVisible = false;
+                await LoadUsersAsync();
+            }
+            else { Snackbar.Add(result.Message ?? "Failed to change role.", Severity.Error); }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    // ── Toggle status ──────────────────────────────────────────────────────────
+    private void OpenToggleDialog(ApplicationUserResponseDto user)
+    {
+        _userToToggle     = user;
+        _toggleDialogVisible = true;
+    }
+
+    private async Task ExecuteToggleAsync()
+    {
+        if (_userToToggle is null || AuthState.CurrentUser is null) return;
+        _saving = true;
+        try
+        {
+            var newStatus = !_userToToggle.IsActive;
+            var result = await AppClient.ToggleUserApplicationMappingAsync(
+                _applicationId, _userToToggle.UserId,
+                AuthState.CurrentUser.UserId,
+                new ToggleStatusRequestDto { IsActive = newStatus });
+
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? (newStatus ? $"{_userToToggle.FullName} activated." : $"{_userToToggle.FullName} deactivated."), Severity.Success);
+                _toggleDialogVisible = false;
+                await Task.WhenAll(LoadUsersAsync(), LoadDeactivatedUsersAsync());
+            }
+            else { Snackbar.Add(result.Message ?? "Operation failed.", Severity.Error); }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    // ── Remove ─────────────────────────────────────────────────────────────────
+    private void OpenRemoveDialog(ApplicationUserResponseDto user)
+    {
+        _userToRemove     = user;
+        _removeDialogVisible = true;
+    }
+
+    private async Task ExecuteRemoveAsync()
+    {
+        if (_userToRemove is null || AuthState.CurrentUser is null) return;
+        _saving = true;
+        try
+        {
+            var result = await AppClient.RemoveUserFromApplicationAsync(
+                _applicationId, _userToRemove.UserId, AuthState.CurrentUser.UserId);
+
+            if (result.Success)
+            {
+                Snackbar.Add($"{_userToRemove.FullName} removed.", Severity.Success);
+                _removeDialogVisible = false;
+                await Task.WhenAll(LoadUsersAsync(), LoadDeactivatedUsersAsync());
+            }
+            else { Snackbar.Add(result.Message ?? "Failed to remove user.", Severity.Error); }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    // ── Re-activate ────────────────────────────────────────────────────────────
+    private void OpenReactivateDialog(ApplicationUserResponseDto user)
+    {
+        _userToReactivate     = user;
+        _reactivateDialogVisible = true;
+    }
+
+    private async Task ExecuteReactivateAsync()
+    {
+        if (_userToReactivate is null || AuthState.CurrentUser is null) return;
+        _saving = true;
+        try
+        {
+            var result = await AppClient.ToggleUserApplicationMappingAsync(
+                _applicationId, _userToReactivate.UserId,
+                AuthState.CurrentUser.UserId,
+                new ToggleStatusRequestDto { IsActive = true });
+
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? $"{_userToReactivate.FullName} re-activated.", Severity.Success);
+                _reactivateDialogVisible = false;
+                await Task.WhenAll(LoadUsersAsync(), LoadDeactivatedUsersAsync());
+            }
+            else { Snackbar.Add(result.Message ?? "Failed to re-activate.", Severity.Error); }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    // ── Re-invite ──────────────────────────────────────────────────────────────
+    private void OpenReinviteDialog(InvitationResponseDto invitation)
+    {
+        _invitationToReinvite = invitation;
+        _reinviteDialogVisible = true;
+    }
+
+    private async Task ExecuteReinviteAsync()
+    {
+        if (_invitationToReinvite is null || AuthState.CurrentUser is null) return;
+        _reinviting = true;
+        try
+        {
+            var result = await AppClient.ReinviteUserAsync(
+                _applicationId, _invitationToReinvite.InvitationId, AuthState.CurrentUser.UserId);
+
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? $"Invitation resent to {_invitationToReinvite.EmailId}.", Severity.Success);
+                _reinviteDialogVisible = false;
+                await LoadInvitationsAsync();
+            }
+            else { Snackbar.Add(result.Message ?? "Failed to resend invitation.", Severity.Error); }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _reinviting = false; }
+    }
+
+    // ── Delete invitation ──────────────────────────────────────────────────────
+    private void OpenDeleteInvitationDialog(InvitationResponseDto invitation)
+    {
+        _invitationToDelete = invitation;
+        _deleteInvitationDialogVisible = true;
+    }
+
+    private async Task ExecuteDeleteInvitationAsync()
+    {
+        if (_invitationToDelete is null) return;
+        _saving = true;
+        try
+        {
+            var result = await AppClient.DeleteInvitationAsync(_applicationId, _invitationToDelete.InvitationId);
+            if (result.Success)
+            {
+                Snackbar.Add("Invitation deleted.", Severity.Success);
+                _deleteInvitationDialogVisible = false;
+                await LoadInvitationsAsync();
+            }
+            else { Snackbar.Add(result.Message ?? "Failed to delete invitation.", Severity.Error); }
+        }
+        catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    // ── Invitation status helper ───────────────────────────────────────────────
+    private static (string text, string fg, string bg) GetInvitationStatus(InvitationResponseDto inv)
+    {
+        if (inv.IsAccepted)  return ("Accepted",  "#16A34A", "#DCFCE7");
+        if (inv.IsExpired)   return ("Expired",   "#EF4444", "#FEE2E2");
+        return                      ("Pending",   "#D97706", "#FEF3C7");
+    }
+}

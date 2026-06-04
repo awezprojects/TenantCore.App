@@ -26,4 +26,7 @@ public interface IAuthApplicationService
     Task ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, Guid newRoleId, CancellationToken cancellationToken = default);
     Task InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request, CancellationToken cancellationToken = default);
     Task<List<ApplicationUserResponseDto>> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken = default);
+    Task<List<InvitationResponseDto>> GetApplicationInvitationsAsync(Guid applicationId, CancellationToken cancellationToken = default);
+    Task ReinviteUserAsync(Guid applicationId, Guid invitationId, Guid reinvitedBy, CancellationToken cancellationToken = default);
+    Task DeleteInvitationAsync(Guid applicationId, Guid invitationId, CancellationToken cancellationToken = default);
 }

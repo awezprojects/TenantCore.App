@@ -71,7 +71,9 @@ else
             @foreach (var item in _clinics)
             {
                 var color = GetClinicColor(item.Clinic.ApplicationId);
-                var role  = GetDoctorRole(item.Clinic.ApplicationId);
+                var roles = item.Clinic.UserRoles.Count > 0
+                    ? string.Join(" · ", item.Clinic.UserRoles)
+                    : "Doctor";
                 var logo  = GetClinicLogo(item.Clinic.ApplicationId);
 
                 <div class="cc-clinic-card" style="--clinic-color:@color;"
@@ -88,18 +90,18 @@ else
                                         font-size:22px;flex-shrink:0;">@logo</div>
                             <div>
                                 <div style="color:#fff;font-weight:800;font-size:15px;line-height:1.2;">
-                                    @item.Clinic.ApplicationName
+                                    @item.Clinic.ClinicName
                                 </div>
                                 <div style="color:rgba(255,255,255,0.85);font-size:11px;margin-top:2px;">
-                                    @GetClinicType(item.Clinic.ApplicationType)
+                                    @item.Clinic.ClinicCode
                                 </div>
                             </div>
                         </div>
                         @if (item.Clinic.IsOwner)
                         {
-                            <span style="padding:3px 8px;background:rgba(255,255,255,0.25);
-                                         border-radius:12px;font-size:10px;font-weight:700;
-                                         color:#fff;letter-spacing:0.5px;">OWNER</span>
+                            <span style="padding:3px 10px;background:rgba(255,255,255,0.95);
+                                         border-radius:12px;font-size:10px;font-weight:800;
+                                         color:#1565C0;letter-spacing:0.5px;">⭐ YOUR CLINIC</span>
                         }
                     </div>
 
@@ -111,7 +113,7 @@ else
                             <div style="font-size:11px;color:#94A3B8;font-weight:600;
                                         text-transform:uppercase;letter-spacing:0.4px;">My Role</div>
                             <div style="font-size:13px;font-weight:700;color:#1E293B;margin-top:2px;">
-                                @role
+                                @roles
                             </div>
                         </div>
 
@@ -157,15 +159,44 @@ else
                         </div>
 
                         <!-- Footer -->
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;">
-                            <div style="font-size:11px;color:#94A3B8;">
-                                Joined @item.Clinic.CreatedDate.ToString("dd MMM yyyy")
+                        @if (item.Clinic.IsOwner)
+                        {
+                            <div style="padding-top:8px;">
+                                <div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">
+                                    Joined @item.Clinic.CreatedDate.ToString("dd MMM yyyy")
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                    <button @onclick:stopPropagation="true"
+                                            @onclick="() => EnterClinicAsDoctor(item.Clinic.ApplicationId)"
+                                            style="padding:8px 0;background:linear-gradient(135deg,@color,@(color)cc);
+                                                   color:#fff;border:none;border-radius:10px;font-size:12px;
+                                                   font-weight:700;cursor:pointer;display:flex;align-items:center;
+                                                   justify-content:center;gap:5px;transition:opacity .15s;">
+                                        🩺 Doctor Panel
+                                    </button>
+                                    <button @onclick:stopPropagation="true"
+                                            @onclick="() => EnterClinicAsAdmin(item.Clinic.ApplicationId)"
+                                            style="padding:8px 0;background:#fff;color:@color;
+                                                   border:2px solid @color;border-radius:10px;font-size:12px;
+                                                   font-weight:700;cursor:pointer;display:flex;align-items:center;
+                                                   justify-content:center;gap:5px;transition:opacity .15s;">
+                                        ⚙️ Clinic Admin
+                                    </button>
+                                </div>
                             </div>
-                            <span style="display:inline-flex;align-items:center;gap:4px;
-                                         color:@color;font-weight:700;font-size:13px;">
-                                Enter Clinic <span style="font-size:14px;">→</span>
-                            </span>
-                        </div>
+                        }
+                        else
+                        {
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;">
+                                <div style="font-size:11px;color:#94A3B8;">
+                                    Joined @item.Clinic.CreatedDate.ToString("dd MMM yyyy")
+                                </div>
+                                <span style="display:inline-flex;align-items:center;gap:4px;
+                                             color:@color;font-weight:700;font-size:13px;">
+                                    Enter Clinic <span style="font-size:14px;">→</span>
+                                </span>
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -231,7 +262,6 @@ else
         ["#1565C0", "#DC2626", "#059669", "#7C3AED", "#D97706", "#0891B2"];
 
     private Dictionary<Guid, string> _colorMap = [];
-    private Dictionary<Guid, string> _roleMap  = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -246,10 +276,6 @@ else
         var user = AuthState.CurrentUser;
         _lastName = user?.LastName ?? user?.FullName?.Split(' ').LastOrDefault() ?? "Doctor";
 
-        if (user?.UserRoles != null)
-            foreach (var ur in user.UserRoles)
-                _roleMap[ur.ApplicationId] = ur.RoleName;
-
         await LoadClinicsAsync(user?.UserId ?? Guid.Empty);
         _hasOwnClinic = _clinics.Any(c => c.Clinic.IsOwner);
         _loading = false;
@@ -257,50 +283,38 @@ else
 
     private async Task LoadClinicsAsync(Guid userId)
     {
-        var appsResult = await AppApi.GetAllApplicationsAsync();
-        if (!appsResult.Success || appsResult.Data == null) return;
+        // Use the dashboard endpoint — reads live from DB so newly created clinics appear
+        // immediately without needing a token refresh.
+        var dashResult = await AppApi.GetClinicDashboardAsync();
+        if (!dashResult.Success || dashResult.Data == null) return;
 
-        // Filter to only the apps the user is linked to
-        var linkedIds = new HashSet<Guid>(
-            AuthState.AvailableApplications.Select(a => a.ApplicationId));
+        var clinics = dashResult.Data;
 
-        if (linkedIds.Count == 0 && AuthState.CurrentUser?.UserApplications != null)
-            foreach (var ua in AuthState.CurrentUser.UserApplications)
-                linkedIds.Add(ua.ApplicationId);
-
-        // Never fall through to all apps — if both collections are empty the doctor
-        // sees no clinics rather than every clinic in the system.
-        if (linkedIds.Count == 0) return;
-
-        var linked = appsResult.Data.Where(a => linkedIds.Contains(a.ApplicationId)).ToList();
-
-        for (var i = 0; i < linked.Count; i++)
-            _colorMap[linked[i].ApplicationId] = Colors[i % Colors.Length];
+        for (var i = 0; i < clinics.Count; i++)
+            _colorMap[clinics[i].ApplicationId] = Colors[i % Colors.Length];
 
         var today = DateTime.UtcNow.Date;
 
-        var tasks = linked.Select(async app =>
+        var tasks = clinics.Select(async clinic =>
         {
             int? appts = null;
             int? rx    = null;
 
             if (userId != Guid.Empty)
             {
-                // Pass the clinic's own app ID explicitly so each card gets its own data,
-                // not the fallback-first-claim data from ClinicControllerBase.
                 var opdRes = await ClinicApi.GetOpdRegistrationsAsync(
                     page: 1, pageSize: 1, doctorUserId: userId, todayOnly: true,
-                    applicationId: app.ApplicationId);
+                    applicationId: clinic.ApplicationId);
                 if (opdRes.Success && opdRes.Data != null) appts = opdRes.Data.TotalCount;
 
                 var rxRes = await PrescriptionApi.GetPrescriptionsAsync(
                     page: 1, pageSize: 1, doctorUserId: userId,
                     from: today, to: today.AddDays(1).AddSeconds(-1),
-                    applicationId: app.ApplicationId);
+                    applicationId: clinic.ApplicationId);
                 if (rxRes.Success && rxRes.Data != null) rx = rxRes.Data.TotalCount;
             }
 
-            return new ClinicItem(app, appts, rx);
+            return new ClinicItem(clinic, appts, rx);
         });
 
         _clinics        = (await Task.WhenAll(tasks)).ToList();
@@ -311,25 +325,28 @@ else
     private async Task EnterClinic(Guid appId)
     {
         var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
-        await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ApplicationName ?? string.Empty);
+        await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
         Nav.NavigateTo("/dashboard");
     }
-    private void RegisterClinic()           => Nav.NavigateTo("/doctor/register-clinic");
+
+    private async Task EnterClinicAsDoctor(Guid appId)
+    {
+        var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
+        await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
+        Nav.NavigateTo("/dashboard");
+    }
+
+    private async Task EnterClinicAsAdmin(Guid appId)
+    {
+        var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
+        await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
+        Nav.NavigateTo("/admin/dashboard");
+    }
+
+    private void RegisterClinic() => Nav.NavigateTo("/doctor/register-clinic");
 
     private string GetClinicColor(Guid id)
         => _colorMap.TryGetValue(id, out var c) ? c : "#1565C0";
-
-    private string GetDoctorRole(Guid id)
-        => _roleMap.TryGetValue(id, out var r) ? r : "Doctor";
-
-    private static string GetClinicType(int type) => type switch
-    {
-        1 => "Hospital",
-        2 => "Speciality Clinic",
-        3 => "Polyclinic",
-        4 => "Diagnostic Centre",
-        _ => "Clinic",
-    };
 
     private static string GetClinicLogo(Guid id)
     {
@@ -338,7 +355,7 @@ else
     }
 
     private record ClinicItem(
-        ApplicationResponseDto Clinic,
+        ClinicDashboardItemDto Clinic,
         int? TodayAppts,
         int? PendingRx);
 }

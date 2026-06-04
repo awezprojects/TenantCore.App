@@ -174,7 +174,9 @@ public sealed class AuthApplicationService(
             httpRequest.Headers.Add("X-ClinicApp-Id", request.ApplicationId.ToString());
         }
         var response = await client.SendAsync(httpRequest, cancellationToken);
-        await EnsureSuccessAsync(response, cancellationToken);
+        // Auth API always returns HTTP 200 — parse the body to surface business errors
+        // (e.g. "pending invitation already exists") back to the caller.
+        await EnsureApiBodySuccessAsync(response, cancellationToken);
     }
 
     public async Task<List<ApplicationUserResponseDto>> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken = default)
@@ -182,6 +184,30 @@ public sealed class AuthApplicationService(
         using var client = CreateClient();
         var response = await client.GetAsync($"api/Application/{applicationId}/users/deactivated", cancellationToken);
         return await ParseRequiredAsync<List<ApplicationUserResponseDto>>(response, cancellationToken);
+    }
+
+    public async Task<List<InvitationResponseDto>> GetApplicationInvitationsAsync(Guid applicationId, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var response = await client.GetAsync($"api/Application/{applicationId}/invitations", cancellationToken);
+        return await ParseRequiredAsync<List<InvitationResponseDto>>(response, cancellationToken);
+    }
+
+    public async Task DeleteInvitationAsync(Guid applicationId, Guid invitationId, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var response = await client.DeleteAsync(
+            $"api/Application/{applicationId}/invitations/{invitationId}", cancellationToken);
+        await EnsureApiBodySuccessAsync(response, cancellationToken);
+    }
+
+    public async Task ReinviteUserAsync(Guid applicationId, Guid invitationId, Guid reinvitedBy, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var response = await client.PostAsync(
+            $"api/Application/{applicationId}/invitations/{invitationId}/reinvite?reinvitedBy={reinvitedBy}",
+            null, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
     }
 
     private async Task<T> ParseRequiredAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
@@ -218,6 +244,30 @@ public sealed class AuthApplicationService(
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
             throw new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+        }
+    }
+
+    // Auth API always returns HTTP 200. This helper also checks the JSON body's
+    // Success field so business errors (duplicate invite, etc.) surface correctly.
+    private async Task EnsureApiBodySuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
+            throw new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+        }
+
+        try
+        {
+            var wrapper = JsonSerializer.Deserialize<ApiResponse<object>>(body, JsonOptions);
+            if (wrapper is not null && !wrapper.Success)
+                throw new InvalidOperationException(wrapper.Message ?? "Operation failed.");
+        }
+        catch (JsonException)
+        {
+            // Body was not JSON — HTTP was 200 so treat as success
         }
     }
 }

@@ -25,13 +25,17 @@ public class ClinicContextMiddleware(RequestDelegate next, ILogger<ClinicContext
                 return;
             }
 
-            // Validate the requested app is in the user's allowed app_ids claims
+            // Parse every app_ids claim to a proper Guid before comparing.
+            // JWT claims may be uppercase/lowercase or in different string formats;
+            // comparing as Guid structs avoids all string format/case issues.
             var allowedApps = context.User
                 .FindAll("app_ids")
-                .Select(c => c.Value)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                .Select(c => Guid.TryParse(c.Value, out var g) ? (Guid?)g : null)
+                .Where(g => g.HasValue)
+                .Select(g => g!.Value)
+                .ToHashSet();
 
-            if (!allowedApps.Contains(requestedAppId.ToString()))
+            if (!allowedApps.Contains(requestedAppId))
             {
                 var userId = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 logger.LogWarning(
