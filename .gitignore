@@ -3,6 +3,20 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# ── Secret / local config files ──────────────────────────────────────────────
+# Real connection strings and keys must NEVER be committed.
+# Use appsettings.Local.json (gitignored) for local dev, or dotnet user-secrets.
+# Use environment variables or Azure Key Vault for deployed environments.
+appsettings.Local.json
+appsettings.*.Local.json
+src/**/appsettings.Local.json
+src/**/appsettings.*.Local.json
+src/**/appsettings.Production.json
+src/**/appsettings.Staging.json
+*.pfx
+*.p12
+# ─────────────────────────────────────────────────────────────────────────────
+
 # User-specific files
 *.rsuser
 *.suo

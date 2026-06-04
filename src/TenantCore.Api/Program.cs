@@ -19,6 +19,10 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
+    // appsettings.Local.json is gitignored — put real connection strings and
+    // secrets there for local dev. Never commit real values to appsettings.json.
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
