@@ -34,36 +34,40 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
         if (doctorUserId.HasValue)
             query = query.Where(o => o.DoctorUserId == doctorUserId.Value);
 
-        // Date range
-        if (todayOnly)
-        {
-            query = query.Where(o => o.RegistrationDate.Date == today &&
-                                     (o.Status == OpdStatus.Pending || o.Status == OpdStatus.InProgress));
-        }
-        else if (fromDate.HasValue || toDate.HasValue)
-        {
-            if (fromDate.HasValue)
-                query = query.Where(o => o.RegistrationDate.Date >= fromDate.Value.Date);
-            if (toDate.HasValue)
-                query = query.Where(o => o.RegistrationDate.Date <= toDate.Value.Date);
-        }
-        else
-        {
-            query = query.Where(o => o.RegistrationDate.Date == today);
-        }
-
-        // Status filter — "Not Visited" = past Pending records
+        // "Not Visited" overrides all date/status filters — past pending only
         if (notVisited)
         {
             query = query.Where(o => o.Status == OpdStatus.Pending && o.RegistrationDate.Date < today);
         }
-        else if (statusFilter.HasValue)
+        else
         {
-            // "Waiting" tab = today's Pending (past Pending are Not Visited)
-            if (statusFilter.Value == OpdStatus.Pending)
-                query = query.Where(o => o.Status == OpdStatus.Pending && o.RegistrationDate.Date >= today);
+            // Date range
+            if (todayOnly)
+            {
+                query = query.Where(o => o.RegistrationDate.Date == today &&
+                                         (o.Status == OpdStatus.Pending || o.Status == OpdStatus.InProgress));
+            }
+            else if (fromDate.HasValue || toDate.HasValue)
+            {
+                if (fromDate.HasValue)
+                    query = query.Where(o => o.RegistrationDate.Date >= fromDate.Value.Date);
+                if (toDate.HasValue)
+                    query = query.Where(o => o.RegistrationDate.Date <= toDate.Value.Date);
+            }
             else
-                query = query.Where(o => o.Status == statusFilter.Value);
+            {
+                query = query.Where(o => o.RegistrationDate.Date == today);
+            }
+
+            // Status filter
+            if (statusFilter.HasValue)
+            {
+                // "Waiting" tab = today's Pending (past Pending are Not Visited)
+                if (statusFilter.Value == OpdStatus.Pending)
+                    query = query.Where(o => o.Status == OpdStatus.Pending && o.RegistrationDate.Date >= today);
+                else
+                    query = query.Where(o => o.Status == statusFilter.Value);
+            }
         }
 
         var total = await query.CountAsync(ct);

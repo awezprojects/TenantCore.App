@@ -52,11 +52,16 @@ public class InvitationResponseDto
     public string EmailId { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
+    public string FullName => $"{FirstName} {LastName}".Trim();
     public Guid ApplicationId { get; set; }
     public Guid RoleId { get; set; }
+    public string RoleName { get; set; } = string.Empty;
     public DateTime ExpiresAt { get; set; }
     public bool IsAccepted { get; set; }
+    public bool IsExistingUser { get; set; }
+    public Guid? ExistingUserId { get; set; }
     public DateTime CreatedDate { get; set; }
+    public bool IsExpired => !IsAccepted && DateTime.UtcNow > ExpiresAt;
 }
 
 /// <summary>

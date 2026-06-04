@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IPdfConversionService, PdfConversionService>();
 
         services.AddScoped<IAuthApplicationService, AuthApplicationService>();
+        services.AddScoped<IAuthClinicService, AuthClinicService>();
 
         return services;
     }

@@ -176,10 +176,10 @@ else if (_isAuthenticated)
         ["/dashboard"]              = "Dashboard",
         ["/admin/dashboard"]        = "Admin Dashboard",
         ["/admin/wards"]            = "Ward & Room Management",
-        ["/doctor/opd-queue"]       = "My OPD Queue",
+        ["/admin/users"]            = "User Management",
         ["/prescriptions"]          = "Prescriptions",
         ["/patients"]               = "Patient Registry",
-        ["/opd"]                    = "OPD Management",
+        ["/opd"]                    = "My OPD Queue",
         ["/ipd"]                    = "IPD & Bed Management",
         ["/medicines"]              = "Medicine Management",
         ["/medicine-types"]         = "Medicine Types",
@@ -225,13 +225,29 @@ else if (_isAuthenticated)
 
             if (_isAuthenticated && AuthState.CurrentUser != null)
             {
-                _roleLabel = AuthState.CurrentUser.UserRoles
-                    .FirstOrDefault()?.RoleName ?? "User";
-                _isDoctor = AuthState.CurrentUser.UserRoles
-                    .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
-                _isAdmin = AuthState.CurrentUser.UserRoles
-                    .Any(r => r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase)
-                           || r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+                // Scope role display to the currently selected clinic so a user who is
+                // "Clinic Admin" in Clinic A and "Doctor" in Clinic B sees the correct
+                // label when inside Clinic B.  Falls back to all roles when no clinic is
+                // selected (e.g. the /doctor/home landing page).
+                var selectedAppId = ClinicContext.SelectedApplicationId;
+                var clinicRoles = selectedAppId != Guid.Empty
+                    ? AuthState.GetRolesForApplication(selectedAppId)
+                    : AuthState.CurrentUser.UserRoles
+                        .Where(r => r.IsActive)
+                        .Select(r => r.RoleName)
+                        .ToList();
+
+                _isDoctor = clinicRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+                _isAdmin  = clinicRoles.Any(r =>
+                    r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+                    r.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+
+                _roleLabel = clinicRoles
+                    .FirstOrDefault(r =>
+                        r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+                        r.Equals("System Admin", StringComparison.OrdinalIgnoreCase))
+                    ?? clinicRoles.FirstOrDefault()
+                    ?? "User";
             }
         }
         catch

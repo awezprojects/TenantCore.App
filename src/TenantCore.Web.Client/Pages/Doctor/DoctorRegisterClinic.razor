@@ -38,35 +38,28 @@
                 <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
                             text-transform:uppercase;letter-spacing:0.5px;">Basic Information</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-                    <MudTextField @bind-Value="_model.ApplicationName"
+                    <MudTextField @bind-Value="_model.ClinicName"
                                   Label="Clinic Name *"
                                   Required="true"
                                   RequiredError="Clinic name is required."
                                   Variant="Variant.Outlined"
                                   Disabled="_submitting" />
-                    <MudTextField @bind-Value="_model.ApplicationCode"
+                    <MudTextField @bind-Value="_model.ClinicCode"
                                   Label="Clinic Code *"
                                   Required="true"
                                   RequiredError="Clinic code is required."
                                   Variant="Variant.Outlined"
-                                  HelperText="Unique short code (e.g. DMC001)"
+                                  HelperText="Unique short code, letters/digits/hyphens only (e.g. DMC-001)"
                                   Disabled="_submitting" />
-                    <MudSelect T="int" @bind-Value="_model.ApplicationType"
-                               Label="Clinic Type *"
-                               Required="true"
-                               Variant="Variant.Outlined"
-                               Disabled="_submitting">
-                        <MudSelectItem Value="0">General Clinic</MudSelectItem>
-                        <MudSelectItem Value="1">Hospital</MudSelectItem>
-                        <MudSelectItem Value="2">Speciality Clinic</MudSelectItem>
-                        <MudSelectItem Value="3">Polyclinic</MudSelectItem>
-                        <MudSelectItem Value="4">Diagnostic Centre</MudSelectItem>
-                    </MudSelect>
                     <MudTextField @bind-Value="_model.RegistrationNumber"
                                   Label="Clinic Registration No."
                                   Variant="Variant.Outlined"
                                   Disabled="_submitting"
                                   Placeholder="Official license or registration number" />
+                    <MudTextField @bind-Value="_model.ContactPerson"
+                                  Label="Contact Person"
+                                  Variant="Variant.Outlined"
+                                  Disabled="_submitting" />
                 </div>
 
                 <!-- Contact info -->
@@ -84,10 +77,6 @@
                                   Disabled="_submitting" />
                     <MudTextField @bind-Value="_model.Website"
                                   Label="Website"
-                                  Variant="Variant.Outlined"
-                                  Disabled="_submitting" />
-                    <MudTextField @bind-Value="_model.ContactPerson"
-                                  Label="Contact Person"
                                   Variant="Variant.Outlined"
                                   Disabled="_submitting" />
                 </div>
@@ -124,23 +113,23 @@
     private MudForm _form = null!;
     private bool _formValid;
     private bool _submitting;
-    private ApplicationCreationRequestDto _model = new();
+    private CreateClinicRequestDto _model = new();
 
     private async Task SubmitAsync()
     {
         await _form.Validate();
         if (!_formValid) return;
 
-        if (AuthState.CurrentUser is null) return;
-
         _submitting = true;
         try
         {
-            var result = await AppClient.CreateApplicationAsync(AuthState.CurrentUser.UserId, _model);
+            var result = await AppClient.CreateClinicAsync(_model);
             if (result.Success)
             {
-                Snackbar.Add($"Clinic '{result.Data?.ApplicationName}' registered! Redirecting…", Severity.Success);
-                Nav.NavigateTo("/doctor/home");
+                Snackbar.Add($"Clinic '{result.Data?.ApplicationName}' registered successfully!", Severity.Success);
+                StateHasChanged();
+                await Task.Delay(1800);
+                Nav.NavigateTo("/doctor/home", forceLoad: true);
             }
             else
             {
