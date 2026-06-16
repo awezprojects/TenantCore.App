@@ -93,7 +93,11 @@ public class AuthController(IHttpClientFactory httpClientFactory) : ControllerBa
 
         CopyHeaderIfPresent(requestMessage, "Authorization");
         CopyHeaderIfPresent(requestMessage, "X-ClinicApp-Id");
-        CopyHeaderIfPresent(requestMessage, "X-Correlation-Id");
+        // Always propagate a correlation ID — use the client's if provided, otherwise use the server-generated trace ID
+        var correlationId = Request.Headers.TryGetValue("X-Correlation-Id", out var incomingCorrId)
+            ? incomingCorrId.ToString()
+            : HttpContext.TraceIdentifier;
+        requestMessage.Headers.TryAddWithoutValidation("X-Correlation-Id", correlationId);
 
         if (includeBody && (Request.ContentLength is null || Request.ContentLength > 0))
         {

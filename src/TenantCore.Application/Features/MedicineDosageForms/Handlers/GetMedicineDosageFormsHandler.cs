@@ -12,15 +12,16 @@ public sealed class GetMedicineDosageFormsHandler(IMedicineDosageFormRepository 
 {
     public async Task<PagedResult<MedicineDosageFormDto>> Handle(GetMedicineDosageFormsQuery request, CancellationToken cancellationToken)
     {
+        var pageSize = Math.Min(request.PageSize, 100);
         var (items, total) = await repository.GetPagedAsync(
-            request.Page, request.PageSize, request.Search, cancellationToken);
+            request.Page, pageSize, request.Search, cancellationToken);
 
         return new PagedResult<MedicineDosageFormDto>
         {
             Items = MedicineDosageFormTranslator.ToDtoList(items).ToList(),
             TotalCount = total,
             Page = request.Page,
-            PageSize = request.PageSize
+            PageSize = pageSize
         };
     }
 }

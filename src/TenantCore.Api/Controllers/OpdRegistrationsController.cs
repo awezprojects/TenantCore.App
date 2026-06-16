@@ -53,7 +53,7 @@ public class OpdRegistrationsController(ISender sender) : ClinicControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
     [ProducesResponseType(typeof(OpdRegistrationDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateOpdRegistrationDto dto, CancellationToken ct)
         => Ok(await sender.Send(new UpdateOpdRegistrationCommand(

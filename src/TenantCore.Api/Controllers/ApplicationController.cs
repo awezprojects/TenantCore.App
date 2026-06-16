@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TenantCore.Application.Features.Applications.Commands;
 using TenantCore.Application.Features.Applications.Queries;
+using TenantCore.Shared.Authorization;
 using TenantCore.Shared.Dtos;
 using TenantCore.Shared.Dtos.Auth;
 
@@ -17,7 +18,7 @@ namespace TenantCore.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/Application")]
-[Authorize]
+[Authorize(Policy = AuthPolicies.RequireAuthenticated)]
 [Produces("application/json")]
 public class ApplicationController(ISender sender) : ControllerBase
 {
@@ -205,6 +206,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // DELETE /api/Application/{applicationId}/invitations/{invitationId}
     [HttpDelete("{applicationId}/invitations/{invitationId}")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -281,6 +283,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // DELETE /api/Application/{applicationId}/users/{userId}?removedBy={guid}
     [HttpDelete("{applicationId:guid}/users/{userId:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RemoveUserFromApplicationAsync(
@@ -295,6 +298,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // DELETE /api/Application/{applicationId}
     [HttpDelete("{applicationId:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteApplicationAsync(Guid applicationId, CancellationToken cancellationToken)
@@ -305,6 +309,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // PATCH /api/Application/{applicationId}/status?modifiedBy={guid}
     [HttpPatch("{applicationId:guid}/status")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ToggleApplicationStatusAsync(
@@ -324,6 +329,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // PATCH /api/Application/{applicationId}/users/{userId}/status?modifiedBy={guid}
     [HttpPatch("{applicationId:guid}/users/{userId:guid}/status")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ToggleUserApplicationMappingAsync(
@@ -344,6 +350,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // PUT /api/Application/{applicationId}/users/{userId}/role?modifiedBy={guid}
     [HttpPut("{applicationId:guid}/users/{userId:guid}/role")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ChangeUserRoleAsync(
