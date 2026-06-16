@@ -12,6 +12,7 @@ namespace TenantCore.Application.Features.Obstetrics.Handlers;
 public sealed class SetObstetricEddByUsgHandler(
     IObstetricPrescriptionDataRepository obstetricRepository,
     IPrescriptionRepository prescriptionRepository,
+    IPregnancyTenureRepository tenureRepository,
     ILogger<SetObstetricEddByUsgHandler> logger)
     : IRequestHandler<SetObstetricEddByUsgCommand, ObstetricDatesDto>
 {
@@ -31,6 +32,14 @@ public sealed class SetObstetricEddByUsgHandler(
         obstetricData.SetEddByUsg(request.Request.EddByUsg);
         obstetricRepository.Update(obstetricData);
         await obstetricRepository.SaveChangesAsync(cancellationToken);
+
+        var activeTenure = await tenureRepository.GetActiveForPatientAsync(prescription.PatientId, request.ApplicationId, cancellationToken);
+        if (activeTenure is not null)
+        {
+            activeTenure.EddByUsg = request.Request.EddByUsg;
+            tenureRepository.Update(activeTenure);
+            await tenureRepository.SaveChangesAsync(cancellationToken);
+        }
 
         return ObstetricDatesTranslator.ToDto(obstetricData);
     }

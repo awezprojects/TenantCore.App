@@ -20,6 +20,7 @@ Wrapper API + Blazor WebAssembly frontend that integrates with TenantCore.Auth f
 | [ADR-007: Blazor WebAssembly Client](.claude/docs/adr/ADR-007-blazor-client.md) | Adding pages, components, typed HTTP clients |
 | [ADR-008: Multi-Tenancy](.claude/docs/adr/ADR-008-multi-tenancy.md) | Any feature touching clinic/application context |
 | [ADR-009: Unit Testing](.claude/docs/adr/ADR-009-unit-testing.md) | Writing or reviewing tests |
+| [ADR-010: Security & Code Quality](.claude/docs/adr/ADR-010-security.md) | Security analysis, code smell detection, architectural violations, quality review |
 
 ---
 

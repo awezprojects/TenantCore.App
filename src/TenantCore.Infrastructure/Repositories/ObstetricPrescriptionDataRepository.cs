@@ -21,6 +21,23 @@ public class ObstetricPrescriptionDataRepository(ClinicDbContext context) : IObs
                   select opd)
                .FirstOrDefaultAsync(ct);
 
+    public async Task<HashSet<Guid>> GetPatientIdsWithLmpAsync(
+        IEnumerable<Guid> patientIds, Guid applicationId, CancellationToken ct = default)
+    {
+        var idList = patientIds as IList<Guid> ?? patientIds.ToList();
+        if (idList.Count == 0) return [];
+
+        var ids = await (from opd in context.ObstetricPrescriptionData
+                         join p in context.Prescriptions on opd.PrescriptionId equals p.Id
+                         where idList.Contains(p.PatientId)
+                               && p.ApplicationId == applicationId
+                               && opd.Lmp != null
+                         select p.PatientId)
+                        .Distinct()
+                        .ToListAsync(ct);
+        return ids.ToHashSet();
+    }
+
     public async Task AddAsync(ObstetricPrescriptionData data, CancellationToken ct = default)
         => await context.ObstetricPrescriptionData.AddAsync(data, ct);
 

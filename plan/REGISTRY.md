@@ -35,6 +35,8 @@ This table is the fastest way for the plan command to check "does this already e
 | Beds | Bed | Pre-existing | Tenant-scoped |
 | Clinic Fee Config | ClinicFeeConfig | Pre-existing | Tenant-scoped |
 | Obstetric LMP & USG Templates | ClinicUsgTemplate, UsgTemplateRow | Executed | Adds Lmp/EddByLmp/EddByUsg to ObstetricPrescriptionData; clinic-customizable USG schedule |
+| Pregnancy Tenure | PregnancyTenure | Executed | Lifecycle tracking (Active/Closed) for each pregnancy; EDD overdue tab; close-tenure workflow; blocks new LMP when overdue tenure is open |
+| Patient LMP Tenure View | — (no new entity) | Executed | "View LMP" button on patient list; active status badge; full tenure history popup per patient |
 
 ---
 
@@ -43,6 +45,8 @@ This table is the fastest way for the plan command to check "does this already e
 | Feature | Plan Date | Execute Date | New Entities | New DbSets | Files Created | Files Modified |
 |---------|-----------|-------------|-------------|------------|--------------|----------------|
 | obstetric-lmp-usg-template | 2026-06-16 | 2026-06-16 | ClinicUsgTemplate, UsgTemplateRow | ClinicUsgTemplates, UsgTemplateRows | 45 | 10 |
+| lmp-edd-pregnancy-tenure | 2026-06-16 | 2026-06-16 | PregnancyTenure | PregnancyTenures | 18 | 8 |
+| patient-lmp-tenure-view | 2026-06-16 | 2026-06-16 | — | — | 3 | 8 |
 
 ---
 
@@ -50,7 +54,7 @@ This table is the fastest way for the plan command to check "does this already e
 
 | Feature | Plan Date | Plan File |
 |---------|-----------|-----------|
-| _(none pending)_ | — | — |
+| *(none)* | — | — |
 
 ---
 

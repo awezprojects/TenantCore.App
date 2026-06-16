@@ -24,6 +24,7 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<ClinicUsgTemplate> ClinicUsgTemplates => Set<ClinicUsgTemplate>();
+    public DbSet<PregnancyTenure> PregnancyTenures => Set<PregnancyTenure>();
     public DbSet<UsgTemplateRow> UsgTemplateRows => Set<UsgTemplateRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -6,6 +6,7 @@
 @inject IClinicApiClient ClinicClient
 @inject IDoctorProfileApiClient DoctorProfileClient
 @inject IObstetricApiClient ObstetricClient
+@inject IPregnancyTenureApiClient PregnancyTenureClient
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject AuthStateService AuthState
@@ -14,6 +15,7 @@
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Clients
 @using TenantCore.Web.Client.Services
+@using TenantCore.Web.Client.Components
 
 <PageTitle>Prescription - TenantCore</PageTitle>
 
@@ -389,6 +391,46 @@ else
                 {
                     <div style="padding:18px 22px; display:flex; flex-direction:column; gap:18px;">
 
+                        <!-- Active tenure card -->
+                        @if (_activeTenure is not null)
+                        {
+                            @if (_tenureOverdue)
+                            {
+                                <!-- Overdue: block new LMP, must close first -->
+                                <div style="background:#FEF2F2; border:1.5px solid #FECACA; border-radius:10px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                                    <div>
+                                        <div style="font-size:13px; font-weight:700; color:#B91C1C; margin-bottom:3px;">Overdue Pregnancy Tenure</div>
+                                        <div style="font-size:12px; color:#991B1B;">
+                                            EDD was <strong>@((_activeTenure.EddByUsg ?? _activeTenure.EddByLmp).ToString("dd MMM yyyy"))</strong>.
+                                            Close this tenure before setting a new LMP.
+                                        </div>
+                                    </div>
+                                    <button @onclick="() => _showCloseTenureModal = true"
+                                            style="padding:8px 18px; border-radius:8px; border:none; background:#DC2626; color:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                        Close Tenure
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <!-- Active but EDD not yet passed: allow early closure for abortion/miscarriage -->
+                                <div style="background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:10px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                                    <div>
+                                        <div style="font-size:13px; font-weight:700; color:#1D4ED8; margin-bottom:3px;">Active Pregnancy Tenure</div>
+                                        <div style="font-size:12px; color:#1E40AF;">
+                                            LMP: <strong>@_activeTenure.Lmp.ToString("dd MMM yyyy")</strong>
+                                            &nbsp;·&nbsp;
+                                            EDD: <strong>@((_activeTenure.EddByUsg ?? _activeTenure.EddByLmp).ToString("dd MMM yyyy"))</strong>
+                                        </div>
+                                    </div>
+                                    <button @onclick="() => _showCloseTenureModal = true"
+                                            style="padding:8px 18px; border-radius:8px; border:1.5px solid #1D4ED8; background:#fff; color:#1D4ED8; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                        Close Tenure
+                                    </button>
+                                </div>
+                            }
+                        }
+
                         <!-- LMP -->
                         <div>
                             <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Last Menstrual Period (LMP)</div>
@@ -397,8 +439,9 @@ else
                                        value="@(_lmpValue?.ToString("yyyy-MM-dd") ?? string.Empty)"
                                        @onchange="@(e => { if (DateOnly.TryParse(e.Value?.ToString(), out var d)) _lmpValue = d; else _lmpValue = null; })"
                                        max="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")"
-                                       style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A;" />
-                                @if (PrescriptionId != Guid.Empty && _lmpValue.HasValue)
+                                       disabled="@_tenureOverdue"
+                                       style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A; opacity:@(_tenureOverdue ? "0.5" : "1");" />
+                                @if (PrescriptionId != Guid.Empty && _lmpValue.HasValue && !_tenureOverdue)
                                 {
                                     <button @onclick="QuickSaveLmpAsync" disabled="@_savingLmp"
                                             style="padding:8px 18px; border-radius:8px; border:none; background:#7C3AED; color:#fff; font-size:12px; font-weight:600; cursor:pointer; opacity:@(_savingLmp ? "0.6" : "1");">
@@ -1135,6 +1178,10 @@ else
     </DialogActions>
 </MudDialog>
 
+<CloseTenureModal Visible="_showCloseTenureModal"
+                  Tenure="_activeTenure"
+                  OnClosed="OnTenureClosed" />
+
 @code {
     [Parameter] public Guid PrescriptionId { get; set; }
     [Parameter] public Guid OpdRegistrationId { get; set; }
@@ -1184,6 +1231,9 @@ else
     private DateOnly? _eddByUsgValue;
     private bool _savingLmp;
     private bool _savingEddUsg;
+    private PregnancyTenureDto? _activeTenure;
+    private bool _showCloseTenureModal;
+    private bool _tenureOverdue;
     private int? _obsGravida;
     private int? _obsPara;
     private int? _obsLive;
@@ -1416,6 +1466,9 @@ else
     {
         var pR = await ClinicClient.GetPatientByIdAsync(patientId);
         if (pR.Success) _patient = pR.Data;
+
+        if (_isGynecologist)
+            await LoadActiveTenureAsync(patientId);
 
         var histR = await PrescriptionClient.GetPrescriptionsAsync(patientId: patientId, pageSize: 20);
         if (histR.Success && histR.Data is not null)
@@ -1814,6 +1867,29 @@ else
         _savingEddUsg = false;
         if (r.Success) Snackbar.Add("EDD by USG saved.", Severity.Success);
         else Snackbar.Add(r.Message ?? "Failed to save EDD by USG.", Severity.Error);
+    }
+
+    private async Task LoadActiveTenureAsync(Guid patientId)
+    {
+        var r = await PregnancyTenureClient.GetActiveForPatientAsync(patientId);
+        if (r.Success)
+        {
+            _activeTenure = r.Data;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            _tenureOverdue = _activeTenure is not null
+                && (_activeTenure.EddByUsg ?? _activeTenure.EddByLmp) < today;
+        }
+    }
+
+    private async Task OnTenureClosed(PregnancyTenureDto? closed)
+    {
+        _showCloseTenureModal = false;
+        if (closed is not null)
+        {
+            _activeTenure = null;
+            _tenureOverdue = false;
+            Snackbar.Add("Tenure closed. You can now set a new LMP.", Severity.Success);
+        }
     }
 
     // ── Remark Generator ──────────────────────────────────────────────────────

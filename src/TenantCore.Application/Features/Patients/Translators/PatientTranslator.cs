@@ -5,7 +5,8 @@ namespace TenantCore.Application.Features.Patients.Translators;
 
 public static class PatientTranslator
 {
-    public static PatientDto ToDto(Patient entity, bool showFullAadhaar = false) => new()
+    public static PatientDto ToDto(Patient entity, bool showFullAadhaar = false,
+        bool hasLmpRecord = false, bool hasActiveTenure = false) => new()
     {
         Id = entity.Id,
         ApplicationId = entity.ApplicationId,
@@ -24,7 +25,9 @@ public static class PatientTranslator
         KnownAllergies = entity.KnownAllergies,
         MedicalHistory = entity.MedicalHistory,
         IsActive = entity.IsActive,
-        CreatedAt = entity.CreatedAt
+        CreatedAt = entity.CreatedAt,
+        HasLmpRecord = hasLmpRecord,
+        HasActiveTenure = hasActiveTenure
     };
 
     private static string? MaskAadhaar(string? aadhaar, bool showFull) =>

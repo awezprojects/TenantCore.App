@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IRoomRepository, RoomRepository>();
         services.AddScoped<IBedRepository, BedRepository>();
         services.AddScoped<IClinicUsgTemplateRepository, ClinicUsgTemplateRepository>();
+        services.AddScoped<IPregnancyTenureRepository, PregnancyTenureRepository>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();

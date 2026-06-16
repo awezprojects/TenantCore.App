@@ -77,4 +77,10 @@ builder.Services.AddHttpClient<IUsgTemplateApiClient, UsgTemplateApiClient>(clie
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
+// Register Pregnancy Tenure API Client
+builder.Services.AddHttpClient<IPregnancyTenureApiClient, PregnancyTenureApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
 await builder.Build().RunAsync();

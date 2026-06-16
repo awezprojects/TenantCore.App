@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-06-16 (updated after obstetric-lmp-usg-template execution)
+**Last verified:** 2026-06-16 (updated after patient-lmp-tenure-view execution — no new DbSets or DI registrations; two new repository methods added to IPregnancyTenureRepository)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -37,8 +37,9 @@
 | Beds | Bed | Yes |
 | ClinicUsgTemplates | ClinicUsgTemplate | Yes |
 | UsgTemplateRows | UsgTemplateRow | Yes |
+| PregnancyTenures | PregnancyTenure | Yes |
 
-**Total DbSets: 20**
+**Total DbSets: 21**
 
 ---
 
@@ -67,6 +68,7 @@
 | IRoomRepository | RoomRepository |
 | IBedRepository | BedRepository |
 | IClinicUsgTemplateRepository | ClinicUsgTemplateRepository |
+| IPregnancyTenureRepository | PregnancyTenureRepository |
 
 ### Services (Scoped)
 

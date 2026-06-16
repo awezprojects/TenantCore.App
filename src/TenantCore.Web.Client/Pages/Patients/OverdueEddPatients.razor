@@ -1,0 +1,138 @@
+@page "/patients/edd-overdue"
+@layout AuthorizedLayout
+@inject IPregnancyTenureApiClient TenureClient
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Components
+
+<PageTitle>EDD Overdue Patients - TenantCore</PageTitle>
+
+<div class="cc-fade-in" style="display:flex;flex-direction:column;gap:20px;">
+
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+            <div style="font-size:18px;font-weight:800;color:#1E293B;">EDD Overdue Patients</div>
+            <div style="font-size:13px;color:#64748B;margin-top:2px;">
+                Patients whose expected delivery date has passed with an active pregnancy tenure
+            </div>
+        </div>
+        <button class="opd-btn start" style="padding:8px 16px;white-space:nowrap;" @onclick="LoadAsync">↻ Refresh</button>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;padding:16px;color:#B91C1C;font-size:13px;">
+            @_error
+        </div>
+    }
+    else if (!_patients.Any())
+    {
+        <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:24px;text-align:center;color:#166534;font-size:14px;font-weight:600;">
+            No overdue EDD patients at this time.
+        </div>
+    }
+    else
+    {
+        <div class="opd-table-card">
+            <table class="opd-table">
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>Phone</th>
+                        <th>LMP</th>
+                        <th>EDD by LMP</th>
+                        <th>EDD by USG</th>
+                        <th>Effective EDD</th>
+                        <th>Days Overdue</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in _patients)
+                    {
+                        <tr>
+                            <td style="font-weight:600;color:#1E293B;">@p.PatientFullName</td>
+                            <td style="color:#64748B;">@p.PatientPhone</td>
+                            <td>@p.Lmp.ToString("dd MMM yyyy")</td>
+                            <td>@p.EddByLmp.ToString("dd MMM yyyy")</td>
+                            <td>@(p.EddByUsg.HasValue ? p.EddByUsg.Value.ToString("dd MMM yyyy") : "—")</td>
+                            <td style="font-weight:700;color:#DC2626;">@p.EffectiveEdd.ToString("dd MMM yyyy")</td>
+                            <td>
+                                <span style="background:#FEF2F2;color:#B91C1C;font-weight:700;font-size:12px;padding:3px 10px;border-radius:12px;">
+                                    @p.DaysOverdue days
+                                </span>
+                            </td>
+                            <td>
+                                <button @onclick="() => OpenCloseTenure(p)"
+                                        style="padding:6px 14px;border-radius:6px;border:1.5px solid #DC2626;background:#FEF2F2;color:#B91C1C;font-size:12px;font-weight:600;cursor:pointer;">
+                                    Close Tenure
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<CloseTenureModal Visible="_showModal"
+                  Tenure="_selectedTenure"
+                  OnClosed="OnTenureClosed" />
+
+@code {
+    private List<PregnancyTenureSummaryDto> _patients = [];
+    private bool _loading;
+    private string? _error;
+    private bool _showModal;
+    private PregnancyTenureDto? _selectedTenure;
+    private Guid _selectedTenureId;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        var result = await TenureClient.GetOverdueAsync();
+        _loading = false;
+
+        if (result.Success)
+            _patients = result.Data?.ToList() ?? [];
+        else
+            _error = result.Message ?? "Failed to load overdue patients.";
+    }
+
+    private void OpenCloseTenure(PregnancyTenureSummaryDto summary)
+    {
+        _selectedTenure = new PregnancyTenureDto
+        {
+            Id = summary.TenureId,
+            PatientId = summary.PatientId,
+            ApplicationId = Guid.Empty,
+            Lmp = summary.Lmp,
+            EddByLmp = summary.EddByLmp,
+            EddByUsg = summary.EddByUsg,
+            EffectiveEdd = summary.EffectiveEdd,
+            Status = summary.Status,
+            CreatedAt = DateTime.MinValue
+        };
+        _showModal = true;
+    }
+
+    private async Task OnTenureClosed(PregnancyTenureDto? closed)
+    {
+        _showModal = false;
+        _selectedTenure = null;
+        if (closed is not null)
+            await LoadAsync();
+    }
+}
