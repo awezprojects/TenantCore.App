@@ -11,7 +11,8 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddJwtAuthentication(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
     {
         var jwtSection = configuration.GetSection("Jwt");
         var secret = jwtSection["Secret"] ?? throw new InvalidOperationException("JWT Secret not configured.");
@@ -24,7 +25,7 @@ public static class ServiceCollectionExtensions
         })
         .AddJwtBearer(options =>
         {
-            options.RequireHttpsMetadata = false;
+            options.RequireHttpsMetadata = !environment.IsDevelopment();
             options.SaveToken = true;
             options.MapInboundClaims = false;
             options.TokenValidationParameters = new TokenValidationParameters
@@ -36,7 +37,7 @@ public static class ServiceCollectionExtensions
                 ValidateAudience = !string.IsNullOrEmpty(jwtSection["Audience"]),
                 ValidAudience = jwtSection["Audience"],
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.FromMinutes(5),
+                ClockSkew = TimeSpan.Zero,
                 // Map the 'role' claim properly from JWT
                 RoleClaimType = "role",
                 NameClaimType = "email"

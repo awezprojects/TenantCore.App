@@ -12,7 +12,8 @@ public sealed class GetMedicineAutocompleteHandler(IMedicineRepository repositor
     public async Task<IEnumerable<MedicineDto>> Handle(
         GetMedicineAutocompleteQuery request, CancellationToken cancellationToken)
     {
-        var items = await repository.GetByNamePrefixAsync(request.Name, request.Limit, cancellationToken);
+        var limit = Math.Min(request.Limit, 50);
+        var items = await repository.GetByNamePrefixAsync(request.Name, limit, cancellationToken);
         return MedicineTranslator.ToDtoList(items);
     }
 }

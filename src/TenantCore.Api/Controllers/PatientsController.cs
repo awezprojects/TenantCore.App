@@ -55,7 +55,7 @@ public class PatientsController(ISender sender) : ClinicControllerBase
             dto.KnownAllergies, dto.MedicalHistory, CanViewFullAadhaar()), ct));
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)

@@ -12,8 +12,9 @@ public sealed class GetMedicinesHandler(IMedicineRepository repository)
 {
     public async Task<PagedResult<MedicineDto>> Handle(GetMedicinesQuery request, CancellationToken cancellationToken)
     {
+        var pageSize = Math.Min(request.PageSize, 100);
         var (items, total) = await repository.GetPagedAsync(
-            request.Page, request.PageSize, request.Search,
+            request.Page, pageSize, request.Search,
             request.BrandName, request.GenericName, request.MedicineTypeId,
             request.DosageFormId, request.IsGeneric, includeInactive: false, cancellationToken);
 
@@ -22,7 +23,7 @@ public sealed class GetMedicinesHandler(IMedicineRepository repository)
             Items = MedicineTranslator.ToDtoList(items).ToList(),
             TotalCount = total,
             Page = request.Page,
-            PageSize = request.PageSize
+            PageSize = pageSize
         };
     }
 }

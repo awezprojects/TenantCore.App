@@ -3,13 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TenantCore.Application.Features.Clinics.Commands;
 using TenantCore.Application.Features.Clinics.Queries;
+using TenantCore.Shared.Authorization;
 using TenantCore.Shared.Dtos.Auth;
 
 namespace TenantCore.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = AuthPolicies.RequireAuthenticated)]
 public class ClinicController(ISender sender) : ControllerBase
 {
     // POST /api/Clinic

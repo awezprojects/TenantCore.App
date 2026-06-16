@@ -14,10 +14,7 @@ public abstract class ClinicControllerBase : ControllerBase
             && item is Guid id && id != Guid.Empty)
             return id;
 
-        var claim = User.FindFirst("app_ids");
-        return claim is not null && Guid.TryParse(claim.Value, out var fallback)
-            ? fallback
-            : Guid.Empty;
+        return Guid.Empty;
     }
 
     // Reads appName from the app_roles JWT claim: [{"appId":"...","appName":"..."}]

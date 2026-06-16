@@ -62,7 +62,7 @@ try
 
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
-    builder.Services.AddJwtAuthentication(builder.Configuration);
+    builder.Services.AddJwtAuthentication(builder.Configuration, builder.Environment);
 
     builder.Services.AddHealthChecks()
         .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
