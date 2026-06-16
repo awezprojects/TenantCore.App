@@ -21,4 +21,6 @@ public interface IMedicineApiClient
     Task<ApiResponse<MedicineDto>> GetMedicineByIdAsync(Guid id);
     Task<ApiResponse<MedicineDto>> CreateMedicineAsync(CreateMedicineDto dto);
     Task<ApiResponse<MedicineDto>> UpdateMedicineAsync(Guid id, UpdateMedicineDto dto);
+
+    Task<ApiResponse<IEnumerable<MedicineDto>>> SearchMedicinesByNameAsync(string name, int limit = 5);
 }

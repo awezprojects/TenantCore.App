@@ -12,4 +12,5 @@ public sealed record UpdatePrescriptionDto(
     decimal? VitalSpO2,
     int? VitalRR,
     decimal? VitalSugar,
-    IReadOnlyList<CreatePrescriptionItemDto> Items);
+    IReadOnlyList<CreatePrescriptionItemDto> Items,
+    UpsertObstetricPrescriptionDataDto? ObstetricData = null);

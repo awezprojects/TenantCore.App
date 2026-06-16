@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Patients.Commands;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Exceptions;
@@ -6,7 +7,7 @@ using TenantCore.Domain.Interfaces;
 
 namespace TenantCore.Application.Features.Patients.Handlers;
 
-public sealed class DeletePatientHandler(IPatientRepository repository)
+public sealed class DeletePatientHandler(IPatientRepository repository, IApplicationAccessValidator accessValidator)
     : IRequestHandler<DeletePatientCommand>
 {
     public async Task Handle(DeletePatientCommand request, CancellationToken cancellationToken)
@@ -14,7 +15,7 @@ public sealed class DeletePatientHandler(IPatientRepository repository)
         var patient = await repository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), request.Id);
 
-        if (patient.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(patient.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
         patient.Deactivate();

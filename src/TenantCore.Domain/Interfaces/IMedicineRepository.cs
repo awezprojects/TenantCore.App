@@ -26,4 +26,6 @@ public interface IMedicineRepository : IRepository<Medicine>
         CancellationToken ct = default);
 
     Task<IEnumerable<Medicine>> GetUnmappedAsync(int batchSize, CancellationToken ct = default);
+
+    Task<IEnumerable<Medicine>> GetByNamePrefixAsync(string name, int limit = 5, CancellationToken ct = default);
 }

@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @using Microsoft.AspNetCore.Components.Forms
 @using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Components
 
 <PageTitle>Patients - CloudClinic</PageTitle>
 
@@ -125,6 +126,18 @@
                                                     disabled="@_deleting">
                                                 Delete
                                             </button>
+                                            @if (p.HasLmpRecord)
+                                            {
+                                                <button class="opd-btn"
+                                                        style="background:#6366F1;color:#fff;border:none;"
+                                                        @onclick="() => OpenLmpDialog(p)">
+                                                    View LMP
+                                                </button>
+                                                @if (p.HasActiveTenure)
+                                                {
+                                                    <span class="opd-badge done" style="font-size:11px;">Active</span>
+                                                }
+                                            }
                                         </div>
                                     </td>
                                 </tr>
@@ -260,6 +273,24 @@ else if (_view == "view" && _viewingPatient is not null)
             </div>
 
         </div>
+
+        <!-- Obstetric / USG schedule OR closed-tenure history -->
+        @if (vp.HasLmpRecord && !vp.HasActiveTenure)
+        {
+            <div class="cc-card" style="padding:20px;">
+                <div style="font-weight:700;font-size:14px;color:#1E293B;margin-bottom:6px;">Pregnancy History</div>
+                <div style="font-size:12px;color:#64748B;margin-bottom:16px;">All previous tenures — no active pregnancy at this time.</div>
+                <PatientTenureSummarySection PatientId="@vp.Id" />
+            </div>
+        }
+        else
+        {
+            <div class="cc-card" style="padding:20px;">
+                <div style="font-weight:700;font-size:14px;color:#1E293B;margin-bottom:16px;">Obstetric & USG Schedule</div>
+                <ObstetricSummarySection PatientId="@vp.Id" />
+            </div>
+        }
+
     </div>
 }
 else if (_view == "register" || _view == "edit")
@@ -560,6 +591,12 @@ else if (_view == "register" || _view == "edit")
     </div>
 }
 
+<!-- LMP Tenure History Dialog -->
+<PatientTenureHistoryDialog Visible="_lmpDialogOpen"
+                            PatientId="_lmpPatientId"
+                            PatientName="_lmpPatientName"
+                            OnClose="CloseLmpDialog" />
+
 <!-- Delete Confirmation Dialog -->
 <MudDialog @bind-Visible="_deleteDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
     <TitleContent>
@@ -612,6 +649,11 @@ else if (_view == "register" || _view == "edit")
     private bool _deleting;
     private bool _deleteDialogOpen;
     private PatientDto? _deleteTarget;
+
+    // ── LMP tenure history dialog state ───────────────────────────────────────
+    private bool _lmpDialogOpen;
+    private Guid _lmpPatientId;
+    private string _lmpPatientName = string.Empty;
 
     // ── Medical conditions ───────────────────────────────────────────────────
     private readonly string[] _conditions = ["Diabetes", "Hypertension", "Heart Disease", "Asthma", "Thyroid", "Cancer"];
@@ -807,6 +849,16 @@ else if (_view == "register" || _view == "edit")
 
         _saving = false;
     }
+
+    // ── LMP dialog ───────────────────────────────────────────────────────────
+    private void OpenLmpDialog(PatientDto patient)
+    {
+        _lmpPatientId = patient.Id;
+        _lmpPatientName = patient.FullName;
+        _lmpDialogOpen = true;
+    }
+
+    private void CloseLmpDialog() => _lmpDialogOpen = false;
 
     // ── Delete ────────────────────────────────────────────────────────────────
     private void ConfirmDelete(PatientDto patient)

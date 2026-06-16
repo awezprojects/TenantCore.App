@@ -1,0 +1,300 @@
+@page "/patients/{PatientId:guid}/usg-chart/print"
+@layout PrintLayout
+@inject IObstetricApiClient ObstetricClient
+@inject IClinicApiClient ClinicClient
+@inject IApplicationApiClient AppClient
+@inject ClinicContextService ClinicContext
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Dtos.Auth
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<PageTitle>USG Appointment Schedule — Print</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
+        <div style="font-size:32px;">⏳</div>
+        <div style="font-size:14px;color:#64748B;">Loading...</div>
+    </div>
+}
+else if (_chart is null || !_chart.Lmp.HasValue)
+{
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
+        <div style="font-size:40px;">❌</div>
+        <div style="font-size:15px;color:#64748B;">No LMP / USG data available for this patient.</div>
+        <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                style="padding:10px 20px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">
+            ✕ Close
+        </button>
+    </div>
+}
+else
+{
+    <!-- ── Print Action Bar (screen only) ─────────────────────── -->
+    <div class="no-print" style="background:#1E3A5F;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                    style="padding:7px 16px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">
+                ✕ Close
+            </button>
+            <div style="color:rgba(255,255,255,0.8);font-size:13px;">
+                <strong style="color:#fff;">USG Appointment Schedule</strong>
+                @if (!string.IsNullOrEmpty(_patientName))
+                {
+                    <span> · @_patientName</span>
+                }
+            </div>
+        </div>
+        <button @onclick="PrintPage"
+                style="padding:9px 22px;border-radius:8px;border:none;background:#fff;color:#1E3A5F;cursor:pointer;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;">
+            🖨️ Print
+        </button>
+    </div>
+
+    <!-- ── Chart Sheet ────────────────────────────────────────── -->
+    <div class="rx-bg">
+        <div class="rx-sheet">
+
+            <!-- ── Clinic Header ─────────────────────────────── -->
+            <div class="rx-header">
+                <div class="rx-header-left">
+                    <div class="rx-clinic-name">🏥 @(_clinic?.ApplicationName ?? "Medical Clinic")</div>
+                    @{
+                        var clinicLine = new List<string>();
+                        if (!string.IsNullOrEmpty(_clinic?.Address)) clinicLine.Add(_clinic.Address);
+                        if (!string.IsNullOrEmpty(_clinic?.ContactNumber)) clinicLine.Add($"Phone: {_clinic.ContactNumber}");
+                    }
+                    @if (clinicLine.Count > 0)
+                    {
+                        <div class="rx-clinic-sub">@string.Join(" · ", clinicLine)</div>
+                    }
+                    @{
+                        var regLine = new List<string>();
+                        if (!string.IsNullOrEmpty(_clinic?.RegistrationNumber)) regLine.Add($"Reg. No: {_clinic.RegistrationNumber}");
+                        if (!string.IsNullOrEmpty(_clinic?.OfficialEmail)) regLine.Add(_clinic.OfficialEmail);
+                    }
+                    @if (regLine.Count > 0)
+                    {
+                        <div class="rx-clinic-sub">@string.Join(" · ", regLine)</div>
+                    }
+                </div>
+                <div class="rx-header-right">
+                    <div class="rx-doctor-name" style="font-size:14px;text-transform:uppercase;letter-spacing:0.5px;">USG Appointment Schedule</div>
+                    <div class="rx-doctor-sub" style="margin-top:4px;">Obstetric Sonography Chart</div>
+                    <div class="rx-doctor-sub">Generated: @DateTime.Now.ToString("dd MMM yyyy")</div>
+                </div>
+            </div>
+
+            <hr class="rx-rule" />
+
+            <!-- ── Patient Strip ─────────────────────────────── -->
+            <div class="rx-patient-strip" style="grid-template-columns:2fr 1fr 1fr 1fr;">
+                <div class="rx-ps-cell rx-ps-wide">
+                    <div class="rx-ps-label">PATIENT NAME</div>
+                    <div class="rx-ps-name">@(string.IsNullOrEmpty(_patientName) ? "—" : _patientName)</div>
+                </div>
+                <div class="rx-ps-cell">
+                    <div class="rx-ps-label">LMP</div>
+                    <div class="rx-ps-value">@_chart.Lmp.Value.ToString("dd MMM yyyy")</div>
+                </div>
+                <div class="rx-ps-cell">
+                    <div class="rx-ps-label">EDD BY LMP</div>
+                    <div class="rx-ps-value rx-uhid">
+                        @(_chart.EddByLmp.HasValue ? _chart.EddByLmp.Value.ToString("dd MMM yyyy") : "—")
+                    </div>
+                </div>
+                <div class="rx-ps-cell">
+                    <div class="rx-ps-label">EDD BY USG</div>
+                    <div class="rx-ps-value" style="color:@(_chart.EddByUsg.HasValue ? "#16A34A" : "#94A3B8");">
+                        @(_chart.EddByUsg.HasValue ? _chart.EddByUsg.Value.ToString("dd MMM yyyy") : "Not recorded")
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Schedule Table ────────────────────────────── -->
+            @if (_chart.Rows.Any())
+            {
+                <div class="rx-section">
+                    <div class="rx-section-title">📅 USG APPOINTMENT SCHEDULE</div>
+                    <table class="rx-table">
+                        <thead>
+                            <tr>
+                                <th class="rx-th-num">#</th>
+                                <th style="width:90px;">Gestation</th>
+                                <th style="width:110px;">Date</th>
+                                <th style="width:90px;">Day</th>
+                                <th>Activity</th>
+                                <th>Indication</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < _chart.Rows.Count; i++)
+                            {
+                                var row = _chart.Rows[i];
+                                <tr class="@(i % 2 == 1 ? "rx-tr-alt" : "")">
+                                    <td class="rx-td-num">@row.RowOrder</td>
+                                    <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;font-weight:700;color:#1E293B;">@row.WeekLabel</td>
+                                    <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;color:#1E293B;white-space:nowrap;">@row.Date.ToString("dd MMM yyyy")</td>
+                                    <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;color:#64748B;white-space:nowrap;">@row.DayOfWeek</td>
+                                    <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;color:#0F172A;font-weight:500;">@row.Activity</td>
+                                    <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;color:#64748B;font-style:italic;">@row.Indication</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            <!-- ── Signature row ─────────────────────────────── -->
+            <div style="display:flex;justify-content:flex-end;padding:16px 28px 12px;">
+                <div class="rx-signature">
+                    <div class="rx-sig-line"></div>
+                    <div class="rx-sig-name">Doctor's Signature</div>
+                    <div class="rx-sig-stamp">Signature &amp; Stamp</div>
+                </div>
+            </div>
+
+            <!-- ── Disclaimer ────────────────────────────────── -->
+            <div class="rx-disclaimer">
+                This USG schedule is auto-calculated based on the recorded LMP using Naegele's rule (LMP + 280 days).
+                <br />
+                ⚠️ Dates are indicative — your doctor may adjust the schedule based on clinical findings.
+                @if (!string.IsNullOrEmpty(_clinic?.ContactNumber))
+                {
+                    <span> · For queries call @_clinic.ContactNumber</span>
+                }
+            </div>
+
+            <!-- ── Screen footer (hidden on print) ──────────── -->
+            <div class="no-print rx-screen-footer">
+                <span>Generated @DateTime.Now.ToString("dd MMM yyyy, HH:mm")</span>
+                <button @onclick="PrintPage" class="rx-print-btn">🖨️ Print</button>
+            </div>
+
+        </div>
+    </div>
+}
+
+<style>
+    /* ── Layout ───────────────────────────────────────── */
+    .rx-bg { background:#F0F4F8; min-height:calc(100vh - 44px); padding:28px 16px; }
+    .rx-sheet { max-width:860px; margin:0 auto; background:#fff; border-radius:4px;
+                box-shadow:0 2px 16px rgba(0,0,0,0.1); font-family:'Segoe UI',sans-serif; color:#111; }
+
+    /* ── Clinic Header ────────────────────────────────── */
+    .rx-header { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 28px 14px; }
+    .rx-header-left { flex:1; }
+    .rx-header-right { text-align:right; flex-shrink:0; max-width:260px; }
+    .rx-clinic-name { font-size:22px; font-weight:800; color:#111; line-height:1.2; }
+    .rx-clinic-sub { font-size:11px; color:#555; margin-top:3px; line-height:1.4; }
+    .rx-doctor-name { font-size:15px; font-weight:700; color:#1565C0; }
+    .rx-doctor-sub { font-size:11px; color:#555; margin-top:2px; }
+    .rx-rule { border:none; border-top:1.5px solid #2563EB; margin:0 28px; }
+
+    /* ── Patient Strip ────────────────────────────────── */
+    .rx-patient-strip { display:grid; border-bottom:1px solid #E2E8F0; padding:10px 28px; gap:8px; }
+    .rx-ps-cell { padding:6px 0; }
+    .rx-ps-label { font-size:9px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:3px; }
+    .rx-ps-name { font-size:15px; font-weight:800; color:#0F172A; }
+    .rx-ps-value { font-size:13px; font-weight:700; color:#0F172A; }
+    .rx-ps-sub { font-size:11px; color:#64748B; margin-top:1px; }
+    .rx-uhid { color:#1565C0; }
+
+    /* ── Sections ─────────────────────────────────────── */
+    .rx-section { padding:12px 28px; border-bottom:1px solid #F1F5F9; }
+    .rx-section-title { font-size:10px; font-weight:700; color:#1565C0; text-transform:uppercase;
+                        letter-spacing:0.7px; margin-bottom:8px; }
+
+    /* ── Table ────────────────────────────────────────── */
+    .rx-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .rx-table thead tr { background:#F8FAFC; }
+    .rx-table th { text-align:left; padding:8px 10px; font-size:10px; font-weight:700; color:#64748B;
+                   text-transform:uppercase; letter-spacing:0.4px;
+                   border-bottom:1.5px solid #E2E8F0; border-top:1px solid #E2E8F0; }
+    .rx-th-num { width:32px; }
+    .rx-tr-alt td { background:#FAFAFA; }
+    .rx-td-num { padding:8px 10px; border-bottom:1px solid #F1F5F9; font-weight:800; color:#1565C0; font-size:13px; }
+
+    /* ── Signature ────────────────────────────────────── */
+    .rx-signature { text-align:center; min-width:180px; }
+    .rx-sig-line { width:180px; border-bottom:1.5px solid #334155; margin:0 auto 6px; }
+    .rx-sig-name { font-size:12px; font-weight:700; color:#0F172A; }
+    .rx-sig-stamp { font-size:10px; color:#94A3B8; margin-top:2px; }
+
+    /* ── Disclaimer ───────────────────────────────────── */
+    .rx-disclaimer { text-align:center; font-size:10px; color:#94A3B8; padding:10px 28px 16px;
+                     border-top:1px solid #F1F5F9; line-height:1.6; }
+
+    /* ── Screen footer ────────────────────────────────── */
+    .rx-screen-footer { display:flex; justify-content:space-between; align-items:center;
+                        padding:12px 28px; background:#F8FAFC; border-top:1px solid #E2E8F0; }
+    .rx-screen-footer span { font-size:11px; color:#94A3B8; }
+    .rx-print-btn { padding:8px 20px; border-radius:8px; background:#1565C0; color:#fff;
+                    border:none; font-size:12px; font-weight:700; cursor:pointer; }
+
+    /* ── Print overrides ──────────────────────────────── */
+    @@media print {
+        .no-print { display:none !important; }
+        .rx-bg { background:#fff !important; padding:0 !important; min-height:unset; }
+        .rx-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; }
+        body { background:#fff !important; margin:0 !important; padding:0 !important; }
+        .rx-tr-alt td { background:#fff !important; }
+    }
+</style>
+
+@code {
+    [Parameter] public Guid PatientId { get; set; }
+
+    private UsgChartDto? _chart;
+    private string _patientName = string.Empty;
+    private ApplicationResponseDto? _clinic;
+    private bool _loading = true;
+
+    // OnAfterRenderAsync is the only safe place in Blazor WASM to call JS interop
+    // (localStorage) and then fire authenticated API calls. Parent OnInitializedAsync
+    // tasks (App.razor → AuthState, PrintLayout) can still be in-flight when a child
+    // OnInitializedAsync starts, leading to 401s. OnAfterRenderAsync(firstRender) is
+    // guaranteed to run after the whole tree has rendered at least once.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await AuthState.InitializeAsync();          // token from localStorage
+            await ClinicContext.InitializeAsync();      // X-Application-Id from localStorage
+            await Task.WhenAll(LoadChart(), LoadPatient(), LoadClinic());
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadClinic()
+    {
+        var appId = ClinicContext.SelectedApplicationId;
+        if (appId == Guid.Empty) return;
+        var r = await AppClient.GetApplicationByIdAsync(appId);
+        if (r.Success && r.Data is not null) _clinic = r.Data;
+    }
+
+    private async Task LoadChart()
+    {
+        var r = await ObstetricClient.GetUsgChartAsync(PatientId);
+        if (r.Success) _chart = r.Data;
+    }
+
+    private async Task LoadPatient()
+    {
+        var r = await ClinicClient.GetPatientByIdAsync(PatientId);
+        if (r.Success && r.Data is not null)
+            _patientName = r.Data.FullName;
+    }
+
+    private async Task PrintPage() => await JS.InvokeVoidAsync("window.print");
+}

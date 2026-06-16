@@ -7,33 +7,39 @@ public class DoctorProfile : BaseEntity
     public Guid UserId { get; private set; }
     public string RegistrationNumber { get; private set; } = string.Empty;
     public bool IsRegistrationVerified { get; private set; }
-    public string? Specialty { get; private set; }
+    public Guid? SpecialityId { get; private set; }
     public string? QualificationDetails { get; private set; }
+
+    // Navigation — loaded explicitly; may be null when not included
+    public DoctorSpeciality? Speciality { get; private set; }
+
+    // Legacy free-text field kept for display fallback only
+    public string? Specialty { get; private set; }
 
     private DoctorProfile() { }
 
     public static DoctorProfile Create(
         Guid userId,
         string registrationNumber,
-        string? specialty,
+        Guid specialityId,
         string? qualificationDetails) => new()
     {
-        Id                    = Guid.NewGuid(),
-        UserId                = userId,
-        RegistrationNumber    = registrationNumber,
+        Id                     = Guid.NewGuid(),
+        UserId                 = userId,
+        RegistrationNumber     = registrationNumber,
         IsRegistrationVerified = true,
-        Specialty             = specialty,
-        QualificationDetails  = qualificationDetails,
-        CreatedAt             = DateTime.UtcNow,
+        SpecialityId           = specialityId,
+        QualificationDetails   = qualificationDetails,
+        CreatedAt              = DateTime.UtcNow,
     };
 
     public void Update(
         string registrationNumber,
-        string? specialty,
+        Guid specialityId,
         string? qualificationDetails)
     {
         RegistrationNumber   = registrationNumber;
-        Specialty            = specialty;
+        SpecialityId         = specialityId;
         QualificationDetails = qualificationDetails;
         SetUpdatedAt();
     }

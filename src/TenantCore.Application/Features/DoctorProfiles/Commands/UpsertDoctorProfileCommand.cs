@@ -6,5 +6,5 @@ namespace TenantCore.Application.Features.DoctorProfiles.Commands;
 public sealed record UpsertDoctorProfileCommand(
     Guid UserId,
     string RegistrationNumber,
-    string? Specialty,
+    Guid SpecialityId,
     string? QualificationDetails) : IRequest<DoctorProfileDto>;

@@ -177,6 +177,7 @@ else if (_isAuthenticated)
         ["/admin/dashboard"]        = "Admin Dashboard",
         ["/admin/wards"]            = "Ward & Room Management",
         ["/admin/users"]            = "User Management",
+        ["/admin/usg-template"]     = "USG Appointment Template",
         ["/prescriptions"]          = "Prescriptions",
         ["/patients"]               = "Patient Registry",
         ["/opd"]                    = "My OPD Queue",
@@ -195,12 +196,19 @@ else if (_isAuthenticated)
         UpdateScreenTitle(NavigationManager.Uri);
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    // Initialize auth + clinic context in OnInitializedAsync so every page's
+    // OnParametersSetAsync / OnInitializedAsync already has SelectedApplicationId
+    // populated before making any API calls.
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
-        {
-            await CheckAuthAndRedirect();
-        }
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) CheckAuthAndRedirect();
+        return Task.CompletedTask;
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -215,12 +223,11 @@ else if (_isAuthenticated)
         _screenTitle = _titles.TryGetValue(path, out var t) ? t : "Dashboard";
     }
 
-    private async Task CheckAuthAndRedirect()
+    private void CheckAuthAndRedirect()
     {
         try
         {
-            await AuthState.InitializeAsync();
-            await ClinicContext.InitializeAsync();
+            // InitializeAsync already called in OnInitializedAsync — read current state
             _isAuthenticated = AuthState.IsAuthenticated;
 
             if (_isAuthenticated && AuthState.CurrentUser != null)
@@ -260,6 +267,14 @@ else if (_isAuthenticated)
         var uri = NavigationManager.Uri;
         var baseUri = NavigationManager.BaseUri;
         var path = uri.Replace(baseUri, "/");
+
+        // Guard: doctor must select a clinic before accessing clinic-specific pages
+        if (_isAuthenticated && _isDoctor && ClinicContext.SelectedApplicationId == Guid.Empty
+            && !path.StartsWith("/doctor/") && !path.StartsWith("/auth/"))
+        {
+            NavigationManager.NavigateTo("/doctor/home");
+            return;
+        }
 
         if (!_isAuthenticated)
         {

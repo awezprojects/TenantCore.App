@@ -1,0 +1,246 @@
+@page "/admin/usg-template"
+@layout AuthorizedLayout
+@inject IUsgTemplateApiClient UsgTemplateClient
+@inject NavigationManager Navigation
+@using TenantCore.Shared.Dtos
+@using TenantCore.Web.Client.Clients
+
+<PageTitle>USG Appointment Template</PageTitle>
+
+<div style="max-width:960px;margin:0 auto;padding:24px 16px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <button @onclick='() => Navigation.NavigateTo("/admin/dashboard")'
+                style="background:none;border:none;cursor:pointer;color:#64748B;font-size:18px;padding:0;">←</button>
+        <div>
+            <h2 style="margin:0;font-size:20px;font-weight:700;color:#1E293B;">USG Appointment Template</h2>
+            <div style="font-size:13px;color:#64748B;margin-top:2px;">Configure the scan schedule for your clinic</div>
+        </div>
+        <div style="flex:1;"></div>
+        @if (_template?.IsCustomized == true)
+        {
+            <span style="font-size:11px;font-weight:600;padding:4px 10px;background:#FEF3C7;color:#92400E;border-radius:12px;border:1px solid #FDE68A;">
+                Customized
+            </span>
+        }
+        else
+        {
+            <span style="font-size:11px;font-weight:600;padding:4px 10px;background:#F0FDF4;color:#166534;border-radius:12px;border:1px solid #BBF7D0;">
+                Using Default
+            </span>
+        }
+    </div>
+
+    @if (_loading)
+    {
+        <div style="padding:40px;text-align:center;color:#94A3B8;font-size:14px;">Loading template...</div>
+    }
+    else if (_rows.Count > 0)
+    {
+        <div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;overflow:hidden;margin-bottom:20px;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:#F8FAFC;border-bottom:2px solid #E2E8F0;">
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;color:#64748B;width:40px;">#</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;color:#64748B;width:100px;">Gestation</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;color:#64748B;width:80px;">LMP Day</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;color:#64748B;">Activity</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;color:#64748B;">Indication</th>
+                        @if (_editing)
+                        {
+                            <th style="padding:10px 12px;width:40px;"></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < _rows.Count; i++)
+                    {
+                        var row = _rows[i];
+                        var idx = i;
+                        <tr style="border-bottom:1px solid #F1F5F9;">
+                            <td style="padding:8px 12px;color:#94A3B8;font-size:12px;">@row.RowOrder</td>
+                            <td style="padding:8px 12px;">
+                                @if (_editing)
+                                {
+                                    <input type="text" value="@row.WeekLabel"
+                                           @onchange="@(e => UpdateRow(idx, r => r with { WeekLabel = e.Value?.ToString() ?? r.WeekLabel }))"
+                                           style="width:90px;padding:4px 6px;border:1.5px solid #E2E8F0;border-radius:5px;font-size:12px;" />
+                                }
+                                else
+                                {
+                                    <span style="font-weight:600;color:#1E293B;">@row.WeekLabel</span>
+                                }
+                            </td>
+                            <td style="padding:8px 12px;">
+                                @if (_editing)
+                                {
+                                    <input type="number" value="@row.LmpDayOffset"
+                                           @onchange="@(e => UpdateRow(idx, r => r with { LmpDayOffset = int.TryParse(e.Value?.ToString(), out var d) ? d : r.LmpDayOffset }))"
+                                           style="width:70px;padding:4px 6px;border:1.5px solid #E2E8F0;border-radius:5px;font-size:12px;" />
+                                }
+                                else
+                                {
+                                    <span style="color:#64748B;">Day @row.LmpDayOffset</span>
+                                }
+                            </td>
+                            <td style="padding:8px 12px;">
+                                @if (_editing)
+                                {
+                                    <input type="text" value="@row.Activity"
+                                           @onchange="@(e => UpdateRow(idx, r => r with { Activity = e.Value?.ToString() ?? r.Activity }))"
+                                           style="width:100%;padding:4px 6px;border:1.5px solid #E2E8F0;border-radius:5px;font-size:12px;box-sizing:border-box;" />
+                                }
+                                else
+                                {
+                                    <span style="color:#1E293B;">@row.Activity</span>
+                                }
+                            </td>
+                            <td style="padding:8px 12px;">
+                                @if (_editing)
+                                {
+                                    <input type="text" value="@row.Indication"
+                                           @onchange="@(e => UpdateRow(idx, r => r with { Indication = e.Value?.ToString() ?? r.Indication }))"
+                                           style="width:100%;padding:4px 6px;border:1.5px solid #E2E8F0;border-radius:5px;font-size:12px;box-sizing:border-box;" />
+                                }
+                                else
+                                {
+                                    <span style="color:#64748B;font-size:12px;">@row.Indication</span>
+                                }
+                            </td>
+                            @if (_editing)
+                            {
+                                <td style="padding:8px 12px;text-align:center;">
+                                    <button @onclick="@(() => RemoveRow(idx))"
+                                            style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:16px;padding:2px;">✕</button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            @if (_editing)
+            {
+                <button @onclick="AddRow"
+                        style="padding:8px 16px;background:#F1F5F9;color:#475569;border:1.5px solid #CBD5E1;
+                               border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+                    + Add Row
+                </button>
+                <button @onclick="SaveTemplate" disabled="@_saving"
+                        style="padding:8px 18px;background:#1565C0;color:#fff;border:none;border-radius:8px;
+                               font-size:13px;font-weight:600;cursor:pointer;">
+                    @(_saving ? "Saving…" : "Save Template")
+                </button>
+                <button @onclick="@(() => { _editing = false; LoadFromTemplate(_template!); })"
+                        style="padding:8px 16px;background:#fff;color:#64748B;border:1.5px solid #E2E8F0;
+                               border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+                    Cancel
+                </button>
+            }
+            else
+            {
+                <button @onclick="@(() => _editing = true)"
+                        style="padding:8px 18px;background:#1565C0;color:#fff;border:none;border-radius:8px;
+                               font-size:13px;font-weight:600;cursor:pointer;">
+                    Customize Template
+                </button>
+                @if (_template?.IsCustomized == true)
+                {
+                    <button @onclick="ResetTemplate" disabled="@_saving"
+                            style="padding:8px 16px;background:#fff;color:#DC2626;border:1.5px solid #FECACA;
+                                   border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+                        @(_saving ? "Resetting…" : "Reset to Default")
+                    </button>
+                }
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div style="margin-top:12px;padding:10px 14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;
+                         font-size:13px;color:#DC2626;">@_error</div>
+        }
+    }
+</div>
+
+@code {
+    private ClinicUsgTemplateDto? _template;
+    private List<UsgTemplateRowDto> _rows = [];
+    private bool _loading = true;
+    private bool _editing;
+    private bool _saving;
+    private string _error = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await UsgTemplateClient.GetClinicTemplateAsync();
+        if (r.Success) _template = r.Data;
+        if (_template is not null) LoadFromTemplate(_template);
+        _loading = false;
+    }
+
+    private void LoadFromTemplate(ClinicUsgTemplateDto template)
+        => _rows = template.Rows.Select(r => r).ToList();
+
+    private void UpdateRow(int idx, Func<UsgTemplateRowDto, UsgTemplateRowDto> update)
+    {
+        if (idx < 0 || idx >= _rows.Count) return;
+        _rows[idx] = update(_rows[idx]);
+    }
+
+    private void AddRow()
+    {
+        var nextOrder = _rows.Count > 0 ? _rows.Max(r => r.RowOrder) + 1 : 1;
+        _rows.Add(new UsgTemplateRowDto
+        {
+            RowOrder     = nextOrder,
+            WeekLabel    = "",
+            LmpDayOffset = 0,
+            Activity     = "",
+            Indication   = "",
+        });
+    }
+
+    private void RemoveRow(int idx)
+    {
+        _rows.RemoveAt(idx);
+        for (int i = 0; i < _rows.Count; i++)
+            _rows[i] = _rows[i] with { RowOrder = i + 1 };
+    }
+
+    private async Task SaveTemplate()
+    {
+        _error = string.Empty;
+        _saving = true;
+        var r = await UsgTemplateClient.UpsertAsync(new UpsertClinicUsgTemplateRequest { Rows = _rows });
+        _saving = false;
+        if (r.Success)
+        {
+            _template = r.Data;
+            _editing = false;
+        }
+        else
+        {
+            _error = r.Message ?? "Failed to save template.";
+        }
+    }
+
+    private async Task ResetTemplate()
+    {
+        _error = string.Empty;
+        _saving = true;
+        var r = await UsgTemplateClient.ResetAsync();
+        _saving = false;
+        if (r.Success)
+        {
+            _template = r.Data;
+            if (_template is not null) LoadFromTemplate(_template);
+            _editing = false;
+        }
+        else
+        {
+            _error = r.Message ?? "Failed to reset template.";
+        }
+    }
+}

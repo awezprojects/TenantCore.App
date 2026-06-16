@@ -51,6 +51,14 @@ public class MedicinesController(ISender sender) : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
+    [HttpGet("autocomplete")]
+    [ProducesResponseType(typeof(IEnumerable<MedicineDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Autocomplete(
+        [FromQuery] string name,
+        [FromQuery] int limit = 5,
+        CancellationToken ct = default)
+        => Ok(await sender.Send(new GetMedicineAutocompleteQuery(name, limit), ct));
+
     [HttpPut("{id:guid}")]
     [Authorize(Policy = AuthPolicies.RequireClinical)]
     [ProducesResponseType(typeof(MedicineDto), StatusCodes.Status200OK)]

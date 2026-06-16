@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Prescriptions.Queries;
 using TenantCore.Application.Features.Prescriptions.Translators;
 using TenantCore.Domain.Entities;
@@ -10,7 +11,8 @@ namespace TenantCore.Application.Features.Prescriptions.Handlers;
 
 public sealed class GetPrescriptionByOpdIdHandler(
     IPrescriptionRepository prescriptionRepository,
-    IPatientRepository patientRepository)
+    IPatientRepository patientRepository,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<GetPrescriptionByOpdIdQuery, PrescriptionDto>
 {
     public async Task<PrescriptionDto> Handle(GetPrescriptionByOpdIdQuery request, CancellationToken cancellationToken)
@@ -18,7 +20,7 @@ public sealed class GetPrescriptionByOpdIdHandler(
         var prescription = await prescriptionRepository.GetByOpdRegistrationIdAsync(request.OpdRegistrationId, cancellationToken)
             ?? throw new NotFoundException(nameof(Prescription), request.OpdRegistrationId);
 
-        if (prescription.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(prescription.ApplicationId))
             throw new NotFoundException(nameof(Prescription), request.OpdRegistrationId);
 
         var patient = await patientRepository.GetByIdAsync(prescription.PatientId, cancellationToken)

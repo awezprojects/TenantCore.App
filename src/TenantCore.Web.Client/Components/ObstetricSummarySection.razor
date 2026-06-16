@@ -1,0 +1,99 @@
+@inject IObstetricApiClient ObstetricClient
+@using TenantCore.Shared.Dtos
+@using TenantCore.Web.Client.Clients
+
+@if (_loading)
+{
+    <div style="padding:24px;text-align:center;color:#94A3B8;font-size:13px;">Loading obstetric summary...</div>
+}
+else if (_chart is null)
+{
+    <div style="padding:16px;background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:10px;color:#9A3412;font-size:13px;">
+        No obstetric data found for this patient.
+    </div>
+}
+else if (_chart.Lmp is null)
+{
+    <div style="padding:16px;background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:10px;color:#0369A1;font-size:13px;">
+        LMP not recorded yet. Set LMP from the patient's obstetric prescription to generate the USG schedule.
+    </div>
+}
+else
+{
+    <div style="margin-bottom:20px;">
+        <div style="display:flex;gap:32px;flex-wrap:wrap;padding:16px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:10px;">
+            <div>
+                <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">LMP</div>
+                <div style="font-size:14px;font-weight:700;color:#1E293B;">@_chart.Lmp.Value.ToString("dd MMM yyyy")</div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">EDD by LMP</div>
+                <div style="font-size:14px;font-weight:700;color:#1565C0;">
+                    @(_chart.EddByLmp.HasValue ? _chart.EddByLmp.Value.ToString("dd MMM yyyy") : "—")
+                </div>
+            </div>
+            <div>
+                <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">EDD by USG</div>
+                <div style="font-size:14px;font-weight:700;color:@(_chart.EddByUsg.HasValue ? "#16A34A" : "#94A3B8");">
+                    @(_chart.EddByUsg.HasValue ? _chart.EddByUsg.Value.ToString("dd MMM yyyy") : "Not recorded")
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_chart.Rows.Any())
+    {
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:#1E293B;color:#fff;">
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap;">#</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap;">Gestation</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap;">Date</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap;">Day</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;">Activity</th>
+                        <th style="padding:10px 12px;text-align:left;font-weight:600;">Indication</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in _chart.Rows)
+                    {
+                        <tr style="border-bottom:1px solid #E2E8F0;@(row.RowOrder % 2 == 0 ? "background:#F8FAFC;" : "")">
+                            <td style="padding:8px 12px;color:#64748B;">@row.RowOrder</td>
+                            <td style="padding:8px 12px;font-weight:600;color:#1E293B;white-space:nowrap;">@row.WeekLabel</td>
+                            <td style="padding:8px 12px;color:#1E293B;white-space:nowrap;">@row.Date.ToString("dd MMM yyyy")</td>
+                            <td style="padding:8px 12px;color:#64748B;white-space:nowrap;">@row.DayOfWeek</td>
+                            <td style="padding:8px 12px;color:#1E293B;">@row.Activity</td>
+                            <td style="padding:8px 12px;color:#64748B;">@row.Indication</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:12px;justify-content:flex-end;">
+            <a href="/patients/@PatientId/usg-chart/print"
+               target="_blank"
+               style="font-size:12px;color:#1565C0;font-weight:600;text-decoration:none;
+                      padding:6px 14px;border:1.5px solid #1565C0;border-radius:6px;">
+                Print USG Chart
+            </a>
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid PatientId { get; set; }
+
+    private UsgChartDto? _chart;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PatientId == Guid.Empty) return;
+        _loading = true;
+        var response = await ObstetricClient.GetUsgChartAsync(PatientId);
+        _chart   = response.Success ? response.Data : null;
+        _loading = false;
+    }
+}

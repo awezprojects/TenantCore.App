@@ -1,0 +1,46 @@
+@page "/patients/{PatientId:guid}/usg-chart"
+@layout AuthorizedLayout
+@inject IObstetricApiClient ObstetricClient
+@inject IClinicApiClient ClinicClient
+@inject NavigationManager Navigation
+@using TenantCore.Shared.Dtos
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Components
+
+<PageTitle>USG Chart</PageTitle>
+
+<div style="max-width:960px;margin:0 auto;padding:24px 16px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <button @onclick='() => Navigation.NavigateTo("/patients")'
+                style="background:none;border:none;cursor:pointer;color:#64748B;font-size:18px;padding:0;">←</button>
+        <div>
+            <h2 style="margin:0;font-size:20px;font-weight:700;color:#1E293B;">USG Appointment Chart</h2>
+            @if (!string.IsNullOrEmpty(_patientName))
+            {
+                <div style="font-size:13px;color:#64748B;margin-top:2px;">Patient: @_patientName</div>
+            }
+        </div>
+        <div style="flex:1;"></div>
+        <a href="/patients/@PatientId/usg-chart/print"
+           target="_blank"
+           style="font-size:13px;color:#fff;font-weight:600;text-decoration:none;
+                  padding:8px 18px;background:#1565C0;border-radius:8px;">
+            Print Chart
+        </a>
+    </div>
+
+    <ObstetricSummarySection PatientId="@PatientId" />
+</div>
+
+@code {
+    [Parameter] public Guid PatientId { get; set; }
+
+    private string _patientName = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var r = await ClinicClient.GetPatientByIdAsync(PatientId);
+        if (r.Success && r.Data is not null)
+            _patientName = r.Data.FullName;
+    }
+}

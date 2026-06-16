@@ -17,12 +17,20 @@ public sealed class UpsertPrescriptionConfigHandler(IPrescriptionConfigRepositor
 
         if (config is null)
         {
-            config = DomainConfig.Create(request.ApplicationId, request.DefaultLanguage);
+            config = DomainConfig.Create(
+                request.ApplicationId, request.DefaultLanguage,
+                request.PrintMarginTop, request.PrintMarginRight,
+                request.PrintMarginBottom, request.PrintMarginLeft,
+                request.HideClinicHeader);
             await repository.AddAsync(config, cancellationToken);
         }
         else
         {
-            config.Update(request.DefaultLanguage);
+            config.Update(
+                request.DefaultLanguage,
+                request.PrintMarginTop, request.PrintMarginRight,
+                request.PrintMarginBottom, request.PrintMarginLeft,
+                request.HideClinicHeader);
             repository.Update(config);
         }
 

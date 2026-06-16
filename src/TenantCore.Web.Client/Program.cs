@@ -35,6 +35,12 @@ builder.Services.AddHttpClient<IDoctorProfileApiClient, DoctorProfileApiClient>(
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 });
 
+// Register Doctor Specialities API Client
+builder.Services.AddHttpClient<IDoctorSpecialitiesApiClient, DoctorSpecialitiesApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+});
+
 // Register Clinic API Client
 builder.Services.AddHttpClient<IClinicApiClient, ClinicApiClient>(client =>
 {
@@ -55,6 +61,24 @@ builder.Services.AddHttpClient<IMedicineApiClient, MedicineApiClient>(client =>
 
 // Register Prescription API Client
 builder.Services.AddHttpClient<IPrescriptionApiClient, PrescriptionApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+// Register Obstetric API Client
+builder.Services.AddHttpClient<IObstetricApiClient, ObstetricApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+// Register USG Template API Client
+builder.Services.AddHttpClient<IUsgTemplateApiClient, UsgTemplateApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+// Register Pregnancy Tenure API Client
+builder.Services.AddHttpClient<IPregnancyTenureApiClient, PregnancyTenureApiClient>(client =>
 {
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();

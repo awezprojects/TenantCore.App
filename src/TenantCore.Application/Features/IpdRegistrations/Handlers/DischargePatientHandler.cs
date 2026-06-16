@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.IpdRegistrations.Commands;
 using TenantCore.Application.Features.IpdRegistrations.Translators;
 using TenantCore.Domain.Entities;
@@ -10,7 +11,8 @@ namespace TenantCore.Application.Features.IpdRegistrations.Handlers;
 
 public sealed class DischargePatientHandler(
     IIpdRegistrationRepository repository,
-    IBedRepository bedRepository)
+    IBedRepository bedRepository,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<DischargePatientCommand, IpdRegistrationDto>
 {
     public async Task<IpdRegistrationDto> Handle(
@@ -19,7 +21,7 @@ public sealed class DischargePatientHandler(
         var registration = await repository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(IpdRegistration), request.Id);
 
-        if (registration.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(registration.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
         // Free the bed before discharging

@@ -2,6 +2,7 @@
 @layout DoctorPortalLayout
 @inject AuthStateService AuthState
 @inject IDoctorProfileApiClient DoctorProfileApi
+@inject IDoctorSpecialitiesApiClient SpecialitiesApi
 @inject IAuthApiClient AuthClient
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
@@ -107,9 +108,132 @@ else
                             </div>
                         </div>
                     }
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-                        <MudTextField @bind-Value="_profModel.Specialty"            Label="Specialty"       Variant="Variant.Outlined" Disabled="_savingProf" Placeholder="e.g. General Medicine" />
-                        <MudTextField @bind-Value="_profModel.QualificationDetails" Label="Qualifications"  Variant="Variant.Outlined" Disabled="_savingProf" Placeholder="e.g. MBBS, MD" />
+                    <!-- ── Speciality Picker ──────────────────────────────────────── -->
+                    <div style="margin-bottom:14px;position:relative;">
+                        @{
+                            var hasSelection  = _profModel.SpecialityId != Guid.Empty;
+                            var selectedSpec  = hasSelection ? _specialities.FirstOrDefault(s => s.Id == _profModel.SpecialityId) : null;
+                            var pickerDisabled = _savingProf || _loadingSpecialities;
+                        }
+                        <div @onclick="() => { if (!pickerDisabled) _specialityOpen = !_specialityOpen; }"
+                             style="position:relative;min-height:56px;
+                                    border:@(_specialityOpen ? "2px solid #1565C0" : "1px solid rgba(0,0,0,0.23)");
+                                    border-radius:4px;background:#fff;
+                                    padding:@(hasSelection ? "20px 44px 8px 14px" : "0 44px 0 14px");
+                                    display:flex;align-items:@(hasSelection ? "flex-start" : "center");
+                                    cursor:@(pickerDisabled ? "not-allowed" : "pointer");
+                                    opacity:@(pickerDisabled ? "0.6" : "1");
+                                    transition:border 0.15s;">
+                            <span style="position:absolute;
+                                         top:@(hasSelection || _specialityOpen ? "8px" : "50%");
+                                         left:14px;
+                                         transform:@(hasSelection || _specialityOpen ? "none" : "translateY(-50%)");
+                                         font-size:@(hasSelection || _specialityOpen ? "11px" : "14px");
+                                         color:@(_specialityOpen ? "#1565C0" : (hasSelection ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.54)"));
+                                         pointer-events:none;transition:all 0.15s;white-space:nowrap;">
+                                Speciality *
+                            </span>
+                            @if (selectedSpec != null)
+                            {
+                                <div style="display:flex;align-items:center;gap:10px;margin-top:2px;">
+                                    <div style="width:28px;height:28px;border-radius:7px;background:#EFF6FF;
+                                                display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">
+                                        @GetSpecialityIcon(selectedSpec.Name)
+                                    </div>
+                                    <span style="font-size:14px;font-weight:600;color:#1E293B;">@selectedSpec.Name</span>
+                                </div>
+                            }
+                            <span style="position:absolute;right:12px;top:50%;
+                                         transform:translateY(-50%) rotate(@(_specialityOpen ? "180deg" : "0deg"));
+                                         transition:transform 0.2s ease;color:#64748B;display:flex;align-items:center;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </span>
+                        </div>
+
+                        @if (_specialityOpen)
+                        {
+                            var filteredList = FilteredSpecialities.ToList();
+                            <!-- Backdrop -->
+                            <div @onclick="() => { _specialityOpen = false; _specialitySearch = string.Empty; }"
+                                 style="position:fixed;inset:0;z-index:998;" />
+                            <!-- Dropdown panel -->
+                            <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;min-width:260px;
+                                        background:#fff;border-radius:12px;
+                                        border:1px solid #E2E8F0;
+                                        box-shadow:0 12px 40px rgba(0,0,0,0.12),0 2px 8px rgba(0,0,0,0.06);
+                                        z-index:999;overflow:hidden;">
+                                <!-- Search bar -->
+                                <div style="padding:12px;background:#F8FAFC;border-bottom:1px solid #F1F5F9;">
+                                    <div style="display:flex;align-items:center;gap:8px;
+                                                background:#fff;border:1px solid #E2E8F0;border-radius:8px;
+                                                padding:8px 10px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                        </svg>
+                                        <input @bind="_specialitySearch" @bind:event="oninput"
+                                               placeholder="Search speciality…"
+                                               style="border:none;background:transparent;outline:none;
+                                                      font-size:13px;color:#1E293B;width:100%;font-family:inherit;" />
+                                        @if (!string.IsNullOrEmpty(_specialitySearch))
+                                        {
+                                            <span @onclick="() => _specialitySearch = string.Empty"
+                                                  @onclick:stopPropagation="true"
+                                                  style="cursor:pointer;color:#94A3B8;font-size:18px;line-height:1;flex-shrink:0;padding:0 2px;">×</span>
+                                        }
+                                    </div>
+                                </div>
+                                <!-- List -->
+                                <div style="max-height:260px;overflow-y:auto;padding:4px 0;">
+                                    @foreach (var s in filteredList)
+                                    {
+                                        var isSel = _profModel.SpecialityId == s.Id;
+                                        var isHov = _hoveredSpecialityId == s.Id;
+                                        <div @onclick="() => SelectSpeciality(s.Id)"
+                                             @onmouseover="() => _hoveredSpecialityId = s.Id"
+                                             @onmouseout="() => _hoveredSpecialityId = Guid.Empty"
+                                             style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;
+                                                    border-left:3px solid @(isSel ? "#1565C0" : "transparent");
+                                                    background:@(isSel ? "#EFF6FF" : (isHov ? "#F8FAFC" : "transparent"));
+                                                    transition:background 0.1s;">
+                                            <div style="width:32px;height:32px;border-radius:8px;flex-shrink:0;
+                                                        display:flex;align-items:center;justify-content:center;font-size:16px;
+                                                        background:@(isSel ? "#DBEAFE" : "#F1F5F9");">
+                                                @GetSpecialityIcon(s.Name)
+                                            </div>
+                                            <span style="font-size:13px;font-weight:@(isSel ? "600" : "400");
+                                                         color:@(isSel ? "#1565C0" : "#374151");flex:1;line-height:1.3;">
+                                                @s.Name
+                                            </span>
+                                            @if (isSel)
+                                            {
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1565C0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="20 6 9 17 4 12"/>
+                                                </svg>
+                                            }
+                                        </div>
+                                    }
+                                    @if (!filteredList.Any())
+                                    {
+                                        <div style="padding:28px 16px;text-align:center;">
+                                            <div style="font-size:28px;margin-bottom:8px;">🔍</div>
+                                            <div style="font-size:13px;color:#94A3B8;">No results for "@_specialitySearch"</div>
+                                        </div>
+                                    }
+                                </div>
+                                <!-- Footer -->
+                                <div style="padding:7px 14px;border-top:1px solid #F1F5F9;background:#F8FAFC;">
+                                    <span style="font-size:11px;color:#CBD5E1;font-weight:500;">
+                                        @filteredList.Count @(string.IsNullOrEmpty(_specialitySearch) ? "specialities available" : "found")
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <!-- Qualifications -->
+                    <div style="margin-bottom:14px;">
+                        <MudTextField @bind-Value="_profModel.QualificationDetails" Label="Qualifications" Variant="Variant.Outlined" Disabled="_savingProf" Placeholder="e.g. MBBS, MD" />
                     </div>
                     @if (!string.IsNullOrEmpty(_profError))
                     {
@@ -380,6 +504,11 @@ else
     // Professional info
     private UpsertDoctorProfileDto _profModel = new();
     private DoctorProfileDto? _profProfile;
+    private List<DoctorSpecialityDto> _specialities = [];
+    private bool _loadingSpecialities;
+    private bool _specialityOpen;
+    private string _specialitySearch = string.Empty;
+    private Guid _hoveredSpecialityId;
     private bool _savingProf;
     private string? _profError;
 
@@ -437,6 +566,12 @@ else
             _twoFactorEnabled = user.IsTwoFactorEnabled;
         }
 
+        _loadingSpecialities = true;
+        var specResult = await SpecialitiesApi.GetAllAsync();
+        if (specResult.Success && specResult.Data != null)
+            _specialities = specResult.Data;
+        _loadingSpecialities = false;
+
         var profResult = await DoctorProfileApi.GetMyProfileAsync();
         if (profResult.Success && profResult.Data != null)
         {
@@ -444,7 +579,7 @@ else
             _profModel = new UpsertDoctorProfileDto
             {
                 RegistrationNumber   = _profProfile.RegistrationNumber,
-                Specialty            = _profProfile.Specialty,
+                SpecialityId         = _profProfile.SpecialityId ?? Guid.Empty,
                 QualificationDetails = _profProfile.QualificationDetails,
             };
         }
@@ -608,6 +743,55 @@ else
         catch { _pwError = "An error occurred. Please try again."; }
         finally  { _savingPw = false; }
     }
+
+    // ── Speciality picker ─────────────────────────────────────────────
+
+    private IEnumerable<DoctorSpecialityDto> FilteredSpecialities =>
+        string.IsNullOrWhiteSpace(_specialitySearch)
+            ? _specialities
+            : _specialities.Where(s => s.Name.Contains(_specialitySearch, StringComparison.OrdinalIgnoreCase));
+
+    private void SelectSpeciality(Guid id)
+    {
+        _profModel.SpecialityId = id;
+        _specialityOpen = false;
+        _specialitySearch = string.Empty;
+    }
+
+    private static string GetSpecialityIcon(string name) => name switch
+    {
+        "General Medicine"        => "🩺",
+        "General Surgery"         => "🩹",
+        "Internal Medicine"       => "💊",
+        "Family Medicine"         => "🏠",
+        "Orthopedics"             => "🦴",
+        "Pediatrics"              => "👶",
+        "Ophthalmology"           => "👁️",
+        "Cardiology"              => "❤️",
+        "Dermatology"             => "🧴",
+        "Gynecology & Obstetrics" => "🤰",
+        "ENT"                     => "👂",
+        "Neurology"               => "🧠",
+        "Psychiatry"              => "💭",
+        "Pulmonology"             => "🫁",
+        "Gastroenterology"        => "🫃",
+        "Nephrology"              => "💧",
+        "Urology"                 => "🫘",
+        "Oncology"                => "🎗️",
+        "Endocrinology"           => "🔬",
+        "Rheumatology"            => "💪",
+        "Anesthesiology"          => "💉",
+        "Radiology"               => "📡",
+        "Pathology"               => "🧫",
+        "Emergency Medicine"      => "🚑",
+        "Dentistry"               => "🦷",
+        "Physiotherapy"           => "🏃",
+        "Nutrition & Dietetics"   => "🥗",
+        "Neurosurgery"            => "🧬",
+        "Plastic Surgery"         => "✨",
+        "Other"                   => "➕",
+        _                         => "🏥",
+    };
 
     // ── Sign out all ───────────────────────────────────────────────────
 

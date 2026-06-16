@@ -1,0 +1,161 @@
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@inject IPregnancyTenureApiClient TenureClient
+
+@if (Visible)
+{
+    <!-- Backdrop -->
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="Close"></div>
+
+    <!-- Dialog -->
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:920px;max-width:96vw;max-height:85vh;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Header -->
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;flex-shrink:0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">Pregnancy History — @PatientName</div>
+            <div style="font-size:12px;color:#64748B;margin-top:3px;">All LMP and EDD tenures, newest first</div>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Style="margin-bottom:12px;" />
+                <div style="text-align:center;font-size:13px;color:#94A3B8;padding:20px 0;">Loading tenure history…</div>
+            }
+            else if (!string.IsNullOrEmpty(_error))
+            {
+                <div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:8px;padding:12px 16px;font-size:13px;color:#B91C1C;">
+                    @_error
+                </div>
+            }
+            else if (_tenures.Count == 0)
+            {
+                <div style="text-align:center;font-size:13px;color:#94A3B8;padding:24px 0;">
+                    No pregnancy tenures found for this patient.
+                </div>
+            }
+            else
+            {
+                <div class="opd-table-card" style="margin:0;">
+                    <table class="opd-table" style="font-size:12px;">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;">#</th>
+                                <th>LMP</th>
+                                <th>EDD (by LMP)</th>
+                                <th>EDD (by USG)</th>
+                                <th>Effective EDD</th>
+                                <th>Status</th>
+                                <th>Outcome</th>
+                                <th>Closed On</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{var idx = 1;}
+                            @foreach (var t in _tenures)
+                            {
+                                <tr>
+                                    <td style="color:#94A3B8;font-weight:600;">@(idx++)</td>
+                                    <td>@t.Lmp.ToString("dd MMM yyyy")</td>
+                                    <td>@t.EddByLmp.ToString("dd MMM yyyy")</td>
+                                    <td>
+                                        @if (t.EddByUsg.HasValue)
+                                        { <span>@t.EddByUsg.Value.ToString("dd MMM yyyy")</span> }
+                                        else
+                                        { <span style="color:#94A3B8;">—</span> }
+                                    </td>
+                                    <td><strong>@t.EffectiveEdd.ToString("dd MMM yyyy")</strong></td>
+                                    <td>
+                                        @if (t.Status == PregnancyTenureStatus.Active)
+                                        {
+                                            <span class="opd-badge done">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="opd-badge cancelled">Closed</span>
+                                        }
+                                    </td>
+                                    <td style="color:#475569;">
+                                        @if (t.Outcome.HasValue)
+                                        { <span>@OutcomeLabel(t.Outcome.Value)</span> }
+                                        else
+                                        { <span style="color:#94A3B8;">—</span> }
+                                    </td>
+                                    <td style="color:#475569;">
+                                        @if (t.ClosedAt.HasValue)
+                                        { <span>@t.ClosedAt.Value.ToLocalTime().ToString("dd MMM yyyy")</span> }
+                                        else
+                                        { <span style="color:#94A3B8;">—</span> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;flex-shrink:0;">
+            <button @onclick="Close"
+                    style="padding:9px 24px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Close
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public bool Visible { get; set; }
+    [Parameter, EditorRequired] public Guid PatientId { get; set; }
+    [Parameter] public string PatientName { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private bool _loading;
+    private string? _error;
+    private List<PregnancyTenureDto> _tenures = [];
+    private bool _prevVisible;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Visible && !_prevVisible)
+        {
+            _prevVisible = true;
+            await LoadAsync();
+        }
+        else if (!Visible)
+        {
+            _prevVisible = false;
+            _tenures = [];
+            _error = null;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        var result = await TenureClient.GetAllForPatientAsync(PatientId);
+        _loading = false;
+
+        if (result.Success && result.Data is not null)
+            _tenures = result.Data.ToList();
+        else
+            _error = result.Message ?? "Failed to load tenure history. Please try again.";
+    }
+
+    private async Task Close() => await OnClose.InvokeAsync();
+
+    private static string OutcomeLabel(PregnancyOutcome outcome) => outcome switch
+    {
+        PregnancyOutcome.Delivered   => "Delivered",
+        PregnancyOutcome.Abortion    => "Abortion",
+        PregnancyOutcome.Miscarriage => "Miscarriage",
+        PregnancyOutcome.NotKnown    => "Not Known",
+        _                            => outcome.ToString()
+    };
+}

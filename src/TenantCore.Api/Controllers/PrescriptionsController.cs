@@ -55,7 +55,7 @@ public class PrescriptionsController(ISender sender) : ClinicControllerBase
             GetApplicationId(), dto.OpdRegistrationId, dto.DoctorUserId,
             dto.DoctorName, dto.NextVisitDate, dto.Diagnosis, dto.Investigations, dto.Notes,
             dto.VitalBP, dto.VitalPulse, dto.VitalTemp, dto.VitalWeight, dto.VitalSpO2, dto.VitalRR, dto.VitalSugar,
-            dto.Items), ct);
+            dto.Items, dto.ObstetricData), ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -66,7 +66,7 @@ public class PrescriptionsController(ISender sender) : ClinicControllerBase
         => Ok(await sender.Send(new UpdatePrescriptionCommand(
             id, GetApplicationId(), dto.NextVisitDate, dto.Diagnosis, dto.Investigations, dto.Notes,
             dto.VitalBP, dto.VitalPulse, dto.VitalTemp, dto.VitalWeight, dto.VitalSpO2, dto.VitalRR, dto.VitalSugar,
-            dto.Items), ct));
+            dto.Items, dto.ObstetricData), ct));
 
     [HttpPost("{id:guid}/submit")]
     [Authorize(Policy = AuthPolicies.RequireClinical)]

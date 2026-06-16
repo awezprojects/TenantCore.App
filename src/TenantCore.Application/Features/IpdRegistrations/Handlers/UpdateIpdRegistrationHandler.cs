@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.IpdRegistrations.Commands;
 using TenantCore.Application.Features.IpdRegistrations.Translators;
 using TenantCore.Domain.Entities;
@@ -8,7 +9,7 @@ using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Application.Features.IpdRegistrations.Handlers;
 
-public sealed class UpdateIpdRegistrationHandler(IIpdRegistrationRepository repository)
+public sealed class UpdateIpdRegistrationHandler(IIpdRegistrationRepository repository, IApplicationAccessValidator accessValidator)
     : IRequestHandler<UpdateIpdRegistrationCommand, IpdRegistrationDto>
 {
     public async Task<IpdRegistrationDto> Handle(
@@ -17,7 +18,7 @@ public sealed class UpdateIpdRegistrationHandler(IIpdRegistrationRepository repo
         var registration = await repository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(IpdRegistration), request.Id);
 
-        if (registration.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(registration.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
         registration.Update(

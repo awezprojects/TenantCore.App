@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Patients.Commands;
 using TenantCore.Application.Services;
 using TenantCore.Domain.Entities;
@@ -9,7 +10,8 @@ namespace TenantCore.Application.Features.Patients.Handlers;
 
 public sealed class UploadPatientPhotoHandler(
     IPatientRepository repository,
-    IBlobStorageService blobStorage)
+    IBlobStorageService blobStorage,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<UploadPatientPhotoCommand, string>
 {
     public async Task<string> Handle(UploadPatientPhotoCommand request, CancellationToken cancellationToken)
@@ -17,7 +19,7 @@ public sealed class UploadPatientPhotoHandler(
         var patient = await repository.GetByIdAsync(request.PatientId, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), request.PatientId);
 
-        if (patient.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(patient.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
         var ext = Path.GetExtension(request.FileName).ToLowerInvariant();

@@ -120,4 +120,15 @@ public class MedicineApiClient(HttpClient httpClient, AuthStateService authState
         }
         catch (Exception ex) { return Fail<MedicineDto>(ex.Message); }
     }
+
+    public async Task<ApiResponse<IEnumerable<MedicineDto>>> SearchMedicinesByNameAsync(string name, int limit = 5)
+    {
+        try
+        {
+            SetAuth();
+            var url = $"api/medicines/autocomplete?name={Uri.EscapeDataString(name)}&limit={limit}";
+            return await Ok<IEnumerable<MedicineDto>>(await httpClient.GetAsync(url));
+        }
+        catch (Exception ex) { return Fail<IEnumerable<MedicineDto>>(ex.Message); }
+    }
 }

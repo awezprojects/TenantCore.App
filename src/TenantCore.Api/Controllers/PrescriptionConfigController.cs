@@ -23,5 +23,9 @@ public class PrescriptionConfigController(ISender sender) : ClinicControllerBase
     [Authorize(Policy = AuthPolicies.RequireClinical)]
     [ProducesResponseType(typeof(PrescriptionConfigDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Upsert([FromBody] UpdatePrescriptionConfigDto dto, CancellationToken ct)
-        => Ok(await sender.Send(new UpsertPrescriptionConfigCommand(GetApplicationId(), dto.DefaultLanguage), ct));
+        => Ok(await sender.Send(new UpsertPrescriptionConfigCommand(
+            GetApplicationId(), dto.DefaultLanguage,
+            dto.PrintMarginTop, dto.PrintMarginRight,
+            dto.PrintMarginBottom, dto.PrintMarginLeft,
+            dto.HideClinicHeader), ct));
 }

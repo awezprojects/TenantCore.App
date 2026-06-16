@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Prescriptions.Commands;
 using TenantCore.Application.Features.Prescriptions.Translators;
 using TenantCore.Application.Services;
@@ -15,7 +16,8 @@ public sealed class UploadPrescriptionReportHandler(
     IPatientRepository patientRepository,
     IFileStorageService fileStorageService,
     IPdfConversionService pdfConversionService,
-    ILogger<UploadPrescriptionReportHandler> logger)
+    ILogger<UploadPrescriptionReportHandler> logger,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<UploadPrescriptionReportCommand, PrescriptionReportDto>
 {
     public async Task<PrescriptionReportDto> Handle(
@@ -26,7 +28,7 @@ public sealed class UploadPrescriptionReportHandler(
         var prescription = await prescriptionRepository.GetByIdWithDetailsAsync(request.PrescriptionId, cancellationToken)
             ?? throw new NotFoundException(nameof(Prescription), request.PrescriptionId);
 
-        if (prescription.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(prescription.ApplicationId))
             throw new NotFoundException(nameof(Prescription), request.PrescriptionId);
 
         var patient = await patientRepository.GetByIdAsync(prescription.PatientId, cancellationToken)

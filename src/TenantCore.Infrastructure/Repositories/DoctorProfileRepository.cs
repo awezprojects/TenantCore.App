@@ -9,5 +9,7 @@ public class DoctorProfileRepository(ClinicDbContext dbContext)
     : ClinicRepository<DoctorProfile>(dbContext), IDoctorProfileRepository
 {
     public async Task<DoctorProfile?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
-        => await DbSet.FirstOrDefaultAsync(dp => dp.UserId == userId, ct);
+        => await DbSet
+            .Include(dp => dp.Speciality)
+            .FirstOrDefaultAsync(dp => dp.UserId == userId, ct);
 }

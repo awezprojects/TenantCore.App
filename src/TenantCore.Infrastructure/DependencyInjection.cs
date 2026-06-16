@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TenantCore.Application.Common;
 using TenantCore.Application.Services;
 using TenantCore.Domain.Interfaces;
 using TenantCore.Infrastructure.ExternalServices;
@@ -30,12 +31,16 @@ public static class DependencyInjection
         services.AddScoped<IMedicineDosageFormRepository, MedicineDosageFormRepository>();
         services.AddScoped<IMedicineRepository, MedicineRepository>();
         services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
+        services.AddScoped<IObstetricPrescriptionDataRepository, ObstetricPrescriptionDataRepository>();
         services.AddScoped<IDosageRemarkRepository, DosageRemarkRepository>();
         services.AddScoped<IPrescriptionConfigRepository, PrescriptionConfigRepository>();
         services.AddScoped<IDoctorProfileRepository, DoctorProfileRepository>();
+        services.AddScoped<IDoctorSpecialityRepository, DoctorSpecialityRepository>();
         services.AddScoped<IWardRepository, WardRepository>();
         services.AddScoped<IRoomRepository, RoomRepository>();
         services.AddScoped<IBedRepository, BedRepository>();
+        services.AddScoped<IClinicUsgTemplateRepository, ClinicUsgTemplateRepository>();
+        services.AddScoped<IPregnancyTenureRepository, PregnancyTenureRepository>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
@@ -44,6 +49,8 @@ public static class DependencyInjection
 
         services.AddScoped<IAuthApplicationService, AuthApplicationService>();
         services.AddScoped<IAuthClinicService, AuthClinicService>();
+
+        services.AddScoped<IApplicationAccessValidator, ApplicationAccessValidator>();
 
         return services;
     }

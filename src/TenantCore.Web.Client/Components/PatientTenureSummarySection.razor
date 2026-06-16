@@ -1,0 +1,96 @@
+@inject IPregnancyTenureApiClient TenureClient
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+
+@if (_loading)
+{
+    <div style="padding:24px;text-align:center;color:#94A3B8;font-size:13px;">Loading pregnancy history...</div>
+}
+else if (!string.IsNullOrEmpty(_error))
+{
+    <div style="padding:14px 16px;background:#FEF2F2;border:1.5px solid #FECACA;border-radius:8px;color:#B91C1C;font-size:13px;">
+        @_error
+    </div>
+}
+else if (_tenures.Count == 0)
+{
+    <div style="padding:16px;background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:10px;color:#0369A1;font-size:13px;">
+        No pregnancy records found for this patient.
+    </div>
+}
+else
+{
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:#1E293B;color:#fff;">
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">#</th>
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">LMP</th>
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">EDD (by LMP)</th>
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">EDD (by USG)</th>
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">Effective EDD</th>
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">Status</th>
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">Outcome</th>
+                    <th style="padding:10px 12px;text-align:left;font-weight:600;">Closed On</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{var idx = 1;}
+                @foreach (var t in _tenures)
+                {
+                    <tr style="border-bottom:1px solid #E2E8F0;@(idx % 2 == 0 ? "background:#F8FAFC;" : "")">
+                        <td style="padding:8px 12px;color:#94A3B8;font-weight:600;">@(idx++)</td>
+                        <td style="padding:8px 12px;color:#1E293B;">@t.Lmp.ToString("dd MMM yyyy")</td>
+                        <td style="padding:8px 12px;color:#1E293B;">@t.EddByLmp.ToString("dd MMM yyyy")</td>
+                        <td style="padding:8px 12px;color:#1E293B;">
+                            @(t.EddByUsg.HasValue ? t.EddByUsg.Value.ToString("dd MMM yyyy") : "—")
+                        </td>
+                        <td style="padding:8px 12px;font-weight:700;color:#1565C0;">@t.EffectiveEdd.ToString("dd MMM yyyy")</td>
+                        <td style="padding:8px 12px;">
+                            @if (t.Status == PregnancyTenureStatus.Active)
+                            { <span class="opd-badge done">Active</span> }
+                            else
+                            { <span class="opd-badge cancelled">Closed</span> }
+                        </td>
+                        <td style="padding:8px 12px;color:#475569;">@OutcomeLabel(t.Outcome)</td>
+                        <td style="padding:8px 12px;color:#475569;">
+                            @(t.ClosedAt.HasValue ? t.ClosedAt.Value.ToLocalTime().ToString("dd MMM yyyy") : "—")
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid PatientId { get; set; }
+
+    private List<PregnancyTenureDto> _tenures = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (PatientId == Guid.Empty) return;
+        _loading = true;
+        _error = null;
+        var result = await TenureClient.GetAllForPatientAsync(PatientId);
+        if (result.Success && result.Data is not null)
+            _tenures = result.Data.ToList();
+        else
+            _error = result.Message ?? "Failed to load pregnancy history.";
+        _loading = false;
+    }
+
+    private static string OutcomeLabel(PregnancyOutcome? outcome) => outcome switch
+    {
+        PregnancyOutcome.Delivered   => "Delivered",
+        PregnancyOutcome.Abortion    => "Abortion",
+        PregnancyOutcome.Miscarriage => "Miscarriage",
+        PregnancyOutcome.NotKnown    => "Not Known",
+        null                         => "—",
+        _                            => outcome.ToString()!
+    };
+}

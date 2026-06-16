@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Rooms.Commands;
 using TenantCore.Application.Features.Rooms.Translators;
 using TenantCore.Domain.Entities;
@@ -9,7 +10,7 @@ using TenantCore.Shared.Errors;
 
 namespace TenantCore.Application.Features.Rooms.Handlers;
 
-public sealed class CreateRoomHandler(IRoomRepository roomRepository, IWardRepository wardRepository)
+public sealed class CreateRoomHandler(IRoomRepository roomRepository, IWardRepository wardRepository, IApplicationAccessValidator accessValidator)
     : IRequestHandler<CreateRoomCommand, RoomDto>
 {
     public async Task<RoomDto> Handle(CreateRoomCommand request, CancellationToken cancellationToken)
@@ -17,7 +18,7 @@ public sealed class CreateRoomHandler(IRoomRepository roomRepository, IWardRepos
         var ward = await wardRepository.GetByIdAsync(request.WardId, cancellationToken)
             ?? throw new NotFoundException(nameof(Ward), request.WardId);
 
-        if (ward.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(ward.ApplicationId))
             throw new NotFoundException(nameof(Ward), request.WardId);
 
         if (await roomRepository.ExistsByNumberAsync(request.WardId, request.RoomNumber, cancellationToken: cancellationToken))

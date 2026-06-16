@@ -20,7 +20,7 @@ public static class PrescriptionTranslator
         PrescribedDate = prescription.PrescribedDate,
         NextVisitDate = prescription.NextVisitDate,
         Diagnosis = prescription.Diagnosis,
-        Investigations = DeserializeInvestigations(prescription.Investigations),
+        Investigations = DeserializeStringList(prescription.Investigations),
         Notes = prescription.Notes,
         VitalBP = prescription.VitalBP,
         VitalPulse = prescription.VitalPulse,
@@ -33,7 +33,10 @@ public static class PrescriptionTranslator
         IsEmailSent = prescription.IsEmailSent,
         CreatedAt = prescription.CreatedAt,
         Items = prescription.Items.Select(ItemToDto).ToList(),
-        Reports = prescription.Reports.Select(ReportToDto).ToList()
+        Reports = prescription.Reports.Select(ReportToDto).ToList(),
+        ObstetricData = prescription.ObstetricData is not null
+            ? ObstetricDataToDto(prescription.ObstetricData)
+            : null
     };
 
     public static PrescriptionItemDto ItemToDto(PrescriptionItem item) => new()
@@ -60,7 +63,24 @@ public static class PrescriptionTranslator
         SortOrder = item.SortOrder
     };
 
-    private static IReadOnlyList<string> DeserializeInvestigations(string? json)
+    public static ObstetricPrescriptionDataDto ObstetricDataToDto(ObstetricPrescriptionData data) => new()
+    {
+        Id = data.Id,
+        PrescriptionId = data.PrescriptionId,
+        Gravida = data.Gravida,
+        Para = data.Para,
+        Live = data.Live,
+        Abortion = data.Abortion,
+        Information = data.Information,
+        MenstrualHistory = DeserializeStringList(data.MenstrualHistory),
+        PastMedicalHistory = DeserializeStringList(data.PastMedicalHistory),
+        FamilyHistory = DeserializeStringList(data.FamilyHistory),
+        Lmp = data.Lmp,
+        EddByLmp = data.EddByLmp,
+        EddByUsg = data.EddByUsg
+    };
+
+    private static IReadOnlyList<string> DeserializeStringList(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return [];
         try { return JsonSerializer.Deserialize<List<string>>(json) ?? []; }

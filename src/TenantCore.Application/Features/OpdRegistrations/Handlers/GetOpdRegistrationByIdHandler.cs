@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.OpdRegistrations.Queries;
 using TenantCore.Application.Features.OpdRegistrations.Translators;
 using TenantCore.Domain.Entities;
@@ -8,7 +9,7 @@ using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Application.Features.OpdRegistrations.Handlers;
 
-public sealed class GetOpdRegistrationByIdHandler(IOpdRegistrationRepository repository)
+public sealed class GetOpdRegistrationByIdHandler(IOpdRegistrationRepository repository, IApplicationAccessValidator accessValidator)
     : IRequestHandler<GetOpdRegistrationByIdQuery, OpdRegistrationDto>
 {
     public async Task<OpdRegistrationDto> Handle(
@@ -17,7 +18,7 @@ public sealed class GetOpdRegistrationByIdHandler(IOpdRegistrationRepository rep
         var registration = await repository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(OpdRegistration), request.Id);
 
-        if (registration.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(registration.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
         return OpdRegistrationTranslator.ToDto(registration);

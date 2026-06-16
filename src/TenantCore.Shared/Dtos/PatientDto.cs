@@ -23,6 +23,8 @@ public class PatientDto
     public string? MedicalHistory { get; init; }
     public bool IsActive { get; init; }
     public DateTime CreatedAt { get; init; }
+    public bool HasLmpRecord { get; init; }
+    public bool HasActiveTenure { get; init; }
 }
 
 public sealed record CreatePatientDto(
