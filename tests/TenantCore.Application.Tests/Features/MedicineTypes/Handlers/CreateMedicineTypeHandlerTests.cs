@@ -60,4 +60,38 @@ public class CreateMedicineTypeHandlerTests
         _repository.Verify(r => r.AddAsync(It.IsAny<MedicineType>(), It.IsAny<CancellationToken>()), Times.Never);
         _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task Handle_WhenUniquenessCheckFails_PropagatesException()
+    {
+        var command = ApplicationTestData.CreateMedicineTypeCommand();
+        _repository.Setup(r => r.GetByNameAsync(command.Name, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("lookup failed"));
+        var handler = new CreateMedicineTypeHandler(_repository.Object, _logger.Object);
+
+        Func<Task> action = () => handler.Handle(command, CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>().WithMessage("lookup failed");
+        _repository.Verify(r => r.AddAsync(It.IsAny<MedicineType>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenSaveChangesFails_PropagatesException()
+    {
+        var command = ApplicationTestData.CreateMedicineTypeCommand();
+        _repository.Setup(r => r.GetByNameAsync(command.Name, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MedicineType?)null);
+        _repository.Setup(r => r.AddAsync(It.IsAny<MedicineType>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _repository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("save failed"));
+        var handler = new CreateMedicineTypeHandler(_repository.Object, _logger.Object);
+
+        Func<Task> action = () => handler.Handle(command, CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>().WithMessage("save failed");
+        _repository.Verify(r => r.AddAsync(It.IsAny<MedicineType>(), It.IsAny<CancellationToken>()), Times.Once);
+        _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
 }
