@@ -8,7 +8,9 @@
     <Project Path="src/TenantCore.Web.Client/TenantCore.Web.Client.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/TenantCore.Api.Tests/TenantCore.Api.Tests.csproj" />
     <Project Path="tests/TenantCore.Application.Tests/TenantCore.Application.Tests.csproj" />
     <Project Path="tests/TenantCore.Domain.Tests/TenantCore.Domain.Tests.csproj" />
+    <Project Path="tests/TenantCore.Web.Client.Tests/TenantCore.Web.Client.Tests.csproj" />
   </Folder>
 </Solution>
