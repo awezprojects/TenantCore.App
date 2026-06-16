@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Prescriptions.Commands;
 using TenantCore.Application.Features.Prescriptions.Translators;
 using TenantCore.Domain.Entities;
@@ -11,8 +12,10 @@ namespace TenantCore.Application.Features.Prescriptions.Handlers;
 
 public sealed class UpdatePrescriptionHandler(
     IPrescriptionRepository prescriptionRepository,
+    IObstetricPrescriptionDataRepository obstetricRepository,
     IPatientRepository patientRepository,
-    ILogger<UpdatePrescriptionHandler> logger)
+    ILogger<UpdatePrescriptionHandler> logger,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<UpdatePrescriptionCommand, PrescriptionDto>
 {
     public async Task<PrescriptionDto> Handle(UpdatePrescriptionCommand request, CancellationToken cancellationToken)
@@ -22,7 +25,7 @@ public sealed class UpdatePrescriptionHandler(
         var prescription = await prescriptionRepository.GetByIdWithDetailsAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Prescription), request.Id);
 
-        if (prescription.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(prescription.ApplicationId))
             throw new NotFoundException(nameof(Prescription), request.Id);
 
         var investigationsJson = request.Investigations.Count > 0
@@ -64,6 +67,23 @@ public sealed class UpdatePrescriptionHandler(
             request.VitalSugar,
             newItems);
         prescriptionRepository.Update(prescription);
+
+        // Upsert obstetric data if provided
+        if (request.ObstetricData is not null)
+        {
+            var existing = await obstetricRepository.GetByPrescriptionIdAsync(prescription.Id, cancellationToken);
+            if (existing is not null)
+            {
+                existing.Update(request.ObstetricData);
+                obstetricRepository.Update(existing);
+            }
+            else
+            {
+                var obsData = ObstetricPrescriptionData.CreateOrUpdate(prescription.Id, request.ObstetricData);
+                await obstetricRepository.AddAsync(obsData, cancellationToken);
+            }
+        }
+
         await prescriptionRepository.SaveChangesAsync(cancellationToken);
 
         var patient = await patientRepository.GetByIdAsync(prescription.PatientId, cancellationToken)

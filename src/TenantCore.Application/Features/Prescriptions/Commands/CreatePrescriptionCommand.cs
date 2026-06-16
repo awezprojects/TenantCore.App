@@ -19,4 +19,5 @@ public sealed record CreatePrescriptionCommand(
     decimal? VitalSpO2,
     int? VitalRR,
     decimal? VitalSugar,
-    IReadOnlyList<CreatePrescriptionItemDto> Items) : IRequest<PrescriptionDto>;
+    IReadOnlyList<CreatePrescriptionItemDto> Items,
+    UpsertObstetricPrescriptionDataDto? ObstetricData = null) : IRequest<PrescriptionDto>;

@@ -6,4 +6,9 @@ namespace TenantCore.Application.Features.PrescriptionConfig.Commands;
 
 public sealed record UpsertPrescriptionConfigCommand(
     Guid ApplicationId,
-    PrescriptionLanguage DefaultLanguage) : IRequest<PrescriptionConfigDto>;
+    PrescriptionLanguage DefaultLanguage,
+    int PrintMarginTop,
+    int PrintMarginRight,
+    int PrintMarginBottom,
+    int PrintMarginLeft,
+    bool HideClinicHeader) : IRequest<PrescriptionConfigDto>;

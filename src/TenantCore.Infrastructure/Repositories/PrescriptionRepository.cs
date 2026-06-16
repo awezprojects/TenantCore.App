@@ -15,6 +15,7 @@ public class PrescriptionRepository(ClinicDbContext dbContext)
     {
         var query = DbSet
             .Include(p => p.Items)
+            .Include(p => p.ObstetricData)
             .Where(p => p.ApplicationId == applicationId);
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -47,12 +48,14 @@ public class PrescriptionRepository(ClinicDbContext dbContext)
         => await DbSet
             .Include(p => p.Items)
             .Include(p => p.Reports)
+            .Include(p => p.ObstetricData)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<Prescription?> GetByOpdRegistrationIdAsync(Guid opdRegistrationId, CancellationToken ct = default)
         => await DbSet
             .Include(p => p.Items)
             .Include(p => p.Reports)
+            .Include(p => p.ObstetricData)
             .FirstOrDefaultAsync(p => p.OpdRegistrationId == opdRegistrationId, ct);
 
     public async Task<int> CountTodayByApplicationAsync(Guid applicationId, CancellationToken ct = default)

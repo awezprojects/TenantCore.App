@@ -11,8 +11,15 @@ internal sealed class DoctorProfileConfiguration : IEntityTypeConfiguration<Doct
         builder.HasKey(dp => dp.Id);
         builder.HasIndex(dp => dp.UserId).IsUnique();
         builder.Property(dp => dp.RegistrationNumber).IsRequired().HasMaxLength(100);
-        builder.Property(dp => dp.Specialty).HasMaxLength(200);
         builder.Property(dp => dp.QualificationDetails).HasMaxLength(500);
         builder.Property(dp => dp.RowVersion).IsRowVersion();
+
+        // Legacy free-text specialty column kept for backward compatibility
+        builder.Property(dp => dp.Specialty).HasMaxLength(200);
+
+        builder.HasOne(dp => dp.Speciality)
+               .WithMany(s => s.DoctorProfiles)
+               .HasForeignKey(dp => dp.SpecialityId)
+               .OnDelete(DeleteBehavior.SetNull);
     }
 }

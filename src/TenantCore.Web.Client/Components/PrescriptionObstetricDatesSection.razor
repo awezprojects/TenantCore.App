@@ -1,0 +1,129 @@
+@inject IObstetricApiClient ObstetricClient
+@using TenantCore.Shared.Dtos
+@using TenantCore.Web.Client.Clients
+
+<div style="padding:16px;background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:10px;margin-bottom:20px;">
+    <h4 style="margin:0 0 14px;font-size:14px;font-weight:700;color:#0369A1;text-transform:uppercase;letter-spacing:.05em;">
+        Obstetric Dates
+    </h4>
+
+    <div style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:14px;">
+        <div>
+            <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">LMP</div>
+            <div style="font-size:14px;font-weight:700;color:#1E293B;">
+                @(Dates?.Lmp.HasValue == true ? Dates.Lmp.Value.ToString("dd MMM yyyy") : "Not recorded")
+            </div>
+        </div>
+        <div>
+            <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">EDD by LMP</div>
+            <div style="font-size:14px;font-weight:700;color:#1565C0;">
+                @(Dates?.EddByLmp.HasValue == true ? Dates.EddByLmp.Value.ToString("dd MMM yyyy") : "—")
+            </div>
+        </div>
+        <div>
+            <div style="font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">EDD by USG</div>
+            <div style="font-size:14px;font-weight:700;color:@(Dates?.EddByUsg.HasValue == true ? "#16A34A" : "#94A3B8");">
+                @(Dates?.EddByUsg.HasValue == true ? Dates.EddByUsg.Value.ToString("dd MMM yyyy") : "Not recorded")
+            </div>
+        </div>
+    </div>
+
+    @if (IsEditable)
+    {
+        <hr style="border:none;border-top:1px solid #BAE6FD;margin:14px 0;" />
+
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end;">
+            <div>
+                <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Set LMP</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="date" @bind="_lmpInput"
+                           style="padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;color:#1E293B;" />
+                    <button @onclick="SaveLmp" disabled="@_savingLmp"
+                            style="padding:7px 14px;background:#1565C0;color:#fff;border:none;border-radius:7px;
+                                   font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                        @(_savingLmp ? "Saving…" : "Save LMP")
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(_lmpError))
+                {
+                    <div style="font-size:11px;color:#DC2626;margin-top:4px;">@_lmpError</div>
+                }
+            </div>
+
+            <div>
+                <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Set EDD by USG</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="date" @bind="_eddByUsgInput"
+                           style="padding:7px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;color:#1E293B;" />
+                    <button @onclick="SaveEddByUsg" disabled="@_savingEdd"
+                            style="padding:7px 14px;background:#16A34A;color:#fff;border:none;border-radius:7px;
+                                   font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                        @(_savingEdd ? "Saving…" : "Save EDD USG")
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(_eddError))
+                {
+                    <div style="font-size:11px;color:#DC2626;margin-top:4px;">@_eddError</div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid PrescriptionId { get; set; }
+    [Parameter] public ObstetricDatesDto? Dates { get; set; }
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public EventCallback<ObstetricDatesDto> OnDatesUpdated { get; set; }
+
+    private DateTime? _lmpInput;
+    private DateTime? _eddByUsgInput;
+    private bool _savingLmp;
+    private bool _savingEdd;
+    private string _lmpError = string.Empty;
+    private string _eddError = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (Dates?.Lmp.HasValue == true && _lmpInput is null)
+            _lmpInput = Dates.Lmp.Value.ToDateTime(TimeOnly.MinValue);
+        if (Dates?.EddByUsg.HasValue == true && _eddByUsgInput is null)
+            _eddByUsgInput = Dates.EddByUsg.Value.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private async Task SaveLmp()
+    {
+        _lmpError = string.Empty;
+        if (_lmpInput is null) { _lmpError = "Select a date."; return; }
+
+        _savingLmp = true;
+        var result = await ObstetricClient.SetLmpAsync(PrescriptionId, new SetLmpRequest
+        {
+            Lmp = DateOnly.FromDateTime(_lmpInput.Value)
+        });
+        _savingLmp = false;
+
+        if (result.Success && result.Data is not null)
+            await OnDatesUpdated.InvokeAsync(result.Data);
+        else
+            _lmpError = result.Message ?? "Failed to save LMP.";
+    }
+
+    private async Task SaveEddByUsg()
+    {
+        _eddError = string.Empty;
+        if (_eddByUsgInput is null) { _eddError = "Select a date."; return; }
+
+        _savingEdd = true;
+        var result = await ObstetricClient.SetEddByUsgAsync(PrescriptionId, new SetEddByUsgRequest
+        {
+            EddByUsg = DateOnly.FromDateTime(_eddByUsgInput.Value)
+        });
+        _savingEdd = false;
+
+        if (result.Success && result.Data is not null)
+            await OnDatesUpdated.InvokeAsync(result.Data);
+        else
+            _eddError = result.Message ?? "Failed to save EDD.";
+    }
+}

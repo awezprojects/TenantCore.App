@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Prescriptions.Commands;
 using TenantCore.Application.Features.Prescriptions.Translators;
 using TenantCore.Domain.Entities;
@@ -12,9 +13,11 @@ namespace TenantCore.Application.Features.Prescriptions.Handlers;
 
 public sealed class CreatePrescriptionHandler(
     IPrescriptionRepository prescriptionRepository,
+    IObstetricPrescriptionDataRepository obstetricRepository,
     IOpdRegistrationRepository opdRepository,
     IPatientRepository patientRepository,
-    ILogger<CreatePrescriptionHandler> logger)
+    ILogger<CreatePrescriptionHandler> logger,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<CreatePrescriptionCommand, PrescriptionDto>
 {
     public async Task<PrescriptionDto> Handle(CreatePrescriptionCommand request, CancellationToken cancellationToken)
@@ -24,7 +27,7 @@ public sealed class CreatePrescriptionHandler(
         var opd = await opdRepository.GetByIdAsync(request.OpdRegistrationId, cancellationToken)
             ?? throw new NotFoundException(nameof(OpdRegistration), request.OpdRegistrationId);
 
-        if (opd.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(opd.ApplicationId))
             throw new NotFoundException(nameof(OpdRegistration), request.OpdRegistrationId);
 
         var existing = await prescriptionRepository.GetByOpdRegistrationIdAsync(request.OpdRegistrationId, cancellationToken);
@@ -83,6 +86,13 @@ public sealed class CreatePrescriptionHandler(
             items);
 
         await prescriptionRepository.AddAsync(prescription, cancellationToken);
+
+        if (request.ObstetricData is not null)
+        {
+            var obsData = ObstetricPrescriptionData.CreateOrUpdate(
+                prescription.Id, request.ObstetricData);
+            await obstetricRepository.AddAsync(obsData, cancellationToken);
+        }
 
         opd.Update(opd.DoctorUserId, opd.DoctorName, opd.Fee, OpdStatus.InProgress, opd.Notes,
             opd.Weight, opd.BloodPressure, opd.PulseRate, opd.OxygenSaturation);

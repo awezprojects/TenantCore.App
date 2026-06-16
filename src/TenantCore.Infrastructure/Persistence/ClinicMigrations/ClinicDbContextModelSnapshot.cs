@@ -109,6 +109,36 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("ClinicFeeConfigs", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicUsgTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsCustomized")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicUsgTemplates", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.DoctorProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -135,6 +165,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<Guid?>("SpecialityId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Specialty")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -147,10 +180,323 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SpecialityId");
+
                     b.HasIndex("UserId")
                         .IsUnique();
 
                     b.ToTable("DoctorProfiles");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.DoctorSpeciality", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("DoctorSpecialities", "clinic");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000001"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Diagnosis and treatment of common illnesses",
+                            IsActive = true,
+                            Name = "General Medicine",
+                            SortOrder = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000002"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Surgical treatment of abdominal and soft-tissue conditions",
+                            IsActive = true,
+                            Name = "General Surgery",
+                            SortOrder = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000003"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Non-surgical management of adult diseases",
+                            IsActive = true,
+                            Name = "Internal Medicine",
+                            SortOrder = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000004"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Comprehensive care for patients of all ages",
+                            IsActive = true,
+                            Name = "Family Medicine",
+                            SortOrder = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000005"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Bone, joint, muscle and spine disorders",
+                            IsActive = true,
+                            Name = "Orthopedics",
+                            SortOrder = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000006"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Medical care for infants, children and adolescents",
+                            IsActive = true,
+                            Name = "Pediatrics",
+                            SortOrder = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000007"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Diseases and surgery of the eye",
+                            IsActive = true,
+                            Name = "Ophthalmology",
+                            SortOrder = 7
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000008"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Heart and cardiovascular system disorders",
+                            IsActive = true,
+                            Name = "Cardiology",
+                            SortOrder = 8
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000009"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Skin, hair and nail conditions",
+                            IsActive = true,
+                            Name = "Dermatology",
+                            SortOrder = 9
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000010"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Women's reproductive health and pregnancy",
+                            IsActive = true,
+                            Name = "Gynecology & Obstetrics",
+                            SortOrder = 10
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000011"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Ear, nose and throat disorders",
+                            IsActive = true,
+                            Name = "ENT",
+                            SortOrder = 11
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000012"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Brain, spinal cord and nervous system disorders",
+                            IsActive = true,
+                            Name = "Neurology",
+                            SortOrder = 12
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000013"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Mental, behavioural and emotional disorders",
+                            IsActive = true,
+                            Name = "Psychiatry",
+                            SortOrder = 13
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000014"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Lungs and respiratory system diseases",
+                            IsActive = true,
+                            Name = "Pulmonology",
+                            SortOrder = 14
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000015"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Digestive system and gastrointestinal disorders",
+                            IsActive = true,
+                            Name = "Gastroenterology",
+                            SortOrder = 15
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000016"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Kidney diseases and renal disorders",
+                            IsActive = true,
+                            Name = "Nephrology",
+                            SortOrder = 16
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000017"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Urinary tract and male reproductive system",
+                            IsActive = true,
+                            Name = "Urology",
+                            SortOrder = 17
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000018"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Cancer diagnosis and treatment",
+                            IsActive = true,
+                            Name = "Oncology",
+                            SortOrder = 18
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000019"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Hormonal and metabolic disorders",
+                            IsActive = true,
+                            Name = "Endocrinology",
+                            SortOrder = 19
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000020"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Arthritis and autoimmune musculoskeletal diseases",
+                            IsActive = true,
+                            Name = "Rheumatology",
+                            SortOrder = 20
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000021"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Anesthesia and perioperative care",
+                            IsActive = true,
+                            Name = "Anesthesiology",
+                            SortOrder = 21
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000022"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Medical imaging and diagnostics",
+                            IsActive = true,
+                            Name = "Radiology",
+                            SortOrder = 22
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000023"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Laboratory diagnosis of disease",
+                            IsActive = true,
+                            Name = "Pathology",
+                            SortOrder = 23
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000024"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Acute illness and emergency care",
+                            IsActive = true,
+                            Name = "Emergency Medicine",
+                            SortOrder = 24
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000025"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Oral health, teeth and gum diseases",
+                            IsActive = true,
+                            Name = "Dentistry",
+                            SortOrder = 25
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000026"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Physical rehabilitation and movement disorders",
+                            IsActive = true,
+                            Name = "Physiotherapy",
+                            SortOrder = 26
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000027"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Diet, nutrition and metabolic health",
+                            IsActive = true,
+                            Name = "Nutrition & Dietetics",
+                            SortOrder = 27
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000028"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Surgical treatment of neurological conditions",
+                            IsActive = true,
+                            Name = "Neurosurgery",
+                            SortOrder = 28
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000029"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Reconstructive and cosmetic surgical procedures",
+                            IsActive = true,
+                            Name = "Plastic Surgery",
+                            SortOrder = 29
+                        },
+                        new
+                        {
+                            Id = new Guid("d0000001-0000-0000-0000-000000000030"),
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Other",
+                            SortOrder = 99
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.DosageRemark", b =>
@@ -700,6 +1046,65 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("MedicineTypes", (string)null);
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.ObstetricPrescriptionData", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("Abortion")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateOnly?>("EddByLmp")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EddByUsg")
+                        .HasColumnType("date");
+
+                    b.Property<string>("FamilyHistory")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("Gravida")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Information")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("Live")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly?>("Lmp")
+                        .HasColumnType("date");
+
+                    b.Property<string>("MenstrualHistory")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("Para")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PastMedicalHistory")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("PrescriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrescriptionId")
+                        .IsUnique();
+
+                    b.ToTable("ObstetricPrescriptionData", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.OpdRegistration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1005,6 +1410,21 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<int>("DefaultLanguage")
                         .HasColumnType("int");
 
+                    b.Property<bool>("HideClinicHeader")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PrintMarginBottom")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PrintMarginLeft")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PrintMarginRight")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PrintMarginTop")
+                        .HasColumnType("int");
+
                     b.Property<byte[]>("RowVersion")
                         .HasColumnType("varbinary(max)");
 
@@ -1216,6 +1636,53 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("Rooms", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.UsgTemplateRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Activity")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("ClinicUsgTemplateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Indication")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("LmpDayOffset")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RowOrder")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WeekLabel")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicUsgTemplateId");
+
+                    b.ToTable("UsgTemplateRows", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.Ward", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1284,6 +1751,16 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Navigation("Ward");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.DoctorProfile", b =>
+                {
+                    b.HasOne("TenantCore.Domain.Entities.DoctorSpeciality", "Speciality")
+                        .WithMany("DoctorProfiles")
+                        .HasForeignKey("SpecialityId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Speciality");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.IpdRegistration", b =>
                 {
                     b.HasOne("TenantCore.Domain.Entities.Patient", "Patient")
@@ -1310,6 +1787,15 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Navigation("DosageForm");
 
                     b.Navigation("MedicineType");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ObstetricPrescriptionData", b =>
+                {
+                    b.HasOne("TenantCore.Domain.Entities.Prescription", null)
+                        .WithOne("ObstetricData")
+                        .HasForeignKey("TenantCore.Domain.Entities.ObstetricPrescriptionData", "PrescriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.OpdRegistration", b =>
@@ -1373,9 +1859,30 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Navigation("Ward");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.UsgTemplateRow", b =>
+                {
+                    b.HasOne("TenantCore.Domain.Entities.ClinicUsgTemplate", null)
+                        .WithMany("Rows")
+                        .HasForeignKey("ClinicUsgTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicUsgTemplate", b =>
+                {
+                    b.Navigation("Rows");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.DoctorSpeciality", b =>
+                {
+                    b.Navigation("DoctorProfiles");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.Prescription", b =>
                 {
                     b.Navigation("Items");
+
+                    b.Navigation("ObstetricData");
 
                     b.Navigation("Reports");
                 });

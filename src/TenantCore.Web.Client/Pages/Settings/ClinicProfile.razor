@@ -1,0 +1,150 @@
+@page "/settings/clinic-profile"
+@layout AuthorizedLayout
+@inject IApplicationApiClient AppClient
+@inject ClinicContextService ClinicContext
+@inject ISnackbar Snackbar
+@using TenantCore.Shared.Dtos.Auth
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<PageTitle>Clinic Profile</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-1" Style="font-weight:700;">Clinic Profile</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-5">Update your clinic's name, address, and contact details.</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_clinicId == Guid.Empty)
+{
+    <MudAlert Severity="Severity.Warning">No clinic selected. Please select a clinic first.</MudAlert>
+}
+else
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-5" Elevation="1" Style="border-radius:12px;">
+                <MudGrid Spacing="3">
+
+                    <MudItem xs="12" sm="8">
+                        <MudTextField @bind-Value="_name" Label="Clinic Name" Variant="Variant.Outlined"
+                                      Required="true" MaxLength="200" FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_code" Label="Clinic Code" Variant="Variant.Outlined"
+                                      Disabled="true" HelperText="Code cannot be changed" FullWidth="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_address" Label="Address" Variant="Variant.Outlined"
+                                      Lines="2" MaxLength="500" FullWidth="true"
+                                      HelperText="Shown on prescription prints below the clinic name" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_contactNumber" Label="Contact Number" Variant="Variant.Outlined"
+                                      MaxLength="20" FullWidth="true"
+                                      HelperText="Shown on prescription prints and disclaimer footer" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_contactPerson" Label="Contact Person" Variant="Variant.Outlined"
+                                      MaxLength="200" FullWidth="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_officialEmail" Label="Official Email" Variant="Variant.Outlined"
+                                      InputType="InputType.Email" MaxLength="256" FullWidth="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_registrationNumber" Label="Registration Number" Variant="Variant.Outlined"
+                                      MaxLength="100" FullWidth="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_website" Label="Website" Variant="Variant.Outlined"
+                                      InputType="InputType.Url" MaxLength="500" FullWidth="true" />
+                    </MudItem>
+
+                </MudGrid>
+
+                <div style="margin-top:24px;">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync"
+                               Disabled="_saving" StartIcon="@Icons.Material.Filled.Save" Size="Size.Large">
+                        @(_saving ? "Saving…" : "Save Profile")
+                    </MudButton>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private Guid _clinicId;
+    private int _applicationType;
+
+    private string _name = string.Empty;
+    private string _code = string.Empty;
+    private string? _address;
+    private string? _contactNumber;
+    private string? _contactPerson;
+    private string? _registrationNumber;
+    private string? _officialEmail;
+    private string? _website;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clinicId = ClinicContext.SelectedApplicationId;
+        if (_clinicId == Guid.Empty)
+        {
+            _loading = false;
+            return;
+        }
+
+        var r = await AppClient.GetApplicationByIdAsync(_clinicId);
+        if (r.Success && r.Data is not null)
+        {
+            var d = r.Data;
+            _name               = d.ApplicationName;
+            _code               = d.ApplicationCode;
+            _applicationType    = d.ApplicationType;
+            _address            = d.Address;
+            _contactNumber      = d.ContactNumber;
+            _contactPerson      = d.ContactPerson;
+            _registrationNumber = d.RegistrationNumber;
+            _officialEmail      = d.OfficialEmail;
+            _website            = d.Website;
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            Snackbar.Add("Clinic name is required.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        var dto = new ApplicationCreationRequestDto
+        {
+            ApplicationName    = _name.Trim(),
+            ApplicationCode    = _code,
+            ApplicationType    = _applicationType,
+            Address            = _address?.Trim(),
+            ContactNumber      = _contactNumber?.Trim(),
+            ContactPerson      = _contactPerson?.Trim(),
+            RegistrationNumber = _registrationNumber?.Trim(),
+            OfficialEmail      = _officialEmail?.Trim(),
+            Website            = _website?.Trim()
+        };
+
+        var r = await AppClient.EditApplicationAsync(_clinicId, dto);
+        if (r.Success) Snackbar.Add("Clinic profile saved.", Severity.Success);
+        else Snackbar.Add(r.Message ?? "Failed to save.", Severity.Error);
+        _saving = false;
+    }
+}

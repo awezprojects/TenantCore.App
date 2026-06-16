@@ -30,4 +30,7 @@ public class PrescriptionDto
     public DateTime CreatedAt { get; init; }
     public IReadOnlyList<PrescriptionItemDto> Items { get; init; } = [];
     public IReadOnlyList<PrescriptionReportDto> Reports { get; init; } = [];
+
+    // Specialty-specific data (null for non-matching specialties)
+    public ObstetricPrescriptionDataDto? ObstetricData { get; init; }
 }

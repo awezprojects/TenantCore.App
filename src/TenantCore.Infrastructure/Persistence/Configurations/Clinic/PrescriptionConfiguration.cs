@@ -60,6 +60,12 @@ internal sealed class PrescriptionConfiguration : IEntityTypeConfiguration<Presc
                .HasForeignKey(r => r.PrescriptionId)
                .OnDelete(DeleteBehavior.Cascade);
 
+        // Specialty-specific 1:0..1 relationships (FK lives on the specialty table)
+        builder.HasOne(p => p.ObstetricData)
+               .WithOne()
+               .HasForeignKey<ObstetricPrescriptionData>(o => o.PrescriptionId)
+               .OnDelete(DeleteBehavior.Cascade);
+
         builder.Navigation(p => p.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Navigation(p => p.Reports).UsePropertyAccessMode(PropertyAccessMode.Field);
     }

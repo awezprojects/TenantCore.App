@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Nav
 @inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
 @implements IDisposable
 
 <MudThemeProvider Theme="_theme" />
@@ -155,6 +156,7 @@ else if (_isAuthenticated)
         if (!firstRender) return;
 
         await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
         _isAuthenticated = AuthState.IsAuthenticated;
 
         if (!_isAuthenticated)

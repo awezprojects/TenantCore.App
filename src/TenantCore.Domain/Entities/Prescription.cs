@@ -27,6 +27,9 @@ public class Prescription : AuditableEntity
     public PrescriptionStatus Status { get; private set; }
     public bool IsEmailSent { get; private set; }
 
+    // Specialty-specific data (separate tables, loaded via navigation)
+    public ObstetricPrescriptionData? ObstetricData { get; private set; }
+
     private readonly List<PrescriptionItem> _items = [];
     private readonly List<PrescriptionReport> _reports = [];
 

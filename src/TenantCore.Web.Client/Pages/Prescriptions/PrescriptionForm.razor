@@ -4,9 +4,12 @@
 @inject IPrescriptionApiClient PrescriptionClient
 @inject IMedicineApiClient MedicineClient
 @inject IClinicApiClient ClinicClient
+@inject IDoctorProfileApiClient DoctorProfileClient
+@inject IObstetricApiClient ObstetricClient
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject AuthStateService AuthState
+@inject IJSRuntime JS
 @using TenantCore.Shared.Dtos
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Clients
@@ -50,7 +53,7 @@ else
                 {
                     <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Medium"
                                StartIcon="@Icons.Material.Filled.Print"
-                               OnClick='() => Navigation.NavigateTo($"/prescriptions/{PrescriptionId}/print")'>
+                               OnClick='async () => await JS.InvokeVoidAsync("window.open", $"/prescriptions/{PrescriptionId}/print", "_blank")'>
                         Print
                     </MudButton>
                 }
@@ -221,6 +224,249 @@ else
                 </div>
             }
         </div>
+
+        <!-- ── Obstetric Details (Gynecology only) ───────────────────────────── -->
+        @if (_isGynecologist)
+        {
+            <div style="border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); background:#fff;">
+                <div style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #E2E8F0;">
+                    <div style="font-weight:700; font-size:14px; color:#0F172A;">🤱 Obstetric Details</div>
+                    <div style="display:flex; gap:4px; background:#F1F5F9; border-radius:8px; padding:3px;">
+                        @foreach (var (tid, tlabel) in new[] { ("obstetric", "Obstetric History"), ("pathistory", "Patient History"), ("lmp", "LMP & EDD") })
+                        {
+                            var tabId = tid; var tabLabel = tlabel;
+                            <button @onclick="() => _obsTab = tabId"
+                                    style="padding:5px 14px; border-radius:6px; border:none; cursor:pointer; font-size:11px; font-weight:@(_obsTab == tabId ? "700" : "500"); color:@(_obsTab == tabId ? "#7C3AED" : "#64748B"); background:@(_obsTab == tabId ? "#fff" : "transparent"); box-shadow:@(_obsTab == tabId ? "0 1px 3px rgba(0,0,0,0.1)" : "none");">
+                                @tabLabel
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (_obsTab == "obstetric")
+                {
+                    <div style="padding:18px 22px;">
+                        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px;">
+                            @foreach (var (key, lbl) in new[] { ("G", "Gravida"), ("P", "Para"), ("L", "Live"), ("A", "Abortion") })
+                            {
+                                var k = key;
+                                <div>
+                                    <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">@lbl (@k)</div>
+                                    <input type="number" min="0"
+                                           value="@GetObsValue(k)"
+                                           @oninput="e => SetObsValue(k, e.Value?.ToString())"
+                                           placeholder="0"
+                                           style="width:100%; padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:18px; font-weight:700; text-align:center; outline:none; box-sizing:border-box; color:#7C3AED;" />
+                                </div>
+                            }
+                        </div>
+                        @if (_obsGravida.HasValue || _obsPara.HasValue || _obsLive.HasValue || _obsAbortion.HasValue)
+                        {
+                            <div style="background:#FDF4FF; border:1.5px solid #E9D5FF; border-radius:10px; padding:10px 16px; margin-bottom:14px; font-size:15px; font-weight:800; color:#7C3AED; letter-spacing:1px;">
+                                G@(_obsGravida?.ToString() ?? "?") P@(_obsPara?.ToString() ?? "?") L@(_obsLive?.ToString() ?? "?") A@(_obsAbortion?.ToString() ?? "?")
+                            </div>
+                        }
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Information</div>
+                            <textarea value="@_obsInformation"
+                                      @oninput="e => _obsInformation = e.Value?.ToString() ?? string.Empty"
+                                      rows="3"
+                                      placeholder="Additional obstetric history notes…"
+                                      style="width:100%; padding:10px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+                        </div>
+                    </div>
+                }
+                else if (_obsTab == "pathistory")
+                {
+                    <div style="padding:18px 22px; display:flex; flex-direction:column; gap:20px;">
+
+                        <!-- Menstrual History -->
+                        <div>
+                            <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">🩸 Menstrual History</div>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
+                                @foreach (var entry in _menstrualHistory.ToList())
+                                {
+                                    var e = entry;
+                                    <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:#FFF1F2; border-radius:14px; border:1px solid #FECDD3;">
+                                        <span style="font-size:12px; font-weight:600; color:#BE123C;">@e</span>
+                                        <button @onclick="() => _menstrualHistory.Remove(e)"
+                                                style="background:none; border:none; cursor:pointer; color:#BE123C; font-size:11px; padding:0; line-height:1;">✕</button>
+                                    </div>
+                                }
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <input value="@_menstrualInput"
+                                       @oninput="e => _menstrualInput = e.Value?.ToString() ?? string.Empty"
+                                       @onkeydown="OnMenstrualKeyDown"
+                                       placeholder="Type and press Enter, or pick below…"
+                                       style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
+                                <button @onclick="AddMenstrualItem"
+                                        style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">Add</button>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
+                                @foreach (var s in _menstrualSuggestions.Where(x => !_menstrualHistory.Contains(x)).Take(6))
+                                {
+                                    var sug = s;
+                                    <button @onclick="() => AddHistoryItem(_menstrualHistory, sug)"
+                                            style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @sug</button>
+                                }
+                            </div>
+                        </div>
+
+                        <div style="border-top:1px solid #F1F5F9;"></div>
+
+                        <!-- Past Medical History -->
+                        <div>
+                            <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">📋 Past Medical History (PAMH)</div>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
+                                @foreach (var entry in _pamHistory.ToList())
+                                {
+                                    var e = entry;
+                                    <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:#FFFBEB; border-radius:14px; border:1px solid #FDE68A;">
+                                        <span style="font-size:12px; font-weight:600; color:#92400E;">@e</span>
+                                        <button @onclick="() => _pamHistory.Remove(e)"
+                                                style="background:none; border:none; cursor:pointer; color:#92400E; font-size:11px; padding:0; line-height:1;">✕</button>
+                                    </div>
+                                }
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <input value="@_pamInput"
+                                       @oninput="e => _pamInput = e.Value?.ToString() ?? string.Empty"
+                                       @onkeydown="OnPamKeyDown"
+                                       placeholder="Type and press Enter, or pick below…"
+                                       style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
+                                <button @onclick="AddPamItem"
+                                        style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">Add</button>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
+                                @foreach (var s in _pamhSuggestions.Where(x => !_pamHistory.Contains(x)).Take(6))
+                                {
+                                    var sug = s;
+                                    <button @onclick="() => AddHistoryItem(_pamHistory, sug)"
+                                            style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @sug</button>
+                                }
+                            </div>
+                        </div>
+
+                        <div style="border-top:1px solid #F1F5F9;"></div>
+
+                        <!-- Family History -->
+                        <div>
+                            <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">👨‍👩‍👧 Family History</div>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
+                                @foreach (var entry in _familyHistory.ToList())
+                                {
+                                    var e = entry;
+                                    <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:#F0FDF4; border-radius:14px; border:1px solid #BBF7D0;">
+                                        <span style="font-size:12px; font-weight:600; color:#166534;">@e</span>
+                                        <button @onclick="() => _familyHistory.Remove(e)"
+                                                style="background:none; border:none; cursor:pointer; color:#166534; font-size:11px; padding:0; line-height:1;">✕</button>
+                                    </div>
+                                }
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <input value="@_familyInput"
+                                       @oninput="e => _familyInput = e.Value?.ToString() ?? string.Empty"
+                                       @onkeydown="OnFamilyKeyDown"
+                                       placeholder="Type and press Enter, or pick below…"
+                                       style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
+                                <button @onclick="AddFamilyItem"
+                                        style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">Add</button>
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
+                                @foreach (var s in _familySuggestions.Where(x => !_familyHistory.Contains(x)).Take(6))
+                                {
+                                    var sug = s;
+                                    <button @onclick="() => AddHistoryItem(_familyHistory, sug)"
+                                            style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @sug</button>
+                                }
+                            </div>
+                        </div>
+
+                    </div>
+                }
+                else if (_obsTab == "lmp")
+                {
+                    <div style="padding:18px 22px; display:flex; flex-direction:column; gap:18px;">
+
+                        <!-- LMP -->
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Last Menstrual Period (LMP)</div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input type="date"
+                                       value="@(_lmpValue?.ToString("yyyy-MM-dd") ?? string.Empty)"
+                                       @onchange="@(e => { if (DateOnly.TryParse(e.Value?.ToString(), out var d)) _lmpValue = d; else _lmpValue = null; })"
+                                       max="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")"
+                                       style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A;" />
+                                @if (PrescriptionId != Guid.Empty && _lmpValue.HasValue)
+                                {
+                                    <button @onclick="QuickSaveLmpAsync" disabled="@_savingLmp"
+                                            style="padding:8px 18px; border-radius:8px; border:none; background:#7C3AED; color:#fff; font-size:12px; font-weight:600; cursor:pointer; opacity:@(_savingLmp ? "0.6" : "1");">
+                                        @(_savingLmp ? "Saving…" : "Save Now")
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- EDD by LMP (computed, read-only) -->
+                        @if (_lmpValue.HasValue)
+                        {
+                            var eddLmp = _lmpValue.Value.AddDays(280);
+                            <div style="background:#F0FDF4; border:1.5px solid #BBF7D0; border-radius:10px; padding:12px 18px;">
+                                <div style="font-size:10px; font-weight:700; color:#166534; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">EDD by LMP (auto-calculated)</div>
+                                <div style="font-size:17px; font-weight:800; color:#166534;">@eddLmp.ToString("dd MMM yyyy")</div>
+                                <div style="font-size:11px; color:#4ADE80; margin-top:2px;">LMP + 280 days · Naegele's rule</div>
+                            </div>
+                        }
+
+                        <!-- EDD by USG -->
+                        <div>
+                            <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">EDD by USG (scan-confirmed)</div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input type="date"
+                                       value="@(_eddByUsgValue?.ToString("yyyy-MM-dd") ?? string.Empty)"
+                                       @onchange="@(e => { if (DateOnly.TryParse(e.Value?.ToString(), out var d)) _eddByUsgValue = d; else _eddByUsgValue = null; })"
+                                       style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A;" />
+                                @if (PrescriptionId != Guid.Empty && _eddByUsgValue.HasValue)
+                                {
+                                    <button @onclick="QuickSaveEddByUsgAsync" disabled="@_savingEddUsg"
+                                            style="padding:8px 18px; border-radius:8px; border:none; background:#0891B2; color:#fff; font-size:12px; font-weight:600; cursor:pointer; opacity:@(_savingEddUsg ? "0.6" : "1");">
+                                        @(_savingEddUsg ? "Saving…" : "Save Now")
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        @if (_eddByUsgValue.HasValue && _lmpValue.HasValue)
+                        {
+                            var diff = _eddByUsgValue.Value.DayNumber - _lmpValue.Value.AddDays(280).DayNumber;
+                            var sign = diff > 0 ? "+" : "";
+                            <div style="background:#FFF7ED; border:1.5px solid #FED7AA; border-radius:10px; padding:10px 16px; font-size:12px; color:#92400E; font-weight:600;">
+                                USG EDD is @(sign)@diff days compared to LMP EDD
+                            </div>
+                        }
+
+                        @if (PrescriptionId == Guid.Empty)
+                        {
+                            <div style="font-size:11px; color:#94A3B8; font-style:italic;">LMP and EDD values will be saved when you save the prescription.</div>
+                        }
+
+                        @if (_opd is not null && _lmpValue.HasValue)
+                        {
+                            <div style="border-top:1px solid #E2E8F0; padding-top:14px; display:flex; gap:10px;">
+                                <a href="/patients/@_opd.PatientId/usg-chart/print"
+                                   target="_blank"
+                                   style="font-size:12px;color:#1565C0;font-weight:600;text-decoration:none;
+                                          padding:7px 16px;border:1.5px solid #1565C0;border-radius:8px;display:inline-block;">
+                                    🖨 Print USG Chart
+                                </a>
+                            </div>
+                        }
+
+                    </div>
+                }
+            </div>
+        }
 
         <!-- ── Two-Column Main Content ─────────────────────────────────────────── -->
         <div style="display:grid; grid-template-columns:1fr 320px; gap:20px;">
@@ -424,11 +670,14 @@ else
                         <!-- Drug Search -->
                         <div style="margin-top:16px;">
                             <div style="font-size:12px; font-weight:600; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.3px;">Add Medicine</div>
-                            <MudAutocomplete T="MedicineDto" Label="Search drug name (tablet, syrup, drops, cream, inhaler…)"
+                            <MudAutocomplete T="MedicineDto" Label="Search drug name…"
                                              SearchFunc="SearchMedicines"
                                              ToStringFunc="MedicineDisplay"
                                              Variant="Variant.Outlined"
                                              ValueChanged="AddMedicine"
+                                             MinCharacters="1"
+                                             DebounceInterval="250"
+                                             MaxItems="5"
                                              Style="font-size:13px;">
                                 <ItemTemplate Context="med">
                                     <div style="padding:2px 0;">
@@ -580,27 +829,74 @@ else
 }
 
 <!-- ── Settings Modal ────────────────────────────────────────────────────────── -->
-<MudDialog @bind-Visible="_showSettings" Options='new DialogOptions { MaxWidth = MaxWidth.Small }'>
+<MudDialog @bind-Visible="_showSettings" Options='new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }'>
     <TitleContent><MudText Typo="Typo.h6">⚙️ Prescription Settings</MudText></TitleContent>
     <DialogContent>
-        <MudText Typo="Typo.subtitle2" Class="mb-1" Color="Color.Secondary">Remark Language</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-            Auto-generated dosage remarks will appear in this language on the prescription.
-        </MudText>
-        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
-            @foreach (var (id, label, sample) in _langOptions)
-            {
-                var langId = id;
-                <button @onclick="() => _lang = langId"
-                        style="padding:12px; border-radius:10px; border:2px solid @(_lang == langId ? "#2563EB" : "#E2E8F0"); background:@(_lang == langId ? "#EFF6FF" : "#fff"); cursor:pointer; text-align:left;">
-                    <div style="font-weight:700; font-size:13px; color:@(_lang == langId ? "#2563EB" : "#0F172A"); margin-bottom:4px;">@label</div>
-                    <div style="font-size:10px; color:#94A3B8; line-height:1.4; font-style:italic;">@sample</div>
-                </button>
-            }
-        </div>
+        <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true" PanelClass="pt-3" @bind-ActivePanelIndex="_settingsTab">
+
+            <!-- Tab 1: Language -->
+            <MudTabPanel Text="🌐 Language">
+                <MudText Typo="Typo.subtitle2" Class="mb-1" Color="Color.Secondary">Remark Language</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Auto-generated dosage remarks will appear in this language on the prescription.
+                </MudText>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+                    @foreach (var (id, label, sample) in _langOptions)
+                    {
+                        var langId = id;
+                        <button @onclick="() => _lang = langId"
+                                style="padding:12px; border-radius:10px; border:2px solid @(_lang == langId ? "#2563EB" : "#E2E8F0"); background:@(_lang == langId ? "#EFF6FF" : "#fff"); cursor:pointer; text-align:left;">
+                            <div style="font-weight:700; font-size:13px; color:@(_lang == langId ? "#2563EB" : "#0F172A"); margin-bottom:4px;">@label</div>
+                            <div style="font-size:10px; color:#94A3B8; line-height:1.4; font-style:italic;">@sample</div>
+                        </button>
+                    }
+                </div>
+            </MudTabPanel>
+
+            <!-- Tab 2: Print Settings -->
+            <MudTabPanel Text="🖨️ Print Settings">
+                <MudText Typo="Typo.subtitle2" Class="mb-1" Color="Color.Secondary">Print Margins</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Set margins (in mm) so the printout fits on your pre-printed prescription pad.
+                    Increase the top margin to skip a printed letterhead.
+                </MudText>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+                    <MudNumericField T="int" Label="Top margin (mm)" @bind-Value="_pMarginTop"
+                                     Min="0" Max="150" Variant="Variant.Outlined" Dense="true"
+                                     HelperText="Skip pre-printed header" />
+                    <MudNumericField T="int" Label="Bottom margin (mm)" @bind-Value="_pMarginBottom"
+                                     Min="0" Max="150" Variant="Variant.Outlined" Dense="true" />
+                    <MudNumericField T="int" Label="Left margin (mm)" @bind-Value="_pMarginLeft"
+                                     Min="0" Max="100" Variant="Variant.Outlined" Dense="true" />
+                    <MudNumericField T="int" Label="Right margin (mm)" @bind-Value="_pMarginRight"
+                                     Min="0" Max="100" Variant="Variant.Outlined" Dense="true" />
+                </div>
+
+                <MudDivider Class="mb-3" />
+
+                <MudText Typo="Typo.subtitle2" Class="mb-1" Color="Color.Secondary">Header on Print</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                    If your prescription pad already has the clinic name and doctor info printed, hide the digital header.
+                </MudText>
+                <MudSwitch T="bool" @bind-Value="_pHideHeader" Color="Color.Primary"
+                           Label="@(_pHideHeader ? "Clinic header hidden on print" : "Show clinic header on print")" />
+
+                @if (_pMarginTop > 0 || _pHideHeader)
+                {
+                    <div style="margin-top:12px; padding:10px 12px; background:#FFF7ED; border:1px solid #FED7AA; border-radius:8px; font-size:12px; color:#92400E;">
+                        💡 Top margin: <strong>@_pMarginTop mm</strong>
+                        @if (_pHideHeader) { <text> · Clinic header hidden</text> }
+                        — content will start lower to fit your pre-printed pad.
+                    </div>
+                }
+            </MudTabPanel>
+
+        </MudTabs>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _showSettings = false">Done</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="() => _showSettings = false">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync">Save</MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -827,7 +1123,7 @@ else
         {
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
                        StartIcon="@Icons.Material.Filled.Print"
-                       OnClick='() => Navigation.NavigateTo($"/prescriptions/{_selectedVisit.Id}/print")'>
+                       OnClick='async () => await JS.InvokeVoidAsync("window.open", $"/prescriptions/{_selectedVisit.Id}/print", "_blank")'>
                 Print
             </MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary"
@@ -848,11 +1144,19 @@ else
     private PrescriptionDto? _prescription;
     private OpdRegistrationDto? _opd;
     private PatientDto? _patient;
+    private DoctorProfileDto? _doctorProfile;
+    private bool _isGynecologist;
     private List<PrescriptionDto> _history = [];
 
     private string _lang = "en";
     private string _historyTab = "visits";
     private bool _showSettings;
+    private int _settingsTab;
+    private int _pMarginTop;
+    private int _pMarginRight;
+    private int _pMarginBottom;
+    private int _pMarginLeft;
+    private bool _pHideHeader;
     private bool _showInvPicker;
     private bool _showVisitDetail;
     private PrescriptionDto? _selectedVisit;
@@ -873,6 +1177,24 @@ else
     private string _vSpO2 = string.Empty;
     private string _vRR = string.Empty;
     private string _vSugar = string.Empty;
+
+    // Obstetric state (gynecology only)
+    private string _obsTab = "obstetric";
+    private DateOnly? _lmpValue;
+    private DateOnly? _eddByUsgValue;
+    private bool _savingLmp;
+    private bool _savingEddUsg;
+    private int? _obsGravida;
+    private int? _obsPara;
+    private int? _obsLive;
+    private int? _obsAbortion;
+    private string _obsInformation = string.Empty;
+    private List<string> _menstrualHistory = [];
+    private List<string> _pamHistory = [];
+    private List<string> _familyHistory = [];
+    private string _menstrualInput = string.Empty;
+    private string _pamInput = string.Empty;
+    private string _familyInput = string.Empty;
 
     private static readonly (string Key, string Label, string Placeholder, string Icon)[] _vitalFields =
     [
@@ -909,6 +1231,18 @@ else
         ["Special"]      = ["Do not crush or chew", "Swallow whole", "Dissolve under tongue", "Apply externally only"],
     };
 
+    private static readonly string[] _menstrualSuggestions =
+        ["3-4/30/ Regular", "moderate flow", "scanty flow", "heavy flow",
+         "irregular cycle", "dysmenorrhea", "amenorrhea", "oligomenorrhea"];
+
+    private static readonly string[] _pamhSuggestions =
+        ["No significant past medical history", "Hypertension", "Diabetes Mellitus",
+         "Hypothyroidism", "Asthma", "Anaemia", "Epilepsy", "Cardiac disease"];
+
+    private static readonly string[] _familySuggestions =
+        ["Not Significant", "Hypertension", "Diabetes Mellitus",
+         "Cancer (specify)", "Twin pregnancy", "Hereditary disorder"];
+
     private static readonly (string id, string label, string sample)[] _langOptions =
     [
         ("en", "English",          "Take 1 tablet twice a day, after meals"),
@@ -934,6 +1268,15 @@ else
     };
 
     private string LangLabel => _lang switch { "hi" => "हिंदी", "mr" => "मराठी", _ => "English" };
+
+    private async Task SaveSettingsAsync()
+    {
+        var dto = new UpdatePrescriptionConfigDto(
+            _lang switch { "hi" => PrescriptionLanguage.Hindi, "mr" => PrescriptionLanguage.Marathi, _ => PrescriptionLanguage.English },
+            _pMarginTop, _pMarginRight, _pMarginBottom, _pMarginLeft, _pHideHeader);
+        await PrescriptionClient.UpdatePrescriptionConfigAsync(dto);
+        _showSettings = false;
+    }
     private string PatientName => _patient is not null ? _patient.FullName : (_opd?.PatientName ?? "Patient");
     private string PatientInitials => string.Join("", PatientName.Split(' ').Take(2).Select(n => n.Length > 0 ? n[0].ToString() : ""));
     private string PatientSubtitle
@@ -973,6 +1316,14 @@ else
         _loading = true;
         try
         {
+            var drR = await DoctorProfileClient.GetMyProfileAsync();
+            if (drR.Success && drR.Data is not null)
+            {
+                _doctorProfile = drR.Data;
+                _isGynecologist = _doctorProfile.SpecialityName?
+                    .Contains("Gynec", StringComparison.OrdinalIgnoreCase) == true;
+            }
+
             if (PrescriptionId != Guid.Empty)
             {
                 var r = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
@@ -995,12 +1346,20 @@ else
 
             var cfgR = await PrescriptionClient.GetPrescriptionConfigAsync();
             if (cfgR.Success && cfgR.Data is not null)
-                _lang = cfgR.Data.DefaultLanguage switch
+            {
+                var cfg = cfgR.Data;
+                _lang = cfg.DefaultLanguage switch
                 {
                     PrescriptionLanguage.Hindi => "hi",
                     PrescriptionLanguage.Marathi => "mr",
                     _ => "en"
                 };
+                _pMarginTop    = cfg.PrintMarginTop;
+                _pMarginRight  = cfg.PrintMarginRight;
+                _pMarginBottom = cfg.PrintMarginBottom;
+                _pMarginLeft   = cfg.PrintMarginLeft;
+                _pHideHeader   = cfg.HideClinicHeader;
+            }
         }
         finally { _loading = false; }
     }
@@ -1044,6 +1403,9 @@ else
             RemarkMarathi = i.RemarkMarathi,
         }).ToList();
 
+        if (_isGynecologist && dto.ObstetricData is not null)
+            CarryForwardObstetricData(dto.ObstetricData);
+
         var opdR = await ClinicClient.GetOpdRegistrationByIdAsync(dto.OpdRegistrationId);
         if (opdR.Success) _opd = opdR.Data;
         if (_opd is not null) await LoadPatientAndHistory(_opd.PatientId);
@@ -1057,7 +1419,19 @@ else
 
         var histR = await PrescriptionClient.GetPrescriptionsAsync(patientId: patientId, pageSize: 20);
         if (histR.Success && histR.Data is not null)
+        {
             _history = histR.Data.Items.Where(p => p.Id != PrescriptionId).ToList();
+
+            // Carry forward obstetric data for new prescriptions (gynecologist only)
+            if (_isGynecologist && PrescriptionId == Guid.Empty)
+            {
+                var lastWithObs = _history
+                    .OrderByDescending(p => p.PrescribedDate)
+                    .FirstOrDefault(p => p.ObstetricData is not null);
+                if (lastWithObs?.ObstetricData is not null)
+                    CarryForwardObstetricData(lastWithObs.ObstetricData);
+            }
+        }
     }
 
     private void OpenVisitDetail(PrescriptionDto prescription)
@@ -1143,8 +1517,9 @@ else
 
     private async Task<IEnumerable<MedicineDto>> SearchMedicines(string search, CancellationToken ct)
     {
-        var r = await MedicineClient.GetMedicinesAsync(search: search, pageSize: 20);
-        return r.Success ? r.Data?.Items ?? [] : [];
+        if (string.IsNullOrWhiteSpace(search)) return [];
+        var r = await MedicineClient.SearchMedicinesByNameAsync(search, 5);
+        return r.Success ? r.Data ?? [] : [];
     }
 
     private void AddMedicine(MedicineDto? medicine)
@@ -1247,7 +1622,7 @@ else
                     _followup, _diagnosis, _investigations,
                     _notes, NullIfEmpty(_vBP), ParseInt(_vPulse), ParseDecimal(_vTemp),
                     ParseDecimal(_vWeight), ParseDecimal(_vSpO2), ParseInt(_vRR), ParseDecimal(_vSugar),
-                    items);
+                    items, BuildObstetricDto());
                 var r = await PrescriptionClient.CreatePrescriptionAsync(dto);
                 if (r.Success && r.Data is not null)
                 {
@@ -1264,7 +1639,7 @@ else
                     _followup, _diagnosis, _investigations,
                     _notes, NullIfEmpty(_vBP), ParseInt(_vPulse), ParseDecimal(_vTemp),
                     ParseDecimal(_vWeight), ParseDecimal(_vSpO2), ParseInt(_vRR), ParseDecimal(_vSugar),
-                    items);
+                    items, BuildObstetricDto());
                 var r = await PrescriptionClient.UpdatePrescriptionAsync(PrescriptionId, dto);
                 if (r.Success) { _prescription = r.Data; Snackbar.Add("Prescription updated.", Severity.Success); }
                 else Snackbar.Add(r.Message ?? "Failed to update.", Severity.Error);
@@ -1327,6 +1702,119 @@ else
     private static int? ParseInt(string? s) => int.TryParse(s, out var v) ? v : null;
     private static decimal? ParseDecimal(string? s) => decimal.TryParse(s, out var v) ? v : null;
     private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
+
+    // ── Obstetric helpers ────────────────────────────────────────────────────
+    private string? GetObsValue(string key) => key switch
+    {
+        "G" => _obsGravida?.ToString(), "P" => _obsPara?.ToString(),
+        "L" => _obsLive?.ToString(),    "A" => _obsAbortion?.ToString(),
+        _ => null
+    };
+
+    private void SetObsValue(string key, string? value)
+    {
+        var v = int.TryParse(value, out var n) ? n : (int?)null;
+        switch (key)
+        {
+            case "G": _obsGravida = v; break;
+            case "P": _obsPara = v; break;
+            case "L": _obsLive = v; break;
+            case "A": _obsAbortion = v; break;
+        }
+    }
+
+    private static void AddHistoryItem(List<string> list, string item)
+    {
+        var trimmed = item.Trim();
+        if (!string.IsNullOrEmpty(trimmed) && !list.Contains(trimmed))
+            list.Add(trimmed);
+    }
+
+    private void OnMenstrualKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddMenstrualItem();
+    }
+    private void OnPamKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddPamItem();
+    }
+    private void OnFamilyKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddFamilyItem();
+    }
+
+    private void AddMenstrualItem()
+    {
+        if (!string.IsNullOrWhiteSpace(_menstrualInput))
+        { AddHistoryItem(_menstrualHistory, _menstrualInput); _menstrualInput = string.Empty; }
+    }
+    private void AddPamItem()
+    {
+        if (!string.IsNullOrWhiteSpace(_pamInput))
+        { AddHistoryItem(_pamHistory, _pamInput); _pamInput = string.Empty; }
+    }
+    private void AddFamilyItem()
+    {
+        if (!string.IsNullOrWhiteSpace(_familyInput))
+        { AddHistoryItem(_familyHistory, _familyInput); _familyInput = string.Empty; }
+    }
+
+    private UpsertObstetricPrescriptionDataDto? BuildObstetricDto()
+    {
+        if (!_isGynecologist) return null;
+        var hasData = _obsGravida.HasValue || _obsPara.HasValue || _obsLive.HasValue ||
+                      _obsAbortion.HasValue || !string.IsNullOrWhiteSpace(_obsInformation) ||
+                      _menstrualHistory.Count > 0 || _pamHistory.Count > 0 || _familyHistory.Count > 0 ||
+                      _lmpValue.HasValue || _eddByUsgValue.HasValue;
+        if (!hasData) return null;
+        return new UpsertObstetricPrescriptionDataDto(
+            _obsGravida, _obsPara, _obsLive, _obsAbortion,
+            NullIfEmpty(_obsInformation),
+            _menstrualHistory.Count > 0 ? _menstrualHistory : null,
+            _pamHistory.Count > 0 ? _pamHistory : null,
+            _familyHistory.Count > 0 ? _familyHistory : null,
+            Lmp: _lmpValue,
+            EddByUsg: _eddByUsgValue);
+    }
+
+    private void CarryForwardObstetricData(ObstetricPrescriptionDataDto source)
+    {
+        _obsGravida = source.Gravida;
+        _obsPara = source.Para;
+        _obsLive = source.Live;
+        _obsAbortion = source.Abortion;
+        _obsInformation = source.Information ?? string.Empty;
+        _menstrualHistory = source.MenstrualHistory.ToList();
+        _pamHistory = source.PastMedicalHistory.ToList();
+        _familyHistory = source.FamilyHistory.ToList();
+        _lmpValue = source.Lmp;
+        _eddByUsgValue = source.EddByUsg;
+    }
+
+    // ── Obstetric quick-save (existing prescriptions only) ───────────────────
+    private async Task QuickSaveLmpAsync()
+    {
+        if (!_lmpValue.HasValue || PrescriptionId == Guid.Empty) return;
+        _savingLmp = true;
+        var r = await ObstetricClient.SetLmpAsync(PrescriptionId, new SetLmpRequest { Lmp = _lmpValue.Value });
+        _savingLmp = false;
+        if (r.Success)
+        {
+            _eddByUsgValue = r.Data?.EddByUsg ?? _eddByUsgValue;
+            Snackbar.Add("LMP saved.", Severity.Success);
+        }
+        else Snackbar.Add(r.Message ?? "Failed to save LMP.", Severity.Error);
+    }
+
+    private async Task QuickSaveEddByUsgAsync()
+    {
+        if (!_eddByUsgValue.HasValue || PrescriptionId == Guid.Empty) return;
+        _savingEddUsg = true;
+        var r = await ObstetricClient.SetEddByUsgAsync(PrescriptionId, new SetEddByUsgRequest { EddByUsg = _eddByUsgValue.Value });
+        _savingEddUsg = false;
+        if (r.Success) Snackbar.Add("EDD by USG saved.", Severity.Success);
+        else Snackbar.Add(r.Message ?? "Failed to save EDD by USG.", Severity.Error);
+    }
 
     // ── Remark Generator ──────────────────────────────────────────────────────
     private static string GenerateRemark(PrescriptionItemRow item, string lang)

@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Patients.Commands;
 using TenantCore.Application.Features.Patients.Translators;
 using TenantCore.Domain.Entities;
@@ -8,7 +9,7 @@ using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Application.Features.Patients.Handlers;
 
-public sealed class UpdatePatientHandler(IPatientRepository repository)
+public sealed class UpdatePatientHandler(IPatientRepository repository, IApplicationAccessValidator accessValidator)
     : IRequestHandler<UpdatePatientCommand, PatientDto>
 {
     public async Task<PatientDto> Handle(UpdatePatientCommand request, CancellationToken cancellationToken)
@@ -16,7 +17,7 @@ public sealed class UpdatePatientHandler(IPatientRepository repository)
         var patient = await repository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), request.Id);
 
-        if (patient.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(patient.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
         patient.Update(

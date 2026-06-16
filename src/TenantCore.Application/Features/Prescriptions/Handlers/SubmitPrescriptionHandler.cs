@@ -1,6 +1,7 @@
 using System.Net;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.Prescriptions.Commands;
 using TenantCore.Application.Features.Prescriptions.Translators;
 using TenantCore.Application.Services;
@@ -17,7 +18,8 @@ public sealed class SubmitPrescriptionHandler(
     IOpdRegistrationRepository opdRepository,
     IPatientRepository patientRepository,
     IEmailService emailService,
-    ILogger<SubmitPrescriptionHandler> logger)
+    ILogger<SubmitPrescriptionHandler> logger,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<SubmitPrescriptionCommand, PrescriptionDto>
 {
     public async Task<PrescriptionDto> Handle(SubmitPrescriptionCommand request, CancellationToken cancellationToken)
@@ -27,7 +29,7 @@ public sealed class SubmitPrescriptionHandler(
         var prescription = await prescriptionRepository.GetByIdWithDetailsAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Prescription), request.Id);
 
-        if (prescription.ApplicationId != request.ApplicationId)
+        if (!accessValidator.CanAccess(prescription.ApplicationId))
             throw new NotFoundException(nameof(Prescription), request.Id);
 
         var patient = await patientRepository.GetByIdAsync(prescription.PatientId, cancellationToken)

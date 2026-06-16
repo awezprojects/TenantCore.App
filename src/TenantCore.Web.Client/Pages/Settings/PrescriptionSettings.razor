@@ -8,7 +8,8 @@
 
 <PageTitle>Prescription Settings</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Prescription Settings</MudText>
+<MudText Typo="Typo.h5" Class="mb-1" Style="font-weight:700;">Prescription Settings</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-5">Configure defaults for new prescriptions and print layout.</MudText>
 
 @if (_loading)
 {
@@ -16,42 +17,116 @@
 }
 else
 {
-    <MudPaper Class="pa-4" Style="max-width: 500px;">
-        <MudText Typo="Typo.h6" Class="mb-3">Default Remark Language</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-            Choose the language in which dosage remarks are pre-filled on new prescriptions.
-        </MudText>
-        <MudSelect T="PrescriptionLanguage" Label="Default Language" @bind-Value="_language"
-                   Variant="Variant.Outlined" Class="mb-4">
-            @foreach (PrescriptionLanguage lang in Enum.GetValues<PrescriptionLanguage>())
-            {
-                <MudSelectItem Value="lang">@lang</MudSelectItem>
-            }
-        </MudSelect>
+    <MudGrid Spacing="4">
+
+        <!-- ── Language ──────────────────────────────── -->
+        <MudItem xs="12" sm="6" md="5">
+            <MudPaper Class="pa-5" Elevation="1" Style="border-radius:12px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                    <span style="font-size:20px;">🌐</span>
+                    <MudText Typo="Typo.h6" Style="font-weight:700;margin:0;">Default Language</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    Dosage remarks on new prescriptions are pre-filled in this language.
+                </MudText>
+                <MudSelect T="PrescriptionLanguage" Label="Language" @bind-Value="_language"
+                           Variant="Variant.Outlined" FullWidth="true">
+                    @foreach (PrescriptionLanguage lang in Enum.GetValues<PrescriptionLanguage>())
+                    {
+                        <MudSelectItem Value="lang">@lang</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudPaper>
+        </MudItem>
+
+        <!-- ── Print Settings ────────────────────────── -->
+        <MudItem xs="12" sm="6" md="7">
+            <MudPaper Class="pa-5" Elevation="1" Style="border-radius:12px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+                    <span style="font-size:20px;">🖨️</span>
+                    <MudText Typo="Typo.h6" Style="font-weight:700;margin:0;">Print Settings</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                    Page margins and header visibility when printing a prescription. Use when your clinic has pre-printed letterhead pads.
+                </MudText>
+
+                <MudText Typo="Typo.subtitle2" Class="mb-2" Style="font-weight:600;">Page Margins (mm)</MudText>
+                <MudGrid Spacing="2" Class="mb-4">
+                    <MudItem xs="6">
+                        <MudNumericField T="int" Label="Top" @bind-Value="_marginTop"
+                                         Variant="Variant.Outlined" Min="0" Max="80" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField T="int" Label="Bottom" @bind-Value="_marginBottom"
+                                         Variant="Variant.Outlined" Min="0" Max="80" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField T="int" Label="Left" @bind-Value="_marginLeft"
+                                         Variant="Variant.Outlined" Min="0" Max="80" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField T="int" Label="Right" @bind-Value="_marginRight"
+                                         Variant="Variant.Outlined" Min="0" Max="80" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="mb-4" />
+
+                <MudSwitch T="bool" @bind-Value="_hideHeader" Color="Color.Primary"
+                           Label="@(_hideHeader ? "Clinic header hidden on print" : "Show clinic header on print")" />
+                @if (_hideHeader)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" Style="font-size:12px;">
+                        The clinic name, address, and doctor info will not print — useful when using pre-printed pads.
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+    </MudGrid>
+
+    <div style="margin-top:28px;">
         <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync"
-                   Disabled="_saving" StartIcon="@Icons.Material.Filled.Save">
-            Save
+                   Disabled="_saving" StartIcon="@Icons.Material.Filled.Save" Size="Size.Large">
+            @(_saving ? "Saving…" : "Save Settings")
         </MudButton>
-    </MudPaper>
+    </div>
 }
 
 @code {
     private bool _loading;
     private bool _saving;
+
     private PrescriptionLanguage _language = PrescriptionLanguage.English;
+    private int _marginTop;
+    private int _marginRight;
+    private int _marginBottom;
+    private int _marginLeft;
+    private bool _hideHeader;
 
     protected override async Task OnInitializedAsync()
     {
         _loading = true;
         var r = await PrescriptionClient.GetPrescriptionConfigAsync();
-        if (r.Success && r.Data is not null) _language = r.Data.DefaultLanguage;
+        if (r.Success && r.Data is not null)
+        {
+            var d = r.Data;
+            _language     = d.DefaultLanguage;
+            _marginTop    = d.PrintMarginTop;
+            _marginRight  = d.PrintMarginRight;
+            _marginBottom = d.PrintMarginBottom;
+            _marginLeft   = d.PrintMarginLeft;
+            _hideHeader   = d.HideClinicHeader;
+        }
         _loading = false;
     }
 
     private async Task SaveAsync()
     {
         _saving = true;
-        var r = await PrescriptionClient.UpdatePrescriptionConfigAsync(new UpdatePrescriptionConfigDto(_language));
+        var dto = new UpdatePrescriptionConfigDto(
+            _language, _marginTop, _marginRight, _marginBottom, _marginLeft, _hideHeader);
+        var r = await PrescriptionClient.UpdatePrescriptionConfigAsync(dto);
         if (r.Success) Snackbar.Add("Settings saved.", Severity.Success);
         else Snackbar.Add(r.Message ?? "Failed to save.", Severity.Error);
         _saving = false;

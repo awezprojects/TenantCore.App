@@ -69,6 +69,14 @@ public class MedicineRepository(ClinicDbContext dbContext)
             .Take(batchSize)
             .ToListAsync(ct);
 
+    public async Task<IEnumerable<Medicine>> GetByNamePrefixAsync(string name, int limit = 5, CancellationToken ct = default)
+        => await DbSet
+            .Include(m => m.DosageForm)
+            .Where(m => m.IsActive && m.Name.StartsWith(name))
+            .OrderBy(m => m.Name)
+            .Take(limit)
+            .ToListAsync(ct);
+
     public async Task<IEnumerable<Medicine>> FindSimilarAsync(
         string name,
         string? genericName,

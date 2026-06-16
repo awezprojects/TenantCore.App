@@ -2,329 +2,571 @@
 @layout PrintLayout
 @inject IPrescriptionApiClient PrescriptionClient
 @inject IClinicApiClient ClinicClient
+@inject IApplicationApiClient AppClient
+@inject IDoctorProfileApiClient DoctorProfileClient
+@inject ClinicContextService ClinicContext
+@inject AuthStateService AuthState
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Dtos.Auth
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
 
 <PageTitle>Print Prescription</PageTitle>
 
 @if (_loading)
 {
-    <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; gap:12px;">
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
         <div style="font-size:32px;">⏳</div>
-        <div style="font-size:14px; color:#64748B;">Loading prescription...</div>
+        <div style="font-size:14px;color:#64748B;">Loading prescription...</div>
     </div>
 }
 else if (_prescription is null)
 {
-    <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; gap:12px;">
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
         <div style="font-size:40px;">❌</div>
-        <div style="font-size:15px; color:#64748B;">Prescription not found.</div>
-        <button @onclick='() => Navigation.NavigateTo("/prescriptions")'
-                style="padding:10px 20px; border-radius:8px; border:none; background:#2563EB; color:#fff; cursor:pointer; font-size:13px; font-weight:600;">
-            ← Back to list
+        <div style="font-size:15px;color:#64748B;">Prescription not found.</div>
+        <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                style="padding:10px 20px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">
+            ✕ Close
         </button>
     </div>
 }
 else
 {
-    <!-- ── Print Action Bar (screen only) ─────────────────────────── -->
-    <div class="no-print" style="background:#1E3A5F; padding:12px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-        <div style="display:flex; align-items:center; gap:12px;">
-            <button @onclick='() => Navigation.NavigateTo($"/prescriptions/{PrescriptionId}")'
-                    style="padding:8px 16px; border-radius:8px; border:1.5px solid rgba(255,255,255,0.3); background:transparent; color:#fff; cursor:pointer; font-size:12px; font-weight:600;">
-                ← Back to Edit
+    <!-- ── Print Action Bar (screen only) ─────────────────────── -->
+    <div class="no-print" style="background:#1E3A5F;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                    style="padding:7px 16px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">
+                ✕ Close
             </button>
-            <div style="color:rgba(255,255,255,0.8); font-size:13px;">
-                Prescription <strong style="color:#fff;">@_prescription.PrescriptionNumber</strong> ·
-                @_prescription.PatientName ·
-                @_prescription.PrescribedDate.ToString("dd MMM yyyy")
+            <div style="color:rgba(255,255,255,0.8);font-size:13px;">
+                <strong style="color:#fff;">@_prescription.PrescriptionNumber</strong>
+                · @_prescription.PatientName
+                · @_prescription.PrescribedDate.ToString("dd MMM yyyy")
             </div>
         </div>
         <button @onclick="PrintPage"
-                style="padding:10px 22px; border-radius:8px; border:none; background:#fff; color:#1E3A5F; cursor:pointer; font-size:13px; font-weight:800; display:flex; align-items:center; gap:6px;">
+                style="padding:9px 22px;border-radius:8px;border:none;background:#fff;color:#1E3A5F;cursor:pointer;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;">
             🖨️ Print
         </button>
     </div>
 
-    <!-- ── Prescription Sheet ────────────────────────────────────── -->
-    <div style="background:#F4F6FA; min-height:calc(100vh - 52px); padding:32px 24px;">
-        <div style="max-width:860px; margin:0 auto; background:#fff; border-radius:16px; box-shadow:0 4px 24px rgba(0,0,0,0.08); overflow:hidden;">
+    <!-- ── Prescription Sheet ────────────────────────────────── -->
+    <div class="rx-bg">
+        <div class="rx-sheet">
 
-            <!-- ── Header / Clinic Branding ─────── -->
-            <div style="padding:28px 32px; background:linear-gradient(135deg,#0A1628 0%,#1565C0 100%);">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div style="width:40px; height:40px; border-radius:10px; background:rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; font-size:20px;">🏥</div>
-                        <div>
-                            <div style="color:#fff; font-weight:800; font-size:15px; letter-spacing:0.3px;">@(_clinicName ?? "Medical Clinic")</div>
-                            <div style="color:rgba(255,255,255,0.65); font-size:11px; margin-top:1px;">Prescription</div>
-                        </div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:11px; font-weight:700; background:rgba(255,255,255,0.18); padding:3px 12px; border-radius:20px; color:#fff; letter-spacing:0.4px; display:inline-block;">
-                            @_prescription.PrescriptionNumber
-                        </div>
-                        @if (_prescription.Status == PrescriptionStatus.Submitted)
-                        {
-                            <div style="margin-top:4px; font-size:10px; font-weight:700; background:#10B981; padding:2px 10px; border-radius:14px; color:#fff; letter-spacing:0.4px; display:inline-block;">
-                                ✓ FINALISED
-                            </div>
-                        }
-                    </div>
+            @{
+                var hideHeader = _config?.HideClinicHeader ?? false;
+                var age = _patient?.DateOfBirth.HasValue == true
+                    ? (DateTime.Today.Year - _patient.DateOfBirth.Value.Year).ToString()
+                    : null;
+                var ageSex = age is not null
+                    ? $"{age} yrs / {_patient!.Gender}"
+                    : _patient is not null ? _patient.Gender.ToString() : "";
+                var uhid = _patient is not null
+                    ? $"CC-{_patient.Id.ToString("N")[..8].ToUpper()}"
+                    : "—";
+                var hasVitals = _prescription.VitalBP != null || _prescription.VitalPulse != null
+                    || _prescription.VitalTemp != null || _prescription.VitalWeight != null
+                    || _prescription.VitalSpO2 != null || _prescription.VitalRR != null
+                    || _prescription.VitalSugar != null;
+            }
+
+            <!-- ── Clinic + Doctor Header ──────── -->
+            <div class="rx-header @(hideHeader ? "rx-no-print" : "")">
+                <div class="rx-header-left">
+                    <div class="rx-clinic-name">🏥 @(_clinic?.ApplicationName ?? "Medical Clinic")</div>
+                    @{
+                        var clinicLine = new List<string>();
+                        if (!string.IsNullOrEmpty(_clinic?.Address)) clinicLine.Add(_clinic.Address);
+                        if (!string.IsNullOrEmpty(_clinic?.ContactNumber)) clinicLine.Add($"Phone: {_clinic.ContactNumber}");
+                    }
+                    @if (clinicLine.Count > 0)
+                    {
+                        <div class="rx-clinic-sub">@string.Join(" · ", clinicLine)</div>
+                    }
+                    @{
+                        var regLine = new List<string>();
+                        if (!string.IsNullOrEmpty(_clinic?.RegistrationNumber)) regLine.Add($"Reg. No: {_clinic.RegistrationNumber}");
+                        if (!string.IsNullOrEmpty(_clinic?.OfficialEmail)) regLine.Add(_clinic.OfficialEmail);
+                    }
+                    @if (regLine.Count > 0)
+                    {
+                        <div class="rx-clinic-sub">@string.Join(" · ", regLine)</div>
+                    }
                 </div>
-
-                <!-- Patient Row -->
-                <div style="padding-top:16px; border-top:1px solid rgba(255,255,255,0.15); display:grid; grid-template-columns:2fr 1fr 1fr; gap:20px;">
-                    <div>
-                        <div style="font-size:10px; color:rgba(255,255,255,0.6); font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:4px;">Patient</div>
-                        <div style="font-size:15px; font-weight:800; color:#fff;">@_prescription.PatientName</div>
-                        @if (_patient is not null)
-                        {
-                            <div style="font-size:11px; color:rgba(255,255,255,0.7); margin-top:2px;">
-                                @if (_patient.DateOfBirth.HasValue) { <text>@(DateTime.Today.Year - _patient.DateOfBirth.Value.Year) yrs · </text> }
-                                @_patient.Gender
-                            </div>
-                        }
-                    </div>
-                    <div>
-                        <div style="font-size:10px; color:rgba(255,255,255,0.6); font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:4px;">Prescribed By</div>
-                        <div style="font-size:13px; font-weight:700; color:#fff;">Dr. @_prescription.DoctorName</div>
-                    </div>
-                    <div>
-                        <div style="font-size:10px; color:rgba(255,255,255,0.6); font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:4px;">Date</div>
-                        <div style="font-size:13px; font-weight:700; color:#fff;">@_prescription.PrescribedDate.ToString("dd MMM yyyy")</div>
-                        <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:1px;">@_prescription.PrescribedDate.ToString("HH:mm")</div>
-                    </div>
+                <div class="rx-header-right">
+                    <div class="rx-doctor-name">Dr. @_prescription.DoctorName</div>
+                    @if (!string.IsNullOrEmpty(_doctorProfile?.QualificationDetails))
+                    {
+                        <div class="rx-doctor-sub">@_doctorProfile.QualificationDetails</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_doctorProfile?.SpecialityName))
+                    {
+                        <div class="rx-doctor-sub">@_doctorProfile.SpecialityName</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_doctorProfile?.RegistrationNumber))
+                    {
+                        <div class="rx-doctor-sub">Reg. No: @_doctorProfile.RegistrationNumber</div>
+                    }
                 </div>
             </div>
 
-            <!-- ── Body ─────────────────────────── -->
-            <div style="padding:28px 32px; display:flex; flex-direction:column; gap:24px;">
+            <hr class="rx-rule @(hideHeader ? "rx-no-print" : "")" />
 
-                <!-- Diagnosis -->
-                @if (!string.IsNullOrEmpty(_prescription.Diagnosis))
+            @if (hideHeader)
+            {
+                <div class="no-print" style="margin:0 28px 4px;padding:5px 12px;background:#FFF7ED;border:1px dashed #FED7AA;border-radius:4px;font-size:11px;font-weight:700;color:#92400E;letter-spacing:0.4px;text-align:center;">
+                    ⚠️ Clinic header &amp; rule are hidden when printing (set in Settings → Print Settings)
+                </div>
+            }
+
+            <!-- ── Patient Strip ───────────────── -->
+            <div class="rx-patient-strip">
+                <div class="rx-ps-cell rx-ps-wide">
+                    <div class="rx-ps-label">PATIENT NAME</div>
+                    <div class="rx-ps-name">@_prescription.PatientName</div>
+                    @if (_patient?.Gender is not null)
+                    {
+                        <div class="rx-ps-sub">@_patient.Gender</div>
+                    }
+                </div>
+                <div class="rx-ps-cell">
+                    <div class="rx-ps-label">AGE / SEX</div>
+                    <div class="rx-ps-value">@(string.IsNullOrEmpty(ageSex) ? "—" : ageSex)</div>
+                </div>
+                <div class="rx-ps-cell">
+                    <div class="rx-ps-label">UHID</div>
+                    <div class="rx-ps-value rx-uhid">@uhid</div>
+                </div>
+                <div class="rx-ps-cell">
+                    <div class="rx-ps-label">DATE / TIME</div>
+                    <div class="rx-ps-value">@_prescription.PrescribedDate.ToString("yyyy-MM-dd")</div>
+                    <div class="rx-ps-sub">@_prescription.PrescribedDate.ToString("HH:mm")</div>
+                </div>
+            </div>
+
+            <!-- ── Vital Signs ─────────────────── -->
+            @if (hasVitals)
+            {
+                <div class="rx-section">
+                    <div class="rx-section-title">VITAL SIGNS</div>
+                    <div class="rx-vitals">
+                        @if (_prescription.VitalBP != null)
+                        {
+                            <div class="rx-vital-cell">
+                                <div class="rx-vital-label">BP</div>
+                                <div class="rx-vital-value">@_prescription.VitalBP</div>
+                                <div class="rx-vital-unit">mmHg</div>
+                            </div>
+                        }
+                        @if (_prescription.VitalPulse != null)
+                        {
+                            <div class="rx-vital-cell">
+                                <div class="rx-vital-label">PULSE</div>
+                                <div class="rx-vital-value">@_prescription.VitalPulse</div>
+                                <div class="rx-vital-unit">bpm</div>
+                            </div>
+                        }
+                        @if (_prescription.VitalTemp != null)
+                        {
+                            <div class="rx-vital-cell">
+                                <div class="rx-vital-label">TEMP</div>
+                                <div class="rx-vital-value">@_prescription.VitalTemp?.ToString("F1")</div>
+                                <div class="rx-vital-unit">°F</div>
+                            </div>
+                        }
+                        @if (_prescription.VitalWeight != null)
+                        {
+                            <div class="rx-vital-cell">
+                                <div class="rx-vital-label">WEIGHT</div>
+                                <div class="rx-vital-value">@_prescription.VitalWeight?.ToString("F1")</div>
+                                <div class="rx-vital-unit">kg</div>
+                            </div>
+                        }
+                        @if (_prescription.VitalSpO2 != null)
+                        {
+                            <div class="rx-vital-cell">
+                                <div class="rx-vital-label">SPO₂</div>
+                                <div class="rx-vital-value">@_prescription.VitalSpO2?.ToString("F1")</div>
+                                <div class="rx-vital-unit">%</div>
+                            </div>
+                        }
+                        @if (_prescription.VitalRR != null)
+                        {
+                            <div class="rx-vital-cell">
+                                <div class="rx-vital-label">RR</div>
+                                <div class="rx-vital-value">@_prescription.VitalRR</div>
+                                <div class="rx-vital-unit">/min</div>
+                            </div>
+                        }
+                        @if (_prescription.VitalSugar != null)
+                        {
+                            <div class="rx-vital-cell">
+                                <div class="rx-vital-label">SUGAR</div>
+                                <div class="rx-vital-value">@_prescription.VitalSugar?.ToString("F0")</div>
+                                <div class="rx-vital-unit">mg/dL</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- ── Obstetric History (Gynecology) ─── -->
+            @if (_prescription.ObstetricData is not null)
+            {
+                var obs = _prescription.ObstetricData;
+                var hasGpla = obs.Gravida.HasValue || obs.Para.HasValue || obs.Live.HasValue || obs.Abortion.HasValue;
+                <div class="rx-section">
+                    <div class="rx-section-title">🤱 OBSTETRIC HISTORY</div>
+                    @if (hasGpla)
+                    {
+                        <div class="rx-gpla">
+                            G@(obs.Gravida?.ToString() ?? "?") &nbsp; P@(obs.Para?.ToString() ?? "?") &nbsp; L@(obs.Live?.ToString() ?? "?") &nbsp; A@(obs.Abortion?.ToString() ?? "?")
+                        </div>
+                        <div class="rx-obs-grid">
+                            @if (obs.Gravida.HasValue)
+                            {
+                                <div class="rx-obs-cell"><div class="rx-obs-label">Gravida</div><div class="rx-obs-val">@obs.Gravida</div></div>
+                            }
+                            @if (obs.Para.HasValue)
+                            {
+                                <div class="rx-obs-cell"><div class="rx-obs-label">Para</div><div class="rx-obs-val">@obs.Para</div></div>
+                            }
+                            @if (obs.Live.HasValue)
+                            {
+                                <div class="rx-obs-cell"><div class="rx-obs-label">Live</div><div class="rx-obs-val">@obs.Live</div></div>
+                            }
+                            @if (obs.Abortion.HasValue)
+                            {
+                                <div class="rx-obs-cell"><div class="rx-obs-label">Abortion</div><div class="rx-obs-val">@obs.Abortion</div></div>
+                            }
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(obs.Information))
+                    {
+                        <div class="rx-obs-info">@obs.Information</div>
+                    }
+
+                    @if (obs.Lmp.HasValue || obs.EddByLmp.HasValue || obs.EddByUsg.HasValue)
+                    {
+                        <div style="margin-top:10px;display:flex;gap:24px;flex-wrap:wrap;padding:8px 0;border-top:1px solid #E2E8F0;">
+                            @if (obs.Lmp.HasValue)
+                            {
+                                <div>
+                                    <div style="font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">LMP</div>
+                                    <div style="font-size:12px;font-weight:700;color:#1E293B;">@obs.Lmp.Value.ToString("dd MMM yyyy")</div>
+                                </div>
+                            }
+                            @if (obs.EddByLmp.HasValue)
+                            {
+                                <div>
+                                    <div style="font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">EDD by LMP</div>
+                                    <div style="font-size:12px;font-weight:700;color:#1565C0;">@obs.EddByLmp.Value.ToString("dd MMM yyyy")</div>
+                                </div>
+                            }
+                            @if (obs.EddByUsg.HasValue)
+                            {
+                                <div>
+                                    <div style="font-size:9px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">EDD by USG</div>
+                                    <div style="font-size:12px;font-weight:700;color:#16A34A;">@obs.EddByUsg.Value.ToString("dd MMM yyyy")</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @if (obs.MenstrualHistory.Count > 0 || obs.PastMedicalHistory.Count > 0 || obs.FamilyHistory.Count > 0)
                 {
-                    <div>
-                        <div style="font-size:11px; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:8px;">Diagnosis</div>
-                        <div style="padding:14px 16px; background:#EFF6FF; border-radius:10px; border-left:4px solid #2563EB; font-size:14px; font-weight:600; color:#0F172A;">
-                            @_prescription.Diagnosis
+                    <div class="rx-section">
+                        <div class="rx-section-title">PATIENT HISTORY</div>
+                        <div class="rx-hist-grid">
+                            @if (obs.MenstrualHistory.Count > 0)
+                            {
+                                <div>
+                                    <div class="rx-hist-heading">Menstrual History</div>
+                                    @foreach (var h in obs.MenstrualHistory)
+                                    {
+                                        <div class="rx-hist-item">• @h</div>
+                                    }
+                                </div>
+                            }
+                            @if (obs.PastMedicalHistory.Count > 0)
+                            {
+                                <div>
+                                    <div class="rx-hist-heading">Past Medical History</div>
+                                    @foreach (var h in obs.PastMedicalHistory)
+                                    {
+                                        <div class="rx-hist-item">• @h</div>
+                                    }
+                                </div>
+                            }
+                            @if (obs.FamilyHistory.Count > 0)
+                            {
+                                <div>
+                                    <div class="rx-hist-heading">Family History</div>
+                                    @foreach (var h in obs.FamilyHistory)
+                                    {
+                                        <div class="rx-hist-item">• @h</div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
                 }
+            }
 
-                <!-- Vitals -->
-                @{
-                    var hasVitals = _prescription.VitalBP != null || _prescription.VitalPulse != null
-                                 || _prescription.VitalTemp != null || _prescription.VitalWeight != null
-                                 || _prescription.VitalSpO2 != null || _prescription.VitalRR != null
-                                 || _prescription.VitalSugar != null;
-                }
-                @if (hasVitals)
-                {
-                    <div>
-                        <div style="font-size:11px; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:8px;">Vitals at this Visit</div>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                            @if (_prescription.VitalBP != null)
-                            {
-                                <div style="padding:10px 14px; border-radius:10px; border:1px solid #E2E8F0; min-width:80px; text-align:center;">
-                                    <div style="font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px;">❤️ BP</div>
-                                    <div style="font-size:16px; font-weight:800; color:#EF4444;">@_prescription.VitalBP</div>
-                                    <div style="font-size:9px; color:#94A3B8;">mmHg</div>
-                                </div>
-                            }
-                            @if (_prescription.VitalPulse != null)
-                            {
-                                <div style="padding:10px 14px; border-radius:10px; border:1px solid #E2E8F0; min-width:80px; text-align:center;">
-                                    <div style="font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px;">💓 Pulse</div>
-                                    <div style="font-size:16px; font-weight:800; color:#F43F5E;">@_prescription.VitalPulse</div>
-                                    <div style="font-size:9px; color:#94A3B8;">bpm</div>
-                                </div>
-                            }
-                            @if (_prescription.VitalTemp != null)
-                            {
-                                <div style="padding:10px 14px; border-radius:10px; border:1px solid #E2E8F0; min-width:80px; text-align:center;">
-                                    <div style="font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px;">🌡️ Temp</div>
-                                    <div style="font-size:16px; font-weight:800; color:#D97706;">@_prescription.VitalTemp?.ToString("F1")</div>
-                                    <div style="font-size:9px; color:#94A3B8;">°F</div>
-                                </div>
-                            }
-                            @if (_prescription.VitalWeight != null)
-                            {
-                                <div style="padding:10px 14px; border-radius:10px; border:1px solid #E2E8F0; min-width:80px; text-align:center;">
-                                    <div style="font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px;">⚖️ Weight</div>
-                                    <div style="font-size:16px; font-weight:800; color:#2563EB;">@_prescription.VitalWeight?.ToString("F1")</div>
-                                    <div style="font-size:9px; color:#94A3B8;">kg</div>
-                                </div>
-                            }
-                            @if (_prescription.VitalSpO2 != null)
-                            {
-                                <div style="padding:10px 14px; border-radius:10px; border:1px solid #E2E8F0; min-width:80px; text-align:center;">
-                                    <div style="font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px;">🫁 SpO₂</div>
-                                    <div style="font-size:16px; font-weight:800; color:#16A34A;">@_prescription.VitalSpO2?.ToString("F1")</div>
-                                    <div style="font-size:9px; color:#94A3B8;">%</div>
-                                </div>
-                            }
-                            @if (_prescription.VitalRR != null)
-                            {
-                                <div style="padding:10px 14px; border-radius:10px; border:1px solid #E2E8F0; min-width:80px; text-align:center;">
-                                    <div style="font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px;">🫧 RR</div>
-                                    <div style="font-size:16px; font-weight:800; color:#0891B2;">@_prescription.VitalRR</div>
-                                    <div style="font-size:9px; color:#94A3B8;">/min</div>
-                                </div>
-                            }
-                            @if (_prescription.VitalSugar != null)
-                            {
-                                <div style="padding:10px 14px; border-radius:10px; border:1px solid #E2E8F0; min-width:80px; text-align:center;">
-                                    <div style="font-size:10px; color:#94A3B8; font-weight:600; margin-bottom:3px;">🩸 Sugar</div>
-                                    <div style="font-size:16px; font-weight:800; color:#7C3AED;">@_prescription.VitalSugar?.ToString("F0")</div>
-                                    <div style="font-size:9px; color:#94A3B8;">mg/dL</div>
-                                </div>
-                            }
-                        </div>
-                    </div>
-                }
+            <!-- ── Diagnosis ────────────────────── -->
+            @if (!string.IsNullOrEmpty(_prescription.Diagnosis))
+            {
+                <div class="rx-section">
+                    <div class="rx-section-title">DIAGNOSIS</div>
+                    <div class="rx-diagnosis">@_prescription.Diagnosis</div>
+                </div>
+            }
 
-                <!-- Medicines -->
-                @if (_prescription.Items.Count > 0)
-                {
-                    <div>
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-                            <div style="font-size:11px; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase;">℞ Medicines Prescribed</div>
-                            <span style="font-size:10px; font-weight:700; color:#2563EB; background:#EFF6FF; padding:2px 8px; border-radius:10px;">
-                                @_prescription.Items.Count drug@(_prescription.Items.Count != 1 ? "s" : "")
-                            </span>
-                        </div>
-                        <div style="border-radius:12px; border:1.5px solid #2563EB; overflow:hidden;">
+            <!-- ── Medicines ─────────────────────── -->
+            @if (_prescription.Items.Count > 0)
+            {
+                <div class="rx-section">
+                    <div class="rx-section-title rx-rx-title">℞ RX — MEDICINES PRESCRIBED</div>
+                    <table class="rx-table">
+                        <thead>
+                            <tr>
+                                <th class="rx-th-num">#</th>
+                                <th class="rx-th-med">Medicine</th>
+                                <th class="rx-th-dur">Duration</th>
+                                <th class="rx-th-inst">Instructions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
                             @for (var i = 0; i < _prescription.Items.Count; i++)
                             {
                                 var item = _prescription.Items[i];
-                                var isLast = i == _prescription.Items.Count - 1;
-                                var remark = GetRemark(item);
-                                <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:@(isLast ? "none" : "1px solid #E2E8F0"); background:@(i % 2 == 0 ? "#fff" : "#FAFAFA");">
-                                    <!-- Number circle -->
-                                    <div style="width:26px; height:26px; border-radius:8px; background:#EFF6FF; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#2563EB; flex-shrink:0; margin-top:1px;">
-                                        @(i + 1)
-                                    </div>
-                                    <div style="flex:1;">
-                                        <!-- Drug name line -->
-                                        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
-                                            <span style="font-size:14px; font-weight:700; color:#0F172A;">@item.MedicineName</span>
-                                            @if (!string.IsNullOrEmpty(item.Strength))
-                                            {
-                                                <span style="font-size:13px; font-weight:600; color:#334155;">@item.Strength</span>
-                                            }
-                                            <span style="font-size:10px; font-weight:700; color:#64748B; background:#F1F5F9; padding:2px 7px; border-radius:4px; text-transform:uppercase; letter-spacing:0.3px;">@item.MedicineForm</span>
-                                        </div>
-                                        <!-- Dosing details -->
-                                        <div style="font-size:12px; color:#64748B; margin-bottom:4px;">
-                                            @{
-                                                var doseParts = new List<string>();
-                                                if (!string.IsNullOrEmpty(item.Frequency)) doseParts.Add(item.Frequency);
-                                                doseParts.Add($"{item.DurationDays} days");
-                                                if (!string.IsNullOrEmpty(item.Timing)) doseParts.Add(item.Timing);
-                                                if (item.DosageMorning.HasValue || item.DosageAfternoon.HasValue || item.DosageEvening.HasValue || item.DosageNight.HasValue)
-                                                {
-                                                    var d = $"M:{item.DosageMorning ?? 0} A:{item.DosageAfternoon ?? 0} E:{item.DosageEvening ?? 0} N:{item.DosageNight ?? 0}";
-                                                    doseParts.Add(d);
-                                                }
-                                                doseParts.Add($"Qty: {item.Quantity} {item.DosageUnit}");
-                                            }
-                                            @string.Join(" · ", doseParts)
-                                        </div>
-                                        @if (!string.IsNullOrEmpty(item.Instructions))
+                                var instrText = GetInstructionText(item);
+                                <tr class="@(i % 2 == 1 ? "rx-tr-alt" : "")">
+                                    <td class="rx-td-num">@(i + 1)</td>
+                                    <td class="rx-td-med">
+                                        <div class="rx-med-name">@item.MedicineName @item.Strength</div>
+                                        <div class="rx-med-form">@item.MedicineForm</div>
+                                    </td>
+                                    <td class="rx-td-dur">@item.DurationDays days</td>
+                                    <td class="rx-td-inst">
+                                        <div>@instrText</div>
+                                        @if (!string.IsNullOrEmpty(item.Timing))
                                         {
-                                            <div style="font-size:11px; color:#92400E; background:#FFFBEB; padding:3px 8px; border-radius:5px; display:inline-block; margin-bottom:4px;">
-                                                📌 @item.Instructions
-                                            </div>
+                                            <div class="rx-timing">• @item.Timing</div>
                                         }
-                                        <!-- Remark -->
-                                        @if (!string.IsNullOrEmpty(remark))
-                                        {
-                                            <div style="font-size:12px; color:#2563EB; font-style:italic; padding:6px 10px; background:#EFF6FF; border-radius:6px; margin-top:4px;">
-                                                📝 @remark
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
+                                    </td>
+                                </tr>
                             }
-                        </div>
-                    </div>
-                }
+                        </tbody>
+                    </table>
+                </div>
+            }
 
-                <!-- Investigations -->
-                @if (_prescription.Investigations.Count > 0)
-                {
-                    <div>
-                        <div style="font-size:11px; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:8px;">🧪 Investigations Ordered</div>
-                        <div style="padding:12px 16px; background:#F5F3FF; border-radius:10px; border:1px solid #DDD6FE;">
-                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                                @foreach (var inv in _prescription.Investigations)
-                                {
-                                    <span style="padding:5px 12px; background:#fff; border:1.5px solid #DDD6FE; border-radius:18px; font-size:12px; font-weight:600; color:#7C3AED;">@inv</span>
-                                }
-                            </div>
-                        </div>
+            <!-- ── Investigations ────────────────── -->
+            @if (_prescription.Investigations.Count > 0)
+            {
+                <div class="rx-section">
+                    <div class="rx-inv-box">
+                        <div class="rx-section-title">🔬 INVESTIGATIONS ADVISED</div>
+                        <ol class="rx-inv-list">
+                            @foreach (var inv in _prescription.Investigations)
+                            {
+                                <li>@inv</li>
+                            }
+                        </ol>
                     </div>
-                }
+                </div>
+            }
 
-                <!-- Notes / Advice -->
-                @if (!string.IsNullOrEmpty(_prescription.Notes))
-                {
-                    <div>
-                        <div style="font-size:11px; font-weight:700; color:#64748B; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:8px;">📝 General Advice</div>
-                        <div style="padding:14px 16px; background:#FFFBEB; border-radius:10px; border:1px solid #FDE68A; font-size:13px; color:#92400E; line-height:1.6; font-style:italic;">
-                            @_prescription.Notes
-                        </div>
-                    </div>
-                }
+            <!-- ── General Advice ─────────────────── -->
+            @if (!string.IsNullOrEmpty(_prescription.Notes))
+            {
+                <div class="rx-section">
+                    <div class="rx-section-title">📝 GENERAL ADVICE</div>
+                    <div class="rx-notes">@_prescription.Notes</div>
+                </div>
+            }
 
-                <!-- Follow-up -->
+            <!-- ── Next Visit + Signature ─────────── -->
+            <div class="rx-bottom-row">
                 @if (_prescription.NextVisitDate.HasValue)
                 {
-                    <div style="padding:14px 16px; background:#ECFDF5; border-radius:10px; border:1px solid #A7F3D0; display:flex; align-items:center; gap:12px;">
-                        <span style="font-size:24px;">📅</span>
-                        <div>
-                            <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:0.4px;">Next Visit Scheduled</div>
-                            <div style="font-size:16px; font-weight:800; color:#0F172A; margin-top:2px;">
-                                @_prescription.NextVisitDate.Value.ToString("dddd, dd MMMM yyyy")
-                            </div>
-                        </div>
+                    <div class="rx-next-visit">
+                        <div class="rx-next-label">⏰ NEXT VISIT</div>
+                        <div class="rx-next-date">@_prescription.NextVisitDate.Value.ToString("ddd, dd MMMM yyyy")</div>
+                        <div class="rx-next-note">Please arrive 15 minutes prior with previous reports</div>
                     </div>
                 }
-
-                <!-- Signature area -->
-                <div style="display:flex; justify-content:flex-end; margin-top:16px; padding-top:24px; border-top:2px dashed #E2E8F0;">
-                    <div style="text-align:center; min-width:180px;">
-                        <div style="height:50px; border-bottom:1.5px solid #334155; margin-bottom:6px;"></div>
-                        <div style="font-size:12px; font-weight:700; color:#0F172A;">Dr. @_prescription.DoctorName</div>
-                        <div style="font-size:11px; color:#64748B;">Signature &amp; Stamp</div>
-                    </div>
+                else
+                {
+                    <div></div>
+                }
+                <div class="rx-signature">
+                    <div class="rx-sig-cursive">Dr. @(_prescription.DoctorName.Split(' ').LastOrDefault() ?? _prescription.DoctorName)</div>
+                    <div class="rx-sig-line"></div>
+                    <div class="rx-sig-name">Dr. @_prescription.DoctorName</div>
+                    @{
+                        var qual = _doctorProfile?.QualificationDetails;
+                        var spec = _doctorProfile?.SpecialityName;
+                        var qualLine = new List<string?> { qual, spec }.Where(s => !string.IsNullOrEmpty(s));
+                    }
+                    @if (qualLine.Any())
+                    {
+                        <div class="rx-sig-sub">@string.Join(" · ", qualLine)</div>
+                    }
+                    <div class="rx-sig-stamp">Signature &amp; Stamp</div>
                 </div>
             </div>
 
-            <!-- ── Footer ────────────────────────── -->
-            <div style="padding:16px 32px; background:#F8FAFC; border-top:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;" class="no-print">
-                <div style="font-size:11px; color:#94A3B8;">
-                    Generated @DateTime.Now.ToString("dd MMM yyyy, HH:mm") · @_prescription.PrescriptionNumber
-                </div>
-                <button @onclick="PrintPage"
-                        style="padding:8px 20px; border-radius:8px; background:#2563EB; color:#fff; border:none; font-size:12px; font-weight:700; cursor:pointer;">
-                    🖨️ Print
-                </button>
+            <!-- ── Disclaimer ───────────────────── -->
+            <div class="rx-disclaimer">
+                This prescription is computer-generated and digitally signed.
+                For emergencies, call @(_clinic?.ContactNumber ?? "the clinic") (24×7).
+                <br />
+                ⚠️ Self-medication can be harmful · Take medicines only as advised · Complete the full course
             </div>
+
+            <!-- ── Screen footer (hidden on print) ─ -->
+            <div class="no-print rx-screen-footer">
+                <span>Generated @DateTime.Now.ToString("dd MMM yyyy, HH:mm") · @_prescription.PrescriptionNumber</span>
+                <button @onclick="PrintPage" class="rx-print-btn">🖨️ Print</button>
+            </div>
+
         </div>
     </div>
 }
 
 <style>
+    /* ── Layout ───────────────────────────────────────── */
+    .rx-bg { background:#F0F4F8; min-height:calc(100vh - 44px); padding:28px 16px; }
+    .rx-sheet { max-width:860px; margin:0 auto; background:#fff; border-radius:4px;
+                box-shadow:0 2px 16px rgba(0,0,0,0.1); font-family:'Segoe UI',sans-serif; color:#111; }
+
+    /* ── Clinic + Doctor Header ───────────────────────── */
+    .rx-header { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 28px 14px; }
+    .rx-header-left { flex:1; }
+    .rx-header-right { text-align:right; flex-shrink:0; max-width:260px; }
+    .rx-clinic-name { font-size:22px; font-weight:800; color:#111; line-height:1.2; }
+    .rx-clinic-sub { font-size:11px; color:#555; margin-top:3px; line-height:1.4; }
+    .rx-doctor-name { font-size:15px; font-weight:700; color:#1565C0; }
+    .rx-doctor-sub { font-size:11px; color:#555; margin-top:2px; }
+    .rx-rule { border:none; border-top:1.5px solid #2563EB; margin:0 28px; }
+
+    /* ── Patient Strip ────────────────────────────────── */
+    .rx-patient-strip { display:grid; grid-template-columns:2fr 1fr 1.2fr 1.2fr;
+                        border-bottom:1px solid #E2E8F0; padding:10px 28px; gap:8px; }
+    .rx-ps-cell { padding:6px 0; }
+    .rx-ps-wide { }
+    .rx-ps-label { font-size:9px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:3px; }
+    .rx-ps-name { font-size:15px; font-weight:800; color:#0F172A; }
+    .rx-ps-value { font-size:14px; font-weight:700; color:#0F172A; }
+    .rx-ps-sub { font-size:11px; color:#64748B; margin-top:1px; }
+    .rx-uhid { color:#1565C0; }
+
+    /* ── Sections ─────────────────────────────────────── */
+    .rx-section { padding:12px 28px; border-bottom:1px solid #F1F5F9; }
+    .rx-section-title { font-size:10px; font-weight:700; color:#1565C0; text-transform:uppercase;
+                        letter-spacing:0.7px; margin-bottom:8px; }
+    .rx-rx-title { font-size:12px; }
+
+    /* ── Vitals ───────────────────────────────────────── */
+    .rx-vitals { display:flex; gap:0; border:1px solid #E2E8F0; border-radius:6px; overflow:hidden; }
+    .rx-vital-cell { flex:1; text-align:center; padding:8px 6px;
+                     border-right:1px solid #E2E8F0; }
+    .rx-vital-cell:last-child { border-right:none; }
+    .rx-vital-label { font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;
+                      letter-spacing:0.5px; margin-bottom:4px; }
+    .rx-vital-value { font-size:16px; font-weight:800; color:#1565C0; line-height:1; }
+    .rx-vital-unit { font-size:9px; color:#94A3B8; margin-top:3px; }
+
+    /* ── Obstetric History ───────────────────────────── */
+    .rx-gpla { font-size:16px; font-weight:800; color:#1565C0; letter-spacing:1px; margin-bottom:8px; }
+    .rx-obs-grid { display:flex; gap:0; border:1px solid #E2E8F0; border-radius:6px;
+                   overflow:hidden; margin-bottom:8px; width:fit-content; }
+    .rx-obs-cell { padding:7px 18px; border-right:1px solid #E2E8F0; text-align:center; }
+    .rx-obs-cell:last-child { border-right:none; }
+    .rx-obs-label { font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;
+                    letter-spacing:0.5px; margin-bottom:3px; }
+    .rx-obs-val { font-size:15px; font-weight:800; color:#0F172A; }
+    .rx-obs-info { font-size:12px; color:#374151; font-style:italic; }
+    .rx-hist-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .rx-hist-heading { font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;
+                       letter-spacing:0.5px; margin-bottom:5px; }
+    .rx-hist-item { font-size:12px; color:#0F172A; margin-bottom:3px; }
+
+    /* ── Diagnosis ────────────────────────────────────── */
+    .rx-diagnosis { font-size:14px; font-weight:600; color:#0F172A; }
+
+    /* ── Medicines Table ──────────────────────────────── */
+    .rx-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .rx-table thead tr { background:#F8FAFC; }
+    .rx-table th { text-align:left; padding:8px 10px; font-size:10px; font-weight:700; color:#64748B;
+                   text-transform:uppercase; letter-spacing:0.4px;
+                   border-bottom:1.5px solid #E2E8F0; border-top:1px solid #E2E8F0; }
+    .rx-th-num { width:32px; }
+    .rx-th-dur { width:80px; }
+    .rx-table td { padding:10px 10px; border-bottom:1px solid #F1F5F9; vertical-align:top; }
+    .rx-tr-alt td { background:#FAFAFA; }
+    .rx-td-num { font-weight:800; color:#1565C0; font-size:13px; }
+    .rx-med-name { font-size:13px; font-weight:700; color:#0F172A; }
+    .rx-med-form { font-size:10px; color:#64748B; margin-top:1px; }
+    .rx-td-inst { color:#374151; font-style:italic; font-size:12px; }
+    .rx-timing { font-size:11px; color:#1565C0; margin-top:3px; }
+
+    /* ── Investigations ───────────────────────────────── */
+    .rx-inv-box { background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:12px 16px; }
+    .rx-inv-list { margin:0; padding-left:18px; }
+    .rx-inv-list li { font-size:13px; color:#0F172A; margin-bottom:4px; font-weight:500; }
+
+    /* ── Notes ────────────────────────────────────────── */
+    .rx-notes { font-size:13px; color:#374151; line-height:1.6; }
+
+    /* ── Bottom row ───────────────────────────────────── */
+    .rx-bottom-row { display:flex; justify-content:space-between; align-items:flex-end;
+                     padding:16px 28px 12px; gap:24px; }
+    .rx-next-visit { background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px;
+                     padding:12px 16px; min-width:220px; }
+    .rx-next-label { font-size:10px; font-weight:700; color:#1565C0; text-transform:uppercase;
+                     letter-spacing:0.5px; margin-bottom:4px; }
+    .rx-next-date { font-size:15px; font-weight:800; color:#0F172A; }
+    .rx-next-note { font-size:10px; color:#64748B; margin-top:3px; }
+    .rx-signature { text-align:center; min-width:180px; }
+    .rx-sig-cursive { font-family:'Georgia',serif; font-size:20px; font-style:italic;
+                      color:#1565C0; margin-bottom:6px; }
+    .rx-sig-line { width:180px; border-bottom:1.5px solid #334155; margin:0 auto 6px; }
+    .rx-sig-name { font-size:12px; font-weight:700; color:#0F172A; }
+    .rx-sig-sub { font-size:10px; color:#64748B; margin-top:2px; }
+    .rx-sig-stamp { font-size:10px; color:#94A3B8; margin-top:2px; }
+
+    /* ── Disclaimer ───────────────────────────────────── */
+    .rx-disclaimer { text-align:center; font-size:10px; color:#94A3B8; padding:10px 28px 16px;
+                     border-top:1px solid #F1F5F9; line-height:1.6; }
+
+    /* ── Screen footer ────────────────────────────────── */
+    .rx-screen-footer { display:flex; justify-content:space-between; align-items:center;
+                        padding:12px 28px; background:#F8FAFC; border-top:1px solid #E2E8F0; }
+    .rx-screen-footer span { font-size:11px; color:#94A3B8; }
+    .rx-print-btn { padding:8px 20px; border-radius:8px; background:#1565C0; color:#fff;
+                    border:none; font-size:12px; font-weight:700; cursor:pointer; }
+
+    /* ── Hide-header helper ───────────────────────────── */
+    /* When "hide header on print" is active the header/rule have rx-no-print class */
+
+    /* ── Print overrides ──────────────────────────────── */
     @@media print {
-        .no-print { display: none !important; }
-        body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
-        div[style*="background:#F4F6FA"] { background: #fff !important; padding: 0 !important; }
-        div[style*="border-radius:16px"] { border-radius: 0 !important; box-shadow: none !important; max-width: none !important; }
+        .no-print { display:none !important; }
+        .rx-no-print { display:none !important; }
+        .rx-bg { background:#fff !important; padding:0 !important; min-height:unset; }
+        .rx-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; }
+        body { background:#fff !important; margin:0 !important; padding:0 !important; }
+        .rx-tr-alt td { background:#fff !important; }
     }
 </style>
 
@@ -334,66 +576,183 @@ else
     private bool _loading = true;
     private PrescriptionDto? _prescription;
     private PatientDto? _patient;
-    private string? _clinicName;
+    private ApplicationResponseDto? _clinic;
+    private DoctorProfileDto? _doctorProfile;
 
-    protected override async Task OnInitializedAsync()
+    private PrescriptionConfigDto? _config;
+
+    // OnAfterRenderAsync is the only safe place in Blazor WASM to call JS interop
+    // (localStorage) before firing authenticated API calls. Parent OnInitializedAsync
+    // tasks can still be in-flight when a child OnInitializedAsync starts, causing 401s.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender) return;
         try
         {
-            var r = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
-            if (r.Success && r.Data is not null)
+            await AuthState.InitializeAsync();
+            await ClinicContext.InitializeAsync();
+            await LoadPrescription();
+            await Task.WhenAll(LoadClinic(), LoadConfig());
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPrescription()
+    {
+        var r = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
+        if (r.Success && r.Data is not null)
+        {
+            _prescription = r.Data;
+
+            var patientTask = _prescription.PatientId != Guid.Empty
+                ? ClinicClient.GetPatientByIdAsync(_prescription.PatientId)
+                : Task.FromResult(new ApiResponse<PatientDto>());
+            var doctorTask = DoctorProfileClient.GetMyProfileAsync();
+
+            await Task.WhenAll(patientTask, doctorTask);
+
+            var pr = await patientTask;
+            if (pr.Success && pr.Data is not null) _patient = pr.Data;
+
+            var dr = await doctorTask;
+            if (dr.Success && dr.Data is not null) _doctorProfile = dr.Data;
+        }
+    }
+
+    private async Task LoadClinic()
+    {
+        var clinicId = ClinicContext.SelectedApplicationId != Guid.Empty
+            ? ClinicContext.SelectedApplicationId
+            : _prescription?.ApplicationId ?? Guid.Empty;
+        if (clinicId == Guid.Empty) return;
+        var cr = await AppClient.GetApplicationByIdAsync(clinicId);
+        if (cr.Success && cr.Data is not null) _clinic = cr.Data;
+    }
+
+    private async Task LoadConfig()
+    {
+        var cfgR = await PrescriptionClient.GetPrescriptionConfigAsync();
+        if (cfgR.Success && cfgR.Data is not null)
+        {
+            _config = cfgR.Data;
+            var c = _config;
+            if (c.PrintMarginTop != 0 || c.PrintMarginRight != 0 || c.PrintMarginBottom != 0 || c.PrintMarginLeft != 0)
             {
-                _prescription = r.Data;
-
-                // Load patient for age/gender
-                if (_prescription.PatientId != Guid.Empty)
-                {
-                    var pr = await ClinicClient.GetPatientByIdAsync(_prescription.PatientId);
-                    if (pr.Success) _patient = pr.Data;
-                }
-
-                // Try to get clinic name from OPD
-                if (_prescription.OpdRegistrationId != Guid.Empty)
-                {
-                    var opdR = await ClinicClient.GetOpdRegistrationByIdAsync(_prescription.OpdRegistrationId);
-                    if (opdR.Success && opdR.Data is not null)
-                        _clinicName = null; // populate from clinic settings if available
-                }
+                var marginCss = $"@page{{margin:{c.PrintMarginTop}mm {c.PrintMarginRight}mm {c.PrintMarginBottom}mm {c.PrintMarginLeft}mm;}}";
+                await JS.InvokeVoidAsync("eval",
+                    "(function(){" +
+                    "var e=document.getElementById('_rxps');" +
+                    "if(!e){e=document.createElement('style');e.id='_rxps';document.head.appendChild(e);}" +
+                    $"e.textContent='{marginCss}';" +
+                    "})()");
             }
         }
-        finally { _loading = false; }
     }
 
     private async Task PrintPage() => await JS.InvokeVoidAsync("window.print");
 
-    private string GetRemark(PrescriptionItemDto item)
+    // Pick the remark in the clinic's configured language.
+    // Falls back: configured language → English remark → auto-generated text in configured language.
+    private string GetInstructionText(PrescriptionItemDto item)
     {
-        // Return English remark; fall back to generating one
-        if (!string.IsNullOrWhiteSpace(item.RemarkEnglish)) return item.RemarkEnglish;
+        var lang = _config?.DefaultLanguage ?? PrescriptionLanguage.English;
 
-        var freq = item.Frequency;
-        var timing = item.Timing;
-        var duration = $"{item.DurationDays} days";
-        var form = item.MedicineForm;
-        var unit = form is MedicineFormType.Tab ? "tablet" : form is MedicineFormType.Capsule ? "capsule" : form is MedicineFormType.Syrup ? "ml" : "unit";
-        var freqEn = freq switch
+        var stored = lang switch
         {
-            "OD" => "once a day", "BD" => "twice a day", "TDS" => "three times a day",
-            "QID" => "four times a day", "HS" => "at bedtime", "SOS" => "when required",
-            "OW" => "once weekly", "BW" => "twice weekly", _ => freq ?? ""
+            PrescriptionLanguage.Marathi => item.RemarkMarathi,
+            PrescriptionLanguage.Hindi   => item.RemarkHindi,
+            _                            => item.RemarkEnglish
         };
-        var timingEn = timing switch
+        if (!string.IsNullOrWhiteSpace(stored)) return stored;
+
+        // Fall back to English remark if the target language remark was not saved
+        if (!string.IsNullOrWhiteSpace(item.RemarkEnglish) && lang == PrescriptionLanguage.English)
+            return item.RemarkEnglish;
+
+        // Auto-generate in the configured language
+        return lang switch
         {
-            "Morning" => "in the morning", "Night" => "at night",
-            "After meals" => "after meals", "Before meals" => "before meals",
-            "Morning & Night" => "morning and night", "Empty stomach" => "on empty stomach",
-            _ => timing?.ToLower() ?? ""
+            PrescriptionLanguage.Marathi => BuildMarathiRemark(item),
+            PrescriptionLanguage.Hindi   => BuildHindiRemark(item),
+            _                            => BuildEnglishRemark(item)
+        };
+    }
+
+    private static string BuildEnglishRemark(PrescriptionItemDto item)
+    {
+        var unit = item.MedicineForm switch
+        {
+            MedicineFormType.Tab     => "tablet",
+            MedicineFormType.Capsule => "capsule",
+            MedicineFormType.Syrup   => "ml",
+            _                        => "unit"
+        };
+        var freq = item.Frequency switch
+        {
+            "OD"  => "once a day",       "BD"  => "twice a day",
+            "TDS" => "three times a day","QID" => "four times a day",
+            "HS"  => "at bedtime",       "SOS" => "when required",
+            "OW"  => "once weekly",      "BW"  => "twice weekly",
+            _     => item.Frequency ?? ""
         };
         var parts = new List<string> { $"Take 1 {unit}" };
-        if (!string.IsNullOrEmpty(freqEn)) parts.Add(freqEn);
-        if (!string.IsNullOrEmpty(timingEn)) parts.Add(timingEn);
-        if (!string.IsNullOrEmpty(duration)) parts.Add($"for {duration}");
+        if (!string.IsNullOrEmpty(freq)) parts.Add(freq);
+        if (!string.IsNullOrEmpty(item.Timing)) parts.Add(item.Timing.ToLower());
+        parts.Add($"for {item.DurationDays} days");
         if (!string.IsNullOrEmpty(item.Instructions)) parts.Add(item.Instructions);
         return string.Join(", ", parts);
     }
+
+    private static string BuildHindiRemark(PrescriptionItemDto item)
+    {
+        var unit = item.MedicineForm switch
+        {
+            MedicineFormType.Tab     => "गोली",
+            MedicineFormType.Capsule => "कैप्सूल",
+            MedicineFormType.Syrup   => "मिली",
+            _                        => "यूनिट"
+        };
+        var freq = item.Frequency switch
+        {
+            "OD"  => "दिन में एक बार",   "BD"  => "दिन में दो बार",
+            "TDS" => "दिन में तीन बार",  "QID" => "दिन में चार बार",
+            "HS"  => "सोते समय",          "SOS" => "जरूरत पड़ने पर",
+            "OW"  => "हफ्ते में एक बार", "BW"  => "हफ्ते में दो बार",
+            _     => item.Frequency ?? ""
+        };
+        var parts = new List<string> { $"1 {unit} लें" };
+        if (!string.IsNullOrEmpty(freq)) parts.Add(freq);
+        parts.Add($"{item.DurationDays} दिनों के लिए");
+        if (!string.IsNullOrEmpty(item.Instructions)) parts.Add(item.Instructions);
+        return string.Join(", ", parts);
+    }
+
+    private static string BuildMarathiRemark(PrescriptionItemDto item)
+    {
+        var unit = item.MedicineForm switch
+        {
+            MedicineFormType.Tab     => "गोळी",
+            MedicineFormType.Capsule => "कॅप्सूल",
+            MedicineFormType.Syrup   => "मिली",
+            _                        => "युनिट"
+        };
+        var freq = item.Frequency switch
+        {
+            "OD"  => "दिवसातून एकदा",    "BD"  => "दिवसातून दोनदा",
+            "TDS" => "दिवसातून तीनदा",   "QID" => "दिवसातून चारदा",
+            "HS"  => "झोपताना",           "SOS" => "गरज असेल तेव्हा",
+            "OW"  => "आठवड्यातून एकदा", "BW"  => "आठवड्यातून दोनदा",
+            _     => item.Frequency ?? ""
+        };
+        var parts = new List<string> { $"1 {unit} घ्या" };
+        if (!string.IsNullOrEmpty(freq)) parts.Add(freq);
+        parts.Add($"{item.DurationDays} दिवसांसाठी");
+        if (!string.IsNullOrEmpty(item.Instructions)) parts.Add(item.Instructions);
+        return string.Join(", ", parts);
+    }
+
 }
