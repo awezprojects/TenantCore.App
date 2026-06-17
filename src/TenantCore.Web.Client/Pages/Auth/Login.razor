@@ -1,3 +1,4 @@
+@page "/"
 @page "/auth/login"
 @layout AuthLayout
 @inject IAuthApiClient AuthClient
@@ -5,116 +6,94 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
-<PageTitle>Sign In - TenantCore</PageTitle>
+<PageTitle>Sign In — ClinicCore</PageTitle>
 
-<MudGrid Justify="Justify.Center" Style="min-height: 100vh; margin: 0;">
-    <MudItem xs="12" sm="10" md="8" lg="6" xl="4">
-        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="background: white;">
-            <!-- Logo & Header -->
-            <MudStack AlignItems="AlignItems.Center" Class="mb-6">
-                <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 80px; height: 80px;">
-                    <MudIcon Icon="@Icons.Material.Filled.Business" Style="font-size: 2.5rem;" />
-                </MudAvatar>
-                <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600; color: #1a1a2e;">
-                    TenantCore
-                </MudText>
-                <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Filled">WebAssembly</MudChip>
-                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
-                    Sign in to your account to continue
-                </MudText>
-            </MudStack>
+<div class="auth-brand">
+    <MudAvatar Size="Size.Small" Color="Color.Primary">
+        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
+    </MudAvatar>
+    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+</div>
 
-            <EditForm Model="_loginModel" OnValidSubmit="HandleLogin">
-                <DataAnnotationsValidator />
+<MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Log in to your Account</MudText>
+<MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">Welcome back! Enter your credentials to continue.</MudText>
 
-                <MudTextField @bind-Value="_loginModel.EmailId"
-                              Label="Email Address"
-                              Variant="Variant.Outlined"
-                              InputType="InputType.Email"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Email"
-                              Class="mb-4"
-                              For="@(() => _loginModel.EmailId)"
-                              Disabled="_loading"
-                              Placeholder="you@example.com" />
+<EditForm Model="_loginModel" OnValidSubmit="HandleLogin">
+    <DataAnnotationsValidator />
 
-                <MudTextField @bind-Value="_loginModel.Password"
-                              Label="Password"
-                              Variant="Variant.Outlined"
-                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                              Adornment="Adornment.End"
-                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                              OnAdornmentClick="@(() => _showPassword = !_showPassword)"
-                              Class="mb-2"
-                              For="@(() => _loginModel.Password)"
-                              Disabled="_loading"
-                              Placeholder="Enter your password" />
+    <MudTextField @bind-Value="_loginModel.EmailId"
+                  Label="Email Address"
+                  Variant="Variant.Outlined"
+                  InputType="InputType.Email"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Email"
+                  Class="mb-4"
+                  For="@(() => _loginModel.EmailId)"
+                  Disabled="_loading"
+                  Placeholder="you@example.com" />
 
-                <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-4">
-                    <MudLink Href="/auth/forgot-password" Typo="Typo.body2" Color="Color.Primary">
-                        Forgot password?
-                    </MudLink>
-                </MudStack>
+    <MudTextField @bind-Value="_loginModel.Password"
+                  Label="Password"
+                  Variant="Variant.Outlined"
+                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                  Adornment="Adornment.End"
+                  AdornmentIcon="@(_showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                  OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                  Class="mb-2"
+                  For="@(() => _loginModel.Password)"
+                  Disabled="_loading"
+                  Placeholder="Enter your password" />
 
-                @if (!string.IsNullOrEmpty(_errorMessage))
-                {
-                    <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
-                        @_errorMessage
-                    </MudAlert>
-                }
+    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-4">
+        <MudLink Href="/auth/forgot-password" Typo="Typo.body2" Color="Color.Primary" Style="font-weight: 600;">
+            Forgot Password?
+        </MudLink>
+    </MudStack>
 
-                <MudButton ButtonType="ButtonType.Submit"
-                           Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           FullWidth="true"
-                           Size="Size.Large"
-                           Disabled="_loading"
-                           Class="mb-4"
-                           Style="height: 48px; font-size: 1rem; text-transform: none;">
-                    @if (_loading)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
-                        <span>Signing In...</span>
-                    }
-                    else
-                    {
-                        <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
-                        <span>Sign In</span>
-                    }
-                </MudButton>
-            </EditForm>
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
+            @_errorMessage
+        </MudAlert>
+    }
 
-            <MudStack AlignItems="AlignItems.Center" Class="my-4">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">OR</MudText>
-            </MudStack>
+    <MudButton ButtonType="ButtonType.Submit"
+               Variant="Variant.Filled"
+               Color="Color.Primary"
+               FullWidth="true"
+               Size="Size.Large"
+               Disabled="_loading"
+               Class="mb-4"
+               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
+        @if (_loading)
+        {
+            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+            <span>Signing In...</span>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
+            <span>Sign In</span>
+        }
+    </MudButton>
+</EditForm>
 
-            <MudStack AlignItems="AlignItems.Center" Spacing="2">
-                <MudText Typo="Typo.body2">
-                    Don't have an account?
-                    <MudLink Href="/auth/register" Color="Color.Primary" Typo="Typo.body2" Style="font-weight: 600;">
-                        Create one
-                    </MudLink>
-                </MudText>
-                <MudText Typo="Typo.body2">
-                    Need to verify your email?
-                    <MudLink Href="/auth/resend-verification" Color="Color.Secondary" Typo="Typo.body2">
-                        Resend verification
-                    </MudLink>
-                </MudText>
-            </MudStack>
+<MudDivider Class="my-4" />
 
-            <!-- Footer -->
-            <MudStack AlignItems="AlignItems.Center" Class="mt-6">
-                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
-                    <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" Color="Color.Secondary" />
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                        Protected by enterprise-grade security
-                    </MudText>
-                </MudStack>
-            </MudStack>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+<MudStack AlignItems="AlignItems.Center" Spacing="2">
+    <MudText Typo="Typo.body2">
+        Don't have an account?
+        <MudLink Href="/auth/register" Color="Color.Primary" Typo="Typo.body2" Style="font-weight: 600;">
+            Create one
+        </MudLink>
+    </MudText>
+    <MudText Typo="Typo.body2">
+        Need to verify your email?
+        <MudLink Href="/auth/resend-verification" Color="Color.Secondary" Typo="Typo.body2">
+            Resend verification
+        </MudLink>
+    </MudText>
+</MudStack>
 
 @code {
     [SupplyParameterFromQuery]
@@ -186,7 +165,6 @@
         catch (Exception ex)
         {
             _errorMessage = "An unexpected error occurred. Please try again.";
-            Console.WriteLine($"Login error: {ex.Message}");
         }
         finally
         {
@@ -201,8 +179,9 @@
             try
             {
                 var decodedUrl = Uri.UnescapeDataString(ReturnUrl);
-                // Don't loop back to login
-                if (!decodedUrl.StartsWith("/auth/login", StringComparison.OrdinalIgnoreCase))
+                // Only allow same-app relative paths; reject external URLs and protocol-relative references
+                if (decodedUrl.StartsWith("/") && !decodedUrl.StartsWith("//")
+                    && !decodedUrl.StartsWith("/auth/login", StringComparison.OrdinalIgnoreCase))
                 {
                     NavigationManager.NavigateTo(decodedUrl);
                     return;

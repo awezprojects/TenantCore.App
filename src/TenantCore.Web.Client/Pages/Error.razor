@@ -1,29 +1,45 @@
 @page "/error"
 @layout AuthLayout
 
-<PageTitle>Error - TenantCore</PageTitle>
+<PageTitle>Error — ClinicCore</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
-    <MudPaper Elevation="4" Class="pa-8">
-        <MudStack AlignItems="AlignItems.Center" Spacing="4">
-            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Style="font-size: 4rem;" />
-            <MudText Typo="Typo.h4">Something went wrong</MudText>
-            <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
-                An unexpected error has occurred. Please try again later.
-            </MudText>
-            <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true))">
-                    <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-1" />
-                    Reload Page
-                </MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/select-clinic">
-                    <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-1" />
-                    Go to Home
-                </MudButton>
-            </MudStack>
-        </MudStack>
-    </MudPaper>
-</MudContainer>
+<div class="auth-brand">
+    <MudAvatar Size="Size.Small" Color="Color.Primary">
+        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
+    </MudAvatar>
+    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+</div>
+
+<MudStack AlignItems="AlignItems.Center" Class="mb-5">
+    <MudIcon Icon="@Icons.Material.Filled.CloudOff"
+             Style="font-size: 6rem; color: #EF4444; display: block;" />
+</MudStack>
+
+<MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Something Went Wrong</MudText>
+<MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">
+    An unexpected error has occurred. Please try refreshing or go back to the home screen.
+</MudText>
+
+<div style="display: flex; gap: 12px; margin-bottom: 1.5rem;">
+    <MudButton Variant="Variant.Outlined"
+               Color="Color.Primary"
+               Style="flex: 1; height: 44px; text-transform: none; border-radius: 8px;"
+               OnClick="@(() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true))">
+        <MudIcon Icon="@Icons.Material.Filled.Refresh" Class="mr-1" />
+        Reload Page
+    </MudButton>
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               Style="flex: 1; height: 44px; text-transform: none; border-radius: 8px;"
+               Href="/select-clinic">
+        <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-1" />
+        Go to Home
+    </MudButton>
+</div>
+
+<MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
+    Error code: 500 · Contact support if this persists.
+</MudText>
 
 @code {
     [Inject]

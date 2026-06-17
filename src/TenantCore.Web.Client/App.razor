@@ -8,21 +8,32 @@
         </Found>
         <NotFound>
             <LayoutView Layout="typeof(AuthLayout)">
-                <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
-                    <MudPaper Elevation="4" Class="pa-8">
-                        <MudStack AlignItems="AlignItems.Center" Spacing="4">
-                            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Color="Color.Warning" Style="font-size: 4rem;" />
-                            <MudText Typo="Typo.h4">Page Not Found</MudText>
-                            <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
-                                The page you're looking for doesn't exist or has been moved.
-                            </MudText>
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/select-clinic"
-                                       StartIcon="@Icons.Material.Filled.Home">
-                                Go to Home
-                            </MudButton>
-                        </MudStack>
-                    </MudPaper>
-                </MudContainer>
+                <div class="auth-brand">
+                    <MudAvatar Size="Size.Small" Color="Color.Primary">
+                        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+                </div>
+
+                <MudStack AlignItems="AlignItems.Center" Class="mb-5">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff"
+                             Style="font-size: 6rem; color: #F59E0B; display: block;" />
+                </MudStack>
+
+                <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Page Not Found</MudText>
+                <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">
+                    The page you're looking for doesn't exist or has been moved.
+                </MudText>
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Href="/select-clinic"
+                           Size="Size.Large"
+                           Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" />
+                    Go to Home
+                </MudButton>
             </LayoutView>
         </NotFound>
     </Router>

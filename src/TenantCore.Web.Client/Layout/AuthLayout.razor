@@ -5,51 +5,274 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
-    <MudMainContent Class="auth-layout">
-        <div class="auth-background">
-            <div class="auth-overlay"></div>
-            <MudContainer MaxWidth="MaxWidth.False" Class="auth-container">
-                @Body
-            </MudContainer>
+<div class="auth-shell">
+    <div class="auth-left">
+        <div class="auth-form-body">
+            @Body
         </div>
-    </MudMainContent>
-</MudLayout>
+    </div>
+
+    <div class="auth-right">
+        <div class="auth-ring auth-ring-outer"></div>
+        <div class="auth-ring auth-ring-mid"></div>
+        <div class="auth-ring auth-ring-inner"></div>
+
+        <div class="auth-illustration">
+            <div class="auth-hub">
+                <MudIcon Icon="@Icons.Material.Filled.LocalHospital" Style="color: #1a56db; font-size: 2.2rem;" />
+            </div>
+            <div class="auth-orbit auth-orbit-1">
+                <MudIcon Icon="@Icons.Material.Filled.People" Style="color: #1a56db; font-size: 1.4rem;" />
+            </div>
+            <div class="auth-orbit auth-orbit-2">
+                <MudIcon Icon="@Icons.Material.Filled.Medication" Style="color: #1a56db; font-size: 1.4rem;" />
+            </div>
+            <div class="auth-orbit auth-orbit-3">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Style="color: #1a56db; font-size: 1.4rem;" />
+            </div>
+            <div class="auth-dashboard-card">
+                <div class="auth-skeleton-row">
+                    <div class="auth-avatar-sm"></div>
+                    <div style="flex:1">
+                        <div class="auth-skeleton-bar" style="width:80%;margin-bottom:4px;"></div>
+                        <div class="auth-skeleton-bar" style="width:50%;"></div>
+                    </div>
+                </div>
+                <div class="auth-skeleton-row">
+                    <div class="auth-avatar-sm"></div>
+                    <div style="flex:1">
+                        <div class="auth-skeleton-bar" style="width:70%;margin-bottom:4px;"></div>
+                        <div class="auth-skeleton-bar" style="width:40%;"></div>
+                    </div>
+                </div>
+                <div class="auth-skeleton-row">
+                    <div class="auth-avatar-sm"></div>
+                    <div style="flex:1">
+                        <div class="auth-skeleton-bar" style="width:75%;margin-bottom:4px;"></div>
+                        <div class="auth-skeleton-bar" style="width:55%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="auth-tagline">
+            <h2 class="auth-tagline-title">Manage Your Clinic Brilliantly.</h2>
+            <p class="auth-tagline-sub">Patients, prescriptions, and reports — all in one seamless platform.</p>
+        </div>
+
+        <div class="auth-dots">
+            <span class="auth-dot auth-dot-active"></span>
+            <span class="auth-dot"></span>
+            <span class="auth-dot"></span>
+        </div>
+    </div>
+</div>
 
 <style>
-    .auth-layout {
+    /* ================================================================
+       AUTH SHELL — Split-panel layout
+    ================================================================ */
+    .auth-shell {
+        display: flex;
+        flex-direction: row;
         min-height: 100vh;
-        padding: 0 !important;
+        background: #F9FAFB;
     }
 
-    .auth-background {
-        min-height: 100vh;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        position: relative;
+    /* ---- Left panel (form) --------------------------------------- */
+    .auth-left {
+        flex: 0 0 45%;
+        background: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
+        padding: 3rem 4rem;
+        overflow-y: auto;
     }
 
-    .auth-overlay {
+    .auth-form-body {
+        width: 100%;
+        max-width: 400px;
+    }
+
+    /* ---- Brand area — shared by all auth pages ------------------- */
+    .auth-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 2rem;
+    }
+
+    /* ---- Right panel (clinic branding) -------------------------- */
+    .auth-right {
+        flex: 1;
+        background: #1a56db;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem 3rem;
+    }
+
+    /* ---- Decorative rings --------------------------------------- */
+    .auth-ring {
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></svg>');
-        background-size: 50px 50px;
-        opacity: 0.5;
+        border-radius: 50%;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
     }
 
-    .auth-container {
+    .auth-ring-outer {
+        width: 520px;
+        height: 520px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .auth-ring-mid {
+        width: 380px;
+        height: 380px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    .auth-ring-inner {
+        width: 240px;
+        height: 240px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    /* ---- Illustration ------------------------------------------- */
+    .auth-illustration {
         position: relative;
+        width: 340px;
+        height: 240px;
+        margin-bottom: 2.5rem;
         z-index: 1;
+    }
+
+    .auth-hub {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 100vh;
-        padding: 2rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .auth-orbit {
+        position: absolute;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .auth-orbit-1 { top: 16px; left: 24px; }
+    .auth-orbit-2 { top: 50%; left: -4px; transform: translateY(-50%); }
+    .auth-orbit-3 { bottom: 16px; right: 24px; }
+
+    /* ---- Dashboard card mock ------------------------------------ */
+    .auth-dashboard-card {
+        position: absolute;
+        right: -16px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 176px;
+        background: white;
+        border-radius: 12px;
+        padding: 14px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .auth-skeleton-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .auth-skeleton-row:last-child { margin-bottom: 0; }
+
+    .auth-avatar-sm {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #E5E7EB;
+        flex-shrink: 0;
+    }
+
+    .auth-skeleton-bar {
+        height: 8px;
+        background: #E5E7EB;
+        border-radius: 4px;
+    }
+
+    /* ---- Tagline ----------------------------------------------- */
+    .auth-tagline {
+        text-align: center;
+        z-index: 1;
+        position: relative;
+        max-width: 320px;
+    }
+
+    .auth-tagline-title {
+        color: white;
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        line-height: 1.3;
+    }
+
+    .auth-tagline-sub {
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 0.9rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    /* ---- Pagination dots --------------------------------------- */
+    .auth-dots {
+        display: flex;
+        gap: 8px;
+        margin-top: 2rem;
+        z-index: 1;
+        position: relative;
+    }
+
+    .auth-dot {
+        display: block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.4);
+    }
+
+    .auth-dot-active {
+        width: 24px;
+        border-radius: 4px;
+        background: white;
+    }
+
+    /* ================================================================
+       RESPONSIVE — hide right panel on small screens
+    ================================================================ */
+    @@media (max-width: 768px) {
+        .auth-shell { flex-direction: column; }
+        .auth-right { display: none; }
+        .auth-left { flex: 1; padding: 2rem 1.5rem; }
     }
 </style>
 

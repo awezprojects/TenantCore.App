@@ -4,92 +4,93 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
-<PageTitle>Resend Verification - TenantCore</PageTitle>
+<PageTitle>Resend Verification — ClinicCore</PageTitle>
 
-<MudGrid Justify="Justify.Center" Style="min-height: 100vh; margin: 0;">
-    <MudItem xs="12" sm="10" md="8" lg="6" xl="4">
-        <MudPaper Elevation="8" Class="pa-8 rounded-lg" Style="background: white;">
-            <MudStack AlignItems="AlignItems.Center" Class="mb-6">
-                <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 80px; height: 80px;">
-                    <MudIcon Icon="@Icons.Material.Filled.Email" Style="font-size: 2.5rem;" />
-                </MudAvatar>
-                <MudText Typo="Typo.h4" Align="Align.Center" Class="mt-4" Style="font-weight: 600;">
-                    Resend Verification
-                </MudText>
-                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
-                    Enter your email to receive a new verification link
-                </MudText>
-            </MudStack>
+<div class="auth-brand">
+    <MudAvatar Size="Size.Small" Color="Color.Primary">
+        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
+    </MudAvatar>
+    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+</div>
 
-            @if (_sent)
+@if (_sent)
+{
+    <MudStack AlignItems="AlignItems.Center" Class="mb-6">
+        <MudIcon Icon="@Icons.Material.Filled.MarkEmailRead"
+                 Style="font-size: 5rem; color: #22C55E; display: block;" />
+    </MudStack>
+
+    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Verification Email Sent!</MudText>
+    <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">
+        Please check your inbox and click the verification link.
+    </MudText>
+
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               FullWidth="true"
+               Href="/auth/login"
+               Size="Size.Large"
+               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
+        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-2" />
+        Back to Login
+    </MudButton>
+}
+else
+{
+    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Resend Verification Email</MudText>
+    <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">
+        Enter your email address to receive a new verification link.
+    </MudText>
+
+    <EditForm Model="_model" OnValidSubmit="HandleResend">
+        <DataAnnotationsValidator />
+
+        <MudTextField @bind-Value="_model.EmailId"
+                      Label="Email Address"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Email"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Email"
+                      For="@(() => _model.EmailId)"
+                      Disabled="_loading"
+                      Class="mb-4"
+                      Placeholder="you@example.com" />
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
+                @_errorMessage
+            </MudAlert>
+        }
+
+        <MudButton ButtonType="ButtonType.Submit"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   FullWidth="true"
+                   Size="Size.Large"
+                   Disabled="_loading"
+                   Class="mb-4"
+                   Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
+            @if (_loading)
             {
-                <MudAlert Severity="Severity.Success" Class="mb-4" Variant="Variant.Filled">
-                    <MudStack Spacing="2">
-                        <MudText Typo="Typo.body1">Verification email sent!</MudText>
-                        <MudText Typo="Typo.body2">
-                            Please check your inbox and click the verification link.
-                        </MudText>
-                    </MudStack>
-                </MudAlert>
-
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Href="/auth/login"
-                           Class="mt-4" Style="height: 48px;">
-                    Back to Login
-                </MudButton>
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                <span>Sending...</span>
             }
             else
             {
-                <EditForm Model="_model" OnValidSubmit="HandleResend">
-                    <DataAnnotationsValidator />
-
-                    <MudTextField @bind-Value="_model.EmailId"
-                                  Label="Email Address"
-                                  Variant="Variant.Outlined"
-                                  InputType="InputType.Email"
-                                  Adornment="Adornment.Start"
-                                  AdornmentIcon="@Icons.Material.Filled.Email"
-                                  For="@(() => _model.EmailId)"
-                                  Disabled="_loading"
-                                  Class="mb-4" />
-
-                    @if (!string.IsNullOrEmpty(_errorMessage))
-                    {
-                        <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
-                            @_errorMessage
-                        </MudAlert>
-                    }
-
-                    <MudButton ButtonType="ButtonType.Submit"
-                               Variant="Variant.Filled"
-                               Color="Color.Primary"
-                               FullWidth="true"
-                               Size="Size.Large"
-                               Disabled="_loading"
-                               Class="mb-4"
-                               Style="height: 48px;">
-                        @if (_loading)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
-                            <span>Sending...</span>
-                        }
-                        else
-                        {
-                            <MudIcon Icon="@Icons.Material.Filled.Send" Class="mr-2" />
-                            <span>Send Verification Email</span>
-                        }
-                    </MudButton>
-                </EditForm>
-
-                <MudStack AlignItems="AlignItems.Center">
-                    <MudButton Variant="Variant.Text" Color="Color.Secondary" Href="/auth/login">
-                        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-1" />
-                        Back to Login
-                    </MudButton>
-                </MudStack>
+                <MudIcon Icon="@Icons.Material.Filled.Send" Class="mr-2" />
+                <span>Send Verification Email</span>
             }
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+        </MudButton>
+    </EditForm>
+
+    <MudStack AlignItems="AlignItems.Center">
+        <MudLink Href="/auth/login" Typo="Typo.body2" Color="Color.Secondary">
+            <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Style="font-size: 1rem; vertical-align: middle; margin-right: 4px;" />
+            Back to Login
+        </MudLink>
+    </MudStack>
+}
 
 @code {
     private ResendEmailVerificationRequestDto _model = new();
@@ -118,7 +119,6 @@
         catch (Exception ex)
         {
             _errorMessage = "An unexpected error occurred. Please try again.";
-            Console.WriteLine($"Resend error: {ex.Message}");
         }
         finally
         {

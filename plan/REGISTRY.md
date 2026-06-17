@@ -48,6 +48,7 @@ This table is the fastest way for the plan command to check "does this already e
 | lmp-edd-pregnancy-tenure | 2026-06-16 | 2026-06-16 | PregnancyTenure | PregnancyTenures | 18 | 8 |
 | patient-lmp-tenure-view | 2026-06-16 | 2026-06-16 | — | — | 3 | 8 |
 | remove-old-unused-pages | 2026-06-17 | 2026-06-17 | — | — | 0 (9 deleted) | 4 |
+| auth-screens-redesign | 2026-06-18 | 2026-06-18 | — | — | 0 | 9 |
 
 ---
 
