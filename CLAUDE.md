@@ -19,7 +19,7 @@ Wrapper API + Blazor WebAssembly frontend that integrates with TenantCore.Auth f
 | [ADR-006: Shared Layer](.claude/docs/adr/ADR-006-shared-layer.md) | Adding DTOs, enums, authorization constants |
 | [ADR-007: Blazor WebAssembly Client](.claude/docs/adr/ADR-007-blazor-client.md) | Adding pages, components, typed HTTP clients |
 | [ADR-008: Multi-Tenancy](.claude/docs/adr/ADR-008-multi-tenancy.md) | Any feature touching clinic/application context |
-| [ADR-009: Unit Testing](.claude/docs/adr/ADR-009-unit-testing.md) | Writing or reviewing tests |
+| [ADR-009: Unit Testing](.claude/docs/adr/ADR-009-unit-testing.md) | Writing or reviewing tests — **read before writing any test file; mandatory for every feature** |
 | [ADR-010: Security & Code Quality](.claude/docs/adr/ADR-010-security.md) | Security analysis, code smell detection, architectural violations, quality review |
 
 ---
@@ -287,6 +287,21 @@ src/
     FooDto.cs
     CreateFooRequest.cs
     UpdateFooRequest.cs
+
+tests/
+  TenantCore.Application.Tests/Features/Foos/
+    Commands/
+      CreateFooHandlerTests.cs
+      UpdateFooHandlerTests.cs
+      DeleteFooHandlerTests.cs
+    Queries/
+      GetFoosHandlerTests.cs
+      GetFooByIdHandlerTests.cs
+    Validators/
+      CreateFooCommandValidatorTests.cs
+      UpdateFooCommandValidatorTests.cs
+    Translators/
+      FooTranslatorTests.cs
 ```
 
 ---
@@ -372,3 +387,4 @@ Named HttpClient: `"AuthApi"`. Base URL: `AuthApi:BaseUrl` in appsettings.
 - Always filter by `applicationId` in tenant-scoped repository queries
 - Throw exceptions for errors; never return error DTOs from handlers
 - Do not change the middleware pipeline order (see ADR-005)
+- **Every feature must ship with unit tests** — all handlers, validators, and translators must have tests covering happy path, not-found errors, cross-tenant isolation, and all validator boundary/edge cases (see ADR-009)

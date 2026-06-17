@@ -271,20 +271,25 @@ Execute in this sequence to avoid compile errors:
 10. Application translator
 11. Application handlers
 12. API controller
-13. Run EF migration
+13. Unit tests — all handler, validator, and translator test files
+14. Run EF migration
 
 ---
 
-## Test Coverage Required
+## Test Files to Create
 
-| Test class | What it tests |
-|-----------|--------------|
-| `Create<Entity>HandlerTests` | Handler calls AddAsync and SaveChangesAsync with correct data; ApplicationId set on entity |
-| `Update<Entity>HandlerTests` | Handler updates correct fields; throws EntityNotFoundException when entity not found |
-| `Delete<Entity>HandlerTests` | Handler removes entity; throws EntityNotFoundException when not found |
-| `Get<Entity>ByIdHandlerTests` | Returns mapped DTO; returns null for unknown Id |
-| `Create<Entity>CommandValidatorTests` | Required fields fail when empty; valid command passes |
-| `<Entity>TranslatorTests` | ToEntity maps all fields; ToDto maps all fields |
+All test files live under `tests/TenantCore.Application.Tests/Features/<Area>/`.
+
+| File | What it covers |
+|------|---------------|
+| `Commands/Create<Entity>HandlerTests.cs` | Happy path (AddAsync + SaveChangesAsync called, Id returned), ApplicationId set on entity, all fields mapped |
+| `Commands/Update<Entity>HandlerTests.cs` | Fields updated, EntityNotFoundException when not found, cross-tenant entity treated as not found |
+| `Commands/Delete<Entity>HandlerTests.cs` | Delete + SaveChangesAsync called, EntityNotFoundException when not found |
+| `Queries/Get<Entity>ByIdHandlerTests.cs` | Mapped DTO returned, EntityNotFoundException when not found |
+| `Queries/Get<Entity>sHandlerTests.cs` | Summary DTOs returned, empty list when no data |
+| `Validators/Create<Entity>CommandValidatorTests.cs` | Valid command passes; each required field fails when null/empty ([Theory]); MaxLength boundary (at limit passes, over limit fails); empty ApplicationId fails |
+| `Validators/Update<Entity>CommandValidatorTests.cs` | Same boundary coverage as Create validator |
+| `Translators/<Entity>TranslatorTests.cs` | ToEntity maps all fields + generates non-empty Id + sets ApplicationId; ToDto maps all fields; ToSummaryDto maps display fields |
 
 ---
 

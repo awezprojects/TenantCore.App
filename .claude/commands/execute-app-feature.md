@@ -137,7 +137,48 @@ Standard order for TenantCore.App features:
 
 ---
 
-## Step 5 — Multi-tenancy verification
+## Step 5 — Write Unit Tests
+
+Read `.claude/docs/adr/ADR-009-unit-testing.md` now. Tests are **not optional** — a feature is not complete without them.
+
+Create the following test files under `tests/TenantCore.Application.Tests/Features/<Area>/`:
+
+```
+Commands/
+  Create<Entity>HandlerTests.cs
+  Update<Entity>HandlerTests.cs
+  Delete<Entity>HandlerTests.cs
+Queries/
+  Get<Entity>sHandlerTests.cs
+  Get<Entity>ByIdHandlerTests.cs
+Validators/
+  Create<Entity>CommandValidatorTests.cs
+  Update<Entity>CommandValidatorTests.cs    (if an Update validator exists)
+Translators/
+  <Entity>TranslatorTests.cs
+```
+
+### Required scenarios per file
+
+**Create handler** — `Handle_ValidCommand_ReturnsNewId`, `Handle_ValidCommand_SetsApplicationIdOnEntity`, `Handle_ValidCommand_MapsAllFieldsToEntity`
+
+**Update handler** — `Handle_ValidCommand_UpdatesEntityFields`, `Handle_EntityNotFound_ThrowsEntityNotFoundException`, `Handle_EntityBelongingToDifferentTenant_ThrowsEntityNotFoundException`
+
+**Delete handler** — `Handle_ValidCommand_DeletesEntityAndSavesChanges`, `Handle_EntityNotFound_ThrowsEntityNotFoundException`
+
+**GetById handler** — `Handle_ExistingEntity_ReturnsMappedDto`, `Handle_NonExistentEntity_ThrowsEntityNotFoundException`
+
+**GetAll handler** — `Handle_EntitiesExist_ReturnsMappedSummaryDtos`, `Handle_NoEntities_ReturnsEmptyList`
+
+**Create validator** — `Validate_ValidCommand_PassesValidation`; one `[Theory]` per required field with `[InlineData("")]` and `[InlineData(null)]`; `Validate_<Field>ExceedsMaxLength_FailsWithError`; `Validate_<Field>AtMaxLength_PassesValidation`; `Validate_EmptyApplicationId_FailsWithError`
+
+**Translator** — `ToEntity_ValidCommand_MapsAllProperties`, `ToEntity_SetsApplicationId`, `ToDto_ValidEntity_MapsAllProperties`, `ToSummaryDto_ValidEntity_MapsDisplayFields`
+
+Run `dotnet test tests/TenantCore.Application.Tests/` to confirm all tests pass before moving on.
+
+---
+
+## Step 6 — Multi-tenancy verification
 
 After all files are written, verify the multi-tenancy checklist from PLAN.md:
 
@@ -150,7 +191,7 @@ If any item is unchecked, fix it before proceeding.
 
 ---
 
-## Step 6 — Migration reminder
+## Step 7 — Migration reminder
 
 Print the migration command from PLAN.md. **Do not run it automatically.**
 
@@ -167,7 +208,7 @@ Run this when your local database is available.
 
 ---
 
-## Step 7 — Update state snapshot
+## Step 8 — Update state snapshot
 
 Edit `.claude/context/current-state.md` to reflect what was just added:
 
@@ -180,7 +221,7 @@ Do not rewrite the whole file — edit only the rows that changed.
 
 ---
 
-## Step 8 — Update feature registry
+## Step 9 — Update feature registry
 
 Edit `plan/REGISTRY.md`:
 
@@ -191,7 +232,7 @@ Edit `plan/REGISTRY.md`:
 
 ---
 
-## Step 9 — Implementation summary
+## Step 10 — Implementation summary
 
 Print a completion table:
 
@@ -204,7 +245,11 @@ Print a completion table:
 | src/TenantCore.Domain/Entities/X.cs | Created |
 | ... | ... |
 | src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs | Modified |
+| tests/TenantCore.Application.Tests/Features/X/Commands/CreateXHandlerTests.cs | Created |
+| tests/TenantCore.Application.Tests/Features/X/Validators/CreateXCommandValidatorTests.cs | Created |
+| ... | ... |
 
+Tests: all passing (dotnet test)
 State snapshot: updated (.claude/context/current-state.md)
 Feature registry: updated (plan/REGISTRY.md)
 Migration: pending — run the command above before testing.

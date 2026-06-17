@@ -10,6 +10,8 @@
 
 Currently, `TenantCore.Application.Tests` and `TenantCore.Domain.Tests` exist but coverage is incomplete. This ADR defines the **target standard** for testing in TenantCore.App — both what exists now and what must be followed when adding new tests.
 
+**Every new feature must ship with tests.** No feature is considered implemented until the test files described in the "Mandatory Coverage Per Feature" section below are written and passing.
+
 ---
 
 ## Test Projects and Their Scope
@@ -45,12 +47,15 @@ TenantCore.Application.Tests/
 ├── Features/
 │   ├── Patients/
 │   │   ├── Commands/
-│   │   │   ├── CreatePatientCommandHandlerTests.cs
-│   │   │   └── UpdatePatientCommandHandlerTests.cs
+│   │   │   ├── CreatePatientHandlerTests.cs
+│   │   │   ├── UpdatePatientHandlerTests.cs
+│   │   │   └── DeletePatientHandlerTests.cs
 │   │   ├── Queries/
-│   │   │   └── GetPatientByIdQueryHandlerTests.cs
+│   │   │   ├── GetPatientsHandlerTests.cs
+│   │   │   └── GetPatientByIdHandlerTests.cs
 │   │   ├── Validators/
-│   │   │   └── CreatePatientCommandValidatorTests.cs
+│   │   │   ├── CreatePatientCommandValidatorTests.cs
+│   │   │   └── UpdatePatientCommandValidatorTests.cs
 │   │   └── Translators/
 │   │       └── PatientTranslatorTests.cs
 │   ├── Medicines/
@@ -193,7 +198,7 @@ public class GetPatientByIdQueryHandlerTests
     }
 
     [Fact]
-    public async Task Handle_NonExistentPatient_ReturnsNull()
+    public async Task Handle_NonExistentPatient_ThrowsEntityNotFoundException()
     {
         // Arrange
         _repositoryMock
@@ -207,10 +212,10 @@ public class GetPatientByIdQueryHandlerTests
         };
 
         // Act
-        var result = await _handler.Handle(query, CancellationToken.None);
+        var act = async () => await _handler.Handle(query, CancellationToken.None);
 
         // Assert
-        result.Should().BeNull();
+        await act.Should().ThrowAsync<EntityNotFoundException>();
     }
 }
 ```
@@ -227,41 +232,111 @@ public class CreatePatientCommandValidatorTests
     [Fact]
     public void Validate_ValidCommand_PassesValidation()
     {
-        // Arrange
-        var command = new CreatePatientCommand
-        {
-            FirstName = "John",
-            LastName = "Doe",
-            ApplicationId = Guid.NewGuid()
-        };
+        var command = new CreatePatientCommand(
+            new CreatePatientRequest { FirstName = "John", LastName = "Doe" },
+            ApplicationId: Guid.NewGuid());
 
-        // Act
         var result = _validator.Validate(command);
 
-        // Assert
         result.IsValid.Should().BeTrue();
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(null)]
-    public void Validate_EmptyFirstName_FailsWithMessage(string firstName)
+    public void Validate_FirstNameNullOrEmpty_FailsWithError(string? firstName)
     {
-        // Arrange
-        var command = new CreatePatientCommand
-        {
-            FirstName = firstName,
-            LastName = "Doe",
-            ApplicationId = Guid.NewGuid()
-        };
+        var command = new CreatePatientCommand(
+            new CreatePatientRequest { FirstName = firstName!, LastName = "Doe" },
+            ApplicationId: Guid.NewGuid());
 
-        // Act
         var result = _validator.Validate(command);
 
-        // Assert
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(CreatePatientCommand.FirstName));
+        result.Errors.Should().Contain(e => e.PropertyName.Contains("FirstName"));
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void Validate_LastNameNullOrEmpty_FailsWithError(string? lastName)
+    {
+        var command = new CreatePatientCommand(
+            new CreatePatientRequest { FirstName = "John", LastName = lastName! },
+            ApplicationId: Guid.NewGuid());
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName.Contains("LastName"));
+    }
+
+    [Fact]
+    public void Validate_FirstNameAtMaxLength_PassesValidation()
+    {
+        var command = new CreatePatientCommand(
+            new CreatePatientRequest { FirstName = new string('A', 100), LastName = "Doe" },
+            ApplicationId: Guid.NewGuid());
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_FirstNameExceedsMaxLength_FailsWithError()
+    {
+        var command = new CreatePatientCommand(
+            new CreatePatientRequest { FirstName = new string('A', 101), LastName = "Doe" },
+            ApplicationId: Guid.NewGuid());
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName.Contains("FirstName"));
+    }
+
+    [Fact]
+    public void Validate_EmptyApplicationId_FailsWithError()
+    {
+        var command = new CreatePatientCommand(
+            new CreatePatientRequest { FirstName = "John", LastName = "Doe" },
+            ApplicationId: Guid.Empty);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName.Contains("ApplicationId"));
+    }
+}
+```
+
+---
+
+## Tenant Isolation Test Pattern
+
+Write one test per Update/Delete handler and GetById handler to verify cross-tenant isolation. The entity exists in the database but belongs to a different `ApplicationId` — the handler must treat this as "not found".
+
+```csharp
+[Fact]
+public async Task Handle_EntityBelongingToDifferentTenant_ThrowsEntityNotFoundException()
+{
+    // Arrange
+    var commandApplicationId = Guid.NewGuid();
+    var entityApplicationId = Guid.NewGuid(); // different tenant
+
+    // GetByIdAsync returns an entity, but it belongs to a different tenant
+    // In production the repository filters by applicationId, so this won't be returned.
+    // In tests, simulate by returning null (the correct repository behavior).
+    _repositoryMock
+        .Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), commandApplicationId))
+        .ReturnsAsync((Patient?)null);
+
+    var command = new UpdatePatientCommand(Guid.NewGuid(), new UpdatePatientRequest(), commandApplicationId);
+
+    // Act
+    var act = async () => await _handler.Handle(command, CancellationToken.None);
+
+    // Assert
+    await act.Should().ThrowAsync<EntityNotFoundException>();
 }
 ```
 
@@ -316,19 +391,88 @@ public class PatientTranslatorTests
 
 ---
 
+## Mandatory Coverage Per Feature
+
+Every new feature **must** include all of the following test scenarios before it is considered complete.
+
+### Create Handler — required tests
+
+| Test name | Scenario |
+|-----------|---------|
+| `Handle_ValidCommand_ReturnsNewId` | Happy path — entity created, `AddAsync` and `SaveChangesAsync` called exactly once, non-empty Guid returned |
+| `Handle_ValidCommand_SetsApplicationIdOnEntity` | Captures entity via `Callback`, asserts `ApplicationId` matches the command value |
+| `Handle_ValidCommand_MapsAllFieldsToEntity` | Captures entity, asserts every field maps from request (no field silently dropped) |
+
+### Update Handler — required tests
+
+| Test name | Scenario |
+|-----------|---------|
+| `Handle_ValidCommand_UpdatesEntityFields` | Entity found, all mutable fields updated, `SaveChangesAsync` called once |
+| `Handle_EntityNotFound_ThrowsEntityNotFoundException` | Repository returns `null`, handler throws `EntityNotFoundException` |
+| `Handle_EntityBelongingToDifferentTenant_ThrowsEntityNotFoundException` | Entity exists but `ApplicationId` does not match — handler must not update it |
+
+### Delete Handler — required tests
+
+| Test name | Scenario |
+|-----------|---------|
+| `Handle_ValidCommand_DeletesEntityAndSavesChanges` | Entity found, `Delete` called, `SaveChangesAsync` called once |
+| `Handle_EntityNotFound_ThrowsEntityNotFoundException` | Repository returns `null`, handler throws `EntityNotFoundException` |
+
+### GetById Handler — required tests
+
+| Test name | Scenario |
+|-----------|---------|
+| `Handle_ExistingEntity_ReturnsMappedDto` | Entity found, all DTO fields populated correctly |
+| `Handle_NonExistentEntity_ThrowsEntityNotFoundException` | Repository returns `null`, handler throws `EntityNotFoundException` |
+
+### GetAll Handler — required tests
+
+| Test name | Scenario |
+|-----------|---------|
+| `Handle_EntitiesExist_ReturnsMappedSummaryDtos` | Returns list of DTOs in correct shape |
+| `Handle_NoEntities_ReturnsEmptyList` | Repository returns empty enumerable — handler returns empty, does not throw |
+
+### Validator — required tests for each validator
+
+| Test name | Scenario |
+|-----------|---------|
+| `Validate_ValidCommand_PassesValidation` | All fields present and within limits — `IsValid` is `true`, no errors |
+| `Validate_<FieldName>Empty_FailsWithError` | One test per required field — `null` and empty string both fail (`[Theory]` with `[InlineData]`) |
+| `Validate_<FieldName>ExceedsMaxLength_FailsWithError` | String one character over `MaxLength` limit — fails |
+| `Validate_<FieldName>AtMaxLength_PassesValidation` | String exactly at `MaxLength` limit — passes |
+| `Validate_ApplicationIdEmpty_FailsWithError` | `ApplicationId == Guid.Empty` fails |
+
+### Translator — required tests
+
+| Test name | Scenario |
+|-----------|---------|
+| `ToEntity_ValidCommand_MapsAllProperties` | Every property on the entity is asserted (no field missed) — `Id` is non-empty Guid |
+| `ToEntity_SetsApplicationId` | `ApplicationId` on the entity matches the argument passed to `ToEntity` |
+| `ToDto_ValidEntity_MapsAllProperties` | Every property on the DTO is asserted |
+| `ToSummaryDto_ValidEntity_MapsDisplayFields` | Summary DTO contains only the fields it is supposed to expose |
+
+---
+
 ## What TO Test
 
 | Layer | Test | Priority |
 |-------|------|---------|
-| Command handlers | That `AddAsync` and `SaveChangesAsync` are called with correct data | High |
-| Command handlers | That `ApplicationId` is set correctly on the entity | High |
-| Query handlers | That repository is called with correct parameters | High |
-| Query handlers | That entities are correctly mapped to DTOs | High |
-| Validators | That required fields fail when empty | High |
-| Validators | That max-length rules are enforced | Medium |
-| Validators | That valid commands pass without errors | High |
-| Translators | That all fields map correctly in both directions | Medium |
-| Pipeline behaviors | That `ValidationBehavior` throws on validation failure | Medium |
+| Command handlers | `AddAsync` and `SaveChangesAsync` called with correct data | High |
+| Command handlers | `ApplicationId` is set correctly on the entity | High |
+| Command handlers | Every field from the request is mapped to the entity | High |
+| Update/Delete handlers | `EntityNotFoundException` thrown when entity is not found | High |
+| Update/Delete handlers | Entity from a different tenant is treated as not found | High |
+| Query handlers | `EntityNotFoundException` thrown when entity is not found by ID | High |
+| Query handlers | Entities are correctly mapped to DTOs — all fields | High |
+| Query handlers | Empty result set returns empty list, not an exception | High |
+| Validators | Each required field fails when `null` or empty string (use `[Theory]`) | High |
+| Validators | Fields exceeding `MaxLength` fail | High |
+| Validators | Fields at exactly `MaxLength` pass | Medium |
+| Validators | `ApplicationId == Guid.Empty` fails | High |
+| Validators | Fully valid command passes with `IsValid == true` | High |
+| Translators | All fields are mapped in both directions | Medium |
+| Translators | `Id` is a newly generated, non-empty Guid | Medium |
+| Pipeline behaviors | `ValidationBehavior` throws on validation failure | Medium |
 
 ---
 
