@@ -1,13 +1,14 @@
 @inject AuthStateService AuthState
 @inject NavigationManager NavigationManager
+@inject ClinicContextService ClinicContext
 @using TenantCore.Web.Client.Services
 @implements IDisposable
 
 <nav style="flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;">
 
-    @if (_isAdmin && (!_isDoctor || _currentPath.StartsWith("/admin")))
+    @if (ClinicContext.ActivePanel == "Admin")
     {
-        @* Clinic Admin panel — Wards & IPD stay here, not in doctor panel *@
+        @* Clinic Admin panel — strict to admin role; no doctor-specific items *@
         <NavItem Href="/admin/dashboard" Icon="▦" Label="Dashboard" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
@@ -15,8 +16,8 @@
         <NavItem Href="/admin/wards"  Icon="🏨" Label="Wards & Rooms"  DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/admin/users"  Icon="👥" Label="User Management" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/ipd"          Icon="🛏" Label="IPD & Beds"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/patients"     Icon="🩺" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/opd"          Icon="📋" Label="OPD Queue"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/patients"     Icon="👥" Label="Patients"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <NavItem Href="/medicines"    Icon="💊" Label="Medicines"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
         <NavItem Href="/admin/usg-template"        Icon="🔬" Label="USG Template"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
@@ -24,7 +25,7 @@
         <NavItem Href="/settings/prescription"     Icon="🖨️" Label="Rx Settings"    DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/auth/profile" Icon="👤" Label="My Profile" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
     }
-    else if (_isDoctor)
+    else if (ClinicContext.ActivePanel == "Doctor")
     {
         @* Doctor panel — no ward management, no IPD & beds *@
         <NavItem Href="/dashboard"     Icon="▦" Label="Dashboard"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
@@ -62,21 +63,17 @@
 @code {
     [Parameter] public bool DrawerOpen { get; set; } = true;
 
-    private bool _isDoctor;
-    private bool _isAdmin;
     private string _currentPath = "/dashboard";
 
     protected override void OnInitialized()
     {
-        AuthState.OnAuthStateChanged += OnAuthChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
-        RefreshState();
+        ClinicContext.OnClinicChanged += OnClinicContextChanged;
         UpdatePath(NavigationManager.Uri);
     }
 
-    private void OnAuthChanged()
+    private void OnClinicContextChanged()
     {
-        RefreshState();
         InvokeAsync(StateHasChanged);
     }
 
@@ -91,18 +88,9 @@
         _currentPath = "/" + uri.Replace(NavigationManager.BaseUri, "").TrimStart('/').Split('?')[0];
     }
 
-    private void RefreshState()
-    {
-        var roles = AuthState.CurrentUser?.UserRoles ?? [];
-        _isAdmin = roles.Any(r =>
-            r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
-            r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
-        _isDoctor = roles.Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
-    }
-
     public void Dispose()
     {
-        AuthState.OnAuthStateChanged -= OnAuthChanged;
         NavigationManager.LocationChanged -= OnLocationChanged;
+        ClinicContext.OnClinicChanged -= OnClinicContextChanged;
     }
 }

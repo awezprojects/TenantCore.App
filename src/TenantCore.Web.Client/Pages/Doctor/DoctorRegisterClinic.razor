@@ -115,6 +115,21 @@
     private bool _submitting;
     private CreateClinicRequestDto _model = new();
 
+    protected override Task OnInitializedAsync()
+    {
+        var user = AuthState.CurrentUser;
+        if (user == null) return Task.CompletedTask;
+
+        var hasAnyClinic = user.UserApplications?.Any() ?? false;
+        var isDoctor = user.UserRoles.Any(r =>
+            r.IsActive && r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+
+        if (hasAnyClinic && !isDoctor)
+            Nav.NavigateTo("/select-clinic");
+
+        return Task.CompletedTask;
+    }
+
     private async Task SubmitAsync()
     {
         await _form.Validate();

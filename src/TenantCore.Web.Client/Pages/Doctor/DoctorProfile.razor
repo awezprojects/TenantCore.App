@@ -74,7 +74,9 @@ else
             </div>
         </div>
 
-        <!-- ── 2. Professional Information ────────────────────────────── -->
+        <!-- ── 2. Professional Information (doctors only) ──────────────── -->
+        @if (_isDoctor)
+        {
         <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
             <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
                 <div style="font-size:15px;font-weight:800;color:#1E293B;">Professional Information</div>
@@ -251,6 +253,7 @@ else
                 </EditForm>
             </div>
         </div>
+        } @* end _isDoctor *@
 
         <!-- ── 3. Security ────────────────────────────────────────────── -->
         <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
@@ -501,6 +504,8 @@ else
     private bool _savingBasic;
     private string? _basicError;
 
+    private bool _isDoctor;
+
     // Professional info
     private UpsertDoctorProfileDto _profModel = new();
     private DoctorProfileDto? _profProfile;
@@ -546,6 +551,9 @@ else
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Take(2).Select(p => p[0].ToString().ToUpper()));
 
+        _isDoctor = user.UserRoles.Any(r =>
+            r.IsActive && r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+
         _basicModel = new UpdateUserProfileRequestDto
         {
             FirstName  = user.FirstName,
@@ -566,22 +574,25 @@ else
             _twoFactorEnabled = user.IsTwoFactorEnabled;
         }
 
-        _loadingSpecialities = true;
-        var specResult = await SpecialitiesApi.GetAllAsync();
-        if (specResult.Success && specResult.Data != null)
-            _specialities = specResult.Data;
-        _loadingSpecialities = false;
-
-        var profResult = await DoctorProfileApi.GetMyProfileAsync();
-        if (profResult.Success && profResult.Data != null)
+        if (_isDoctor)
         {
-            _profProfile = profResult.Data;
-            _profModel = new UpsertDoctorProfileDto
+            _loadingSpecialities = true;
+            var specResult = await SpecialitiesApi.GetAllAsync();
+            if (specResult.Success && specResult.Data != null)
+                _specialities = specResult.Data;
+            _loadingSpecialities = false;
+
+            var profResult = await DoctorProfileApi.GetMyProfileAsync();
+            if (profResult.Success && profResult.Data != null)
             {
-                RegistrationNumber   = _profProfile.RegistrationNumber,
-                SpecialityId         = _profProfile.SpecialityId ?? Guid.Empty,
-                QualificationDetails = _profProfile.QualificationDetails,
-            };
+                _profProfile = profResult.Data;
+                _profModel = new UpsertDoctorProfileDto
+                {
+                    RegistrationNumber   = _profProfile.RegistrationNumber,
+                    SpecialityId         = _profProfile.SpecialityId ?? Guid.Empty,
+                    QualificationDetails = _profProfile.QualificationDetails,
+                };
+            }
         }
 
         _loading = false;

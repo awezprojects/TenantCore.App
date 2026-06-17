@@ -49,6 +49,7 @@ This table is the fastest way for the plan command to check "does this already e
 | patient-lmp-tenure-view | 2026-06-16 | 2026-06-16 | — | — | 3 | 8 |
 | remove-old-unused-pages | 2026-06-17 | 2026-06-17 | — | — | 0 (9 deleted) | 4 |
 | auth-screens-redesign | 2026-06-18 | 2026-06-18 | — | — | 0 | 9 |
+| clinic-admin-role-ui-fixes | 2026-06-18 | 2026-06-18 | — | — | 0 | 3 |
 
 ---
 

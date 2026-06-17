@@ -77,6 +77,11 @@ else
                     ? string.Join(" · ", item.Clinic.UserRoles)
                     : "Doctor";
                 var logo  = GetClinicLogo(item.Clinic.ApplicationId);
+                var clinicRoles = item.Clinic.UserRoles;
+                var isClinicAdminOnly =
+                    clinicRoles.Any(r => r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase)
+                                      || r.Equals("System Admin", StringComparison.OrdinalIgnoreCase))
+                    && !clinicRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
 
                 <div class="cc-clinic-card" style="--clinic-color:@color;"
                      @onclick="() => EnterClinic(item.Clinic.ApplicationId)">
@@ -161,7 +166,7 @@ else
                         </div>
 
                         <!-- Footer -->
-                        @if (item.Clinic.IsOwner)
+                        @if (item.Clinic.IsOwner && !isClinicAdminOnly)
                         {
                             <div style="padding-top:8px;">
                                 <div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">
@@ -193,10 +198,13 @@ else
                                 <div style="font-size:11px;color:#94A3B8;">
                                     Joined @item.Clinic.CreatedDate.ToString("dd MMM yyyy")
                                 </div>
-                                <span style="display:inline-flex;align-items:center;gap:4px;
-                                             color:@color;font-weight:700;font-size:13px;">
-                                    Enter Clinic <span style="font-size:14px;">→</span>
-                                </span>
+                                @if (!isClinicAdminOnly)
+                                {
+                                    <span style="display:inline-flex;align-items:center;gap:4px;
+                                                 color:@color;font-weight:700;font-size:13px;">
+                                        Enter Clinic <span style="font-size:14px;">→</span>
+                                    </span>
+                                }
                             </div>
                         }
                     </div>
@@ -339,19 +347,20 @@ else
     private async Task EnterClinic(Guid appId)
     {
         var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
-        await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
-
-        // Route to the correct dashboard based on the user's role in this specific clinic.
         var roles = clinic?.Clinic.UserRoles ?? [];
         var isClinicAdmin = roles.Any(r =>
             r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
             r.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+
+        await ClinicContext.SetActivePanelAsync(isClinicAdmin ? "Admin" : "Other");
+        await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
         Nav.NavigateTo(isClinicAdmin ? "/admin/dashboard" : "/dashboard");
     }
 
     private async Task EnterClinicAsDoctor(Guid appId)
     {
         var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
+        await ClinicContext.SetActivePanelAsync("Doctor");
         await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
         Nav.NavigateTo("/dashboard");
     }
@@ -359,6 +368,7 @@ else
     private async Task EnterClinicAsAdmin(Guid appId)
     {
         var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
+        await ClinicContext.SetActivePanelAsync("Admin");
         await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
         Nav.NavigateTo("/admin/dashboard");
     }
