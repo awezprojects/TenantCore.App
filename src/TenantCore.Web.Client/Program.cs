@@ -15,8 +15,12 @@ builder.Services.AddScoped<TokenStorageService>();
 builder.Services.AddScoped<AuthStateService>();
 builder.Services.AddSingleton<RoleCacheService>();
 
-// Clinic context (persists selected clinic across pages)
-builder.Services.AddScoped<ClinicContextService>();
+// Clinic context (persists selected clinic across pages).
+// Must be Singleton — IHttpClientFactory creates a fresh DI scope for each handler pipeline,
+// so AddScoped would give ClinicAuthorizationHandler a different ClinicContextService instance
+// from the one initialized by layout components, causing the X-Application-Id header to never
+// be injected for endpoints that don't pass an explicit applicationId.
+builder.Services.AddSingleton<ClinicContextService>();
 builder.Services.AddTransient<ClinicAuthorizationHandler>();
 
 // Get API base URLs from configuration

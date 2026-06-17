@@ -12,7 +12,7 @@ namespace TenantCore.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/auth")]
-[AllowAnonymous]
+[AllowAnonymous] // Intentional — this controller is a transparent proxy to TenantCore.Auth; auth is enforced there
 public class AuthController(IHttpClientFactory httpClientFactory) : ControllerBase
 {
     private readonly HttpClient _authClient = httpClientFactory.CreateClient("AuthApi");

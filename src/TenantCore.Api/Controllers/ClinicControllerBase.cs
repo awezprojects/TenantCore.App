@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using TenantCore.Api.Middleware;
@@ -17,6 +18,14 @@ public abstract class ClinicControllerBase : ControllerBase
         return Guid.Empty;
     }
 
+    protected Guid GetCurrentUserId()
+    {
+        var claim = User.FindFirst("nameid")
+                 ?? User.FindFirst(ClaimTypes.NameIdentifier)
+                 ?? User.FindFirst("sub");
+        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
+    }
+
     // Reads appName from the app_roles JWT claim: [{"appId":"...","appName":"..."}]
     protected string GetApplicationName()
     {
@@ -31,7 +40,7 @@ public abstract class ClinicControllerBase : ControllerBase
                 if (!string.IsNullOrWhiteSpace(name))
                     return Slugify(name);
             }
-            catch { /* malformed claim — fall through */ }
+            catch (JsonException) { /* malformed claim — fall through */ }
         }
         return appId.ToString();
     }

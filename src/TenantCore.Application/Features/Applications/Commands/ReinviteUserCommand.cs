@@ -1,5 +1,5 @@
-using MediatR;
+﻿using MediatR;
 
 namespace TenantCore.Application.Features.Applications.Commands;
 
-public record ReinviteUserCommand(Guid ApplicationId, Guid InvitationId, Guid ReinvitedBy) : IRequest;
+public sealed record ReinviteUserCommand(Guid ApplicationId, Guid InvitationId, Guid ReinvitedBy) : IRequest;

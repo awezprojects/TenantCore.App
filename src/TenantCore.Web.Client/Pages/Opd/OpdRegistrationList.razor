@@ -502,17 +502,6 @@
         _isDoctor     = clinicRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
         _doctorUserId = _isDoctor ? AuthState.CurrentUser?.UserId : null;
 
-        // Non-doctor staff: auto-set clinic context from JWT if not already set
-        if (!_isDoctor && appId == Guid.Empty)
-        {
-            var apps = AuthState.AvailableApplications;
-            if (apps.Count > 0)
-            {
-                await ClinicContext.SetClinicAsync(apps[0].ApplicationId, apps[0].ApplicationName);
-                appId = apps[0].ApplicationId;
-            }
-        }
-
         // Store for use in LoadPageAsync / LoadCountsAsync so all calls are explicit
         _clinicAppId = appId != Guid.Empty ? appId : null;
 

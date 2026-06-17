@@ -90,7 +90,7 @@
 
                 <div style="display:flex;gap:12px;justify-content:flex-end;">
                     <MudButton Variant="Variant.Text" Color="Color.Default"
-                               OnClick='() => Nav.NavigateTo("/doctor/home")'>
+                               OnClick='() => Nav.NavigateTo("/select-clinic")'>
                         Cancel
                     </MudButton>
                     <MudButton Variant="Variant.Filled" Color="Color.Primary"
@@ -129,7 +129,7 @@
                 Snackbar.Add($"Clinic '{result.Data?.ApplicationName}' registered successfully!", Severity.Success);
                 StateHasChanged();
                 await Task.Delay(1800);
-                Nav.NavigateTo("/doctor/home", forceLoad: true);
+                Nav.NavigateTo("/select-clinic", forceLoad: true);
             }
             else
             {

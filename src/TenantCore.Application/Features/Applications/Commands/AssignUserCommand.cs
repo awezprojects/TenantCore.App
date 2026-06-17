@@ -1,8 +1,8 @@
-using MediatR;
+﻿using MediatR;
 
 namespace TenantCore.Application.Features.Applications.Commands;
 
-public record AssignUserCommand(
+public sealed record AssignUserCommand(
     Guid ApplicationId,
     Guid UserId,
     Guid RoleId,

@@ -1,8 +1,8 @@
-using MediatR;
+﻿using MediatR;
 using TenantCore.Shared.Dtos.Auth;
 
 namespace TenantCore.Application.Features.Applications.Commands;
 
-public record EditApplicationCommand(
+public sealed record EditApplicationCommand(
     Guid ApplicationId,
     ApplicationCreationRequestDto Request) : IRequest<ApplicationResponseDto>;
