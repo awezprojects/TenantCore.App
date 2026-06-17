@@ -3,11 +3,11 @@
 <CascadingAuthenticationState>
     <Router AppAssembly="typeof(Program).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+            <RouteView RouteData="routeData" DefaultLayout="typeof(AuthLayout)" />
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
         <NotFound>
-            <LayoutView Layout="typeof(MainLayout)">
+            <LayoutView Layout="typeof(AuthLayout)">
                 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
                     <MudPaper Elevation="4" Class="pa-8">
                         <MudStack AlignItems="AlignItems.Center" Spacing="4">
@@ -16,7 +16,7 @@
                             <MudText Typo="Typo.body1" Color="Color.Secondary" Align="Align.Center">
                                 The page you're looking for doesn't exist or has been moved.
                             </MudText>
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/"
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/select-clinic"
                                        StartIcon="@Icons.Material.Filled.Home">
                                 Go to Home
                             </MudButton>

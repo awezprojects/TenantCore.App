@@ -46,10 +46,10 @@
                 <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
                     @(_successMessage ?? "You have been added to the application. You can now access it from your dashboard.")
                 </MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/applications"
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/select-clinic"
                            FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;" Class="mt-2">
-                    <MudIcon Icon="@Icons.Material.Filled.Apps" Class="mr-2" />
-                    Go to Applications
+                    <MudIcon Icon="@Icons.Material.Filled.LocalHospital" Class="mr-2" />
+                    Go to My Clinics
                 </MudButton>
             }
             else if (_error)
@@ -60,10 +60,10 @@
                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="false" Class="mt-2" Style="width: 100%;">
                     @_errorMessage
                 </MudAlert>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/applications"
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/select-clinic"
                            FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;" Class="mt-2">
-                    <MudIcon Icon="@Icons.Material.Filled.Apps" Class="mr-2" />
-                    Go to Applications
+                    <MudIcon Icon="@Icons.Material.Filled.LocalHospital" Class="mr-2" />
+                    Go to My Clinics
                 </MudButton>
             }
             else
@@ -74,10 +74,10 @@
                 <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary">
                     The invitation link is invalid or missing the required token.
                 </MudText>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/applications"
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/select-clinic"
                            FullWidth="true" Size="Size.Large" Style="height: 48px; text-transform: none;" Class="mt-2">
-                    <MudIcon Icon="@Icons.Material.Filled.Apps" Class="mr-2" />
-                    Go to Applications
+                    <MudIcon Icon="@Icons.Material.Filled.LocalHospital" Class="mr-2" />
+                    Go to My Clinics
                 </MudButton>
             }
         </MudStack>
