@@ -54,7 +54,7 @@ This table is the fastest way for the plan command to check "does this already e
 
 | Feature | Plan Date | Plan File |
 |---------|-----------|-----------|
-| *(none)* | — | — |
+| remove-old-unused-pages | 2026-06-17 | [plan/remove-old-unused-pages/PLAN.md](remove-old-unused-pages/PLAN.md) |
 
 ---
 

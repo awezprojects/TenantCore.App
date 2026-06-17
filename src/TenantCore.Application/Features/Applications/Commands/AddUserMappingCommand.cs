@@ -1,8 +1,8 @@
-using MediatR;
+﻿using MediatR;
 
 namespace TenantCore.Application.Features.Applications.Commands;
 
-public record AddUserMappingCommand(
+public sealed record AddUserMappingCommand(
     Guid ApplicationId,
     Guid UserId,
     Guid AssignedBy) : IRequest;

@@ -268,11 +268,14 @@ else if (_isAuthenticated)
         var baseUri = NavigationManager.BaseUri;
         var path = uri.Replace(baseUri, "/");
 
-        // Guard: doctor must select a clinic before accessing clinic-specific pages
-        if (_isAuthenticated && _isDoctor && ClinicContext.SelectedApplicationId == Guid.Empty
-            && !path.StartsWith("/doctor/") && !path.StartsWith("/auth/"))
+        // Guard: all users must select a clinic before accessing clinic-scoped pages.
+        // /select-clinic and /doctor/* are exempt — they work without a selected clinic.
+        if (_isAuthenticated && ClinicContext.SelectedApplicationId == Guid.Empty
+            && !path.StartsWith("/select-clinic")
+            && !path.StartsWith("/doctor/")
+            && !path.StartsWith("/auth/"))
         {
-            NavigationManager.NavigateTo("/doctor/home");
+            NavigationManager.NavigateTo("/select-clinic");
             return;
         }
 
@@ -289,23 +292,8 @@ else if (_isAuthenticated)
         {
             if (path.StartsWith("/auth/login"))
             {
-                var roles = AuthState.CurrentUser?.UserRoles ?? [];
-                var isAdminUser = roles.Any(r =>
-                    r.RoleName.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
-                    r.RoleName.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
-                var isDoctorUser = roles.Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
-
-                string target;
-                if (isAdminUser && isDoctorUser)
-                    target = "/doctor/home"; // admin-doctors select clinic first
-                else if (isDoctorUser)
-                    target = "/doctor/home";
-                else if (isAdminUser)
-                    target = "/admin/dashboard";
-                else
-                    target = "/dashboard";
-
-                NavigationManager.NavigateTo(target, forceLoad: true);
+                // Always go to clinic selection after login — users pick their clinic first.
+                NavigationManager.NavigateTo("/select-clinic", forceLoad: true);
                 return;
             }
         }
@@ -319,7 +307,7 @@ else if (_isAuthenticated)
     private async Task SwitchClinic()
     {
         await ClinicContext.ClearClinicAsync();
-        NavigationManager.NavigateTo("/doctor/home");
+        NavigationManager.NavigateTo("/select-clinic");
     }
 
     private async Task Logout()

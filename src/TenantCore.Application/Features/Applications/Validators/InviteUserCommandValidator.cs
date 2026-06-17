@@ -3,7 +3,7 @@ using TenantCore.Application.Features.Applications.Commands;
 
 namespace TenantCore.Application.Features.Applications.Validators;
 
-public class InviteUserCommandValidator : AbstractValidator<InviteUserCommand>
+public sealed class InviteUserCommandValidator : AbstractValidator<InviteUserCommand>
 {
     public InviteUserCommandValidator()
     {

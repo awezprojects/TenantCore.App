@@ -145,9 +145,7 @@
                     }
                 }
 
-                var isDoctor = AuthState.CurrentUser?.UserRoles
-                    .Any(r => r.RoleName.Equals("Doctor", StringComparison.OrdinalIgnoreCase)) ?? false;
-                NavigationManager.NavigateTo(isDoctor ? "/doctor/home" : "/dashboard");
+                NavigationManager.NavigateTo("/select-clinic");
             }
             else
             {

@@ -8,6 +8,7 @@ public sealed class UpdatePatientCommandValidator : AbstractValidator<UpdatePati
     public UpdatePatientCommandValidator()
     {
         RuleFor(x => x.Id).NotEmpty();
+        RuleFor(x => x.ApplicationId).NotEmpty().WithMessage("A clinic must be selected to update a patient.");
         RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.PhoneNumber)

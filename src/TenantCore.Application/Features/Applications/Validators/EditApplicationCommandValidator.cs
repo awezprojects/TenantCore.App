@@ -1,9 +1,9 @@
-using FluentValidation;
+﻿using FluentValidation;
 using TenantCore.Application.Features.Applications.Commands;
 
 namespace TenantCore.Application.Features.Applications.Validators;
 
-public class EditApplicationCommandValidator : AbstractValidator<EditApplicationCommand>
+public sealed class EditApplicationCommandValidator : AbstractValidator<EditApplicationCommand>
 {
     public EditApplicationCommandValidator()
     {

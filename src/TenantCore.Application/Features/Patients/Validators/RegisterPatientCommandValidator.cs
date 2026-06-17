@@ -7,6 +7,7 @@ public sealed class RegisterPatientCommandValidator : AbstractValidator<Register
 {
     public RegisterPatientCommandValidator()
     {
+        RuleFor(x => x.ApplicationId).NotEmpty().WithMessage("A clinic must be selected before registering a patient.");
         RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.PhoneNumber)

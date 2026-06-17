@@ -3,6 +3,6 @@ using TenantCore.Shared.Dtos.Auth;
 
 namespace TenantCore.Application.Features.Applications.Commands;
 
-public record CreateApplicationCommand(
+public sealed record CreateApplicationCommand(
     Guid OwnerId,
     ApplicationCreationRequestDto Request) : IRequest<ApplicationResponseDto>;

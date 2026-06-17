@@ -1,6 +1,6 @@
-using MediatR;
+﻿using MediatR;
 using TenantCore.Shared.Dtos.Auth;
 
 namespace TenantCore.Application.Features.Applications.Queries;
 
-public record GetApplicationsByTypeQuery(int ApplicationType) : IRequest<List<ApplicationResponseDto>>;
+public sealed record GetApplicationsByTypeQuery(int ApplicationType) : IRequest<List<ApplicationResponseDto>>;

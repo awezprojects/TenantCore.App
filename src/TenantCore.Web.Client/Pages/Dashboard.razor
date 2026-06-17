@@ -470,25 +470,6 @@ else
             return;
         }
 
-        // Doctors must select a clinic first
-        if (_isDoctor && selectedAppId == Guid.Empty)
-        {
-            Nav.NavigateTo("/doctor/home", forceLoad: true);
-            return;
-        }
-
-        // Non-doctor staff (reception, nurse, etc.) may not have gone through clinic selection.
-        // Auto-set their clinic context from their JWT so all API calls hit the correct clinic.
-        if (!_isDoctor && selectedAppId == Guid.Empty)
-        {
-            var apps = AuthState.AvailableApplications;
-            if (apps.Count > 0)
-            {
-                await ClinicContext.SetClinicAsync(apps[0].ApplicationId, apps[0].ApplicationName);
-                selectedAppId = apps[0].ApplicationId;
-            }
-        }
-
         var fullName = AuthState.CurrentUser?.FullName ?? "User";
         _greeting = GetGreeting();
 

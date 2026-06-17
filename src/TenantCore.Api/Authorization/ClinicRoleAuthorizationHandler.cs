@@ -29,20 +29,10 @@ public sealed class ClinicRoleAuthorizationHandler(IHttpContextAccessor httpCont
         var http = httpContextAccessor.HttpContext;
         if (http is null) return Task.CompletedTask; // fails by default
 
-        // Resolve the active clinic: middleware already validated and stored it,
-        // fall back to the first app_ids claim for single-clinic users.
-        Guid applicationId;
-        if (http.Items.TryGetValue(ClinicContextMiddleware.ContextKey, out var item)
-            && item is Guid id && id != Guid.Empty)
-        {
-            applicationId = id;
-        }
-        else
-        {
-            var firstAppId = context.User.FindFirst("app_ids")?.Value;
-            if (firstAppId is null || !Guid.TryParse(firstAppId, out applicationId))
-                return Task.CompletedTask;
-        }
+        // Clinic context must have been set by ClinicContextMiddleware — no fallback.
+        if (!http.Items.TryGetValue(ClinicContextMiddleware.ContextKey, out var item)
+            || item is not Guid applicationId || applicationId == Guid.Empty)
+            return Task.CompletedTask; // missing or invalid X-Application-Id — deny
 
         // Parse the app_roles JSON claim: [{appId,appName,roleId,roleName}]
         var appRolesClaim = context.User.FindFirst("app_roles")?.Value;
@@ -63,7 +53,7 @@ public sealed class ClinicRoleAuthorizationHandler(IHttpContextAccessor httpCont
                 context.Succeed(requirement);
             }
         }
-        catch { /* malformed claim — deny */ }
+        catch (JsonException) { /* malformed claim — deny */ }
 
         return Task.CompletedTask;
     }

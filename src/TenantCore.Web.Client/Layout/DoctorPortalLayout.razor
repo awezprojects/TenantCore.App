@@ -37,7 +37,7 @@ else if (_isAuthenticated)
                 {
                     <div>
                         <div style="font-size:15px;font-weight:800;color:#fff;letter-spacing:-0.3px;">CloudClinic</div>
-                        <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.5px;">DOCTOR PORTAL</div>
+                        <div style="font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:0.5px;">CLINIC PORTAL</div>
                     </div>
                 }
             </div>
@@ -58,7 +58,7 @@ else if (_isAuthenticated)
                                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                                 @AuthState.CurrentUser.FullName
                             </div>
-                            <div style="font-size:10px;color:rgba(255,255,255,0.45);">Doctor</div>
+                            <div style="font-size:10px;color:rgba(255,255,255,0.45);">@_roleLabel</div>
                         </div>
                     </div>
                 </div>
@@ -66,9 +66,9 @@ else if (_isAuthenticated)
 
             <!-- Nav items -->
             <nav style="flex:1;padding:10px 8px;overflow-y:auto;">
-                <DoctorNavItem Href="/doctor/home"    Icon="🏥" Label="My Clinics"       SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
+                <DoctorNavItem Href="/select-clinic"  Icon="🏥" Label="My Clinics"       SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
                 <DoctorNavItem Href="/doctor/profile" Icon="👤" Label="My Profile"       SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
-                @if (!_hasOwnClinic)
+                @if (!_hasOwnClinic && _isDoctor)
                 {
                     <DoctorNavItem Href="/doctor/register-clinic" Icon="➕" Label="Register Clinic" SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
                 }
@@ -103,7 +103,7 @@ else if (_isAuthenticated)
                 <div style="display:flex;align-items:center;gap:10px;">
                     <div style="padding:5px 12px;background:#EFF6FF;border-radius:20px;
                                 font-size:11px;font-weight:700;color:#1565C0;border:1px solid #BFDBFE;">
-                        🩺 Doctor Portal
+                        🏥 Clinic Portal
                     </div>
                 </div>
             </div>
@@ -121,12 +121,15 @@ else if (_isAuthenticated)
     private bool _isAuthenticated;
     private bool _sidebarOpen = true;
     private bool _hasOwnClinic;
-    private string _initials = "DR";
-    private string _currentPath = "/doctor/home";
-    private string _pageTitle = "Doctor Portal";
+    private bool _isDoctor;
+    private string _roleLabel = "User";
+    private string _initials = "U";
+    private string _currentPath = "/select-clinic";
+    private string _pageTitle = "Clinic Portal";
 
     private static readonly Dictionary<string, string> _titles = new()
     {
+        ["/select-clinic"]           = "My Clinics",
         ["/doctor/home"]             = "My Clinics",
         ["/doctor/profile"]          = "My Profile",
         ["/doctor/change-password"]  = "Change Password",
@@ -171,6 +174,14 @@ else if (_isAuthenticated)
             _initials = string.Join("", name.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Take(2).Select(p => p[0].ToString().ToUpper()));
             _hasOwnClinic = AuthState.CurrentUser.UserApplications?.Any(a => a.IsOwner) ?? false;
+
+            var roles = AuthState.CurrentUser.UserRoles.Where(r => r.IsActive).Select(r => r.RoleName).ToList();
+            _isDoctor  = roles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+            _roleLabel = roles.FirstOrDefault(r =>
+                             r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+                             r.Equals("System Admin", StringComparison.OrdinalIgnoreCase))
+                         ?? roles.FirstOrDefault()
+                         ?? "User";
         }
 
         _checkingAuth = false;

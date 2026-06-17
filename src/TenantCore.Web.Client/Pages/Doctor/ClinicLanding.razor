@@ -1,3 +1,4 @@
+@page "/select-clinic"
 @page "/doctor/home"
 @layout DoctorPortalLayout
 @inject AuthStateService AuthState
@@ -24,39 +25,40 @@ else
         <!-- Greeting -->
         <div style="margin-bottom:28px;">
             <div style="font-size:26px;font-weight:800;color:#0A1628;letter-spacing:-0.5px;">
-                Welcome back, Dr. @_lastName 👋
+                Welcome back, @_displayName 👋
             </div>
             <div style="font-size:14px;color:#64748B;margin-top:4px;">
                 You're linked with
                 <strong style="color:#1565C0;">@_clinics.Count clinic@(_clinics.Count != 1 ? "s" : "")</strong>.
-                Select one to start your day.
+                Select one to continue.
             </div>
         </div>
 
         <!-- Top Stats Row -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;">
+        <div style="display:grid;grid-template-columns:@(_isDoctor ? "repeat(4,1fr)" : "repeat(2,1fr)");gap:14px;margin-bottom:28px;">
             <div class="cc-landing-stat">
                 <div class="cc-stat-label">LINKED CLINICS</div>
                 <div class="cc-stat-value">@_clinics.Count</div>
                 <div class="cc-stat-sub">Active practice locations</div>
             </div>
             <div class="cc-landing-stat">
-                <div class="cc-stat-label">TODAY'S APPOINTMENTS</div>
-                <div class="cc-stat-value" style="color:#1565C0;">@_totalAppts</div>
-                <div class="cc-stat-sub">Across all clinics</div>
+                <div class="cc-stat-label">YOUR ROLE</div>
+                <div class="cc-stat-value" style="font-size:18px;color:#1565C0;">@_primaryRole</div>
+                <div class="cc-stat-sub">Primary role</div>
             </div>
-            <div class="cc-landing-stat">
-                <div class="cc-stat-label">PENDING RX</div>
-                <div class="cc-stat-value" style="color:#D97706;">@_totalPendingRx</div>
-                <div class="cc-stat-sub">Awaiting completion</div>
-            </div>
-            <div class="cc-landing-stat">
-                <div class="cc-stat-label">OWN PRACTICE</div>
-                <div class="cc-stat-value" style="color:@(_hasOwnClinic ? "#16A34A" : "#94A3B8");">
-                    @(_hasOwnClinic ? "✓" : "—")
+            @if (_isDoctor)
+            {
+                <div class="cc-landing-stat">
+                    <div class="cc-stat-label">TODAY'S APPOINTMENTS</div>
+                    <div class="cc-stat-value" style="color:#1565C0;">@_totalAppts</div>
+                    <div class="cc-stat-sub">Across all clinics</div>
                 </div>
-                <div class="cc-stat-sub">@(_hasOwnClinic ? "Registered" : "Not registered")</div>
-            </div>
+                <div class="cc-landing-stat">
+                    <div class="cc-stat-label">PENDING RX</div>
+                    <div class="cc-stat-value" style="color:#D97706;">@_totalPendingRx</div>
+                    <div class="cc-stat-sub">Awaiting completion</div>
+                </div>
+            }
         </div>
 
         <!-- Section Heading -->
@@ -201,8 +203,8 @@ else
                 </div>
             }
 
-            <!-- Register own clinic card -->
-            @if (!_hasOwnClinic)
+            <!-- Register own clinic card — doctors only -->
+            @if (!_hasOwnClinic && _isDoctor)
             {
                 <div class="cc-add-clinic-card" @onclick="RegisterClinic">
                     <div style="width:64px;height:64px;border-radius:18px;
@@ -226,7 +228,7 @@ else
             }
         </div>
 
-        @if (_hasOwnClinic)
+        @if (_hasOwnClinic && _isDoctor)
         {
             <div style="background:#fff;border-radius:14px;padding:16px 20px;
                         border:1px solid #E2E8F0;display:flex;
@@ -251,7 +253,9 @@ else
 
 @code {
     private bool   _loading        = true;
-    private string _lastName       = string.Empty;
+    private string _displayName    = string.Empty;
+    private string _primaryRole    = string.Empty;
+    private bool   _isDoctor;
     private bool   _hasOwnClinic;
     private int    _totalAppts;
     private int    _totalPendingRx;
@@ -274,7 +278,16 @@ else
         }
 
         var user = AuthState.CurrentUser;
-        _lastName = user?.LastName ?? user?.FullName?.Split(' ').LastOrDefault() ?? "Doctor";
+        var allRoles = user?.UserRoles.Where(r => r.IsActive).Select(r => r.RoleName).ToList() ?? [];
+        _isDoctor    = allRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+        _primaryRole = allRoles.FirstOrDefault(r =>
+                           r.Equals("Clinic Admin",  StringComparison.OrdinalIgnoreCase) ||
+                           r.Equals("System Admin",  StringComparison.OrdinalIgnoreCase))
+                       ?? allRoles.FirstOrDefault()
+                       ?? "User";
+        _displayName = _isDoctor
+            ? $"Dr. {user?.LastName ?? user?.FullName?.Split(' ').LastOrDefault() ?? "Doctor"}"
+            : user?.FirstName ?? user?.FullName ?? "User";
 
         await LoadClinicsAsync(user?.UserId ?? Guid.Empty);
         _hasOwnClinic = _clinics.Any(c => c.Clinic.IsOwner);
@@ -300,7 +313,8 @@ else
             int? appts = null;
             int? rx    = null;
 
-            if (userId != Guid.Empty)
+            // Only fetch appointment/RX stats for doctor users — non-doctors have no OPD queue.
+            if (userId != Guid.Empty && _isDoctor)
             {
                 var opdRes = await ClinicApi.GetOpdRegistrationsAsync(
                     page: 1, pageSize: 1, doctorUserId: userId, todayOnly: true,
@@ -326,7 +340,13 @@ else
     {
         var clinic = _clinics.FirstOrDefault(c => c.Clinic.ApplicationId == appId);
         await ClinicContext.SetClinicAsync(appId, clinic?.Clinic.ClinicName ?? string.Empty);
-        Nav.NavigateTo("/dashboard");
+
+        // Route to the correct dashboard based on the user's role in this specific clinic.
+        var roles = clinic?.Clinic.UserRoles ?? [];
+        var isClinicAdmin = roles.Any(r =>
+            r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
+            r.Equals("System Admin", StringComparison.OrdinalIgnoreCase));
+        Nav.NavigateTo(isClinicAdmin ? "/admin/dashboard" : "/dashboard");
     }
 
     private async Task EnterClinicAsDoctor(Guid appId)
