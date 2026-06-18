@@ -254,6 +254,12 @@ else
         await AuthState.InitializeAsync();
         await ClinicContext.InitializeAsync();
 
+        if (!AuthState.IsClinicAdmin(ClinicContext.SelectedApplicationId))
+        {
+            Nav.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+
         _firstName = AuthState.CurrentUser?.FullName.Split(' ').FirstOrDefault() ?? "Admin";
         _greeting = GetGreeting();
 

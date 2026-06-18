@@ -15,12 +15,14 @@ namespace TenantCore.Api.Controllers;
 public class ObstetricController(ISender sender) : ClinicControllerBase
 {
     [HttpGet("prescriptions/{prescriptionId:guid}/dates")]
+    [Authorize(Policy = AuthPolicies.RequireClinical)]
     [ProducesResponseType(typeof(ObstetricDatesDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetObstetricDates(Guid prescriptionId, CancellationToken ct)
         => Ok(await sender.Send(new GetObstetricDatesQuery(prescriptionId, GetApplicationId()), ct));
 
     [HttpGet("patients/{patientId:guid}/usg-chart")]
+    [Authorize(Policy = AuthPolicies.RequireClinical)]
     [ProducesResponseType(typeof(UsgChartDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUsgChart(Guid patientId, CancellationToken ct)
         => Ok(await sender.Send(new GetUsgChartByPatientQuery(patientId, GetApplicationId()), ct));

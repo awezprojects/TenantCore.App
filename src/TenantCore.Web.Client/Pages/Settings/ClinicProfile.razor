@@ -3,6 +3,8 @@
 @inject IApplicationApiClient AppClient
 @inject ClinicContextService ClinicContext
 @inject ISnackbar Snackbar
+@inject AuthStateService AuthState
+@inject NavigationManager Navigation
 @using TenantCore.Shared.Dtos.Auth
 @using TenantCore.Web.Client.Clients
 @using TenantCore.Web.Client.Services
@@ -96,6 +98,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+        if (!AuthState.IsClinicAdmin(ClinicContext.SelectedApplicationId))
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+
         _clinicId = ClinicContext.SelectedApplicationId;
         if (_clinicId == Guid.Empty)
         {

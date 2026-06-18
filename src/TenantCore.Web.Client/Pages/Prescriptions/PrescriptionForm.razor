@@ -10,6 +10,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
 @inject IJSRuntime JS
 @using TenantCore.Shared.Dtos
 @using TenantCore.Shared.Enums
@@ -1361,8 +1362,20 @@ else
         _ => "💊"
     };
 
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+        if (!AuthState.IsClinical(ClinicContext.SelectedApplicationId))
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+    }
+
     protected override async Task OnParametersSetAsync()
     {
+        if (!AuthState.IsClinical(ClinicContext.SelectedApplicationId)) return;
         _loading = true;
         try
         {

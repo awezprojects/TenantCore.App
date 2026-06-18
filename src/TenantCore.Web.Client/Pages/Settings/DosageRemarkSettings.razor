@@ -2,6 +2,9 @@
 @layout AuthorizedLayout
 @inject IPrescriptionApiClient PrescriptionClient
 @inject ISnackbar Snackbar
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject NavigationManager Navigation
 @using TenantCore.Shared.Dtos
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Clients
@@ -80,7 +83,17 @@
     private string? _remarkHindi;
     private string? _remarkMarathi;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+        if (!AuthState.IsClinical(ClinicContext.SelectedApplicationId))
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

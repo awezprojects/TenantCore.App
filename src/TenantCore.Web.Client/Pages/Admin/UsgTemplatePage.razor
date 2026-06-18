@@ -2,6 +2,8 @@
 @layout AuthorizedLayout
 @inject IUsgTemplateApiClient UsgTemplateClient
 @inject NavigationManager Navigation
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
 @using TenantCore.Shared.Dtos
 @using TenantCore.Web.Client.Clients
 
@@ -174,6 +176,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+        if (!AuthState.IsClinicAdmin(ClinicContext.SelectedApplicationId))
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+
         var r = await UsgTemplateClient.GetClinicTemplateAsync();
         if (r.Success) _template = r.Data;
         if (_template is not null) LoadFromTemplate(_template);

@@ -25,6 +25,7 @@ public class DoctorProfileController(ISender sender) : ClinicControllerBase
     }
 
     [HttpPut]
+    [Authorize(Policy = AuthPolicies.RequireClinical)]
     [ProducesResponseType(typeof(DoctorProfileDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

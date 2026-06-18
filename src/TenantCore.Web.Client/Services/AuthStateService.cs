@@ -155,4 +155,26 @@ public class AuthStateService
             .Select(r => r.RoleName)
             .ToList();
     }
+
+    /// <summary>
+    /// Returns true if the current user holds the ClinicAdmin or SystemAdmin role for the given clinic.
+    /// </summary>
+    public bool IsClinicAdmin(Guid applicationId)
+    {
+        var roles = GetRolesForApplication(applicationId);
+        return roles.Any(r =>
+            r.Equals(TenantCore.Shared.Authorization.AppRoles.ClinicAdmin, StringComparison.OrdinalIgnoreCase) ||
+            r.Equals(TenantCore.Shared.Authorization.AppRoles.SystemAdmin, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Returns true if the current user holds any clinical role (Doctor, ClinicAdmin, ClinicManager, SystemAdmin) for the given clinic.
+    /// </summary>
+    public bool IsClinical(Guid applicationId)
+    {
+        var roles = GetRolesForApplication(applicationId);
+        return roles.Any(r =>
+            TenantCore.Shared.Authorization.AppRoles.ClinicalRoles
+                .Contains(r, StringComparer.OrdinalIgnoreCase));
+    }
 }

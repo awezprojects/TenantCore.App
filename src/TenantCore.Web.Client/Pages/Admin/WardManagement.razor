@@ -3,6 +3,8 @@
 @inject IClinicApiClient ClinicApi
 @inject ISnackbar Snackbar
 @inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject NavigationManager Navigation
 @using TenantCore.Web.Client.Clients
 
 <PageTitle>Wards, Rooms & Beds - CloudClinic</PageTitle>
@@ -364,7 +366,17 @@ else
     private Func<Task>? _deleteAction;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+        if (!AuthState.IsClinicAdmin(ClinicContext.SelectedApplicationId))
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

@@ -3,6 +3,8 @@
 @inject IPrescriptionApiClient PrescriptionClient
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Clients
 
@@ -221,7 +223,17 @@
         ("custom", "Custom")
     ];
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+        if (!AuthState.IsClinical(ClinicContext.SelectedApplicationId))
+        {
+            Navigation.NavigateTo("/dashboard", replace: true);
+            return;
+        }
+        await LoadAsync();
+    }
 
     private void OnFromDateChanged(ChangeEventArgs e)
     {
