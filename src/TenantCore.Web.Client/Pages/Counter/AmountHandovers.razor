@@ -1,0 +1,444 @@
+@page "/amount-handovers"
+@layout AuthorizedLayout
+@using TenantCore.Web.Client.Helpers
+@inject IAmountHandoverApiClient HandoverClient
+@inject ICounterSessionApiClient CounterSessionClient
+@inject IApplicationApiClient AppClient
+@inject ClinicContextService ClinicContext
+@inject ISnackbar Snackbar
+@inject AuthStateService AuthState
+@using TenantCore.Shared.Enums
+@using TenantCore.Shared.Authorization
+@using TenantCore.Shared.Dtos.Auth
+
+<PageTitle>Amount Handovers - CloudClinic</PageTitle>
+
+<div class="opd-page">
+
+    <div class="opd-header">
+        <div>
+            <div class="opd-title">Amount Handovers</div>
+            <div class="opd-subtitle">Finance &middot; @DateTime.Now.ToString("dddd, dd MMMM yyyy")</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            @if (_isReception)
+            {
+                <button class="opd-btn-primary" @onclick="OpenCreateDialog">+ New Handover</button>
+            }
+            @if (_isAdminOrDoctor)
+            {
+                <button class="opd-btn-primary" style="background:#059669;border-color:#059669;" @onclick="OpenCollectDialog">💰 Collect from Reception</button>
+            }
+        </div>
+    </div>
+
+    <!-- Date filter -->
+    <div class="opd-filter-bar" style="flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="today"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("today")'>Today</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="yesterday"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("yesterday")'>Yesterday</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="7d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("7d")'>Last 7 Days</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="30d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("30d")'>Last 30 Days</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="all"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("all")'>All</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+            <input type="date" class="opd-search-input" style="width:130px;padding:6px 8px;font-size:12px;" @bind="_fromDate" @bind:event="onchange" />
+            <span style="font-size:12px;color:#64748B;">–</span>
+            <input type="date" class="opd-search-input" style="width:130px;padding:6px 8px;font-size:12px;" @bind="_toDate" @bind:event="onchange" />
+            <button class="opd-btn-primary" style="padding:6px 14px;font-size:12px;" @onclick="LoadAsync">Apply</button>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        @if (_forMe.Any())
+        {
+            <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">
+                Handovers For Me
+                <span style="font-size:12px;font-weight:400;color:#64748B;margin-left:6px;">(pending your action)</span>
+            </div>
+            <div class="opd-table-card" style="padding:0;margin-bottom:20px;">
+                <table class="opd-table">
+                    <thead>
+                        <tr><th>Amount</th><th>Sent To Role</th><th>Status</th><th>Sent At</th><th style="width:160px;">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _forMe)
+                        {
+                            <tr>
+                                <td><strong style="font-size:15px;">Rs. @item.Amount.ToString("N2")</strong></td>
+                                <td>
+                                    <span style="background:#EFF6FF;color:#1D4ED8;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;">
+                                        @item.HandedOverToRoleName
+                                    </span>
+                                </td>
+                                <td>@StatusBadge(item.Status)</td>
+                                <td style="font-size:12px;color:#64748B;">@DateTimeHelper.ToLocalString(item.HandedOverAt)</td>
+                                <td>
+                                    @if (item.Status == HandoverStatus.Pending)
+                                    {
+                                        <div style="display:flex;gap:6px;">
+                                            <button style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;"
+                                                    @onclick="@(() => AcceptAsync(item.Id))" disabled="@_saving">
+                                                ✓ Accept
+                                            </button>
+                                            <button style="background:transparent;border:1px solid #DC2626;color:#DC2626;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;"
+                                                    @onclick="@(() => OpenDisputeDialog(item.Id))" disabled="@_saving">
+                                                ✕ Dispute
+                                            </button>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">All Handovers</div>
+        <div class="opd-table-card" style="padding:0;">
+            <table class="opd-table">
+                <thead>
+                    <tr><th>Amount</th><th>Sent To Role</th><th>Status</th><th>Sent At</th></tr>
+                </thead>
+                <tbody>
+                    @if (!_all.Any())
+                    {
+                        <tr><td colspan="4" class="opd-empty">No handovers found for the selected period.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in _all)
+                        {
+                            <tr>
+                                <td><strong>Rs. @item.Amount.ToString("N2")</strong></td>
+                                <td>
+                                    <span style="background:#EFF6FF;color:#1D4ED8;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;">
+                                        @item.HandedOverToRoleName
+                                    </span>
+                                </td>
+                                <td>@StatusBadge(item.Status)</td>
+                                <td style="font-size:12px;color:#64748B;">@DateTimeHelper.ToLocalString(item.HandedOverAt)</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Create Handover Dialog -->
+<MudDialog @bind-Visible="_createVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">New Amount Handover</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (_usersLoading)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="56px" />
+            }
+            else if (_handoverUsers.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">No admin or doctor users found.</MudAlert>
+            }
+            else
+            {
+                @* Each entry is one user+role — a user with two roles appears twice *@
+                <MudSelect T="ApplicationUserResponseDto?" @bind-Value="_selectedHandoverUser"
+                           Label="Handover To *"
+                           Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomLeft"
+                           Placeholder="Select recipient and role">
+                    @foreach (var user in _handoverUsers)
+                    {
+                        <MudSelectItem T="ApplicationUserResponseDto?" Value="@user">
+                            @user.FullName
+                            <span style="color:#94A3B8;font-size:0.75rem;margin-left:8px;">(@user.RoleName)</span>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            <MudNumericField @bind-Value="_amount" Label="Amount (Rs.) *" Min="0.01m" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _createVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateAsync"
+                   Disabled="@(_saving || _selectedHandoverUser is null || _handoverUsers.Count == 0)">
+            @(_saving ? "Sending..." : "Send")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Collect from Reception Dialog (admin/doctor) -->
+<MudDialog @bind-Visible="_collectVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">💰 Collect from Reception</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (_activeSessions.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">No active counter sessions found.</MudAlert>
+            }
+            else
+            {
+                <MudSelect T="CounterSessionSummaryDto?" Value="_selectedSession"
+                           ValueChanged="OnSessionSelected"
+                           Label="Reception Session *" Variant="Variant.Outlined"
+                           AnchorOrigin="Origin.BottomLeft">
+                    @foreach (var s in _activeSessions)
+                    {
+                        <MudSelectItem T="CounterSessionSummaryDto?" Value="@s">
+                            @s.SessionDate.ToString("dd MMM yyyy")
+                            <span style="color:#94A3B8;font-size:0.75rem;margin-left:6px;">
+                                — Net: Rs. @s.NetAmount.ToString("N0")
+                            </span>
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            <MudNumericField @bind-Value="_collectAmount" Label="Amount (Rs.) *" Min="0.01m" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_collectNotes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _collectVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled"
+                   OnClick="CollectAsync"
+                   Disabled="@(_saving || _selectedSession is null)">
+            @(_saving ? "Collecting..." : "✓ Collect & Accept")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Dispute Dialog -->
+<MudDialog @bind-Visible="_disputeVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">Dispute Handover</MudText></TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_resolutionNotes" Label="Resolution Notes *" Variant="Variant.Outlined" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _disputeVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DisputeAsync" Disabled="@_saving">
+            @(_saving ? "Disputing..." : "Dispute")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private static readonly string[] HandoverTargetRoles =
+        [AppRoles.ClinicAdmin, AppRoles.ClinicManager, AppRoles.Doctor];
+
+    private bool _loading = true;
+    private bool _usersLoading;
+    private bool _createVisible;
+    private bool _collectVisible;
+    private bool _disputeVisible;
+    private bool _saving;
+    private string _preset = "today";
+
+    private DateTime? _fromDate = DateTime.Today;
+    private DateTime? _toDate = DateTime.Today;
+
+    private List<AmountHandoverSummaryDto> _all = [];
+    private List<AmountHandoverSummaryDto> _forMe = [];
+    private List<ApplicationUserResponseDto> _handoverUsers = [];
+    private List<CounterSessionSummaryDto> _activeSessions = [];
+    private CounterSessionDto? _activeSession;
+    private Guid? _disputingId;
+
+    // Role helpers
+    private bool _isReception => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+        .Any(r => string.Equals(r, AppRoles.Receptionist, StringComparison.OrdinalIgnoreCase));
+    private bool _isAdminOrDoctor => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+        .Any(r => string.Equals(r, AppRoles.ClinicAdmin, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(r, AppRoles.ClinicManager, StringComparison.OrdinalIgnoreCase));
+
+    // Create dialog (reception)
+    private ApplicationUserResponseDto? _selectedHandoverUser;
+    private decimal _amount;
+    private string? _notes;
+
+    // Collect dialog (admin/doctor)
+    private CounterSessionSummaryDto? _selectedSession;
+    private decimal _collectAmount;
+    private string? _collectNotes;
+
+    private string? _resolutionNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var session = await CounterSessionClient.GetActiveAsync();
+        _activeSession = session.Success && session.Data is not null ? session.Data : null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var currentUserId = AuthState.CurrentUser?.UserId;
+        // Current user's roles — used to filter "for me" correctly when user holds multiple roles
+        var currentRoles = AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var response = await HandoverClient.GetAllAsync(_fromDate, _toDate);
+        if (response.Success && response.Data is not null)
+        {
+            _all = response.Data.ToList();
+            // A handover is "for me" only if it was addressed to my userId AND to a role I actually hold.
+            // This correctly handles users with two roles (Doctor + Clinic Admin).
+            _forMe = currentUserId.HasValue
+                ? _all.Where(h =>
+                    h.HandedOverToUserId == currentUserId.Value &&
+                    currentRoles.Contains(h.HandedOverToRoleName)).ToList()
+                : [];
+        }
+        else
+        {
+            _all = [];
+            _forMe = [];
+        }
+        _loading = false;
+    }
+
+    private async Task ApplyPreset(string preset)
+    {
+        _preset = preset;
+        var today = DateTime.Today;
+        (_fromDate, _toDate) = preset switch
+        {
+            "today"     => ((DateTime?)today, (DateTime?)today),
+            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
+            "7d"        => (today.AddDays(-6), today),
+            "30d"       => (today.AddDays(-29), today),
+            "all"       => (null, null),
+            _           => (_fromDate, _toDate)
+        };
+        await LoadAsync();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        _selectedHandoverUser = null;
+        _amount = _activeSession?.NetAmount ?? 0;
+        _notes = null;
+        _createVisible = true;
+        await LoadHandoverUsersAsync();
+    }
+
+    private void OnSessionSelected(CounterSessionSummaryDto? session)
+    {
+        _selectedSession = session;
+        _collectAmount   = session?.NetAmount ?? 0;
+    }
+
+    private async Task OpenCollectDialog()
+    {
+        _selectedSession = null;
+        _collectAmount = 0;
+        _collectNotes = null;
+        _collectVisible = true;
+        var resp = await CounterSessionClient.GetAllActiveAsync();
+        _activeSessions = resp.Success && resp.Data is not null ? resp.Data.ToList() : [];
+        if (_activeSessions.Count == 1)
+        {
+            _selectedSession = _activeSessions[0];
+            _collectAmount = _selectedSession.NetAmount;
+        }
+        StateHasChanged();
+    }
+
+    private async Task LoadHandoverUsersAsync()
+    {
+        _usersLoading = true;
+        StateHasChanged();
+        var currentUserId = AuthState.CurrentUser?.UserId;
+        var response = await AppClient.GetApplicationUsersAsync(ClinicContext.SelectedApplicationId);
+        // One entry per user-role assignment — a user with Doctor + ClinicAdmin gets 2 entries.
+        // Reception selects exactly which role to hand money to.
+        _handoverUsers = response.Success && response.Data is not null
+            ? response.Data
+                .Where(u => u.IsActive
+                    && u.UserId != currentUserId
+                    && u.RoleName is not null
+                    && HandoverTargetRoles.Contains(u.RoleName))
+                .OrderBy(u => u.RoleName)
+                .ThenBy(u => u.FullName)
+                .ToList()
+            : [];
+        _usersLoading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_selectedHandoverUser is null) { Snackbar.Add("Select a recipient and role.", Severity.Warning); return; }
+        if (_activeSession is null) { Snackbar.Add("No active session. Open a counter session first.", Severity.Warning); return; }
+        _saving = true;
+        var response = await HandoverClient.CreateAsync(new CreateAmountHandoverRequest
+        {
+            CounterSessionId = _activeSession.Id,
+            HandedOverToUserId = _selectedHandoverUser.UserId,
+            HandedOverToRoleName = _selectedHandoverUser.RoleName ?? string.Empty,
+            Amount = _amount,
+            Notes = _notes
+        });
+        if (response.Success) { Snackbar.Add("Handover sent.", Severity.Success); _createVisible = false; await LoadAsync(); }
+        else Snackbar.Add(response.Message ?? "Failed to create handover.", Severity.Error);
+        _saving = false;
+    }
+
+    private async Task CollectAsync()
+    {
+        if (_selectedSession is null) { Snackbar.Add("Select a reception session.", Severity.Warning); return; }
+        _saving = true;
+        var response = await HandoverClient.CollectAsync(new CollectAmountHandoverRequest
+        {
+            CounterSessionId = _selectedSession.Id,
+            Amount = _collectAmount,
+            Notes  = _collectNotes
+        });
+        if (response.Success)
+        {
+            Snackbar.Add("Collected and accepted.", Severity.Success);
+            _collectVisible = false;
+            await LoadAsync();
+        }
+        else Snackbar.Add(response.Message ?? "Failed.", Severity.Error);
+        _saving = false;
+    }
+
+    private async Task AcceptAsync(Guid id)
+    {
+        _saving = true;
+        var response = await HandoverClient.AcceptAsync(id);
+        if (response.Success) { Snackbar.Add("Handover accepted.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(response.Message ?? "Failed to accept.", Severity.Error);
+        _saving = false;
+    }
+
+    private void OpenDisputeDialog(Guid id) { _disputingId = id; _resolutionNotes = null; _disputeVisible = true; }
+
+    private async Task DisputeAsync()
+    {
+        if (_disputingId is null) return;
+        _saving = true;
+        var response = await HandoverClient.DisputeAsync(_disputingId.Value,
+            new ResolveAmountHandoverRequest { ResolutionNotes = _resolutionNotes });
+        if (response.Success) { Snackbar.Add("Handover disputed.", Severity.Success); _disputeVisible = false; await LoadAsync(); }
+        else Snackbar.Add(response.Message ?? "Failed to dispute.", Severity.Error);
+        _saving = false;
+    }
+
+    private static MarkupString StatusBadge(HandoverStatus status) => status switch
+    {
+        HandoverStatus.Accepted => new MarkupString("<span style=\"background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">✓ Accepted</span>"),
+        HandoverStatus.Disputed => new MarkupString("<span style=\"background:#FEE2E2;color:#991B1B;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">✕ Disputed</span>"),
+        _                       => new MarkupString("<span style=\"background:#FEF3C7;color:#92400E;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">⏳ Pending</span>")
+    };
+}

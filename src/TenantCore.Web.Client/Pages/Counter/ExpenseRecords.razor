@@ -1,0 +1,398 @@
+@page "/expense-records"
+@layout AuthorizedLayout
+@using TenantCore.Web.Client.Helpers
+@using TenantCore.Shared.Authorization
+@inject IExpenseRecordApiClient ExpenseRecordClient
+@inject IExpenseCategoryApiClient ExpenseCategoryClient
+@inject ICounterSessionApiClient CounterSessionClient
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject ISnackbar Snackbar
+
+<PageTitle>Expenses - CloudClinic</PageTitle>
+
+<div class="opd-page">
+
+    <div class="opd-header">
+        <div>
+            <div class="opd-title">Expense Records</div>
+            <div class="opd-subtitle">Counter &middot; @DateTime.Now.ToString("dddd, dd MMMM yyyy")</div>
+        </div>
+        <button class="opd-btn-primary" @onclick="OpenAddDialog">+ Add Expense</button>
+    </div>
+
+    <!-- Date filter bar -->
+    <div class="opd-filter-bar" style="flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="opd-btn @(_preset == "today" ? "active" : "")" style="padding:6px 14px;font-size:12px;@(_preset=="today"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("today")'>Today</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="yesterday"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("yesterday")'>Yesterday</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="7d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("7d")'>Last 7 Days</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="30d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("30d")'>Last 30 Days</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="all"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("all")'>All</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+            <input type="date" class="opd-search-input" style="width:130px;padding:6px 8px;font-size:12px;"
+                   @bind="_fromDate" @bind:event="onchange" @oninput="ClearPreset" />
+            <span style="font-size:12px;color:#64748B;">–</span>
+            <input type="date" class="opd-search-input" style="width:130px;padding:6px 8px;font-size:12px;"
+                   @bind="_toDate" @bind:event="onchange" @oninput="ClearPreset" />
+            <button class="opd-btn-primary" style="padding:6px 14px;font-size:12px;" @onclick="LoadAsync">Apply</button>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        @if (_items.Any())
+        {
+            var totalBill    = _items.Sum(i => i.Amount);
+            var totalPaid    = _items.Sum(i => i.PaidAmount);
+            var totalPending = totalBill - totalPaid;
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+                <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 20px;min-width:140px;">
+                    <div style="font-size:11px;font-weight:600;color:#991B1B;text-transform:uppercase;letter-spacing:.5px;">Total Bill</div>
+                    <div style="font-size:20px;font-weight:700;color:#DC2626;">Rs. @totalBill.ToString("N0")</div>
+                </div>
+                <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 20px;min-width:140px;">
+                    <div style="font-size:11px;font-weight:600;color:#166534;text-transform:uppercase;letter-spacing:.5px;">Paid</div>
+                    <div style="font-size:20px;font-weight:700;color:#16A34A;">Rs. @totalPaid.ToString("N0")</div>
+                </div>
+                @if (totalPending > 0)
+                {
+                    <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 20px;min-width:140px;">
+                        <div style="font-size:11px;font-weight:600;color:#92400E;text-transform:uppercase;letter-spacing:.5px;">Pending</div>
+                        <div style="font-size:20px;font-weight:700;color:#D97706;">Rs. @totalPending.ToString("N0")</div>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="opd-table-card">
+            <table class="opd-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Bill Amount</th>
+                        <th>Paid</th>
+                        <th>Pending</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                        <th>Recorded At</th>
+                        <th style="width:110px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!_items.Any())
+                    {
+                        <tr><td colspan="8" class="opd-empty">No expense records found for the selected period.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in _items)
+                        {
+                            var pending = item.Amount - item.PaidAmount;
+                            var isPaid = item.PaidAmount >= item.Amount;
+                            var isPartial = item.PaidAmount > 0 && !isPaid;
+                            <tr>
+                                <td><strong>@item.CategoryName</strong></td>
+                                <td style="color:#DC2626;font-weight:600;">Rs. @item.Amount.ToString("N2")</td>
+                                <td style="color:#16A34A;font-weight:600;">Rs. @item.PaidAmount.ToString("N2")</td>
+                                <td style="color:@(pending > 0 ? "#D97706" : "#94A3B8");font-weight:600;">Rs. @pending.ToString("N2")</td>
+                                <td>@StatusBadge(isPaid, isPartial)</td>
+                                <td style="color:#64748B;font-size:12px;">@(item.Notes ?? "—")</td>
+                                <td style="font-size:12px;color:#475569;">@DateTimeHelper.ToLocalString(item.RecordedAt, "dd MMM HH:mm")</td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:6px;">
+                                        @if (!isPaid)
+                                        {
+                                            <button style="background:#2563EB;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;"
+                                                    @onclick="@(() => OpenPayDialog(item))">
+                                                Pay
+                                            </button>
+                                        }
+                                        @if (_isAdmin)
+                                        {
+                                            <button style="background:#2563EB;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:14px;cursor:pointer;line-height:1;"
+                                                    title="Edit" @onclick="@(() => OpenEditDialog(item))">
+                                                ✏️
+                                            </button>
+                                            <button style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:14px;cursor:pointer;line-height:1;"
+                                                    title="Delete" @onclick="@(() => ConfirmDelete(item.Id))">
+                                                🗑
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Add Expense Dialog -->
+<MudDialog @bind-Visible="_addVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">Add Expense</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="Guid?" @bind-Value="_expenseCategoryId" Label="Category *" Variant="Variant.Outlined" Placeholder="Select category">
+                @foreach (var cat in _categories)
+                {
+                    <MudSelectItem T="Guid?" Value="@((Guid?)cat.Id)">@cat.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudNumericField @bind-Value="_amount" Label="Bill Amount (Rs.) *" Min="0.01m" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _addVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync"
+                   Disabled="@(_saving || _expenseCategoryId is null)">
+            @(_saving ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Pay Dialog -->
+<MudDialog @bind-Visible="_payVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">Record Payment — @_payingItem?.CategoryName</MudText></TitleContent>
+    <DialogContent>
+        @if (_payingItem is not null)
+        {
+            var remaining = _payingItem.Amount - _payingItem.PaidAmount;
+            <MudStack Spacing="3">
+                <div style="background:#F8FAFC;border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;">
+                    <div>
+                        <div style="font-size:11px;color:#64748B;font-weight:600;">TOTAL BILL</div>
+                        <div style="font-size:18px;font-weight:700;color:#DC2626;">Rs. @_payingItem.Amount.ToString("N2")</div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:#64748B;font-weight:600;">ALREADY PAID</div>
+                        <div style="font-size:18px;font-weight:700;color:#16A34A;">Rs. @_payingItem.PaidAmount.ToString("N2")</div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:#64748B;font-weight:600;">REMAINING</div>
+                        <div style="font-size:18px;font-weight:700;color:#D97706;">Rs. @remaining.ToString("N2")</div>
+                    </div>
+                </div>
+                <MudNumericField @bind-Value="_payAmount" Label="Amount Paying Now (Rs.) *"
+                                 Min="0.01m" Max="@remaining" Variant="Variant.Outlined" />
+                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
+                           OnClick="@(() => _payAmount = remaining)">
+                    Pay Full Remaining (Rs. @remaining.ToString("N2"))
+                </MudButton>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _payVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ConfirmPayAsync"
+                   Disabled="@(_saving || _payAmount <= 0)">
+            @(_saving ? "Processing..." : "Confirm Payment")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Edit Expense Dialog -->
+<MudDialog @bind-Visible="_editVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">Edit Expense — @_editingItem?.CategoryName</MudText></TitleContent>
+    <DialogContent>
+        @if (_editingItem is not null)
+        {
+            <MudStack Spacing="3">
+                @if (_editingItem.PaidAmount > 0)
+                {
+                    <div style="background:#FEF9C3;border:1px solid #FDE68A;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400E;">
+                        ⚠️ Rs. @_editingItem.PaidAmount.ToString("N2") already paid — new amount cannot be less than this.
+                    </div>
+                }
+                <MudNumericField @bind-Value="_editAmount" Label="Amount (Rs.) *"
+                                 Min="@_editingItem.PaidAmount" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_editNotes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _editVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveEditAsync"
+                   Disabled="@(_saving || _editAmount <= 0)">
+            @(_saving ? "Saving..." : "Save Changes")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Delete Confirmation Dialog -->
+<MudDialog @bind-Visible="_deleteVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">Delete Expense?</MudText></TitleContent>
+    <DialogContent>
+        <MudText>This expense record will be permanently removed. Are you sure?</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _deleteVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeleteAsync" Disabled="_saving">
+            @(_saving ? "Deleting..." : "Delete")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _addVisible;
+    private bool _payVisible;
+    private bool _deleteVisible;
+    private bool _saving;
+    private bool _isAdmin;
+    private List<ExpenseRecordSummaryDto> _items = [];
+    private List<ExpenseCategorySummaryDto> _categories = [];
+    private Guid? _activeSessionId;
+    private string _preset = "today";
+
+    private DateTime? _fromDate = DateTime.Today;
+    private DateTime? _toDate = DateTime.Today;
+
+    // Add dialog
+    private Guid? _expenseCategoryId;
+    private decimal _amount;
+    private string? _notes;
+
+    // Pay dialog
+    private ExpenseRecordSummaryDto? _payingItem;
+    private decimal _payAmount;
+
+    // Edit dialog
+    private bool _editVisible;
+    private ExpenseRecordSummaryDto? _editingItem;
+    private decimal _editAmount;
+    private string? _editNotes;
+
+    // Delete dialog
+    private Guid _deletingId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAdmin = AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+            .Any(r => string.Equals(r, AppRoles.ClinicAdmin, StringComparison.OrdinalIgnoreCase));
+
+        var catResponse = await ExpenseCategoryClient.GetAllAsync();
+        if (catResponse.Success && catResponse.Data is not null)
+            _categories = catResponse.Data.Where(c => c.IsActive).ToList();
+
+        var session = await CounterSessionClient.GetActiveAsync();
+        _activeSessionId = session.Success && session.Data is not null ? session.Data.Id : null;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await ExpenseRecordClient.GetAllAsync(_fromDate, _toDate);
+        _items = response.Success && response.Data is not null ? response.Data.ToList() : [];
+        _loading = false;
+    }
+
+    private async Task ApplyPreset(string preset)
+    {
+        _preset = preset;
+        var today = DateTime.Today;
+        (_fromDate, _toDate) = preset switch
+        {
+            "today"     => ((DateTime?)today, (DateTime?)today),
+            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
+            "7d"        => (today.AddDays(-6), today),
+            "30d"       => (today.AddDays(-29), today),
+            "all"       => (null, null),
+            _           => (_fromDate, _toDate)
+        };
+        await LoadAsync();
+    }
+
+    private void ClearPreset() => _preset = string.Empty;
+
+    private void OpenAddDialog()
+    {
+        _expenseCategoryId = _categories.Count > 0 ? (Guid?)_categories[0].Id : null;
+        _amount = 0;
+        _notes = null;
+        _addVisible = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_expenseCategoryId is null) { Snackbar.Add("Select a category.", Severity.Warning); return; }
+        _saving = true;
+        var response = await ExpenseRecordClient.CreateAsync(new CreateExpenseRecordRequest
+        {
+            ExpenseCategoryId = _expenseCategoryId.Value,
+            Amount = _amount,
+            Notes = _notes,
+            CounterSessionId = _activeSessionId
+        });
+        if (response.Success) { Snackbar.Add("Expense recorded.", Severity.Success); _addVisible = false; await LoadAsync(); }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private void OpenPayDialog(ExpenseRecordSummaryDto item)
+    {
+        _payingItem = item;
+        _payAmount = item.Amount - item.PaidAmount;
+        _payVisible = true;
+    }
+
+    private async Task ConfirmPayAsync()
+    {
+        if (_payingItem is null || _payAmount <= 0) return;
+        _saving = true;
+        var response = await ExpenseRecordClient.PayAsync(_payingItem.Id, new PayExpenseRecordRequest { PayAmount = _payAmount });
+        if (response.Success) { Snackbar.Add($"Rs. {_payAmount:N2} payment recorded.", Severity.Success); _payVisible = false; await LoadAsync(); }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private void OpenEditDialog(ExpenseRecordSummaryDto item)
+    {
+        _editingItem = item;
+        _editAmount = item.Amount;
+        _editNotes = item.Notes;
+        _editVisible = true;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_editingItem is null || _editAmount <= 0) return;
+        _saving = true;
+        var response = await ExpenseRecordClient.UpdateAsync(_editingItem.Id, new UpdateExpenseRecordRequest
+        {
+            Amount = _editAmount,
+            Notes = _editNotes
+        });
+        if (response.Success) { Snackbar.Add("Expense updated.", Severity.Success); _editVisible = false; await LoadAsync(); }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private void ConfirmDelete(Guid id) { _deletingId = id; _deleteVisible = true; }
+
+    private async Task DeleteAsync()
+    {
+        _saving = true;
+        var response = await ExpenseRecordClient.DeleteAsync(_deletingId);
+        if (response.Success) { Snackbar.Add("Expense deleted.", Severity.Success); _deleteVisible = false; await LoadAsync(); }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _saving = false;
+    }
+
+    private static MarkupString StatusBadge(bool isPaid, bool isPartial)
+    {
+        if (isPaid)    return new MarkupString("<span style=\"background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Paid</span>");
+        if (isPartial) return new MarkupString("<span style=\"background:#FEF3C7;color:#92400E;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Partial</span>");
+        return             new MarkupString("<span style=\"background:#FEE2E2;color:#991B1B;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Unpaid</span>");
+    }
+}

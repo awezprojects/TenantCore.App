@@ -20,6 +20,11 @@ public class OpdRegistrationDto
     public int? PulseRate { get; init; }
     public decimal? OxygenSaturation { get; init; }
     public DateTime CreatedAt { get; init; }
+
+    // null when no payment record exists yet (rare), Pending = fee not yet collected
+    public PaymentStatus? PaymentStatus { get; init; }
+    public decimal? FinalAmount { get; init; }
+    public bool HasDiscount { get; init; }
 }
 
 public sealed record CreateOpdRegistrationDto(

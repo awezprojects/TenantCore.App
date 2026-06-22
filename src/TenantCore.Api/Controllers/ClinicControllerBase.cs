@@ -26,6 +26,24 @@ public abstract class ClinicControllerBase : ControllerBase
         return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
     }
 
+    protected string GetCurrentUserRole()
+    {
+        var appId = GetApplicationId();
+        var claim = User.FindFirst("app_roles");
+        if (claim is not null)
+        {
+            try
+            {
+                var entries = JsonSerializer.Deserialize<AppRoleEntry[]>(claim.Value, _jsonOpts);
+                var role = entries?.FirstOrDefault(e => e.AppId == appId)?.RoleName;
+                if (!string.IsNullOrWhiteSpace(role))
+                    return role;
+            }
+            catch (JsonException) { }
+        }
+        return string.Empty;
+    }
+
     // Reads appName from the app_roles JWT claim: [{"appId":"...","appName":"..."}]
     protected string GetApplicationName()
     {

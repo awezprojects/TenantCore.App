@@ -87,4 +87,50 @@ builder.Services.AddHttpClient<IPregnancyTenureApiClient, PregnancyTenureApiClie
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
+// Register Counter & Expenses Management API Clients
+builder.Services.AddHttpClient<IDoctorFeeConfigApiClient, DoctorFeeConfigApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<IParticularApiClient, ParticularApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<IOpdParticularApiClient, OpdParticularApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<IOpdPaymentApiClient, OpdPaymentApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<IExpenseCategoryApiClient, ExpenseCategoryApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<IExpenseRecordApiClient, ExpenseRecordApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<ICounterSessionApiClient, CounterSessionApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<IAmountHandoverApiClient, AmountHandoverApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+builder.Services.AddHttpClient<IFinanceReportApiClient, FinanceReportApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
 await builder.Build().RunAsync();

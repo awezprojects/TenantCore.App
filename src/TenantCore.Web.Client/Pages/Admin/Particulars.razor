@@ -1,0 +1,155 @@
+@page "/admin/particulars"
+@layout AuthorizedLayout
+@inject IParticularApiClient ParticularClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Particulars - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Particulars (Service Items)</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Add Particular
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudTable Items="_items" Hover="true" Striped="true" Bordered="true" Dense="false" Elevation="2">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Default Amount</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width:100px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="item">
+            <MudTd DataLabel="Name"><strong>@item.Name</strong></MudTd>
+            <MudTd DataLabel="Default Amount">Rs. @item.DefaultAmount.ToString("N2")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Error)"
+                         Size="Size.Small" Variant="Variant.Text">
+                    @(item.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudTooltip Text="Edit">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="@(() => OpenEditDialog(item))" />
+                </MudTooltip>
+                <MudTooltip Text="Delete">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => DeleteAsync(item.Id))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No particulars found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+<MudDialog @bind-Visible="_dialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit Particular" : "Add Particular")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudNumericField @bind-Value="_defaultAmount" Label="Default Amount" Min="0" Variant="Variant.Outlined" />
+            </MudItem>
+            @if (_editingId.HasValue)
+            {
+                <MudItem xs="12">
+                    <MudCheckBox @bind-Value="_isActive" Label="Is Active" Color="Color.Primary" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _saving;
+    private List<ParticularSummaryDto> _items = [];
+
+    private Guid? _editingId;
+    private string _name = string.Empty;
+    private decimal _defaultAmount;
+    private bool _isActive = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await ParticularClient.GetAllAsync();
+        if (response.Success && response.Data is not null)
+            _items = response.Data.ToList();
+        else if (!response.Success)
+            Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingId = null;
+        _name = string.Empty;
+        _defaultAmount = 0;
+        _isActive = true;
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(ParticularSummaryDto item)
+    {
+        _editingId = item.Id;
+        _name = item.Name;
+        _defaultAmount = item.DefaultAmount;
+        _isActive = item.IsActive;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) { Snackbar.Add("Name is required.", Severity.Warning); return; }
+        _saving = true;
+        if (_editingId.HasValue)
+        {
+            var response = await ParticularClient.UpdateAsync(_editingId.Value,
+                new UpdateParticularRequest { Name = _name, DefaultAmount = _defaultAmount, IsActive = _isActive });
+            if (response.Success) { Snackbar.Add("Updated.", Severity.Success); CloseDialog(); await LoadAsync(); }
+            else Snackbar.Add(response.Message, Severity.Error);
+        }
+        else
+        {
+            var response = await ParticularClient.CreateAsync(
+                new CreateParticularRequest { Name = _name, DefaultAmount = _defaultAmount });
+            if (response.Success) { Snackbar.Add("Created.", Severity.Success); CloseDialog(); await LoadAsync(); }
+            else Snackbar.Add(response.Message, Severity.Error);
+        }
+        _saving = false;
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        var response = await ParticularClient.DeleteAsync(id);
+        if (response.Success) { Snackbar.Add("Deleted.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(response.Message, Severity.Error);
+    }
+}

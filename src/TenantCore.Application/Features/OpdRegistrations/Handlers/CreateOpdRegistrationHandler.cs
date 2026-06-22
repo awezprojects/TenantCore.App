@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using TenantCore.Application.Features.OpdPayments.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Translators;
 using TenantCore.Domain.Entities;
@@ -13,6 +14,9 @@ public sealed class CreateOpdRegistrationHandler(
     IOpdRegistrationRepository opdRepository,
     IPatientRepository patientRepository,
     IClinicFeeConfigRepository feeRepository,
+    IDoctorProfileRepository doctorProfileRepository,
+    ICounterSessionRepository counterSessionRepository,
+    ISender sender,
     ILogger<CreateOpdRegistrationHandler> logger)
     : IRequestHandler<CreateOpdRegistrationCommand, OpdRegistrationDto>
 {
@@ -20,6 +24,10 @@ public sealed class CreateOpdRegistrationHandler(
         CreateOpdRegistrationCommand request, CancellationToken cancellationToken)
     {
         logger.LogInformation("Creating OPD registration for patient {PatientId}", request.PatientId);
+
+        var activeSession = await counterSessionRepository.GetActiveSessionAsync(request.ApplicationId, cancellationToken);
+        if (activeSession is null)
+            throw new InvalidOperationException("No active counter session. Please open a counter session before booking OPD appointments.");
 
         var patient = await patientRepository.GetByIdAsync(request.PatientId, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), request.PatientId);
@@ -41,6 +49,10 @@ public sealed class CreateOpdRegistrationHandler(
 
         await opdRepository.AddAsync(registration, cancellationToken);
         await opdRepository.SaveChangesAsync(cancellationToken);
+
+        var doctorProfile = await doctorProfileRepository.GetByUserIdAsync(request.DoctorUserId, cancellationToken);
+        var doctorProfileId = doctorProfile?.Id ?? Guid.Empty;
+        await sender.Send(new EnsureOpdPaymentCommand(registration.Id, doctorProfileId, request.ApplicationId), cancellationToken);
 
         var loaded = await opdRepository.GetByIdAsync(registration.Id, cancellationToken);
         return OpdRegistrationTranslator.ToDto(loaded!);

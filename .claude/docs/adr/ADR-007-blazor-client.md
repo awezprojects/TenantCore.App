@@ -337,6 +337,249 @@ All print pages use the `rx-*` CSS class system. Copy the `<style>` block from `
 
 ---
 
+## UI Theme System (Critical — Read Before Building Any Page)
+
+TenantCore.App uses **two distinct visual themes**. Using the wrong theme for a given page is a bug.
+
+### Theme 1 — OPD Theme (custom CSS, `opd-*` classes)
+
+**Use for:** All clinical and counter management pages — OPD, Expenses, Counter Session, Amount Handovers, and any future management/list pages.
+
+The OPD theme is defined in `wwwroot/css/app.css` using the `opd-` prefix. These classes produce a clean, card-based layout with a white sidebar, slate typography, and color-coded status badges.
+
+#### Required page shell
+
+```razor
+<div class="opd-page">
+
+    <div class="opd-header">
+        <div>
+            <div class="opd-title">Page Title</div>
+            <div class="opd-subtitle">Section &middot; @DateTime.Now.ToString("dddd, dd MMMM yyyy")</div>
+        </div>
+        <button class="opd-btn-primary">+ Add Something</button>
+    </div>
+
+    <!-- optional filter bar -->
+    <div class="opd-filter-bar">
+        <input class="opd-search-input" placeholder="Search..." @bind="_search" />
+        <button class="opd-btn">↻ Refresh</button>
+    </div>
+
+    <!-- optional stats strip -->
+    <div class="opd-stats">
+        <div class="opd-stat-card done">
+            <div class="opd-stat-label">Collected</div>
+            <div class="opd-stat-icon">💰</div>
+            <div class="opd-stat-value">Rs. 5,000</div>
+        </div>
+    </div>
+
+    <div class="opd-table-card">
+        <table class="opd-table">
+            <thead><tr><th>Column</th></tr></thead>
+            <tbody>
+                <tr><td>Data</td></tr>
+                <tr><td colspan="N" class="opd-empty">No records found.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+```
+
+#### Available CSS classes
+
+| Class | Purpose |
+|-------|---------|
+| `opd-page` | Outer page wrapper — max-width, padding |
+| `opd-header` | Title row — flex, space-between, aligns title + action button |
+| `opd-title` | Large bold page heading |
+| `opd-subtitle` | Muted subtitle line (breadcrumb / date) |
+| `opd-filter-bar` | Horizontal filter strip below the header |
+| `opd-search-input` | Text input styled for the filter bar |
+| `opd-stats` | Flex row of stat cards |
+| `opd-stat-card` | Individual stat card — add modifier `done`, `waiting` for color tints |
+| `opd-stat-label` | Small uppercase label inside stat card |
+| `opd-stat-icon` | Emoji/icon inside stat card |
+| `opd-stat-value` | Large number inside stat card |
+| `opd-table-card` | White card wrapper around a table (border-radius, shadow) |
+| `opd-table` | Styled `<table>` — full-width, row hover, `<th>` with slate bg |
+| `opd-empty` | `<td>` colspan cell for empty-state rows |
+| `opd-btn` | Secondary/outline button |
+| `opd-btn-primary` | Primary filled button |
+| `opd-btn start` | Green accent button (use with space, not dash: `class="opd-btn start"`) |
+| `opd-tab` | Tab strip button |
+
+#### Status badges — use inline `<span>` with explicit styles
+
+**Never use `RenderFragment` return types for status chips/badges.** This pattern is fragile in Blazor switch expressions and causes phantom error messages to appear after successful operations. Use one of the two safe alternatives:
+
+**Option A — inline in the template (preferred for simple status):**
+```razor
+@if (item.Status == MyStatus.Active)
+{
+    <span style="background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">Active</span>
+}
+else
+{
+    <span style="background:#FEE2E2;color:#991B1B;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">Inactive</span>
+}
+```
+
+**Option B — `static MarkupString` helper (for reuse in multiple rows):**
+```csharp
+private static MarkupString StatusBadge(MyStatus status) => status switch
+{
+    MyStatus.Active   => new MarkupString("<span style=\"background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Active</span>"),
+    MyStatus.Inactive => new MarkupString("<span style=\"background:#FEE2E2;color:#991B1B;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Inactive</span>"),
+    _                 => new MarkupString("<span style=\"background:#F1F5F9;color:#475569;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Unknown</span>")
+};
+```
+
+Then call it in the template as `@StatusBadge(item.Status)`.
+
+#### Standard status color palette
+
+| Meaning | Background | Text | Usage |
+|---------|-----------|------|-------|
+| Success / Paid / Active / Accepted | `#DCFCE7` | `#166534` | Positive states |
+| Pending / Partial / Warning | `#FEF3C7` | `#92400E` | In-progress / attention needed |
+| Error / Unpaid / Disputed / Danger | `#FEE2E2` | `#991B1B` | Problem states |
+| Neutral / Closed / Inactive | `#F1F5F9` | `#475569` | Archived/closed states |
+| Amounts in red (expenses) | color `#DC2626` | — | Outgoing money |
+| Amounts in green (collected) | color `#16A34A` | — | Incoming money |
+
+#### Dialogs within OPD pages
+
+Forms and dialogs on OPD pages still use MudBlazor dialog components (`<MudDialog>`, `<MudTextField>`, `<MudSelect>`, `<MudNumericField>`) — that is intentional. Only the **page layout and tables** use the OPD custom CSS. Do not replace MudBlazor form inputs with raw HTML inputs.
+
+```razor
+<!-- Correct: OPD page layout + MudBlazor dialog -->
+<div class="opd-page">
+    <div class="opd-header">...</div>
+    <div class="opd-table-card"><table class="opd-table">...</table></div>
+</div>
+
+<MudDialog @bind-Visible="_addVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent><MudText Typo="Typo.h6">Add Item</MudText></TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" />
+            <MudNumericField @bind-Value="_amount" Label="Amount *" Min="0.01m" Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _addVisible = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+```
+
+### Theme 2 — MudBlazor Material Design
+
+**Use for:** Auth pages (login, register), dashboard/home pages, and any page that does **not** deal with clinical or counter workflows.
+
+Do not use `<MudTable>`, `<MudDataGrid>`, MudBlazor layout components, or Material Design cards on OPD/counter management pages. Those are Theme 2 only.
+
+### Theme decision rule
+
+> **Is this page a management/list/detail page for clinical or counter data?** → OPD theme (`opd-*` classes).  
+> **Is this an auth flow, dashboard, or admin settings page?** → MudBlazor Material Design.
+
+---
+
+## DateTime Handling (Critical — UTC Storage + Local Display)
+
+All timestamps in this application are stored in the database as UTC (via `DateTime.UtcNow`). Two problems arise if this is ignored:
+
+1. **Wrong display** — raw UTC shown to users in India shows times 5:30 hours behind local IST
+2. **Wrong filtering** — a date filter like "Today (June 22 IST)" expressed as `yyyy-MM-dd` covers June 22 UTC midnight to midnight, but a record created at 1:16 AM IST (= 7:46 PM June 21 UTC) is silently excluded
+
+### Rule 1 — Translators must stamp `DateTimeKind.Utc` on all UTC fields
+
+EF Core reads `datetime2` columns back as `Kind.Unspecified`. If left unchanged, `System.Text.Json` omits the `Z` suffix from the JSON, and the client cannot tell if the value is UTC or local.
+
+Every translator that maps a UTC-stored field MUST call `DateTime.SpecifyKind`:
+
+```csharp
+// In every translator ToDto / ToSummaryDto:
+RecordedAt  = DateTime.SpecifyKind(entity.RecordedAt,  DateTimeKind.Utc),
+HandedOverAt = DateTime.SpecifyKind(entity.HandedOverAt, DateTimeKind.Utc),
+OpenedAt    = DateTime.SpecifyKind(entity.OpenedAt,    DateTimeKind.Utc),
+// Nullable:
+ClosedAt    = entity.ClosedAt.HasValue
+    ? DateTime.SpecifyKind(entity.ClosedAt.Value, DateTimeKind.Utc)
+    : null,
+```
+
+**Do NOT stamp fields that are LOCAL dates** (e.g., `CounterSession.SessionDate` which is sent from the browser as `DateTime.Today`).
+
+### Rule 2 — Display ALWAYS goes through `DateTimeHelper`
+
+Add `@using TenantCore.Web.Client.Helpers` and call `DateTimeHelper.ToLocalString(utcDateTime)`.  
+Never call `.ToString(...)` directly on a UTC-stored datetime.
+
+```razor
+@* Wrong: *@
+<td>@item.RecordedAt.ToString("dd MMM HH:mm")</td>
+
+@* Correct: *@
+<td>@DateTimeHelper.ToLocalString(item.RecordedAt, "dd MMM HH:mm")</td>
+```
+
+`DateTimeHelper` always calls `DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime()` so the result uses the browser's timezone regardless of what `Kind` the DTO carries.
+
+### Rule 3 — Session / local dates use `DateTime.Today`, never `DateTime.UtcNow.Date`
+
+When the client needs to record "today's date" as a local calendar date (e.g., `CounterSession.SessionDate`), always use:
+
+```csharp
+DateTime.Today  // ✓ — browser local date (IST June 22 at 1 AM IST = June 22)
+DateTime.UtcNow.Date  // ✗ — UTC date (June 21 at 1 AM IST → UTC June 21)
+```
+
+### Rule 4 — Date-range filters over UTC timestamps must send `utcOffset`
+
+When the API filters records by a user-selected date range where the underlying column stores UTC, the server must know the user's timezone to compute the correct UTC boundaries.
+
+**Client API clients** send `utcOffset` (minutes) alongside `yyyy-MM-dd` dates:
+
+```csharp
+qs.Add($"from={from.Value:yyyy-MM-dd}");
+qs.Add($"to={to.Value:yyyy-MM-dd}");
+qs.Add($"utcOffset={(int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes}");
+```
+
+**Query record** carries the offset:
+
+```csharp
+public sealed record GetExpenseRecordsQuery(
+    Guid ApplicationId, DateTime? From, DateTime? To, int UtcOffsetMinutes = 0)
+    : IRequest<...>;
+```
+
+**Handler** converts to UTC range before in-memory filtering:
+
+```csharp
+var offsetMinutes = request.UtcOffsetMinutes;          // e.g. 330 for IST
+DateTime? fromUtc = request.From.HasValue
+    ? request.From.Value.Date.AddMinutes(-offsetMinutes)   // midnight IST → UTC
+    : null;
+DateTime? toUtc = request.To.HasValue
+    ? request.To.Value.Date.AddDays(1).AddMinutes(-offsetMinutes)  // next midnight IST → UTC
+    : null;
+
+return all
+    .Where(e => e.ApplicationId == request.ApplicationId
+        && (fromUtc == null || e.RecordedAt >= fromUtc.Value)
+        && (toUtc   == null || e.RecordedAt <  toUtc.Value))
+```
+
+**Do NOT apply this to `CounterSession` history filtering** — `SessionDate` is a local DATE (not a UTC timestamp), so `yyyy-MM-dd` direct comparison is correct and no UTC offset is needed.
+
+---
+
 ## What NOT to Do
 
 - Do NOT reference `TenantCore.Api`, `TenantCore.Application`, `TenantCore.Infrastructure`, or `TenantCore.Domain` from this project
@@ -346,3 +589,8 @@ All print pages use the `rx-*` CSS class system. Copy the `<style>` block from `
 - Do NOT make API calls in `OnInitializedAsync` on print pages — always use `OnAfterRenderAsync(firstRender)` with explicit auth init first
 - Do NOT use `Navigation.NavigateTo` to open print pages — use `JS.InvokeVoidAsync("window.open", url, "_blank")`
 - Do NOT put a "← Back" button on print pages — use a red "✕ Close" button that calls `window.close()`
+- Do NOT use `<MudTable>`, `<MudDataGrid>`, or MudBlazor card/layout components on OPD/counter pages — use `opd-table-card` + `opd-table` instead
+- Do NOT return `RenderFragment` from a method to render status chips — use inline `@if`/`@else` blocks or a `static MarkupString` helper instead
+- Do NOT call `.ToString(...)` directly on UTC-stored datetimes — always use `DateTimeHelper.ToLocalString()`
+- Do NOT use `DateTime.UtcNow.Date` to record "today" on the client — use `DateTime.Today`
+- Do NOT filter UTC-timestamp columns with raw `yyyy-MM-dd` local dates without the `utcOffset` conversion

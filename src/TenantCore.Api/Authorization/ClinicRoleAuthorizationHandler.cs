@@ -43,12 +43,15 @@ public sealed class ClinicRoleAuthorizationHandler(IHttpContextAccessor httpCont
             var appRoles = JsonSerializer.Deserialize<List<AppRoleClaim>>(appRolesClaim, JsonOpts);
             if (appRoles is null) return Task.CompletedTask;
 
-            var userRoleForApp = appRoles
-                .FirstOrDefault(r => r.AppId == applicationId)
-                ?.RoleName;
+            // A user may hold multiple roles for the same clinic (e.g. Doctor + Clinic Admin).
+            // Check all roles for this application, not just the first one.
+            var userRolesForApp = appRoles
+                .Where(r => r.AppId == applicationId)
+                .Select(r => r.RoleName)
+                .ToList();
 
-            if (userRoleForApp is not null &&
-                requirement.Roles.Any(r => string.Equals(r, userRoleForApp, StringComparison.OrdinalIgnoreCase)))
+            if (userRolesForApp.Any(roleName =>
+                    requirement.Roles.Any(r => string.Equals(r, roleName, StringComparison.OrdinalIgnoreCase))))
             {
                 context.Succeed(requirement);
             }

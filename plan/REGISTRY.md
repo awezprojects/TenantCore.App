@@ -37,6 +37,14 @@ This table is the fastest way for the plan command to check "does this already e
 | Obstetric LMP & USG Templates | ClinicUsgTemplate, UsgTemplateRow | Executed | Adds Lmp/EddByLmp/EddByUsg to ObstetricPrescriptionData; clinic-customizable USG schedule |
 | Pregnancy Tenure | PregnancyTenure | Executed | Lifecycle tracking (Active/Closed) for each pregnancy; EDD overdue tab; close-tenure workflow; blocks new LMP when overdue tenure is open |
 | Patient LMP Tenure View | — (no new entity) | Executed | "View LMP" button on patient list; active status badge; full tenure history popup per patient |
+| Doctor Fee Config | DoctorFeeConfig | Executed | Per-doctor visit fee set by admin; auto-populates OPD registration |
+| Particulars | Particular, OpdParticular | Executed | Clinic-defined OPD service items + per-appointment applied particulars |
+| OPD Payments | OpdPayment | Executed | 1:1 payment record per OPD; visit fee + particulars total + discount + status; auto-created on OPD registration |
+| Expense Categories | ExpenseCategory | Executed | Admin-defined expense types for reception to record against |
+| Expense Records | ExpenseRecord | Executed | Reception-recorded expense instances linked to category + session |
+| Counter Sessions | CounterSession | Executed | Reception daily shift session tracking collections and expenses |
+| Amount Handovers | AmountHandover | Executed | Handover workflow from reception to doctor/admin with acceptance status |
+| Finance Reports | — (no new entity) | Executed | Day/week/month/date-range/reception-wise/expense-summary reports dashboard |
 
 ---
 
@@ -58,7 +66,7 @@ This table is the fastest way for the plan command to check "does this already e
 
 | Feature | Plan Date | Plan File |
 |---------|-----------|-----------|
-| *(none)* | — | — |
+| counter-expenses-management | 2026-06-18 | [plan/counter-expenses-management/PLAN.md](counter-expenses-management/PLAN.md) |
 
 ---
 
