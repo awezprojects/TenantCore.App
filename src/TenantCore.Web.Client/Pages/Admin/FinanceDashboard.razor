@@ -1,0 +1,448 @@
+@page "/finance-dashboard"
+@layout AuthorizedLayout
+@using TenantCore.Web.Client.Helpers
+@using TenantCore.Shared.Enums
+@using TenantCore.Shared.Authorization
+@using TenantCore.Web.Client.Services
+@inject IFinanceReportApiClient ReportClient
+@inject ICounterSessionApiClient SessionClient
+@inject IAmountHandoverApiClient HandoverClient
+@inject ClinicContextService ClinicContext
+@inject AuthStateService AuthState
+@inject ISnackbar Snackbar
+
+<PageTitle>Finance Dashboard - CloudClinic</PageTitle>
+
+<div class="opd-page">
+
+    <div class="opd-header">
+        <div>
+            <div class="opd-title">Finance Dashboard</div>
+            <div class="opd-subtitle">Finance &middot; @DateTime.Now.ToString("dddd, dd MMMM yyyy")</div>
+        </div>
+    </div>
+
+    <div class="opd-filter-bar" style="flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="today"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("today")'>Today</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="yesterday"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("yesterday")'>Yesterday</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="7d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("7d")'>Last 7 Days</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="30d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("30d")'>Last 30 Days</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="month"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("month")'>This Month</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+            <input type="date" class="opd-search-input" style="width:130px;padding:6px 8px;font-size:12px;"
+                   @bind="_fromDate" @bind:event="onchange" @oninput="ClearPreset" />
+            <span style="font-size:12px;color:#64748B;">–</span>
+            <input type="date" class="opd-search-input" style="width:130px;padding:6px 8px;font-size:12px;"
+                   @bind="_toDate" @bind:event="onchange" @oninput="ClearPreset" />
+            <button class="opd-btn-primary" style="padding:6px 14px;font-size:12px;" @onclick="LoadAsync">Apply</button>
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <!-- KPI Summary Cards -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+            <div class="opd-stat-card" style="border-top:4px solid #16A34A;flex:1;min-width:160px;">
+                <div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">OPD Income</div>
+                <div style="font-size:24px;font-weight:700;color:#166534;">Rs. @_totalIncome.ToString("N0")</div>
+                <div style="font-size:11px;color:#6B7280;margin-top:2px;">Collected via OPD</div>
+            </div>
+            <div class="opd-stat-card" style="border-top:4px solid #DC2626;flex:1;min-width:160px;">
+                <div style="font-size:11px;font-weight:700;color:#991B1B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Expenses</div>
+                <div style="font-size:24px;font-weight:700;color:#DC2626;">Rs. @_totalExpenses.ToString("N0")</div>
+                <div style="font-size:11px;color:#6B7280;margin-top:2px;">Total outgoings</div>
+            </div>
+            <div class="opd-stat-card" style="border-top:4px solid #2563EB;flex:1;min-width:160px;">
+                <div style="font-size:11px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Net Balance</div>
+                <div style="font-size:24px;font-weight:700;color:@(_netBalance >= 0 ? "#1D4ED8" : "#DC2626");">Rs. @_netBalance.ToString("N0")</div>
+                <div style="font-size:11px;color:#6B7280;margin-top:2px;">Income minus Expenses</div>
+            </div>
+            <div class="opd-stat-card" style="border-top:4px solid #D97706;flex:1;min-width:160px;">
+                <div style="font-size:11px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Pending Handovers</div>
+                <div style="font-size:24px;font-weight:700;color:#D97706;">Rs. @_pendingHandovers.ToString("N0")</div>
+                <div style="font-size:11px;color:#6B7280;margin-top:2px;">Awaiting acceptance</div>
+            </div>
+        </div>
+
+        <!-- Section 1: OPD Collection -->
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;">📋 OPD Collection</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">Day-wise OPD payment breakdown for the period</div>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#16A34A;">Rs. @_totalIncome.ToString("N0")</div>
+            </div>
+            @if (_range?.DayTotals?.Any() == true)
+            {
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th style="text-align:right;">Amount (Rs.)</th>
+                            <th style="width:180px;text-align:right;">Share of Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var day in _range.DayTotals)
+                        {
+                            var pct = _totalIncome > 0 ? (double)(day.Amount / _totalIncome) * 100 : 0;
+                            <tr>
+                                <td style="font-weight:600;">@day.Date.ToString("dd MMM yyyy")</td>
+                                <td style="color:#64748B;font-size:12px;">@day.DayOfWeek</td>
+                                <td style="text-align:right;font-weight:600;color:#1E293B;">@day.Amount.ToString("N2")</td>
+                                <td style="text-align:right;">
+                                    <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+                                        <div style="background:#E2E8F0;border-radius:4px;height:6px;width:80px;overflow:hidden;flex-shrink:0;">
+                                            <div style="background:#16A34A;height:100%;width:@pct.ToString("F0")%;border-radius:4px;"></div>
+                                        </div>
+                                        <span style="font-size:11px;color:#64748B;min-width:36px;text-align:right;">@pct.ToString("F1")%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        <tr style="background:#F1F5F9;font-weight:700;">
+                            <td colspan="2">Grand Total</td>
+                            <td style="text-align:right;color:#16A34A;">Rs. @_totalIncome.ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="opd-empty">No OPD collection data for the selected period.</div>
+            }
+        </div>
+
+        <!-- Section 1b: Doctor Wise OPD Collection -->
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;">🩺 Doctor Wise OPD Collection</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">OPD fees collected per doctor</div>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#7C3AED;">Rs. @(_doctorData?.GrandTotal.ToString("N0") ?? "0")</div>
+            </div>
+            @if (_doctorData?.Doctors?.Any() == true)
+            {
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Doctor</th>
+                            <th style="text-align:right;">Amount (Rs.)</th>
+                            <th style="width:200px;text-align:right;">Share</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var doc in _doctorData.Doctors)
+                        {
+                            var pct = _doctorData.GrandTotal > 0 ? (double)(doc.TotalAmount / _doctorData.GrandTotal) * 100 : 0;
+                            <tr>
+                                <td><strong>@doc.DoctorName</strong></td>
+                                <td style="text-align:right;font-weight:600;color:#7C3AED;">@doc.TotalAmount.ToString("N2")</td>
+                                <td style="text-align:right;">
+                                    <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+                                        <div style="background:#EDE9FE;border-radius:4px;height:6px;width:80px;overflow:hidden;flex-shrink:0;">
+                                            <div style="background:#7C3AED;height:100%;width:@pct.ToString("F0")%;border-radius:4px;"></div>
+                                        </div>
+                                        <span style="font-size:11px;color:#64748B;min-width:36px;text-align:right;">@pct.ToString("F1")%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="opd-empty">No OPD collection data for the selected period.</div>
+            }
+        </div>
+
+        <!-- Section 2: Expense Breakdown -->
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;">💸 Expense Breakdown</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">Total outgoings by category</div>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#DC2626;">Rs. @_totalExpenses.ToString("N0")</div>
+            </div>
+            @if (_expSummary?.CategoryTotals?.Any() == true)
+            {
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th style="text-align:right;">Amount (Rs.)</th>
+                            <th style="width:200px;text-align:right;">Share of Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var cat in _expSummary.CategoryTotals.OrderByDescending(c => c.Amount))
+                        {
+                            var pct = _totalExpenses > 0 ? (double)(cat.Amount / _totalExpenses) * 100 : 0;
+                            <tr>
+                                <td><strong>@cat.CategoryName</strong></td>
+                                <td style="text-align:right;font-weight:600;color:#DC2626;">@cat.Amount.ToString("N2")</td>
+                                <td style="text-align:right;">
+                                    <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;">
+                                        <div style="background:#FEE2E2;border-radius:4px;height:8px;width:80px;overflow:hidden;flex-shrink:0;">
+                                            <div style="background:#DC2626;height:100%;width:@pct.ToString("F0")%;border-radius:4px;"></div>
+                                        </div>
+                                        <span style="font-size:11px;color:#64748B;min-width:36px;text-align:right;">@pct.ToString("F1")%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        <tr style="background:#F1F5F9;font-weight:700;">
+                            <td>Grand Total</td>
+                            <td style="text-align:right;color:#DC2626;">Rs. @_totalExpenses.ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="opd-empty">No expense records for the selected period.</div>
+            }
+        </div>
+
+        <!-- Section 3: Counter Sessions -->
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;">🏧 Counter Sessions</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">@_sessions.Count session(s) opened in this period</div>
+                </div>
+                <div style="display:flex;gap:16px;font-size:13px;font-weight:600;flex-wrap:wrap;">
+                    <span style="color:#16A34A;">Collected: Rs. @_sessions.Sum(s => s.TotalCollected).ToString("N0")</span>
+                    <span style="color:#DC2626;">Expenses: Rs. @_sessions.Sum(s => s.TotalExpenses).ToString("N0")</span>
+                    <span style="color:#2563EB;">Net: Rs. @_sessions.Sum(s => s.NetAmount).ToString("N0")</span>
+                </div>
+            </div>
+            @if (_sessions.Any())
+            {
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Session Date</th>
+                            <th>Opened At</th>
+                            <th style="text-align:right;">Collected</th>
+                            <th style="text-align:right;">Expenses</th>
+                            <th style="text-align:right;">Net</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in _sessions.OrderByDescending(s => s.SessionDate))
+                        {
+                            <tr>
+                                <td style="font-weight:600;">@s.SessionDate.ToString("dd MMM yyyy")</td>
+                                <td style="font-size:12px;color:#64748B;">@DateTimeHelper.ToLocalString(s.OpenedAt, "HH:mm")</td>
+                                <td style="text-align:right;color:#16A34A;font-weight:600;">Rs. @s.TotalCollected.ToString("N2")</td>
+                                <td style="text-align:right;color:#DC2626;font-weight:600;">Rs. @s.TotalExpenses.ToString("N2")</td>
+                                <td style="text-align:right;font-weight:700;color:@(s.NetAmount >= 0 ? "#1D4ED8" : "#DC2626");">Rs. @s.NetAmount.ToString("N2")</td>
+                                <td>@SessionStatusBadge(s.Status)</td>
+                            </tr>
+                        }
+                        <tr style="background:#F1F5F9;font-weight:700;">
+                            <td colspan="2">Total</td>
+                            <td style="text-align:right;color:#16A34A;">Rs. @_sessions.Sum(s => s.TotalCollected).ToString("N2")</td>
+                            <td style="text-align:right;color:#DC2626;">Rs. @_sessions.Sum(s => s.TotalExpenses).ToString("N2")</td>
+                            <td style="text-align:right;color:#1D4ED8;">Rs. @_sessions.Sum(s => s.NetAmount).ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="opd-empty">No counter sessions for the selected period.</div>
+            }
+        </div>
+
+        <!-- Section 4: Amount Handovers -->
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <div>
+                        <div style="font-size:14px;font-weight:700;color:#1E293B;">🤝 Amount Handovers</div>
+                        <div style="font-size:11px;color:#64748B;margin-top:2px;">Cash handover tracking for the period</div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 16px;flex:1;min-width:120px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.4px;">Accepted</div>
+                        <div style="font-size:18px;font-weight:700;color:#16A34A;">Rs. @_handoverAccepted.ToString("N0")</div>
+                    </div>
+                    <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 16px;flex:1;min-width:120px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.4px;">Pending</div>
+                        <div style="font-size:18px;font-weight:700;color:#D97706;">Rs. @_pendingHandovers.ToString("N0")</div>
+                    </div>
+                    <div style="background:#FFF1F2;border:1px solid #FECDD3;border-radius:8px;padding:8px 16px;flex:1;min-width:120px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#9F1239;text-transform:uppercase;letter-spacing:.4px;">Disputed</div>
+                        <div style="font-size:18px;font-weight:700;color:#E11D48;">Rs. @_handoverDisputed.ToString("N0")</div>
+                    </div>
+                    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 16px;flex:1;min-width:120px;text-align:center;">
+                        <div style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.4px;">Total</div>
+                        <div style="font-size:18px;font-weight:700;color:#2563EB;">Rs. @_handovers.Sum(h => h.Amount).ToString("N0")</div>
+                    </div>
+                </div>
+            </div>
+            @if (_handovers.Any())
+            {
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align:right;">Amount</th>
+                            <th>Handed To</th>
+                            <th>Status</th>
+                            <th>Date &amp; Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var h in _handovers.OrderByDescending(h => h.HandedOverAt))
+                        {
+                            <tr>
+                                <td style="text-align:right;font-weight:700;color:#1E293B;font-size:15px;">Rs. @h.Amount.ToString("N2")</td>
+                                <td style="font-size:12px;color:#64748B;">@(h.HandedOverToRoleName ?? "—")</td>
+                                <td>@HandoverStatusBadge(h.Status)</td>
+                                <td style="font-size:12px;color:#64748B;">@DateTimeHelper.ToLocalString(h.HandedOverAt, "dd MMM yyyy HH:mm")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="opd-empty">No handovers recorded for the selected period.</div>
+            }
+        </div>
+
+        <!-- Period Summary Banner -->
+        <div style="background:linear-gradient(135deg,#1E293B 0%,#334155 100%);border-radius:12px;padding:24px;color:#fff;margin-bottom:8px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;opacity:.6;margin-bottom:16px;">
+                Period Summary &mdash; @_fromDate?.ToString("dd MMM") &ndash; @_toDate?.ToString("dd MMM yyyy")
+            </div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end;">
+                <div>
+                    <div style="font-size:11px;opacity:.6;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Total Income</div>
+                    <div style="font-size:32px;font-weight:800;color:#4ADE80;line-height:1;">Rs. @_totalIncome.ToString("N0")</div>
+                </div>
+                <div style="opacity:.4;font-size:28px;padding-bottom:4px;">−</div>
+                <div>
+                    <div style="font-size:11px;opacity:.6;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Total Expenses</div>
+                    <div style="font-size:32px;font-weight:800;color:#F87171;line-height:1;">Rs. @_totalExpenses.ToString("N0")</div>
+                </div>
+                <div style="opacity:.4;font-size:28px;padding-bottom:4px;">=</div>
+                <div>
+                    <div style="font-size:11px;opacity:.6;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Net Profit</div>
+                    <div style="font-size:32px;font-weight:800;line-height:1;color:@(_netBalance >= 0 ? "#60A5FA" : "#F87171");">Rs. @_netBalance.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+@code {
+    private bool _loading = true;
+    private string _preset = "today";
+
+    private DateTime? _fromDate = DateTime.Today;
+    private DateTime? _toDate = DateTime.Today;
+
+    private DateRangeCollectionReportDto? _range;
+    private ExpenseSummaryReportDto? _expSummary;
+    private DoctorWiseCollectionDto? _doctorData;
+    private List<CounterSessionSummaryDto> _sessions = [];
+    private List<AmountHandoverSummaryDto> _handovers = [];
+
+    private bool _isAdmin  => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+        .Any(r => string.Equals(r, AppRoles.ClinicAdmin, StringComparison.OrdinalIgnoreCase));
+    private bool _isDoctor => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+        .Any(r => string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase));
+
+    private decimal _totalIncome   => _range?.GrandTotal ?? 0;
+    private decimal _totalExpenses => _expSummary?.GrandTotal ?? 0;
+    private decimal _netBalance    => _totalIncome - _totalExpenses;
+    private decimal _pendingHandovers  => _handovers.Where(h => h.Status == HandoverStatus.Pending).Sum(h => h.Amount);
+    private decimal _handoverAccepted  => _handovers.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount);
+    private decimal _handoverDisputed  => _handovers.Where(h => h.Status == HandoverStatus.Disputed).Sum(h => h.Amount);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ApplyPreset(string preset)
+    {
+        _preset = preset;
+        var today = DateTime.Today;
+        (_fromDate, _toDate) = preset switch
+        {
+            "today"     => ((DateTime?)today, (DateTime?)today),
+            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
+            "7d"        => (today.AddDays(-6), today),
+            "30d"       => (today.AddDays(-29), today),
+            "month"     => (new DateTime(today.Year, today.Month, 1), today),
+            _           => (_fromDate, _toDate)
+        };
+        await LoadAsync();
+    }
+
+    private void ClearPreset() => _preset = string.Empty;
+
+    private async Task LoadAsync()
+    {
+        if (_fromDate is null || _toDate is null) return;
+        _loading = true;
+        StateHasChanged();
+
+        var from = _fromDate.Value;
+        var to   = _toDate.Value;
+
+        // Doctor-only: auto-filter to current user; admin: see all doctors
+        Guid? doctorFilter = _isDoctor && !_isAdmin
+            ? AuthState.CurrentUser?.UserId
+            : null;
+
+        var rangeTask     = ReportClient.GetDateRangeAsync(from, to);
+        var expTask       = ReportClient.GetExpenseSummaryAsync(from, to);
+        var sessionsTask  = SessionClient.GetAllAsync(from, to);
+        var handoversTask = HandoverClient.GetAllAsync(from, to);
+        var doctorTask    = ReportClient.GetDoctorWiseAsync(from, to, doctorFilter);
+
+        await Task.WhenAll(rangeTask, expTask, sessionsTask, handoversTask, doctorTask);
+
+        _range      = rangeTask.Result.Success    ? rangeTask.Result.Data    : null;
+        _expSummary = expTask.Result.Success       ? expTask.Result.Data     : null;
+        _doctorData = doctorTask.Result.Success    ? doctorTask.Result.Data  : null;
+        _sessions   = sessionsTask.Result.Success  && sessionsTask.Result.Data  is not null ? sessionsTask.Result.Data.ToList()  : [];
+        _handovers  = handoversTask.Result.Success && handoversTask.Result.Data is not null ? handoversTask.Result.Data.ToList() : [];
+
+        _loading = false;
+    }
+
+    private static MarkupString SessionStatusBadge(CounterSessionStatus status) => status switch
+    {
+        CounterSessionStatus.Open   => new MarkupString("<span style=\"background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Open</span>"),
+        CounterSessionStatus.Closed => new MarkupString("<span style=\"background:#F1F5F9;color:#475569;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Closed</span>"),
+        _                           => new MarkupString("<span style=\"background:#F1F5F9;color:#475569;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Unknown</span>")
+    };
+
+    private static MarkupString HandoverStatusBadge(HandoverStatus status) => status switch
+    {
+        HandoverStatus.Pending  => new MarkupString("<span style=\"background:#FEF9C3;color:#92400E;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Pending</span>"),
+        HandoverStatus.Accepted => new MarkupString("<span style=\"background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Accepted</span>"),
+        HandoverStatus.Disputed => new MarkupString("<span style=\"background:#FEE2E2;color:#991B1B;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Disputed</span>"),
+        _                       => new MarkupString("<span style=\"background:#F1F5F9;color:#475569;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;\">Unknown</span>")
+    };
+}

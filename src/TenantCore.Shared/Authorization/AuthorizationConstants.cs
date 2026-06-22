@@ -21,6 +21,10 @@ public static class AppRoles
     // Roles that can perform clinical actions such as patient discharge
     public static readonly string[] ClinicalRoles =
         [Doctor, ClinicAdmin, ClinicManager, SystemAdmin];
+
+    // All active clinic staff — reception + clinical combined (e.g. update OPD status)
+    public static readonly string[] ClinicStaffRoles =
+        [Receptionist, Doctor, ClinicAdmin, ClinicManager, SystemAdmin];
 }
 
 public static class AuthPolicies
@@ -36,4 +40,7 @@ public static class AuthPolicies
 
     // Doctor + Clinic Admin + Clinic Manager (clinical decisions e.g. discharge)
     public const string RequireClinical = "RequireClinical";
+
+    // All clinic staff — reception + clinical (e.g. OPD status updates by any staff)
+    public const string RequireClinicStaff = "RequireClinicStaff";
 }

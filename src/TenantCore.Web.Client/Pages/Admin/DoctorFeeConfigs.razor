@@ -1,0 +1,234 @@
+@page "/admin/doctor-fee-configs"
+@layout AuthorizedLayout
+@inject IDoctorFeeConfigApiClient FeeConfigClient
+@inject IClinicApiClient ClinicClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Doctor Fee Configs - TenantCore</PageTitle>
+
+<div class="opd-page">
+
+    <!-- Header -->
+    <div class="opd-header">
+        <div>
+            <div class="opd-title">Doctor Fee Configs</div>
+            <div class="opd-subtitle">Set visit fees per doctor for automatic OPD billing</div>
+        </div>
+        <button class="opd-btn-primary" @onclick="OpenCreateDialog">+ Add Fee Config</button>
+    </div>
+
+    <!-- Table -->
+    @if (_loading)
+    {
+        <div class="opd-empty">Loading...</div>
+    }
+    else
+    {
+        <div class="opd-table-card">
+            <table class="opd-table">
+                <thead>
+                    <tr>
+                        <th>Doctor</th>
+                        <th>Visit Fee</th>
+                        <th>Status</th>
+                        <th style="width:110px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_items.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="opd-empty">No fee configs found.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in _items)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="opd-patient-name">@(string.IsNullOrWhiteSpace(item.DoctorName) ? "—" : item.DoctorName)</div>
+                                </td>
+                                <td><strong>Rs. @item.VisitFee.ToString("N2")</strong></td>
+                                <td>
+                                    <span class="opd-badge @(item.IsActive ? "done" : "cancelled")">
+                                        @(item.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="opd-actions">
+                                        <button class="opd-btn edit-btn" @onclick="@(() => OpenEditDialog(item))">Edit</button>
+                                        <button class="opd-btn delete-btn" @onclick="@(() => DeleteAsync(item.Id))">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Modal -->
+@if (_dialogVisible)
+{
+    <div class="opd-modal-overlay" @onclick="CloseDialog">
+        <div class="opd-modal" style="width:460px;" @onclick:stopPropagation="true">
+            <button class="opd-modal-close" @onclick="CloseDialog">✕</button>
+            <div class="opd-modal-title">@(_editingId.HasValue ? "Edit Fee Config" : "Add Fee Config")</div>
+
+            @if (!_editingId.HasValue)
+            {
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">
+                        Doctor *
+                    </label>
+                    @if (_doctorsLoading)
+                    {
+                        <div style="font-size:13px;color:#94A3B8;">Loading doctors...</div>
+                    }
+                    else if (_availableDoctors.Count == 0)
+                    {
+                        <div style="font-size:13px;color:#EF4444;">No doctors with profiles found. Ask doctors to set up their profiles first.</div>
+                    }
+                    else
+                    {
+                        <select class="opd-search-input" style="width:100%;cursor:pointer;"
+                                value="@_selectedDoctorProfileId"
+                                @onchange="OnDoctorChanged">
+                            <option value="">— Select Doctor —</option>
+                            @foreach (var doc in _availableDoctors)
+                            {
+                                <option value="@doc.ProfileId">Dr. @doc.FullName</option>
+                            }
+                        </select>
+                    }
+                </div>
+            }
+
+            <div style="margin-bottom:14px;">
+                <label style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;">
+                    Visit Fee (Rs.) *
+                </label>
+                <input type="number" min="0" step="0.01"
+                       class="opd-search-input" style="width:100%;"
+                       @bind="_visitFee" />
+            </div>
+
+            @if (_editingId.HasValue)
+            {
+                <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="isActiveCheck" @bind="_isActive"
+                           style="width:16px;height:16px;cursor:pointer;accent-color:#3B82F6;" />
+                    <label for="isActiveCheck" style="font-size:13px;font-weight:600;color:#1E293B;cursor:pointer;">Is Active</label>
+                </div>
+            }
+
+            <div class="opd-modal-actions">
+                <button class="opd-modal-btn-outline" @onclick="CloseDialog">Cancel</button>
+                <button class="opd-modal-btn-filled" @onclick="SaveAsync" disabled="@_saving">
+                    @(_saving ? "Saving..." : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _saving;
+    private bool _doctorsLoading;
+    private List<DoctorFeeConfigSummaryDto> _items = [];
+    private List<DoctorDto> _availableDoctors = [];
+
+    private Guid? _editingId;
+    private Guid? _selectedDoctorProfileId;
+    private decimal _visitFee;
+    private bool _isActive = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await FeeConfigClient.GetAllAsync();
+        if (response.Success && response.Data is not null)
+            _items = response.Data.ToList();
+        else if (!response.Success)
+            Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        _editingId = null;
+        _selectedDoctorProfileId = null;
+        _visitFee = 0;
+        _isActive = true;
+        _dialogVisible = true;
+
+        _doctorsLoading = true;
+        var doctorsResp = await ClinicClient.GetDoctorsAsync();
+        if (doctorsResp.Success && doctorsResp.Data is not null)
+        {
+            var existingProfileIds = _items.Select(i => i.DoctorProfileId).ToHashSet();
+            _availableDoctors = doctorsResp.Data
+                .Where(d => d.ProfileId.HasValue && !existingProfileIds.Contains(d.ProfileId!.Value))
+                .ToList();
+        }
+        _doctorsLoading = false;
+    }
+
+    private void OpenEditDialog(DoctorFeeConfigSummaryDto item)
+    {
+        _editingId = item.Id;
+        _visitFee = item.VisitFee;
+        _isActive = item.IsActive;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private void OnDoctorChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+            _selectedDoctorProfileId = id;
+        else
+            _selectedDoctorProfileId = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        if (_editingId.HasValue)
+        {
+            var response = await FeeConfigClient.UpdateAsync(_editingId.Value,
+                new UpdateDoctorFeeConfigRequest { VisitFee = _visitFee, IsActive = _isActive });
+            if (response.Success) { Snackbar.Add("Updated.", Severity.Success); CloseDialog(); await LoadAsync(); }
+            else Snackbar.Add(response.Message, Severity.Error);
+        }
+        else
+        {
+            if (_selectedDoctorProfileId is null)
+            {
+                Snackbar.Add("Please select a doctor.", Severity.Warning);
+                _saving = false;
+                return;
+            }
+            var response = await FeeConfigClient.CreateAsync(
+                new CreateDoctorFeeConfigRequest { DoctorProfileId = _selectedDoctorProfileId.Value, VisitFee = _visitFee });
+            if (response.Success) { Snackbar.Add("Fee config created.", Severity.Success); CloseDialog(); await LoadAsync(); }
+            else Snackbar.Add(response.Message, Severity.Error);
+        }
+        _saving = false;
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        var response = await FeeConfigClient.DeleteAsync(id);
+        if (response.Success) { Snackbar.Add("Deleted.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(response.Message, Severity.Error);
+    }
+}

@@ -15,7 +15,7 @@ public class ClinicRepository<T>(ClinicDbContext dbContext) : IClinicRepository<
         => await DbSet.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
     public virtual async Task<IReadOnlyList<T>> GetAllAsync(CancellationToken cancellationToken = default)
-        => await DbSet.ToListAsync(cancellationToken);
+        => await DbSet.AsNoTracking().ToListAsync(cancellationToken);
 
     public virtual async Task AddAsync(T entity, CancellationToken cancellationToken = default)
         => await DbSet.AddAsync(entity, cancellationToken);

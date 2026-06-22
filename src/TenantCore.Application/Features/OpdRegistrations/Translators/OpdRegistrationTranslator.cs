@@ -5,7 +5,7 @@ namespace TenantCore.Application.Features.OpdRegistrations.Translators;
 
 public static class OpdRegistrationTranslator
 {
-    public static OpdRegistrationDto ToDto(OpdRegistration entity) => new()
+    public static OpdRegistrationDto ToDto(OpdRegistration entity, OpdPayment? payment = null) => new()
     {
         Id = entity.Id,
         ApplicationId = entity.ApplicationId,
@@ -24,6 +24,9 @@ public static class OpdRegistrationTranslator
         BloodPressure = entity.BloodPressure,
         PulseRate = entity.PulseRate,
         OxygenSaturation = entity.OxygenSaturation,
-        CreatedAt = entity.CreatedAt
+        CreatedAt = entity.CreatedAt,
+        PaymentStatus = payment?.PaymentStatus,
+        FinalAmount = payment?.FinalAmount,
+        HasDiscount = payment?.Discount > 0
     };
 }

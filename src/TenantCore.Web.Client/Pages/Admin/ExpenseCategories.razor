@@ -1,0 +1,155 @@
+@page "/admin/expense-categories"
+@layout AuthorizedLayout
+@inject IExpenseCategoryApiClient ExpenseCategoryClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Expense Categories - TenantCore</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Expense Categories</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Add Category
+    </MudButton>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudTable Items="_items" Hover="true" Striped="true" Bordered="true" Dense="false" Elevation="2">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Description</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="width:100px;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate Context="item">
+            <MudTd DataLabel="Name"><strong>@item.Name</strong></MudTd>
+            <MudTd DataLabel="Description">@(item.Description ?? "—")</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="@(item.IsActive ? Color.Success : Color.Error)"
+                         Size="Size.Small" Variant="Variant.Text">
+                    @(item.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudTooltip Text="Edit">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="@(() => OpenEditDialog(item))" />
+                </MudTooltip>
+                <MudTooltip Text="Delete">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="@(() => DeleteAsync(item.Id))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Color="Color.Secondary">No expense categories found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+<MudDialog @bind-Visible="_dialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit Category" : "Add Category")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" Required="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined" Lines="2" />
+            </MudItem>
+            @if (_editingId.HasValue)
+            {
+                <MudItem xs="12">
+                    <MudCheckBox @bind-Value="_isActive" Label="Is Active" Color="Color.Primary" />
+                </MudItem>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">
+            @(_saving ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _saving;
+    private List<ExpenseCategorySummaryDto> _items = [];
+
+    private Guid? _editingId;
+    private string _name = string.Empty;
+    private string? _description;
+    private bool _isActive = true;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await ExpenseCategoryClient.GetAllAsync();
+        if (response.Success && response.Data is not null)
+            _items = response.Data.ToList();
+        else if (!response.Success)
+            Snackbar.Add(response.Message, Severity.Error);
+        _loading = false;
+    }
+
+    private void OpenCreateDialog()
+    {
+        _editingId = null;
+        _name = string.Empty;
+        _description = null;
+        _isActive = true;
+        _dialogVisible = true;
+    }
+
+    private void OpenEditDialog(ExpenseCategorySummaryDto item)
+    {
+        _editingId = item.Id;
+        _name = item.Name;
+        _description = item.Description;
+        _isActive = item.IsActive;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) { Snackbar.Add("Name is required.", Severity.Warning); return; }
+        _saving = true;
+        if (_editingId.HasValue)
+        {
+            var response = await ExpenseCategoryClient.UpdateAsync(_editingId.Value,
+                new UpdateExpenseCategoryRequest { Name = _name, Description = _description, IsActive = _isActive });
+            if (response.Success) { Snackbar.Add("Updated.", Severity.Success); CloseDialog(); await LoadAsync(); }
+            else Snackbar.Add(response.Message, Severity.Error);
+        }
+        else
+        {
+            var response = await ExpenseCategoryClient.CreateAsync(
+                new CreateExpenseCategoryRequest { Name = _name, Description = _description });
+            if (response.Success) { Snackbar.Add("Created.", Severity.Success); CloseDialog(); await LoadAsync(); }
+            else Snackbar.Add(response.Message, Severity.Error);
+        }
+        _saving = false;
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        var response = await ExpenseCategoryClient.DeleteAsync(id);
+        if (response.Success) { Snackbar.Add("Deleted.", Severity.Success); await LoadAsync(); }
+        else Snackbar.Add(response.Message, Severity.Error);
+    }
+}

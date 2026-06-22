@@ -26,6 +26,14 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<ClinicUsgTemplate> ClinicUsgTemplates => Set<ClinicUsgTemplate>();
     public DbSet<PregnancyTenure> PregnancyTenures => Set<PregnancyTenure>();
     public DbSet<UsgTemplateRow> UsgTemplateRows => Set<UsgTemplateRow>();
+    public DbSet<DoctorFeeConfig> DoctorFeeConfigs => Set<DoctorFeeConfig>();
+    public DbSet<Particular> Particulars => Set<Particular>();
+    public DbSet<OpdParticular> OpdParticulars => Set<OpdParticular>();
+    public DbSet<OpdPayment> OpdPayments => Set<OpdPayment>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<ExpenseRecord> ExpenseRecords => Set<ExpenseRecord>();
+    public DbSet<CounterSession> CounterSessions => Set<CounterSession>();
+    public DbSet<AmountHandover> AmountHandovers => Set<AmountHandover>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

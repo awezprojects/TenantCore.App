@@ -3,6 +3,10 @@
 @layout AuthorizedLayout
 @inject IClinicApiClient ClinicClient
 @inject IPrescriptionApiClient PrescriptionClient
+@inject IOpdParticularApiClient OpdParticularClient
+@inject IOpdPaymentApiClient OpdPaymentClient
+@inject IDoctorFeeConfigApiClient DoctorFeeConfigClient
+@inject ICounterSessionApiClient CounterSessionClient
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject ISnackbar Snackbar
@@ -226,10 +230,37 @@
                                         }
                                         else
                                         {
+                                            <button class="opd-btn rx" @onclick="() => OpenParticularsPopup(reg)">Items</button>
+                                            @if (reg.Status == OpdStatus.Completed)
+                                            {
+                                                @if (reg.PaymentStatus == PaymentStatus.Received)
+                                                {
+                                                    <span class="opd-badge done" style="font-size:11px;padding:3px 8px;">Paid ✓</span>
+                                                }
+                                                else
+                                                {
+                                                    @if (reg.HasDiscount)
+                                                    {
+                                                        <button class="opd-btn done-btn" @onclick="() => CollectFeeAsync(reg)" disabled="@_updating">
+                                                            Collect Full ₹@((reg.FinalAmount ?? reg.Fee).ToString("N0"))
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button class="opd-btn done-btn" @onclick="() => CollectFeeAsync(reg)" disabled="@_updating">
+                                                            Collect ₹@reg.Fee.ToString("N0")
+                                                        </button>
+                                                    }
+                                                }
+                                            }
                                             @if (reg.Status != OpdStatus.Cancelled && reg.Status != OpdStatus.Completed)
                                             {
                                                 <button class="opd-btn cancelled" @onclick="() => CancelAsync(reg)" disabled="@_updating">Cancel</button>
                                             }
+                                        }
+                                        @if (_isDoctor)
+                                        {
+                                            <button class="opd-btn rx" @onclick="() => OpenDiscountDialog(reg)">Disc</button>
                                         }
                                         <button class="opd-btn more" @onclick="() => OpenViewModal(reg)">···</button>
                                     </div>
@@ -378,7 +409,8 @@
                                         Placeholder="Type patient name or phone to search…" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudSelect T="Guid?" @bind-Value="_selectedDoctorId" Label="Select Doctor (optional)" Variant="Variant.Outlined">
+                    <MudSelect T="Guid?" Value="_selectedDoctorId" ValueChanged="OnDoctorSelectedAsync"
+                               Label="Select Doctor (optional)" Variant="Variant.Outlined">
                         <MudSelectItem T="Guid?" Value="null">— No Doctor —</MudSelectItem>
                         @foreach (var d in _doctors)
                         {
@@ -415,6 +447,15 @@
     </MudDialog>
 }
 
+<!-- OPD Particulars Popup (reception) -->
+<OpdParticularsPopup Visible="_particularsVisible"
+                     VisibleChanged="OnParticularsVisibleChanged"
+                     OpdRegistrationId="_particularsOpdId"
+                     OnFeesChanged="ReloadAll" />
+
+<!-- OPD Discount Dialog (doctor) -->
+<OpdDiscountDialog @bind-Visible="_discountVisible" OpdRegistrationId="_discountOpdId" OnDiscountApplied="ReloadAll" />
+
 @code {
     private record DatePreset(string Key, string Label, DateTime From, DateTime To);
     private List<DatePreset> _datePresets = [];
@@ -422,6 +463,17 @@
     // ── Auth ─────────────────────────────────────────────────────────────────
     private bool _isDoctor;
     private Guid? _doctorUserId;
+
+    // ── Counter session (reception only) ─────────────────────────────────────
+    private Guid? _activeSessionId;
+
+    // ── Particulars popup (reception) ─────────────────────────────────────────
+    private bool _particularsVisible;
+    private Guid _particularsOpdId;
+
+    // ── Discount dialog (doctor) ──────────────────────────────────────────────
+    private bool _discountVisible;
+    private Guid _discountOpdId;
 
     // ── Paging / filter state ─────────────────────────────────────────────────
     private int  _page       = 1;
@@ -507,7 +559,10 @@
 
         BuildPresets();
         await Task.WhenAll(LoadPageAsync(), LoadCountsAsync());
-        if (!_isDoctor) await LoadDoctorsAsync();
+        if (!_isDoctor)
+        {
+            await Task.WhenAll(LoadDoctorsAsync(), LoadActiveSessionAsync());
+        }
         if (Navigation.Uri.EndsWith("/opd/new", StringComparison.OrdinalIgnoreCase) && !_isDoctor)
             OpenNewDialog();
     }
@@ -593,6 +648,12 @@
         if (r.Success) _doctors = r.Data?.ToList() ?? [];
     }
 
+    private async Task LoadActiveSessionAsync()
+    {
+        var r = await CounterSessionClient.GetActiveAsync();
+        _activeSessionId = r.Success && r.Data is not null ? r.Data.Id : null;
+    }
+
     private (DateTime From, DateTime To) GetDateRange()
     {
         if (_activePreset == "custom") return (_customFrom, _customTo);
@@ -643,6 +704,16 @@
 
     // ── OPD actions ───────────────────────────────────────────────────────────
     private void OpenViewModal(OpdRegistrationDto reg) { _selected = reg; _viewModalOpen = true; }
+
+    private void OpenParticularsPopup(OpdRegistrationDto reg) { _particularsOpdId = reg.Id; _particularsVisible = true; }
+
+    private async Task OnParticularsVisibleChanged(bool visible)
+    {
+        _particularsVisible = visible;
+        if (!visible) await ReloadAll();
+    }
+
+    private void OpenDiscountDialog(OpdRegistrationDto reg) { _discountOpdId = reg.Id; _discountVisible = true; }
     private void CloseViewModal() { _viewModalOpen = false; _selected = null; }
 
     private async Task OpenPrescription(OpdRegistrationDto reg)
@@ -695,6 +766,56 @@
         _updating = false;
     }
 
+    private async Task CollectFeeAsync(OpdRegistrationDto reg)
+    {
+        _updating = true;
+
+        if (_activeSessionId is null)
+        {
+            Snackbar.Add("No active counter session. Open a counter session first.", Severity.Warning);
+            _updating = false;
+            return;
+        }
+
+        var paymentResp = await OpdPaymentClient.GetByOpdAsync(reg.Id);
+        if (!paymentResp.Success || paymentResp.Data is null)
+        {
+            Snackbar.Add("Payment record not found for this visit.", Severity.Error);
+            _updating = false;
+            return;
+        }
+
+        var payment = paymentResp.Data;
+
+        ApiResponse<OpdPaymentDto> acceptResp;
+        decimal collectedAmount;
+
+        if (reg.HasDiscount)
+        {
+            // Discount applied — collect the entire discounted bill at once.
+            acceptResp = await OpdPaymentClient.AcceptFullAsync(payment.Id,
+                new AcceptOpdPaymentFullRequest { OpdRegistrationId = reg.Id, CounterSessionId = _activeSessionId });
+            collectedAmount = payment.FinalAmount;
+        }
+        else
+        {
+            // No discount — collect visit fee only; services are collected per-item in the Items popup.
+            acceptResp = await OpdPaymentClient.AcceptAsync(payment.Id,
+                new AcceptOpdPaymentRequest { OpdRegistrationId = reg.Id, CounterSessionId = _activeSessionId });
+            collectedAmount = payment.VisitFee;
+        }
+
+        if (acceptResp.Success)
+        {
+            Snackbar.Add($"₹{collectedAmount:N0} collected for {reg.PatientName}.", Severity.Success);
+            await ReloadAll();
+        }
+        else
+            Snackbar.Add(acceptResp.Message, Severity.Error);
+
+        _updating = false;
+    }
+
     // New OPD form
     private void OnOpdPatientSelected(PatientDto? p) => _selectedPatientId = p?.Id ?? Guid.Empty;
 
@@ -704,6 +825,20 @@
         _fee = 0; _notes = null; _weight = null;
         _bloodPressure = null; _pulseRate = null; _oxygenSaturation = null;
         _newDialogVisible = true;
+    }
+
+    private async Task OnDoctorSelectedAsync(Guid? userId)
+    {
+        _selectedDoctorId = userId;
+        _fee = 0;
+        if (userId is null) return;
+
+        var doctor = _doctors.FirstOrDefault(d => d.UserId == userId);
+        if (doctor?.ProfileId is null) return;
+
+        var resp = await DoctorFeeConfigClient.GetByDoctorIdAsync(doctor.ProfileId.Value);
+        if (resp.Success && resp.Data is not null && resp.Data.IsActive)
+            _fee = resp.Data.VisitFee;
     }
 
     private async Task CreateOpdAsync()

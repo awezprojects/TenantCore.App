@@ -1,0 +1,61 @@
+@inject IOpdPaymentApiClient OpdPaymentClient
+@inject ISnackbar Snackbar
+
+<MudDialog Visible="Visible" VisibleChanged="VisibleChanged" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Apply Discount</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_payment is not null)
+        {
+            <MudText Class="mb-2">Total: Rs. @_payment.TotalAmount.ToString("N2")</MudText>
+            <MudText Class="mb-3">Current Discount: Rs. @_payment.Discount.ToString("N2")</MudText>
+        }
+        <MudNumericField @bind-Value="_discount" Label="Discount Amount" Min="0" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Cancel</MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="ApplyAsync" Disabled="_applying">
+            @(_applying ? "Applying..." : "Apply")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public Guid OpdRegistrationId { get; set; }
+    [Parameter] public EventCallback OnDiscountApplied { get; set; }
+
+    private bool _applying;
+    private OpdPaymentDto? _payment;
+    private decimal _discount;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Visible && OpdRegistrationId != Guid.Empty)
+        {
+            var response = await OpdPaymentClient.GetByOpdAsync(OpdRegistrationId);
+            _payment = response.Success ? response.Data : null;
+            _discount = _payment?.Discount ?? 0;
+        }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (_payment is null) return;
+        _applying = true;
+        var response = await OpdPaymentClient.ApplyDiscountAsync(_payment.Id,
+            new ApplyOpdDiscountRequest { OpdRegistrationId = OpdRegistrationId, Discount = _discount });
+        if (response.Success)
+        {
+            Snackbar.Add("Discount applied.", Severity.Success);
+            await OnDiscountApplied.InvokeAsync();
+            await Close();
+        }
+        else Snackbar.Add(response.Message, Severity.Error);
+        _applying = false;
+    }
+
+    private async Task Close() => await VisibleChanged.InvokeAsync(false);
+}

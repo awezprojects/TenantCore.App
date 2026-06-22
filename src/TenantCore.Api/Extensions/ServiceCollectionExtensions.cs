@@ -62,7 +62,11 @@ public static class ServiceCollectionExtensions
             // Clinical: doctors + management — per-clinic check
             .AddPolicy(AuthPolicies.RequireClinical, policy =>
                 policy.RequireAuthenticatedUser()
-                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicalRoles)));
+                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicalRoles)))
+            // All clinic staff: reception + clinical combined (e.g. OPD status updates)
+            .AddPolicy(AuthPolicies.RequireClinicStaff, policy =>
+                policy.RequireAuthenticatedUser()
+                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicStaffRoles)));
 
         return services;
     }

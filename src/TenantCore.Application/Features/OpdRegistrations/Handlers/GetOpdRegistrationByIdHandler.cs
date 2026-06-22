@@ -9,7 +9,10 @@ using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Application.Features.OpdRegistrations.Handlers;
 
-public sealed class GetOpdRegistrationByIdHandler(IOpdRegistrationRepository repository, IApplicationAccessValidator accessValidator)
+public sealed class GetOpdRegistrationByIdHandler(
+    IOpdRegistrationRepository repository,
+    IOpdPaymentRepository paymentRepository,
+    IApplicationAccessValidator accessValidator)
     : IRequestHandler<GetOpdRegistrationByIdQuery, OpdRegistrationDto>
 {
     public async Task<OpdRegistrationDto> Handle(
@@ -21,6 +24,7 @@ public sealed class GetOpdRegistrationByIdHandler(IOpdRegistrationRepository rep
         if (!accessValidator.CanAccess(registration.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
-        return OpdRegistrationTranslator.ToDto(registration);
+        var payment = await paymentRepository.GetByOpdRegistrationIdAsync(request.Id, registration.ApplicationId, cancellationToken);
+        return OpdRegistrationTranslator.ToDto(registration, payment);
     }
 }

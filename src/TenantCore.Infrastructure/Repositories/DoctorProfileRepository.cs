@@ -12,4 +12,16 @@ public class DoctorProfileRepository(ClinicDbContext dbContext)
         => await DbSet
             .Include(dp => dp.Speciality)
             .FirstOrDefaultAsync(dp => dp.UserId == userId, ct);
+
+    public async Task<IEnumerable<DoctorProfile>> GetByUserIdsAsync(IEnumerable<Guid> userIds, CancellationToken ct = default)
+        => await DbSet
+            .AsNoTracking()
+            .Where(dp => userIds.Contains(dp.UserId))
+            .ToListAsync(ct);
+
+    public async Task<IEnumerable<DoctorProfile>> GetByIdsAsync(IEnumerable<Guid> profileIds, CancellationToken ct = default)
+        => await DbSet
+            .AsNoTracking()
+            .Where(dp => profileIds.Contains(dp.Id))
+            .ToListAsync(ct);
 }

@@ -56,9 +56,10 @@ TenantCore.Web.Client
 | [ADR-004](ADR-004-infrastructure-layer.md) | Infrastructure Layer | ClinicDbContext, ClinicRepository<T>, EF Fluent API, external services |
 | [ADR-005](ADR-005-api-layer.md) | API Layer | ClinicControllerBase, middleware order, authorization policies |
 | [ADR-006](ADR-006-shared-layer.md) | Shared Layer | DTOs, AuthorizationConstants, enums, error types |
-| [ADR-007](ADR-007-blazor-client.md) | Blazor Client | Component structure, HTTP clients, SPA fallback |
+| [ADR-007](ADR-007-blazor-client.md) | Blazor Client | Component structure, HTTP clients, SPA fallback, **UI theme system** |
 | [ADR-008](ADR-008-multi-tenancy.md) | Multi-Tenancy | X-Application-Id header, JWT claims, per-tenant roles |
 | [ADR-009](ADR-009-unit-testing.md) | Unit Testing | xUnit, Moq, FluentAssertions, test organization |
+| [ADR-010](ADR-010-security.md) | Security & Code Quality | Security analysis, architectural violations, quality review |
 
 ## Key Technology Decisions
 
