@@ -13,7 +13,7 @@
 @if (_loading)
 {
     <div style="display:flex;justify-content:center;align-items:center;padding:60px 0;">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <div class="auth-spinner" style="width:48px;height:48px;border-width:4px;"></div>
     </div>
 }
 else if (_isDoctor)
@@ -30,177 +30,147 @@ else if (_isDoctor)
                     @_totalCount appointments today &nbsp;·&nbsp; @_visitedCount completed &nbsp;·&nbsp; @_pendingCount pending
                 </div>
             </div>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Add"
-                       Href="/prescriptions/new"
-                       Style="border-radius:8px;font-weight:600;text-transform:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
-                New Prescription
-            </MudButton>
+            <a href="/prescriptions/new"
+               style="display:inline-flex;align-items:center;padding:9px 18px;border-radius:8px;
+                      border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;
+                      text-decoration:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
+                ＋ New Prescription
+            </a>
         </div>
 
         <!-- Stat Cards -->
-        <MudGrid Spacing="3">
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#EFF6FF;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">TODAY'S APPOINTMENTS</div>
-                            <div class="cc-stat-value">@_totalCount</div>
-                            <div class="cc-stat-sub">All scheduled</div>
-                        </div>
-                        <div class="cc-stat-icon">📅</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+            <div class="cc-stat-card" style="background:#EFF6FF;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">TODAY'S APPOINTMENTS</div>
+                        <div class="cc-stat-value">@_totalCount</div>
+                        <div class="cc-stat-sub">All scheduled</div>
                     </div>
+                    <div class="cc-stat-icon">📅</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#ECFDF5;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">VISITED</div>
-                            <div class="cc-stat-value" style="color:#16A34A;">@_visitedCount</div>
-                            <div class="cc-stat-sub">Consultations done</div>
-                        </div>
-                        <div class="cc-stat-icon">✅</div>
+            </div>
+            <div class="cc-stat-card" style="background:#ECFDF5;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">VISITED</div>
+                        <div class="cc-stat-value" style="color:#16A34A;">@_visitedCount</div>
+                        <div class="cc-stat-sub">Consultations done</div>
                     </div>
+                    <div class="cc-stat-icon">✅</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#FFFBEB;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">PENDING</div>
-                            <div class="cc-stat-value" style="color:#D97706;">@_pendingCount</div>
-                            <div class="cc-stat-sub">In queue</div>
-                        </div>
-                        <div class="cc-stat-icon">⏳</div>
+            </div>
+            <div class="cc-stat-card" style="background:#FFFBEB;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">PENDING</div>
+                        <div class="cc-stat-value" style="color:#D97706;">@_pendingCount</div>
+                        <div class="cc-stat-sub">In queue</div>
                     </div>
+                    <div class="cc-stat-icon">⏳</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#FAF5FF;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">RX TODAY</div>
-                            <div class="cc-stat-value" style="color:#7C3AED;">@_rxCount</div>
-                            <div class="cc-stat-sub">Prescriptions written</div>
-                        </div>
-                        <div class="cc-stat-icon">📋</div>
+            </div>
+            <div class="cc-stat-card" style="background:#FAF5FF;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">RX TODAY</div>
+                        <div class="cc-stat-value" style="color:#7C3AED;">@_rxCount</div>
+                        <div class="cc-stat-sub">Prescriptions written</div>
                     </div>
+                    <div class="cc-stat-icon">📋</div>
                 </div>
-            </MudItem>
-        </MudGrid>
+            </div>
+        </div>
 
         <!-- Two Column: Appointments + Visited -->
-        <MudGrid Spacing="3">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px;">
             <!-- Today's Appointments -->
-            <MudItem xs="12" md="6">
-                <div class="cc-card">
-                    <div class="cc-card-header">
-                        <div class="cc-card-title">📅 Today's Appointments</div>
-                        <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>
-                            View all →
-                        </button>
-                    </div>
-                    <div>
-                        @if (!_todayOpd.Any())
-                        {
-                            <div class="cc-empty">No appointments today</div>
-                        }
-                        else
-                        {
-                            @foreach (var (opd, idx) in _todayOpd.Take(5).Select((o, i) => (o, i)))
-                            {
-                                var (badgeColor, badgeBg, badgeLabel) = GetStatusStyle(opd.Status);
-                                var isLast = idx == Math.Min(4, _todayOpd.Count - 1);
-                                <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;
-                                            border-bottom:@(isLast ? "none" : "1px solid #E2E8F0");
-                                            background:@(opd.Status == OpdStatus.InProgress ? "#F0F7FF" : "transparent");">
-                                    <div style="width:44px;text-align:center;flex-shrink:0;">
-                                        <div style="font-size:12px;font-weight:800;color:#1E293B;">
-                                            @opd.RegistrationDate.ToString("hh:mm")
-                                        </div>
-                                        <div style="font-size:10px;color:#94A3B8;">
-                                            @opd.RegistrationDate.ToString("tt")
-                                        </div>
-                                    </div>
-                                    <div class="cc-avatar cc-avatar-blue">
-                                        @GetInitials(opd.PatientName)
-                                    </div>
-                                    <div style="flex:1;min-width:0;">
-                                        <div style="font-size:13px;font-weight:600;color:#1E293B;
-                                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                                            @opd.PatientName
-                                        </div>
-                                        <div style="font-size:11px;color:#94A3B8;">
-                                            @opd.RegistrationNumber
-                                        </div>
-                                    </div>
-                                    <span class="cc-badge" style="color:@badgeColor;background:@badgeBg;">
-                                        @badgeLabel
-                                    </span>
-                                </div>
-                            }
-                        }
-                    </div>
+            <div class="cc-card">
+                <div class="cc-card-header">
+                    <div class="cc-card-title">📅 Today's Appointments</div>
+                    <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>View all →</button>
                 </div>
-            </MudItem>
+                <div>
+                    @if (!_todayOpd.Any())
+                    {
+                        <div class="cc-empty">No appointments today</div>
+                    }
+                    else
+                    {
+                        @foreach (var (opd, idx) in _todayOpd.Take(5).Select((o, i) => (o, i)))
+                        {
+                            var (badgeColor, badgeBg, badgeLabel) = GetStatusStyle(opd.Status);
+                            var isLast = idx == Math.Min(4, _todayOpd.Count - 1);
+                            <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;
+                                        border-bottom:@(isLast ? "none" : "1px solid #E2E8F0");
+                                        background:@(opd.Status == OpdStatus.InProgress ? "#F0F7FF" : "transparent");">
+                                <div style="width:44px;text-align:center;flex-shrink:0;">
+                                    <div style="font-size:12px;font-weight:800;color:#1E293B;">
+                                        @opd.RegistrationDate.ToString("hh:mm")
+                                    </div>
+                                    <div style="font-size:10px;color:#94A3B8;">
+                                        @opd.RegistrationDate.ToString("tt")
+                                    </div>
+                                </div>
+                                <div class="cc-avatar cc-avatar-blue">@GetInitials(opd.PatientName)</div>
+                                <div style="flex:1;min-width:0;">
+                                    <div style="font-size:13px;font-weight:600;color:#1E293B;
+                                                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                                        @opd.PatientName
+                                    </div>
+                                    <div style="font-size:11px;color:#94A3B8;">@opd.RegistrationNumber</div>
+                                </div>
+                                <span class="cc-badge" style="color:@badgeColor;background:@badgeBg;">@badgeLabel</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
 
             <!-- Today's Visited Patients -->
-            <MudItem xs="12" md="6">
-                <div class="cc-card">
-                    <div class="cc-card-header">
-                        <div class="cc-card-title">✅ Today's Visited Patients</div>
-                        <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>
-                            View all →
-                        </button>
-                    </div>
-                    <div>
-                        @if (!_visitedOpd.Any())
-                        {
-                            <div class="cc-empty">No visited patients yet</div>
-                        }
-                        else
-                        {
-                            @foreach (var (opd, idx) in _visitedOpd.Take(5).Select((o, i) => (o, i)))
-                            {
-                                var isLast = idx == Math.Min(4, _visitedOpd.Count - 1);
-                                <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;
-                                            border-bottom:@(isLast ? "none" : "1px solid #E2E8F0");">
-                                    <div style="width:44px;text-align:center;flex-shrink:0;">
-                                        <div style="font-size:12px;font-weight:800;color:#16A34A;">
-                                            @opd.RegistrationDate.ToString("hh:mm")
-                                        </div>
-                                        <div style="font-size:10px;color:#94A3B8;">
-                                            @opd.RegistrationDate.ToString("tt")
-                                        </div>
-                                    </div>
-                                    <div class="cc-avatar cc-avatar-green">
-                                        @GetInitials(opd.PatientName)
-                                    </div>
-                                    <div style="flex:1;min-width:0;">
-                                        <div style="font-size:13px;font-weight:600;color:#1E293B;">
-                                            @opd.PatientName
-                                        </div>
-                                        <div style="font-size:11px;color:#94A3B8;">
-                                            @opd.RegistrationNumber
-                                        </div>
-                                    </div>
-                                    <span class="cc-badge" style="color:#16A34A;background:#ECFDF5;">✓ Done</span>
-                                </div>
-                            }
-                        }
-                    </div>
+            <div class="cc-card">
+                <div class="cc-card-header">
+                    <div class="cc-card-title">✅ Today's Visited Patients</div>
+                    <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>View all →</button>
                 </div>
-            </MudItem>
-        </MudGrid>
+                <div>
+                    @if (!_visitedOpd.Any())
+                    {
+                        <div class="cc-empty">No visited patients yet</div>
+                    }
+                    else
+                    {
+                        @foreach (var (opd, idx) in _visitedOpd.Take(5).Select((o, i) => (o, i)))
+                        {
+                            var isLast = idx == Math.Min(4, _visitedOpd.Count - 1);
+                            <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;
+                                        border-bottom:@(isLast ? "none" : "1px solid #E2E8F0");">
+                                <div style="width:44px;text-align:center;flex-shrink:0;">
+                                    <div style="font-size:12px;font-weight:800;color:#16A34A;">
+                                        @opd.RegistrationDate.ToString("hh:mm")
+                                    </div>
+                                    <div style="font-size:10px;color:#94A3B8;">
+                                        @opd.RegistrationDate.ToString("tt")
+                                    </div>
+                                </div>
+                                <div class="cc-avatar cc-avatar-green">@GetInitials(opd.PatientName)</div>
+                                <div style="flex:1;min-width:0;">
+                                    <div style="font-size:13px;font-weight:600;color:#1E293B;">@opd.PatientName</div>
+                                    <div style="font-size:11px;color:#94A3B8;">@opd.RegistrationNumber</div>
+                                </div>
+                                <span class="cc-badge" style="color:#16A34A;background:#ECFDF5;">✓ Done</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
 
         <!-- Recent Prescriptions Table -->
         <div class="cc-card">
             <div class="cc-card-header">
                 <div class="cc-card-title">📋 Recent Prescriptions</div>
-                <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/prescriptions")'>
-                    View all →
-                </button>
+                <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/prescriptions")'>View all →</button>
             </div>
             @if (!_recentRx.Any())
             {
@@ -282,73 +252,63 @@ else
                     Front Desk &nbsp;·&nbsp; @_rTotalCount patients registered in OPD today
                 </div>
             </div>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.PersonAdd"
-                       Href="/patients"
-                       Style="border-radius:8px;font-weight:600;text-transform:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
-                + Register Patient
-            </MudButton>
+            <a href="/patients"
+               style="display:inline-flex;align-items:center;padding:9px 18px;border-radius:8px;
+                      border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;
+                      text-decoration:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
+                ＋ Register Patient
+            </a>
         </div>
 
         <!-- Stat Cards -->
-        <MudGrid Spacing="3">
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#EFF6FF;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">TODAY'S OPD</div>
-                            <div class="cc-stat-value">@_rTotalCount</div>
-                            <div class="cc-stat-sub">All registrations</div>
-                        </div>
-                        <div class="cc-stat-icon">📋</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+            <div class="cc-stat-card" style="background:#EFF6FF;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">TODAY'S OPD</div>
+                        <div class="cc-stat-value">@_rTotalCount</div>
+                        <div class="cc-stat-sub">All registrations</div>
                     </div>
+                    <div class="cc-stat-icon">📋</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#FFFBEB;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">WAITING</div>
-                            <div class="cc-stat-value" style="color:#D97706;">@_rWaitingCount</div>
-                            <div class="cc-stat-sub">In queue</div>
-                        </div>
-                        <div class="cc-stat-icon">⏳</div>
+            </div>
+            <div class="cc-stat-card" style="background:#FFFBEB;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">WAITING</div>
+                        <div class="cc-stat-value" style="color:#D97706;">@_rWaitingCount</div>
+                        <div class="cc-stat-sub">In queue</div>
                     </div>
+                    <div class="cc-stat-icon">⏳</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#EFF6FF;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">IN PROGRESS</div>
-                            <div class="cc-stat-value" style="color:#1565C0;">@_rInProgressCount</div>
-                            <div class="cc-stat-sub">Being seen</div>
-                        </div>
-                        <div class="cc-stat-icon">🩺</div>
+            </div>
+            <div class="cc-stat-card" style="background:#EFF6FF;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">IN PROGRESS</div>
+                        <div class="cc-stat-value" style="color:#1565C0;">@_rInProgressCount</div>
+                        <div class="cc-stat-sub">Being seen</div>
                     </div>
+                    <div class="cc-stat-icon">🩺</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#ECFDF5;">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">COMPLETED</div>
-                            <div class="cc-stat-value" style="color:#16A34A;">@_rCompletedCount</div>
-                            <div class="cc-stat-sub">Visits done</div>
-                        </div>
-                        <div class="cc-stat-icon">✅</div>
+            </div>
+            <div class="cc-stat-card" style="background:#ECFDF5;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">COMPLETED</div>
+                        <div class="cc-stat-value" style="color:#16A34A;">@_rCompletedCount</div>
+                        <div class="cc-stat-sub">Visits done</div>
                     </div>
+                    <div class="cc-stat-icon">✅</div>
                 </div>
-            </MudItem>
-        </MudGrid>
+            </div>
+        </div>
 
         <!-- Today's OPD Queue -->
         <div class="cc-card">
             <div class="cc-card-header">
                 <div class="cc-card-title">📅 Today's OPD Queue</div>
-                <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>
-                    View all →
-                </button>
+                <button class="cc-btn-light" @onclick='() => Nav.NavigateTo("/opd")'>View all →</button>
             </div>
             <div>
                 @if (!_rTodayOpd.Any())
@@ -372,9 +332,7 @@ else
                                     @opd.RegistrationDate.ToString("tt")
                                 </div>
                             </div>
-                            <div class="cc-avatar cc-avatar-blue">
-                                @GetInitials(opd.PatientName)
-                            </div>
+                            <div class="cc-avatar cc-avatar-blue">@GetInitials(opd.PatientName)</div>
                             <div style="flex:1;min-width:0;">
                                 <div style="font-size:13px;font-weight:600;color:#1E293B;
                                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -388,9 +346,7 @@ else
                                     }
                                 </div>
                             </div>
-                            <span class="cc-badge" style="color:@badgeColor;background:@badgeBg;">
-                                @badgeLabel
-                            </span>
+                            <span class="cc-badge" style="color:@badgeColor;background:@badgeBg;">@badgeLabel</span>
                         </div>
                     }
                 }
@@ -399,18 +355,16 @@ else
 
         <!-- Quick Actions -->
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.PersonAdd"
-                       Href="/patients"
-                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+            <a href="/patients"
+               style="display:inline-flex;align-items:center;padding:9px 18px;border-radius:8px;
+                      border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;text-decoration:none;">
                 Register Patient
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.LocalHospital"
-                       Href="/opd"
-                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+            </a>
+            <a href="/opd"
+               style="display:inline-flex;align-items:center;padding:9px 18px;border-radius:8px;
+                      border:1.5px solid #1565C0;background:#fff;color:#1565C0;font-size:13px;font-weight:700;text-decoration:none;">
                 OPD Queue
-            </MudButton>
+            </a>
         </div>
 
     </div>
@@ -423,7 +377,6 @@ else
     private string _receptionFirstName = string.Empty;
     private string _greeting = "morning";
 
-    // Doctor dashboard state
     private List<OpdRegistrationDto> _todayOpd = [];
     private List<OpdRegistrationDto> _visitedOpd = [];
     private List<PrescriptionDto> _recentRx = [];
@@ -432,7 +385,6 @@ else
     private int _pendingCount;
     private int _rxCount;
 
-    // Reception dashboard state
     private List<OpdRegistrationDto> _rTodayOpd = [];
     private int _rTotalCount;
     private int _rWaitingCount;
@@ -446,10 +398,6 @@ else
 
         var selectedAppId = ClinicContext.SelectedApplicationId;
 
-        // Resolve the user's roles for the SELECTED clinic only.
-        // This ensures a user who is "Clinic Admin" in Clinic A and "Doctor" in Clinic B
-        // sees the correct dashboard when entering Clinic B.
-        // Falls back to all active roles when no clinic is selected (e.g. first load).
         var clinicRoles = selectedAppId != Guid.Empty
             ? AuthState.GetRolesForApplication(selectedAppId)
             : (AuthState.CurrentUser?.UserRoles
@@ -463,7 +411,6 @@ else
 
         _isDoctor = clinicRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
 
-        // Admins who are not doctors in this clinic → admin dashboard
         if (isAdmin && !_isDoctor)
         {
             Nav.NavigateTo("/admin/dashboard", forceLoad: true);
@@ -492,8 +439,6 @@ else
     {
         var appId = ClinicContext.SelectedApplicationId;
         var today = DateTime.Today;
-        // Pass applicationId explicitly so the correct clinic's data is fetched
-        // regardless of in-memory delegating-handler state timing.
         Guid? explicitApp = appId != Guid.Empty ? appId : null;
 
         var todayTask = ClinicApi.GetOpdRegistrationsAsync(
@@ -554,7 +499,7 @@ else
             _rTodayOpd = opdResult.Data.Items
                 .OrderBy(o => o.RegistrationDate)
                 .ToList();
-            _rTotalCount = _rTodayOpd.Count;
+            _rTotalCount      = _rTodayOpd.Count;
             _rWaitingCount    = _rTodayOpd.Count(o => o.Status == OpdStatus.Pending);
             _rInProgressCount = _rTodayOpd.Count(o => o.Status == OpdStatus.InProgress);
             _rCompletedCount  = _rTodayOpd.Count(o => o.Status == OpdStatus.Completed);

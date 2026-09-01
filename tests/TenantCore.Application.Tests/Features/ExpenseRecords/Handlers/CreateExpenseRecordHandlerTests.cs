@@ -13,6 +13,17 @@ public class CreateExpenseRecordHandlerTests
 {
     private readonly Mock<IExpenseRecordRepository> _repository = new();
     private readonly Mock<IExpenseCategoryRepository> _categoryRepository = new();
+    private readonly Mock<ICounterSessionRepository> _sessionRepository = new();
+
+    private CreateExpenseRecordHandler CreateHandler() =>
+        new(_repository.Object, _categoryRepository.Object, _sessionRepository.Object);
+
+    private void SetupActiveSession(Guid appId)
+    {
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        _sessionRepository.Setup(r => r.GetActiveSessionAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(session);
+    }
 
     [Fact]
     public async Task Handle_WhenValid_CreatesRecordAndReturnsGuid()
@@ -22,6 +33,7 @@ public class CreateExpenseRecordHandlerTests
         var category = ExpenseCategory.Create(appId, "Transport", null);
         var recordedBy = Guid.NewGuid();
 
+        SetupActiveSession(appId);
         _categoryRepository.Setup(r => r.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
         _repository.Setup(r => r.AddAsync(It.IsAny<ExpenseRecord>(), It.IsAny<CancellationToken>()))
@@ -33,25 +45,42 @@ public class CreateExpenseRecordHandlerTests
             new CreateExpenseRecordRequest { ExpenseCategoryId = categoryId, Amount = 200, Notes = "Taxi" },
             recordedBy, appId);
 
-        var handler = new CreateExpenseRecordHandler(_repository.Object, _categoryRepository.Object);
-        var result = await handler.Handle(command, CancellationToken.None);
+        var result = await CreateHandler().Handle(command, CancellationToken.None);
 
         result.Should().NotBeEmpty();
         _repository.Verify(r => r.AddAsync(It.IsAny<ExpenseRecord>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
+    public async Task Handle_WhenNoActiveSession_ThrowsInvalidOperationException()
+    {
+        var appId = Guid.NewGuid();
+        _sessionRepository.Setup(r => r.GetActiveSessionAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((CounterSession?)null);
+
+        var command = new CreateExpenseRecordCommand(
+            new CreateExpenseRecordRequest { ExpenseCategoryId = Guid.NewGuid(), Amount = 200 },
+            Guid.NewGuid(), appId);
+
+        var action = () => CreateHandler().Handle(command, CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*counter session*");
+    }
+
+    [Fact]
     public async Task Handle_WhenCategoryNotFound_ThrowsNotFoundException()
     {
+        var appId = Guid.NewGuid();
+        SetupActiveSession(appId);
         _categoryRepository.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ExpenseCategory?)null);
 
         var command = new CreateExpenseRecordCommand(
             new CreateExpenseRecordRequest { ExpenseCategoryId = Guid.NewGuid(), Amount = 200 },
-            Guid.NewGuid(), Guid.NewGuid());
+            Guid.NewGuid(), appId);
 
-        var handler = new CreateExpenseRecordHandler(_repository.Object, _categoryRepository.Object);
-        var action = () => handler.Handle(command, CancellationToken.None);
+        var action = () => CreateHandler().Handle(command, CancellationToken.None);
 
         await action.Should().ThrowAsync<NotFoundException>();
     }
@@ -63,6 +92,7 @@ public class CreateExpenseRecordHandlerTests
         var category = ExpenseCategory.Create(appId, "Transport", null);
         category.Update("Transport", null, false);
 
+        SetupActiveSession(appId);
         _categoryRepository.Setup(r => r.GetByIdAsync(category.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(category);
 
@@ -70,8 +100,7 @@ public class CreateExpenseRecordHandlerTests
             new CreateExpenseRecordRequest { ExpenseCategoryId = category.Id, Amount = 200 },
             Guid.NewGuid(), appId);
 
-        var handler = new CreateExpenseRecordHandler(_repository.Object, _categoryRepository.Object);
-        var action = () => handler.Handle(command, CancellationToken.None);
+        var action = () => CreateHandler().Handle(command, CancellationToken.None);
 
         await action.Should().ThrowAsync<InvalidOperationException>();
     }

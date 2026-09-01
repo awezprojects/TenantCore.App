@@ -4,10 +4,11 @@
 @inject ICounterSessionApiClient CounterSessionClient
 @inject IAmountHandoverApiClient HandoverClient
 @inject IExpenseRecordApiClient ExpenseClient
+@inject IOpdPaymentApiClient OpdPaymentClient
 @inject IApplicationApiClient AppClient
 @inject ClinicContextService ClinicContext
 @inject AuthStateService AuthState
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @using TenantCore.Shared.Enums
 @using TenantCore.Shared.Authorization
 @using TenantCore.Shared.Dtos
@@ -33,7 +34,9 @@
 
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        <div style="display:flex;justify-content:center;padding:32px 0;">
+            <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+        </div>
     }
     else
     {
@@ -165,113 +168,129 @@
             </div>
         }
 
-        <!-- Session History -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
-            <div style="font-size:14px;font-weight:700;color:#374151;">Session History</div>
-            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                <button class="opd-btn" style="padding:5px 12px;font-size:12px;@(_histPreset=="today"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyHistPreset("today")'>Today</button>
-                <button class="opd-btn" style="padding:5px 12px;font-size:12px;@(_histPreset=="yesterday"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyHistPreset("yesterday")'>Yesterday</button>
-                <button class="opd-btn" style="padding:5px 12px;font-size:12px;@(_histPreset=="7d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyHistPreset("7d")'>Last 7 Days</button>
-                <button class="opd-btn" style="padding:5px 12px;font-size:12px;@(_histPreset=="30d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyHistPreset("30d")'>Last 30 Days</button>
-                <button class="opd-btn" style="padding:5px 12px;font-size:12px;@(_histPreset=="all"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyHistPreset("all")'>All</button>
-                <input type="date" class="opd-search-input" style="width:120px;padding:5px 8px;font-size:12px;" @bind="_histFrom" @bind:event="onchange" />
-                <span style="font-size:12px;color:#94A3B8;">–</span>
-                <input type="date" class="opd-search-input" style="width:120px;padding:5px 8px;font-size:12px;" @bind="_histTo" @bind:event="onchange" />
-                <button class="opd-btn-primary" style="padding:5px 12px;font-size:12px;" @onclick="LoadHistoryAsync">Apply</button>
+        @if (_activeSession is not null)
+        {
+            <!-- Patient Collections -->
+            <div style="margin-bottom:8px;">
+                <div style="font-size:14px;font-weight:700;color:#374151;">
+                    Patient Collections This Session
+                    <span style="font-size:12px;font-weight:400;color:#64748B;margin-left:8px;">
+                        (@_sessionCollections.Count patient@(_sessionCollections.Count == 1 ? "" : "s") · total: Rs. @_sessionCollections.Sum(c => c.TotalCollected).ToString("N0"))
+                    </span>
+                </div>
             </div>
-        </div>
-        <div class="opd-table-card" style="padding:0;">
-            <table class="opd-table">
-                <thead>
-                    <tr><th>Session Date</th><th>Opened At</th><th>Status</th><th>Collected</th><th>Expenses</th><th>Net</th></tr>
-                </thead>
-                <tbody>
-                    @if (!_sessions.Any())
-                    {
-                        <tr><td colspan="6" class="opd-empty">No sessions found for the selected period.</td></tr>
-                    }
-                    else
-                    {
-                        @foreach (var s in _sessions)
+            <div class="opd-table-card" style="padding:0;">
+                <table class="opd-table">
+                    <thead>
+                        <tr><th>Patient</th><th>Token</th><th>Doctor</th><th>Consultation Fee</th><th>Items Total</th><th>Total Collected</th><th>Collected At</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @if (!_sessionCollections.Any())
                         {
-                            <tr>
-                                <td>@s.SessionDate.ToString("dd MMM yyyy")</td>
-                                <td style="font-size:12px;color:#64748B;">@DateTimeHelper.ToLocalString(s.OpenedAt, "HH:mm")</td>
-                                <td>
-                                    @if (s.Status == CounterSessionStatus.Open)
-                                    {
-                                        <span style="background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">Open</span>
-                                    }
-                                    else
-                                    {
-                                        <span style="background:#F1F5F9;color:#475569;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">Closed</span>
-                                    }
-                                </td>
-                                <td style="color:#16A34A;font-weight:600;">Rs. @s.TotalCollected.ToString("N2")</td>
-                                <td style="color:#DC2626;font-weight:600;">Rs. @s.TotalExpenses.ToString("N2")</td>
-                                <td style="font-weight:700;color:@(s.NetAmount >= 0 ? "#16A34A" : "#DC2626");">Rs. @s.NetAmount.ToString("N2")</td>
-                            </tr>
+                            <tr><td colspan="8" class="opd-empty">No collections recorded in this session yet.</td></tr>
                         }
-                    }
-                </tbody>
-            </table>
-        </div>
+                        else
+                        {
+                            @foreach (var c in _sessionCollections)
+                            {
+                                <tr>
+                                    <td><strong>@c.PatientName</strong></td>
+                                    <td style="font-size:12px;color:#64748B;">@c.RegistrationNumber</td>
+                                    <td>@c.DoctorName</td>
+                                    <td>Rs. @c.ConsultationFee.ToString("N2")</td>
+                                    <td>Rs. @c.ItemsTotal.ToString("N2")</td>
+                                    <td style="color:#16A34A;font-weight:700;">Rs. @c.TotalCollected.ToString("N2")</td>
+                                    <td style="font-size:12px;color:#64748B;">@(c.CollectedAt.HasValue ? DateTimeHelper.ToLocalString(c.CollectedAt.Value, "HH:mm") : "—")</td>
+                                    <td>
+                                        @if (c.HasItems)
+                                        {
+                                            <button class="opd-btn" style="padding:5px 12px;font-size:12px;" @onclick="() => ViewItems(c)">View</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     }
 </div>
 
-<!-- Handover Dialog -->
-<MudDialog @bind-Visible="_handoverVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">💸 Handover Cash</MudText></TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudAlert Severity="Severity.Info" Dense="true">
+<!-- Patient Items View (session collections) -->
+<OpdParticularsPopup Visible="_itemsVisible" VisibleChanged="OnItemsVisibleChanged" OpdRegistrationId="_itemsOpdId" OnFeesChanged="LoadAsync" ReadOnly="true" />
+
+<!-- Handover Modal -->
+@if (_handoverVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _handoverVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:480px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">💸 Handover Cash</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div class="auth-info" style="font-size:13px;">
                 Net amount after expenses: <strong>Rs. @(_activeSession?.NetAmount.ToString("N2") ?? "0.00")</strong>
-            </MudAlert>
-            <MudNumericField @bind-Value="_handoverAmount" Label="Amount to Handover (Rs.) *" Min="0.01m" Variant="Variant.Outlined" />
-            <MudSelect T="ApplicationUserResponseDto?" @bind-Value="_handoverRecipient"
-                       Label="Handover To *" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomLeft">
-                @foreach (var u in _handoverUsers)
-                {
-                    <MudSelectItem T="ApplicationUserResponseDto?" Value="@u">
-                        @u.FullName <span style="color:#94A3B8;font-size:0.75rem;margin-left:6px;">(@u.RoleName)</span>
-                    </MudSelectItem>
-                }
-            </MudSelect>
-            <MudTextField @bind-Value="_handoverNotes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _handoverVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled"
-                   OnClick="SubmitHandoverAsync"
-                   Disabled="@(_saving || _handoverRecipient is null)">
-            @(_saving ? "Sending..." : "Send")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Amount to Handover (Rs.) *</label>
+                <input class="form-input" type="number" min="0.01" step="0.01" @bind="_handoverAmount" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Handover To *</label>
+                <select class="form-input" style="margin-bottom:0;"
+                        value="@_handoverRecipientId"
+                        @onchange="OnRecipientChanged">
+                    <option value="">— Select recipient —</option>
+                    @foreach (var u in _handoverUsers)
+                    {
+                        <option value="@u.UserId">@u.FullName (@u.RoleName)</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Notes</label>
+                <textarea class="form-input" rows="2" @bind="_handoverNotes"
+                          style="resize:vertical;min-height:60px;"></textarea>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _handoverVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="SubmitHandoverAsync" disabled="@(_saving || _handoverRecipient is null)"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@((_saving || _handoverRecipient is null) ? "0.6" : "1");">
+                @(_saving ? "Sending..." : "Send")
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     private bool _loading = true;
     private bool _saving;
     private CounterSessionDto? _activeSession;
-    private List<CounterSessionSummaryDto> _sessions = [];
     private List<AmountHandoverSummaryDto> _sessionHandovers = [];
     private List<ExpenseRecordSummaryDto> _sessionExpenses = [];
+    private List<SessionCollectionDto> _sessionCollections = [];
     private bool _hasPendingHandover => _sessionHandovers.Any(h => h.Status == HandoverStatus.Pending);
     private bool _canClose => _sessionHandovers.Any(h => h.Status == HandoverStatus.Accepted) && !_hasPendingHandover;
 
-    // Handover dialog
     private bool _handoverVisible;
     private decimal _handoverAmount;
     private string? _handoverNotes;
     private ApplicationUserResponseDto? _handoverRecipient;
+    private string? _handoverRecipientId;
     private List<ApplicationUserResponseDto> _handoverUsers = [];
 
     private static readonly string[] HandoverTargetRoles = [AppRoles.ClinicAdmin, AppRoles.ClinicManager, AppRoles.Doctor];
 
-    private string _histPreset = "today";
-    private DateTime? _histFrom = DateTime.Today;
-    private DateTime? _histTo = DateTime.Today;
+    private bool _itemsVisible;
+    private Guid _itemsOpdId;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -287,37 +306,29 @@
             _sessionHandovers = handovers.Success && handovers.Data is not null ? handovers.Data.ToList() : [];
             var expenses = await ExpenseClient.GetBySessionAsync(_activeSession.Id);
             _sessionExpenses = expenses.Success && expenses.Data is not null ? expenses.Data.ToList() : [];
+            var collections = await OpdPaymentClient.GetBySessionAsync(_activeSession.Id);
+            _sessionCollections = collections.Success && collections.Data is not null ? collections.Data.ToList() : [];
         }
         else
         {
             _sessionHandovers = [];
             _sessionExpenses = [];
+            _sessionCollections = [];
         }
 
-        await LoadHistoryAsync();
         _loading = false;
     }
 
-    private async Task LoadHistoryAsync()
+    private void ViewItems(SessionCollectionDto c)
     {
-        var all = await CounterSessionClient.GetAllAsync(_histFrom, _histTo);
-        _sessions = all.Success && all.Data is not null ? all.Data.ToList() : [];
+        _itemsOpdId = c.OpdRegistrationId;
+        _itemsVisible = true;
     }
 
-    private async Task ApplyHistPreset(string preset)
+    private async Task OnItemsVisibleChanged(bool visible)
     {
-        _histPreset = preset;
-        var today = DateTime.Today;
-        (_histFrom, _histTo) = preset switch
-        {
-            "today"     => ((DateTime?)today, (DateTime?)today),
-            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
-            "7d"        => (today.AddDays(-6), today),
-            "30d"       => (today.AddDays(-29), today),
-            "all"       => (null, null),
-            _           => (_histFrom, _histTo)
-        };
-        await LoadHistoryAsync();
+        _itemsVisible = visible;
+        if (!visible) await LoadAsync();
     }
 
     private async Task OpenSessionAsync()
@@ -325,8 +336,8 @@
         _saving = true;
         // Send as Unspecified so JSON doesn't add +05:30, which would be UTC-converted by the server
         var response = await CounterSessionClient.OpenAsync(new OpenCounterSessionRequest { SessionDate = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Unspecified) });
-        if (response.Success) { Snackbar.Add("Session opened.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Session opened."); await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed to open session.");
         _saving = false;
     }
 
@@ -335,8 +346,8 @@
         if (_activeSession is null) return;
         _saving = true;
         var response = await CounterSessionClient.CloseAsync(_activeSession.Id);
-        if (response.Success) { Snackbar.Add("Session closed.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Session closed."); await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed to close session.");
         _saving = false;
     }
 
@@ -345,6 +356,7 @@
         _handoverAmount = _activeSession?.NetAmount ?? 0;
         _handoverNotes  = null;
         _handoverRecipient = null;
+        _handoverRecipientId = null;
         _handoverVisible = true;
 
         var currentUserId = AuthState.CurrentUser?.UserId;
@@ -355,6 +367,21 @@
                 .OrderBy(u => u.RoleName).ThenBy(u => u.FullName)
                 .ToList()
             : [];
+    }
+
+    private void OnRecipientChanged(ChangeEventArgs e)
+    {
+        var idStr = e.Value?.ToString();
+        if (Guid.TryParse(idStr, out var uid))
+        {
+            _handoverRecipientId = idStr;
+            _handoverRecipient = _handoverUsers.FirstOrDefault(u => u.UserId == uid);
+        }
+        else
+        {
+            _handoverRecipientId = null;
+            _handoverRecipient = null;
+        }
     }
 
     private async Task SubmitHandoverAsync()
@@ -371,11 +398,11 @@
         });
         if (response.Success)
         {
-            Snackbar.Add("Handover sent.", Severity.Success);
+            Toast.ShowSuccess("Handover sent.");
             _handoverVisible = false;
             await LoadAsync();
         }
-        else Snackbar.Add(response.Message ?? "Failed.", Severity.Error);
+        else Toast.ShowError(response.Message ?? "Failed.");
         _saving = false;
     }
 

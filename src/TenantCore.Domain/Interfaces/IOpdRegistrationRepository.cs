@@ -15,4 +15,6 @@ public interface IOpdRegistrationRepository : IClinicRepository<OpdRegistration>
     Task<int> CountTodayAsync(Guid applicationId, CancellationToken ct = default);
 
     Task<int> CountTodayByDoctorAsync(Guid applicationId, Guid doctorUserId, CancellationToken ct = default);
+
+    Task<IEnumerable<OpdRegistration>> GetByIdsAsync(IEnumerable<Guid> ids, Guid applicationId, CancellationToken ct = default);
 }

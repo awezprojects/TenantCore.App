@@ -2,186 +2,218 @@
 @inject IParticularApiClient ParticularClient
 @inject IOpdPaymentApiClient OpdPaymentClient
 @inject ICounterSessionApiClient CounterSessionClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @using TenantCore.Shared.Enums
 
-<MudDialog Visible="Visible" VisibleChanged="VisibleChanged" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">OPD Service Items</MudText>
-    </TitleContent>
-    <DialogContent>
-        @if (_loadingParticulars)
-        {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-        }
-        else
-        {
-            @* ── Discount banner (when discount applied, individual collect is locked) ── *@
-            @if (_payment is not null && _payment.Discount > 0)
+@if (Visible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="Close"></div>
+
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;padding:0;width:700px;max-width:96vw;
+                max-height:90vh;display:flex;flex-direction:column;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;">
+
+        <!-- Header -->
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">OPD Service Items</div>
+            <button @onclick="Close"
+                    style="background:none;border:none;font-size:18px;color:#94A3B8;cursor:pointer;padding:2px 6px;line-height:1;">×</button>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+
+            @if (_loadingParticulars)
             {
-                <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
-                    Discount of Rs. @_payment.Discount.ToString("N2") applied — use <strong>Collect Full Bill</strong> to collect all at once.
-                </MudAlert>
+                <div style="display:flex;justify-content:center;padding:40px 0;">
+                    <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+                </div>
             }
-
-            @* ── Collect All / Collect Full Bill buttons ── *@
-            @if (_payment is not null)
+            else
             {
-                var pendingItems = _particulars.Where(p => p.PaymentStatus == PaymentStatus.Pending).ToList();
-                var collectedItems = _particulars.Where(p => p.PaymentStatus == PaymentStatus.Received).ToList();
-                var pendingTotal = pendingItems.Sum(p => p.Amount);
-                var collectedTotal = collectedItems.Sum(p => p.Amount);
-
-                @if (_particulars.Any())
+                @* Discount warning banner *@
+                @if (_payment is not null && _payment.Discount > 0)
                 {
-                    <div class="d-flex align-center gap-3 mb-3 flex-wrap">
+                    <div style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:8px;
+                                padding:10px 14px;color:#92400E;font-size:13px;margin-bottom:16px;">
+                        Discount of <strong>Rs. @_payment.Discount.ToString("N2")</strong> applied — use <strong>Collect Full Bill</strong> to collect all at once.
+                    </div>
+                }
+
+                @* Collect All / Collect Full Bill action row *@
+                @if (!ReadOnly && _payment is not null && _particulars.Any())
+                {
+                    var pendingItems = _particulars.Where(p => p.PaymentStatus == PaymentStatus.Pending).ToList();
+                    var collectedItems = _particulars.Where(p => p.PaymentStatus == PaymentStatus.Received).ToList();
+                    var pendingTotal = pendingItems.Sum(p => p.Amount);
+                    var collectedTotal = collectedItems.Sum(p => p.Amount);
+
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
                         @if (_payment.Discount > 0)
                         {
-                            @* Discount mode: only allow full-bill collection *@
                             @if (_payment.PaymentStatus != PaymentStatus.Received)
                             {
-                                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
-                                           OnClick="CollectFullBillAsync" Disabled="_collecting"
-                                           StartIcon="@Icons.Material.Filled.Payments">
+                                <button @onclick="CollectFullBillAsync" disabled="@_collecting"
+                                        style="padding:7px 16px;border-radius:8px;border:none;background:#16A34A;color:#fff;
+                                               font-size:12px;font-weight:700;cursor:pointer;opacity:@(_collecting ? "0.6" : "1");">
                                     Collect Full Bill — Rs. @_payment.FinalAmount.ToString("N2")
-                                </MudButton>
+                                </button>
                             }
                         }
                         else if (pendingItems.Any())
                         {
-                            @* No discount: allow individual or batch collection *@
-                            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
-                                       OnClick="CollectAllPendingAsync" Disabled="_collecting"
-                                       StartIcon="@Icons.Material.Filled.DoneAll">
+                            <button @onclick="CollectAllPendingAsync" disabled="@_collecting"
+                                    style="padding:7px 16px;border-radius:8px;border:none;background:#16A34A;color:#fff;
+                                           font-size:12px;font-weight:700;cursor:pointer;opacity:@(_collecting ? "0.6" : "1");">
                                 Collect All Pending — Rs. @pendingTotal.ToString("N2")
-                            </MudButton>
+                            </button>
                         }
-
-                        <MudSpacer />
-
+                        <div style="flex:1;"></div>
                         @if (collectedTotal > 0)
                         {
-                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle">
+                            <span style="background:#DCFCE7;color:#166534;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;">
                                 Collected: Rs. @collectedTotal.ToString("N2")
-                            </MudChip>
+                            </span>
                         }
                         @if (pendingTotal > 0 && _payment.Discount == 0)
                         {
-                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.PendingActions">
+                            <span style="background:#FEF3C7;color:#92400E;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;">
                                 Pending: Rs. @pendingTotal.ToString("N2")
-                            </MudChip>
+                            </span>
                         }
                     </div>
                 }
+
+                @* Service items table *@
+                <div class="opd-table-card" style="margin-bottom:20px;">
+                    <table class="opd-table">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                @if (!ReadOnly)
+                                {
+                                    <th style="width:120px;">Actions</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!_particulars.Any())
+                            {
+                                <tr><td colspan="4" class="opd-empty">No service items added yet.</td></tr>
+                            }
+                            @foreach (var item in _particulars)
+                            {
+                                <tr>
+                                    <td>@item.ParticularName</td>
+                                    <td>Rs. @item.Amount.ToString("N2")</td>
+                                    <td>
+                                        @if (item.PaymentStatus == PaymentStatus.Received)
+                                        {
+                                            <span style="background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">Collected</span>
+                                        }
+                                        else
+                                        {
+                                            <span style="background:#FEF3C7;color:#92400E;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">Pending</span>
+                                        }
+                                    </td>
+                                    @if (!ReadOnly)
+                                    {
+                                        <td style="display:flex;gap:6px;align-items:center;">
+                                            @if (item.PaymentStatus == PaymentStatus.Pending && (_payment is null || _payment.Discount == 0))
+                                            {
+                                                <button @onclick="@(() => CollectItemAsync(item))" disabled="@_collecting"
+                                                        style="padding:4px 10px;border-radius:6px;border:none;background:#16A34A;color:#fff;
+                                                               font-size:11px;font-weight:700;cursor:pointer;opacity:@(_collecting ? "0.6" : "1");">
+                                                    Collect
+                                                </button>
+                                            }
+                                            @if (item.PaymentStatus == PaymentStatus.Pending)
+                                            {
+                                                <button @onclick="@(() => RemoveAsync(item.Id))"
+                                                        style="padding:4px 10px;border-radius:6px;border:none;background:#FEE2E2;color:#991B1B;
+                                                               font-size:11px;font-weight:700;cursor:pointer;">
+                                                    Remove
+                                                </button>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                @if (!ReadOnly)
+                {
+                    <div style="height:1px;background:#E2E8F0;margin-bottom:20px;"></div>
+
+                    @* Add new service item *@
+                    <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:12px;">Add Service Item</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;">
+                        <div>
+                            <label class="form-label">Select Service</label>
+                            <select class="form-input" @onchange="OnParticularSelected">
+                                <option value="">— Select service —</option>
+                                @foreach (var p in _availableParticulars)
+                                {
+                                    <option value="@p.Id">@p.Name (Rs. @p.DefaultAmount.ToString("N2"))</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Amount (Rs.)</label>
+                            <input type="number" class="form-input" value="@_addAmount" disabled />
+                        </div>
+                        <button @onclick="AddParticularAsync" disabled="@(_adding || _selectedParticularId is null)"
+                                style="padding:9px 18px;border-radius:8px;border:none;background:#1565C0;color:#fff;
+                                       font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;
+                                       opacity:@(_adding || _selectedParticularId is null ? "0.6" : "1");">
+                            + Add
+                        </button>
+                    </div>
+                }
+
+                @* Bill summary *@
+                @if (_payment is not null)
+                {
+                    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #E2E8F0;
+                                display:flex;justify-content:space-between;align-items:flex-end;">
+                        <div style="font-size:12px;color:#64748B;line-height:1.8;">
+                            <div>Visit Fee: Rs. @_payment.VisitFee.ToString("N2")</div>
+                            <div>Services: Rs. @_payment.ParticularsTotal.ToString("N2")</div>
+                            @if (_payment.Discount > 0)
+                            {
+                                <div style="color:#D97706;">Discount: - Rs. @_payment.Discount.ToString("N2")</div>
+                            }
+                        </div>
+                        <div style="font-size:16px;font-weight:800;color:#1565C0;">
+                            Total: Rs. @_payment.FinalAmount.ToString("N2")
+                        </div>
+                    </div>
+                }
             }
+        </div>
 
-            @* ── Service items table ── *@
-            <MudTable Items="_particulars" Hover="true" Dense="true" Elevation="0" Class="mb-4">
-                <HeaderContent>
-                    <MudTh>Service</MudTh>
-                    <MudTh>Amount</MudTh>
-                    <MudTh>Status</MudTh>
-                    <MudTh Style="width:80px;"></MudTh>
-                </HeaderContent>
-                <RowTemplate Context="item">
-                    <MudTd>@item.ParticularName</MudTd>
-                    <MudTd>Rs. @item.Amount.ToString("N2")</MudTd>
-                    <MudTd>
-                        @if (item.PaymentStatus == PaymentStatus.Received)
-                        {
-                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle" Style="height:24px;">
-                                Collected
-                            </MudChip>
-                        }
-                        else
-                        {
-                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.HourglassEmpty" Style="height:24px;">
-                                Pending
-                            </MudChip>
-                        }
-                    </MudTd>
-                    <MudTd>
-                        @if (item.PaymentStatus == PaymentStatus.Pending && (_payment is null || _payment.Discount == 0))
-                        {
-                            <MudButton Variant="Variant.Text" Color="Color.Success" Size="Size.Small"
-                                       OnClick="@(() => CollectItemAsync(item))" Disabled="_collecting">
-                                Collect
-                            </MudButton>
-                        }
-                        else if (item.PaymentStatus == PaymentStatus.Pending)
-                        {
-                            @* Discount applied — individual collect blocked *@
-                        }
-                        else
-                        {
-                            <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success"
-                                           Size="Size.Small" Disabled="true" />
-                        }
-                        @if (item.PaymentStatus == PaymentStatus.Pending)
-                        {
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
-                                           OnClick="@(() => RemoveAsync(item.Id))" />
-                        }
-                    </MudTd>
-                </RowTemplate>
-                <NoRecordsContent>
-                    <MudText Color="Color.Secondary">No service items added yet.</MudText>
-                </NoRecordsContent>
-            </MudTable>
-
-            <MudDivider Class="my-3" />
-
-            @* ── Add new service item ── *@
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Add Service Item</MudText>
-            <MudGrid>
-                <MudItem xs="12" sm="6">
-                    <MudSelect T="Guid?" Value="_selectedParticularId" ValueChanged="OnParticularSelected"
-                               Label="Select Service" Variant="Variant.Outlined" Clearable="true">
-                        @foreach (var p in _availableParticulars)
-                        {
-                            <MudSelectItem T="Guid?" Value="@((Guid?)p.Id)">@p.Name (Rs. @p.DefaultAmount.ToString("N2"))</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" sm="4">
-                    <MudNumericField Value="_addAmount" Label="Amount (Rs.)" Variant="Variant.Outlined" ReadOnly="true" />
-                </MudItem>
-                <MudItem xs="12" sm="2" Class="d-flex align-end">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                               OnClick="AddParticularAsync" Disabled="_adding || _selectedParticularId is null">Add</MudButton>
-                </MudItem>
-            </MudGrid>
-
-            @* ── Bill summary ── *@
-            @if (_payment is not null)
-            {
-                <MudDivider Class="my-3" />
-                <MudGrid>
-                    <MudItem xs="6">
-                        <MudText Typo="Typo.body2">Visit Fee: Rs. @_payment.VisitFee.ToString("N2")</MudText>
-                        <MudText Typo="Typo.body2">Services: Rs. @_payment.ParticularsTotal.ToString("N2")</MudText>
-                        @if (_payment.Discount > 0)
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Warning">Discount: - Rs. @_payment.Discount.ToString("N2")</MudText>
-                        }
-                    </MudItem>
-                    <MudItem xs="6" Class="d-flex align-end justify-end">
-                        <MudText Typo="Typo.h6" Color="Color.Primary">Total: Rs. @_payment.FinalAmount.ToString("N2")</MudText>
-                    </MudItem>
-                </MudGrid>
-            }
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Close">Close</MudButton>
-    </DialogActions>
-</MudDialog>
+        <!-- Footer -->
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;flex-shrink:0;">
+            <button @onclick="Close"
+                    style="padding:9px 22px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;
+                           font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Close
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter] public bool Visible { get; set; }
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
     [Parameter] public Guid OpdRegistrationId { get; set; }
     [Parameter] public EventCallback OnFeesChanged { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
 
     private bool _loadingParticulars = true;
     private bool _adding;
@@ -206,25 +238,34 @@
         var parts = await OpdParticularClient.GetByOpdAsync(OpdRegistrationId);
         _particulars = parts.Success && parts.Data is not null ? parts.Data.ToList() : [];
 
-        var avail = await ParticularClient.GetAllAsync();
-        _availableParticulars = avail.Success && avail.Data is not null
-            ? avail.Data.Where(p => p.IsActive).ToList() : [];
-
         var payment = await OpdPaymentClient.GetByOpdAsync(OpdRegistrationId);
         _payment = payment.Success ? payment.Data : null;
 
-        var session = await CounterSessionClient.GetActiveAsync();
-        _activeSessionId = session.Success && session.Data is not null ? session.Data.Id : null;
+        if (!ReadOnly)
+        {
+            var avail = await ParticularClient.GetAllAsync();
+            _availableParticulars = avail.Success && avail.Data is not null
+                ? avail.Data.Where(p => p.IsActive).ToList() : [];
+
+            var session = await CounterSessionClient.GetActiveAsync();
+            _activeSessionId = session.Success && session.Data is not null ? session.Data.Id : null;
+        }
 
         _loadingParticulars = false;
     }
 
-    private void OnParticularSelected(Guid? id)
+    private void OnParticularSelected(ChangeEventArgs e)
     {
-        _selectedParticularId = id;
-        _addAmount = id.HasValue
-            ? (_availableParticulars.FirstOrDefault(p => p.Id == id.Value)?.DefaultAmount ?? 0)
-            : 0;
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _selectedParticularId = id;
+            _addAmount = _availableParticulars.FirstOrDefault(p => p.Id == id)?.DefaultAmount ?? 0;
+        }
+        else
+        {
+            _selectedParticularId = null;
+            _addAmount = 0;
+        }
     }
 
     private async Task AddParticularAsync()
@@ -237,8 +278,13 @@
             ParticularId = _selectedParticularId.Value,
             Amount = _addAmount
         });
-        if (response.Success) { await LoadAsync(); _selectedParticularId = null; _addAmount = 0; }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success)
+        {
+            await LoadAsync();
+            _selectedParticularId = null;
+            _addAmount = 0;
+        }
+        else Toast.ShowError(response.Message ?? "Failed to add service item.");
         _adding = false;
     }
 
@@ -246,7 +292,7 @@
     {
         if (_activeSessionId is null)
         {
-            Snackbar.Add("No active counter session — open a session first.", Severity.Warning);
+            Toast.ShowWarning("No active counter session — open a session first.", "Open counter session", "/counter-session");
             return;
         }
         _collecting = true;
@@ -254,11 +300,11 @@
             new CollectOpdParticularRequest { CounterSessionId = _activeSessionId });
         if (resp.Success)
         {
-            Snackbar.Add($"Rs. {item.Amount:N2} collected for {item.ParticularName}.", Severity.Success);
+            Toast.ShowSuccess($"Rs. {item.Amount:N2} collected for {item.ParticularName}.");
             await LoadAsync();
             await OnFeesChanged.InvokeAsync();
         }
-        else Snackbar.Add(resp.Message, Severity.Error);
+        else Toast.ShowError(resp.Message ?? "Failed to collect item.");
         _collecting = false;
     }
 
@@ -266,7 +312,7 @@
     {
         if (_activeSessionId is null)
         {
-            Snackbar.Add("No active counter session — open a session first.", Severity.Warning);
+            Toast.ShowWarning("No active counter session — open a session first.", "Open counter session", "/counter-session");
             return;
         }
         _collecting = true;
@@ -275,11 +321,11 @@
             new CollectAllOpdParticularsRequest { OpdRegistrationId = OpdRegistrationId, CounterSessionId = _activeSessionId });
         if (resp.Success)
         {
-            Snackbar.Add($"Rs. {pendingTotal:N2} collected for all pending services.", Severity.Success);
+            Toast.ShowSuccess($"Rs. {pendingTotal:N2} collected for all pending services.");
             await LoadAsync();
             await OnFeesChanged.InvokeAsync();
         }
-        else Snackbar.Add(resp.Message, Severity.Error);
+        else Toast.ShowError(resp.Message ?? "Failed to collect all.");
         _collecting = false;
     }
 
@@ -288,7 +334,7 @@
         if (_payment is null) return;
         if (_activeSessionId is null)
         {
-            Snackbar.Add("No active counter session — open a session first.", Severity.Warning);
+            Toast.ShowWarning("No active counter session — open a session first.", "Open counter session", "/counter-session");
             return;
         }
         _collecting = true;
@@ -296,11 +342,11 @@
             new AcceptOpdPaymentFullRequest { OpdRegistrationId = OpdRegistrationId, CounterSessionId = _activeSessionId });
         if (resp.Success)
         {
-            Snackbar.Add($"Full bill of Rs. {_payment.FinalAmount:N2} collected (discount applied).", Severity.Success);
+            Toast.ShowSuccess($"Full bill of Rs. {_payment.FinalAmount:N2} collected (discount applied).");
             await LoadAsync();
             await OnFeesChanged.InvokeAsync();
         }
-        else Snackbar.Add(resp.Message, Severity.Error);
+        else Toast.ShowError(resp.Message ?? "Failed to collect full bill.");
         _collecting = false;
     }
 
@@ -308,11 +354,8 @@
     {
         var response = await OpdParticularClient.RemoveAsync(id);
         if (response.Success) await LoadAsync();
-        else Snackbar.Add(response.Message, Severity.Error);
+        else Toast.ShowError(response.Message ?? "Failed to remove service item.");
     }
 
-    private async Task Close()
-    {
-        await VisibleChanged.InvokeAsync(false);
-    }
+    private async Task Close() => await VisibleChanged.InvokeAsync(false);
 }

@@ -1,0 +1,13 @@
+@* Animated horizontal loading bar. Shows only when Loading=true.
+   Usage:
+     <AppLoadingBar Loading="_loading" />
+*@
+
+@if (Loading)
+{
+    <div class="app-loading-bar"></div>
+}
+
+@code {
+    [Parameter] public bool Loading { get; set; }
+}

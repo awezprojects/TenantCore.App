@@ -1,7 +1,7 @@
 @page "/settings/dosage-remarks"
 @layout AuthorizedLayout
 @inject IPrescriptionApiClient PrescriptionClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject NavigationManager Navigation
@@ -11,68 +11,119 @@
 
 <PageTitle>Dosage Remarks - Settings</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Dosage Remark Templates</MudText>
+<div class="opd-header" style="margin-bottom:24px;">
+    <div class="opd-header-title">Dosage Remark Templates</div>
+</div>
 
-<MudGrid>
-    <MudItem xs="12" md="4">
-        <MudPaper Class="pa-4">
-            <MudText Typo="Typo.h6" Class="mb-3">@(_editing is null ? "Add Remark" : "Edit Remark")</MudText>
-            <MudSelect T="MedicineFormType" Label="Medicine Form" @bind-Value="_form" Variant="Variant.Outlined" Class="mb-3">
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+
+    <!-- Add / Edit form panel -->
+    <div style="min-width:280px;flex:0 0 280px;background:#fff;border-radius:14px;
+                border:1px solid #E2E8F0;padding:22px;">
+        <div style="font-size:14px;font-weight:800;color:#1E293B;margin-bottom:16px;">
+            @(_editing is null ? "Add Remark" : "Edit Remark")
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Medicine Form</label>
+            <select class="form-input" @bind="_form">
                 @foreach (MedicineFormType f in Enum.GetValues<MedicineFormType>())
                 {
-                    <MudSelectItem Value="f">@f</MudSelectItem>
+                    <option value="@f">@f</option>
                 }
-            </MudSelect>
-            <MudTextField @bind-Value="_remarkEnglish" Label="Remark (English)" Variant="Variant.Outlined"
-                          Lines="2" MaxLength="500" Class="mb-2" />
-            <MudTextField @bind-Value="_remarkHindi" Label="Remark (Hindi)" Variant="Variant.Outlined"
-                          Lines="2" MaxLength="500" Class="mb-2" />
-            <MudTextField @bind-Value="_remarkMarathi" Label="Remark (Marathi)" Variant="Variant.Outlined"
-                          Lines="2" MaxLength="500" Class="mb-3" />
-            <MudStack Row="true" Spacing="2">
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync">
-                    @(_editing is null ? "Add" : "Update")
-                </MudButton>
-                @if (_editing is not null)
-                {
-                    <MudButton Variant="Variant.Text" OnClick="ClearForm">Cancel</MudButton>
-                }
-            </MudStack>
-        </MudPaper>
-    </MudItem>
+            </select>
+        </div>
 
-    <MudItem xs="12" md="8">
+        <div class="form-group">
+            <label class="form-label">Remark (English)</label>
+            <textarea class="form-input" rows="2" @bind="_remarkEnglish" maxlength="500" style="resize:none;"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Remark (Hindi)</label>
+            <textarea class="form-input" rows="2" @bind="_remarkHindi" maxlength="500" style="resize:none;"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Remark (Marathi)</label>
+            <textarea class="form-input" rows="2" @bind="_remarkMarathi" maxlength="500" style="resize:none;"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;">
+            <button @onclick="SaveAsync"
+                    style="padding:9px 18px;border-radius:8px;border:none;background:#1565C0;color:#fff;
+                           font-size:13px;font-weight:700;cursor:pointer;">
+                @(_editing is null ? "Add" : "Update")
+            </button>
+            @if (_editing is not null)
+            {
+                <button @onclick="ClearForm"
+                        style="padding:9px 16px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;
+                               font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                    Cancel
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div style="flex:1;min-width:0;">
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <div style="display:flex;justify-content:center;padding:40px 0;">
+                <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+            </div>
         }
         else if (_remarks is not null)
         {
-            <MudTable Items="_remarks" Hover="true" Striped="true" Dense="true" Elevation="2">
-                <HeaderContent>
-                    <MudTh>Form</MudTh>
-                    <MudTh>English</MudTh>
-                    <MudTh>Hindi</MudTh>
-                    <MudTh>Marathi</MudTh>
-                    <MudTh>Active</MudTh>
-                    <MudTh Style="width:80px;">Actions</MudTh>
-                </HeaderContent>
-                <RowTemplate Context="r">
-                    <MudTd>@r.MedicineForm</MudTd>
-                    <MudTd>@r.RemarkEnglish</MudTd>
-                    <MudTd>@(r.RemarkHindi ?? "—")</MudTd>
-                    <MudTd>@(r.RemarkMarathi ?? "—")</MudTd>
-                    <MudTd><MudChip T="bool" Size="Size.Small" Color="@(r.IsActive ? Color.Success : Color.Default)">@(r.IsActive ? "Yes" : "No")</MudChip></MudTd>
-                    <MudTd>
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => EditRemark(r)" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
-                                       OnClick="() => DeleteAsync(r.Id)" />
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
+            <div class="opd-table-card">
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Form</th>
+                            <th>English</th>
+                            <th>Hindi</th>
+                            <th>Marathi</th>
+                            <th>Active</th>
+                            <th style="white-space:nowrap;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!_remarks.Any())
+                        {
+                            <tr><td colspan="6" class="opd-empty">No dosage remarks found.</td></tr>
+                        }
+                        @foreach (var r in _remarks)
+                        {
+                            <tr>
+                                <td>@r.MedicineForm</td>
+                                <td>@r.RemarkEnglish</td>
+                                <td>@(r.RemarkHindi ?? "—")</td>
+                                <td>@(r.RemarkMarathi ?? "—")</td>
+                                <td>
+                                    @if (r.IsActive)
+                                    {
+                                        <span style="background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;">Yes</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background:#F1F5F9;color:#64748B;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:600;">No</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="opd-actions">
+                                        <button class="opd-btn edit-btn" @onclick="() => EditRemark(r)">Edit</button>
+                                        <button class="opd-btn delete-btn" @onclick="() => DeleteAsync(r.Id)">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         }
-    </MudItem>
-</MudGrid>
+    </div>
+</div>
 
 @code {
     private bool _loading;
@@ -126,15 +177,15 @@
         {
             var r = await PrescriptionClient.CreateDosageRemarkAsync(
                 new CreateDosageRemarkDto(_form, _remarkEnglish, _remarkHindi, _remarkMarathi));
-            if (r.Success) { Snackbar.Add("Remark added.", Severity.Success); ClearForm(); }
-            else Snackbar.Add(r.Message ?? "Failed.", Severity.Error);
+            if (r.Success) { Toast.ShowSuccess("Remark added."); ClearForm(); }
+            else Toast.ShowError(r.Message ?? "Failed.");
         }
         else
         {
             var r = await PrescriptionClient.UpdateDosageRemarkAsync(_editing.Id,
                 new UpdateDosageRemarkDto(_form, _remarkEnglish, _remarkHindi, _remarkMarathi, _editing.IsActive));
-            if (r.Success) { Snackbar.Add("Remark updated.", Severity.Success); ClearForm(); }
-            else Snackbar.Add(r.Message ?? "Failed.", Severity.Error);
+            if (r.Success) { Toast.ShowSuccess("Remark updated."); ClearForm(); }
+            else Toast.ShowError(r.Message ?? "Failed.");
         }
         await LoadAsync();
     }
@@ -142,7 +193,7 @@
     private async Task DeleteAsync(Guid id)
     {
         var r = await PrescriptionClient.DeleteDosageRemarkAsync(id);
-        if (r.Success) { Snackbar.Add("Remark deleted.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(r.Message ?? "Failed.", Severity.Error);
+        if (r.Success) { Toast.ShowSuccess("Remark deleted."); await LoadAsync(); }
+        else Toast.ShowError(r.Message ?? "Failed.");
     }
 }

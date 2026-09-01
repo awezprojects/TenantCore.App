@@ -33,6 +33,12 @@ public class OpdPaymentApiClient(HttpClient httpClient, AuthStateService authSta
         catch (Exception ex) { return new ApiResponse<OpdPaymentDto> { Success = false, Message = ex.Message }; }
     }
 
+    public async Task<ApiResponse<IEnumerable<SessionCollectionDto>>> GetBySessionAsync(Guid sessionId)
+    {
+        try { SetAuth(); return await Read<IEnumerable<SessionCollectionDto>>(await httpClient.GetAsync($"api/opd-payments/by-session/{sessionId}")); }
+        catch (Exception ex) { return new ApiResponse<IEnumerable<SessionCollectionDto>> { Success = false, Message = ex.Message }; }
+    }
+
     public async Task<ApiResponse<Guid>> EnsureAsync(EnsureOpdPaymentRequest request)
     {
         try { SetAuth(); return await Read<Guid>(await httpClient.PostAsJsonAsync("api/opd-payments/ensure", request, JsonOptions)); }
@@ -54,6 +60,12 @@ public class OpdPaymentApiClient(HttpClient httpClient, AuthStateService authSta
     public async Task<ApiResponse<OpdPaymentDto>> AcceptFullAsync(Guid id, AcceptOpdPaymentFullRequest request)
     {
         try { SetAuth(); return await Read<OpdPaymentDto>(await httpClient.PostAsJsonAsync($"api/opd-payments/{id}/accept-full", request, JsonOptions)); }
+        catch (Exception ex) { return new ApiResponse<OpdPaymentDto> { Success = false, Message = ex.Message }; }
+    }
+
+    public async Task<ApiResponse<OpdPaymentDto>> ProcessRefundAsync(Guid id, ProcessOpdRefundRequest request)
+    {
+        try { SetAuth(); return await Read<OpdPaymentDto>(await httpClient.PostAsJsonAsync($"api/opd-payments/{id}/refund", request, JsonOptions)); }
         catch (Exception ex) { return new ApiResponse<OpdPaymentDto> { Success = false, Message = ex.Message }; }
     }
 }

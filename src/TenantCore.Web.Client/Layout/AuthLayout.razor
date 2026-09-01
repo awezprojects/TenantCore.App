@@ -1,9 +1,6 @@
 @inherits LayoutComponentBase
 
-<MudThemeProvider @bind-IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<ToastContainer />
 
 <div class="auth-shell">
     <div class="auth-left">
@@ -19,16 +16,16 @@
 
         <div class="auth-illustration">
             <div class="auth-hub">
-                <MudIcon Icon="@Icons.Material.Filled.LocalHospital" Style="color: #1a56db; font-size: 2.2rem;" />
+                <span style="font-size:2.2rem;">🏥</span>
             </div>
             <div class="auth-orbit auth-orbit-1">
-                <MudIcon Icon="@Icons.Material.Filled.People" Style="color: #1a56db; font-size: 1.4rem;" />
+                <span style="font-size:1.4rem;">👥</span>
             </div>
             <div class="auth-orbit auth-orbit-2">
-                <MudIcon Icon="@Icons.Material.Filled.Medication" Style="color: #1a56db; font-size: 1.4rem;" />
+                <span style="font-size:1.4rem;">💊</span>
             </div>
             <div class="auth-orbit auth-orbit-3">
-                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Style="color: #1a56db; font-size: 1.4rem;" />
+                <span style="font-size:1.4rem;">📅</span>
             </div>
             <div class="auth-dashboard-card">
                 <div class="auth-skeleton-row">
@@ -277,5 +274,4 @@
 </style>
 
 @code {
-    private bool _isDarkMode;
 }

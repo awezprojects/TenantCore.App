@@ -34,4 +34,16 @@ public class ClinicSettingsController(ISender sender) : ClinicControllerBase
         var applicationId = GetApplicationId();
         return Ok(await sender.Send(new GetClinicDoctorsQuery(applicationId), ct));
     }
+
+    [HttpGet("feature-flags")]
+    [ProducesResponseType(typeof(ClinicFeatureFlagsDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFeatureFlags(CancellationToken ct)
+        => Ok(await sender.Send(new GetClinicFeatureFlagsQuery(GetApplicationId()), ct));
+
+    [HttpPut("feature-flags")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
+    [ProducesResponseType(typeof(ClinicFeatureFlagsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateFeatureFlags([FromBody] UpdateClinicFeatureFlagsDto dto, CancellationToken ct)
+        => Ok(await sender.Send(new UpdateClinicFeatureFlagsCommand(GetApplicationId(), dto.PrepaidOpdEnabled), ct));
 }

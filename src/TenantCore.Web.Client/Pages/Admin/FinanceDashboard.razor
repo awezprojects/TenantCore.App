@@ -9,7 +9,7 @@
 @inject IAmountHandoverApiClient HandoverClient
 @inject ClinicContextService ClinicContext
 @inject AuthStateService AuthState
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 <PageTitle>Finance Dashboard - CloudClinic</PageTitle>
 
@@ -42,7 +42,9 @@
 
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        <div style="display:flex;justify-content:center;padding:32px 0;">
+        <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+    </div>
     }
     else
     {

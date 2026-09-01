@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IExpenseRecordRepository, ExpenseRecordRepository>();
         services.AddScoped<ICounterSessionRepository, CounterSessionRepository>();
         services.AddScoped<IAmountHandoverRepository, AmountHandoverRepository>();
+        services.AddScoped<IClinicFeatureFlagsRepository, ClinicFeatureFlagsRepository>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();

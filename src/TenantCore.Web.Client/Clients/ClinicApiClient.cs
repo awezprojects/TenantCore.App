@@ -218,6 +218,19 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
         catch (Exception ex) { return Fail<OpdRegistrationDto>(ex.Message); }
     }
 
+    public async Task<ApiResponse<bool>> DeleteOpdRegistrationAsync(Guid id)
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.DeleteAsync($"api/opd-registrations/{id}");
+            return response.IsSuccessStatusCode
+                ? new ApiResponse<bool> { Success = true, Data = true }
+                : new ApiResponse<bool> { Success = false, Message = await ExtractUserMessage(response) };
+        }
+        catch (Exception ex) { return Fail<bool>(ex.Message); }
+    }
+
     // --- IPD Registrations ---
 
     public async Task<ApiResponse<PagedResult<IpdRegistrationDto>>> GetIpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null)
@@ -296,6 +309,26 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
             return await Ok<ClinicFeeConfigDto>(await httpClient.PutAsJsonAsync("api/clinic-settings/fees", dto, JsonOptions));
         }
         catch (Exception ex) { return Fail<ClinicFeeConfigDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<ClinicFeatureFlagsDto>> GetFeatureFlagsAsync()
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<ClinicFeatureFlagsDto>(await httpClient.GetAsync("api/clinic-settings/feature-flags"));
+        }
+        catch (Exception ex) { return Fail<ClinicFeatureFlagsDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<ClinicFeatureFlagsDto>> UpdateFeatureFlagsAsync(UpdateClinicFeatureFlagsDto dto)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<ClinicFeatureFlagsDto>(await httpClient.PutAsJsonAsync("api/clinic-settings/feature-flags", dto, JsonOptions));
+        }
+        catch (Exception ex) { return Fail<ClinicFeatureFlagsDto>(ex.Message); }
     }
 
     public async Task<ApiResponse<IEnumerable<DoctorDto>>> GetDoctorsAsync()

@@ -1,203 +1,283 @@
 @page "/medicines"
 @layout AuthorizedLayout
 @inject IMedicineApiClient MedicineClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @inject AuthStateService AuthState
 
 <PageTitle>Medicines - TenantCore</PageTitle>
 
-<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">Medicines</MudText>
+<!-- Header -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+    <div>
+        <div style="font-size:22px;font-weight:800;color:#0F172A;">Medicines</div>
+        <div style="font-size:13px;color:#64748B;margin-top:2px;">
+            @(_result?.TotalCount ?? 0) medicines registered
+        </div>
+    </div>
     @if (_canManage)
     {
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   StartIcon="@Icons.Material.Filled.Add"
-                   OnClick="OpenCreateDialog">
-            Add Medicine
-        </MudButton>
+        <button style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;
+                       border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;"
+                @onclick="OpenCreateDialog">+ Add Medicine</button>
     }
-</MudStack>
+</div>
 
-<MudPaper Class="pa-4 mb-4">
-    <MudGrid>
-        <MudItem xs="12" md="4">
-            <MudTextField @bind-Value="_search" Label="Search by name..." Variant="Variant.Outlined"
-                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Immediate="false" Clearable="true" @onkeyup="OnSearchKeyUp" />
-        </MudItem>
-        <MudItem xs="12" md="3">
-            <MudTextField @bind-Value="_brandNameFilter" Label="Brand Name" Variant="Variant.Outlined"
-                          Clearable="true" @onkeyup="OnSearchKeyUp" />
-        </MudItem>
-        <MudItem xs="12" md="3">
-            <MudTextField @bind-Value="_genericNameFilter" Label="Generic Name" Variant="Variant.Outlined"
-                          Clearable="true" @onkeyup="OnSearchKeyUp" />
-        </MudItem>
-        <MudItem xs="12" md="2">
-            <MudSelect T="Guid?" @bind-Value="_medicineTypeFilter" Label="Type" Variant="Variant.Outlined" Clearable="true"
-                       SelectedValuesChanged="@(_ => OnFilterChanged())">
-                <MudSelectItem T="Guid?" Value="@((Guid?)null)">All Types</MudSelectItem>
-                @foreach (var type in _medicineTypes)
-                {
-                    <MudSelectItem T="Guid?" Value="@type.Id">@type.Name</MudSelectItem>
-                }
-            </MudSelect>
-        </MudItem>
-        <MudItem xs="12" md="2" Class="d-flex align-center gap-2">
-            <MudChip T="string" Color="@(_isGenericFilter == true ? Color.Primary : Color.Default)"
-                     OnClick="@(() => ToggleIsGeneric(true))" Variant="Variant.Outlined">Generic</MudChip>
-            <MudChip T="string" Color="@(_isGenericFilter == false ? Color.Secondary : Color.Default)"
-                     OnClick="@(() => ToggleIsGeneric(false))" Variant="Variant.Outlined">Branded</MudChip>
-        </MudItem>
-        <MudItem xs="12" md="2" Class="d-flex align-end">
-            <MudButton Variant="Variant.Outlined" Color="Color.Default" FullWidth="true"
-                       OnClick="ClearFilters" StartIcon="@Icons.Material.Filled.Clear">
-                Clear
-            </MudButton>
-        </MudItem>
-    </MudGrid>
-</MudPaper>
+<!-- Filter bar -->
+<div style="background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:16px;
+            border:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <div style="flex:2;min-width:180px;position:relative;">
+            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:13px;">🔍</span>
+            <input type="text" @bind="_search" @onkeyup="OnSearchKeyUp"
+                   placeholder="Search by name…"
+                   style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #E2E8F0;
+                          border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" />
+        </div>
+        <input type="text" @bind="_brandNameFilter" @onkeyup="OnSearchKeyUp"
+               placeholder="Brand Name"
+               style="flex:1;min-width:130px;padding:8px 10px;border:1.5px solid #E2E8F0;
+                      border-radius:8px;font-size:12px;outline:none;" />
+        <input type="text" @bind="_genericNameFilter" @onkeyup="OnSearchKeyUp"
+               placeholder="Generic Name"
+               style="flex:1;min-width:130px;padding:8px 10px;border:1.5px solid #E2E8F0;
+                      border-radius:8px;font-size:12px;outline:none;" />
+        <select @onchange="OnMedTypeFilterChanged"
+                style="flex:1;min-width:130px;padding:8px 10px;border:1.5px solid #E2E8F0;
+                       border-radius:8px;font-size:12px;outline:none;">
+            <option value="">All Types</option>
+            @foreach (var type in _medicineTypes)
+            {<option value="@type.Id" selected="@(_medicineTypeFilter == type.Id)">@type.Name</option>}
+        </select>
+        <div style="display:flex;gap:6px;">
+            <button @onclick="() => ToggleIsGeneric(true)"
+                    style="padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;
+                           border:1.5px solid @(_isGenericFilter == true ? "#1565C0" : "#E2E8F0");
+                           background:@(_isGenericFilter == true ? "#EFF6FF" : "#fff");
+                           color:@(_isGenericFilter == true ? "#1565C0" : "#64748B");">Generic</button>
+            <button @onclick="() => ToggleIsGeneric(false)"
+                    style="padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;
+                           border:1.5px solid @(_isGenericFilter == false ? "#D97706" : "#E2E8F0");
+                           background:@(_isGenericFilter == false ? "#FFFBEB" : "#fff");
+                           color:@(_isGenericFilter == false ? "#D97706" : "#64748B");">Branded</button>
+        </div>
+        <button @onclick="ClearFilters"
+                style="padding:7px 14px;border:1.5px solid #E2E8F0;border-radius:7px;
+                       background:#fff;color:#64748B;font-size:12px;font-weight:600;cursor:pointer;">
+            ✕ Clear
+        </button>
+    </div>
+</div>
 
 @if (_loading)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <div style="height:4px;background:linear-gradient(90deg,#1565C0 0%,#42A5F5 50%,#1565C0 100%);
+                background-size:200% 100%;animation:medload 1.2s ease infinite;border-radius:2px;margin-bottom:4px;"></div>
+    <style>@@keyframes medload{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>
 }
 else if (_result is not null)
 {
-    <MudTable Items="_result.Items" Hover="true" Striped="true" Bordered="true"
-              Dense="false" Breakpoint="Breakpoint.Sm" Elevation="2">
-        <HeaderContent>
-            <MudTh>Name</MudTh>
-            <MudTh>Generic Name</MudTh>
-            <MudTh>Brand Name</MudTh>
-            <MudTh>Type</MudTh>
-            <MudTh>Form</MudTh>
-            <MudTh>Dosage</MudTh>
-            <MudTh>Kind</MudTh>
-            <MudTh>Status</MudTh>
-            @if (_canManage)
-            {
-                <MudTh Style="width: 80px;">Actions</MudTh>
-            }
-        </HeaderContent>
-        <RowTemplate Context="medicine">
-            <MudTd DataLabel="Name"><strong>@medicine.Name</strong></MudTd>
-            <MudTd DataLabel="Generic Name">@(medicine.GenericName ?? "—")</MudTd>
-            <MudTd DataLabel="Brand Name">@(medicine.BrandName ?? "—")</MudTd>
-            <MudTd DataLabel="Type">@(medicine.MedicineTypeName ?? "—")</MudTd>
-            <MudTd DataLabel="Form">@(medicine.Form ?? "—")</MudTd>
-            <MudTd DataLabel="Dosage">@(medicine.Dosage ?? "—")</MudTd>
-            <MudTd DataLabel="Kind">
-                <MudChip T="string" Color="@(medicine.IsGeneric ? Color.Info : Color.Warning)"
-                         Size="Size.Small" Variant="Variant.Text">
-                    @(medicine.IsGeneric ? "Generic" : "Branded")
-                </MudChip>
-            </MudTd>
-            <MudTd DataLabel="Status">
-                <MudChip T="string" Color="@(medicine.IsActive ? Color.Success : Color.Error)"
-                         Size="Size.Small" Variant="Variant.Text">
-                    @(medicine.IsActive ? "Active" : "Inactive")
-                </MudChip>
-            </MudTd>
-            @if (_canManage)
-            {
-                <MudTd>
-                    <MudTooltip Text="Edit">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" Size="Size.Small"
-                                       OnClick="@(() => OpenEditDialog(medicine))" />
-                    </MudTooltip>
-                </MudTd>
-            }
-        </RowTemplate>
-        <NoRecordsContent>
-            <MudText Color="Color.Secondary">No medicines found.</MudText>
-        </NoRecordsContent>
-    </MudTable>
-
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-2">
-        <MudText Typo="Typo.body2" Color="Color.Secondary">
-            Showing @_result.Items.Count of @_result.TotalCount medicines
-        </MudText>
-        <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" />
-    </MudStack>
+    <div style="background:#fff;border-radius:12px;border:1px solid #E2E8F0;
+                box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;">
+        @if (_result.Items.Any())
+        {
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:#F8FAFC;border-bottom:2px solid #E2E8F0;">
+                            @{ var thStyle = "padding:11px 14px;text-align:left;font-weight:700;color:#64748B;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;"; }
+                            <th style="@thStyle">Name</th>
+                            <th style="@thStyle">Generic Name</th>
+                            <th style="@thStyle">Brand Name</th>
+                            <th style="@thStyle">Type</th>
+                            <th style="@thStyle">Form</th>
+                            <th style="@thStyle">Dosage</th>
+                            <th style="@thStyle">Kind</th>
+                            <th style="@thStyle">Status</th>
+                            @if (_canManage)
+                            {<th style="@thStyle;white-space:nowrap;">Actions</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in _result.Items)
+                        {
+                            var med = m;
+                            <tr style="border-bottom:1px solid #F1F5F9;">
+                                <td style="padding:12px 14px;font-weight:600;color:#0F172A;">@med.Name</td>
+                                <td style="padding:12px 14px;color:#334155;">@(med.GenericName ?? "—")</td>
+                                <td style="padding:12px 14px;color:#334155;">@(med.BrandName ?? "—")</td>
+                                <td style="padding:12px 14px;color:#64748B;font-size:12px;">@(med.MedicineTypeName ?? "—")</td>
+                                <td style="padding:12px 14px;color:#64748B;font-size:12px;">@(med.Form ?? "—")</td>
+                                <td style="padding:12px 14px;color:#64748B;font-size:12px;">@(med.Dosage ?? "—")</td>
+                                <td style="padding:12px 14px;">
+                                    <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:14px;
+                                                 background:@(med.IsGeneric ? "#EFF6FF" : "#FFFBEB");
+                                                 color:@(med.IsGeneric ? "#1565C0" : "#D97706");">
+                                        @(med.IsGeneric ? "Generic" : "Branded")
+                                    </span>
+                                </td>
+                                <td style="padding:12px 14px;">
+                                    <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:14px;
+                                                 background:@(med.IsActive ? "#ECFDF5" : "#FEF2F2");
+                                                 color:@(med.IsActive ? "#059669" : "#EF4444");">
+                                        @(med.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                @if (_canManage)
+                                {
+                                    <td style="padding:12px 14px;">
+                                        <button class="opd-btn edit-btn" @onclick="() => OpenEditDialog(med)">Edit</button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;
+                        padding:12px 16px;border-top:1px solid #F1F5F9;background:#FAFAFA;">
+                <span style="font-size:12px;color:#64748B;">
+                    Showing @_result.Items.Count of @_result.TotalCount medicines
+                </span>
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <button @onclick="() => OnPageChanged(_page - 1)" disabled="@(_page <= 1)"
+                            style="width:30px;height:30px;border:1.5px solid #E2E8F0;border-radius:7px;background:#fff;
+                                   cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                                   opacity:@(_page <= 1 ? "0.4" : "1");">‹</button>
+                    @for (int pg = Math.Max(1, _page - 2); pg <= Math.Min(TotalPages, _page + 2); pg++)
+                    {
+                        var p = pg;
+                        <button @onclick="() => OnPageChanged(p)"
+                                style="min-width:30px;height:30px;border:1.5px solid @(p == _page ? "#1565C0" : "#E2E8F0");
+                                       border-radius:7px;background:@(p == _page ? "#1565C0" : "#fff");cursor:pointer;
+                                       font-size:12px;font-weight:@(p == _page ? "700" : "500");
+                                       color:@(p == _page ? "#fff" : "#64748B");padding:0 6px;">@p</button>
+                    }
+                    <button @onclick="() => OnPageChanged(_page + 1)" disabled="@(_page >= TotalPages)"
+                            style="width:30px;height:30px;border:1.5px solid #E2E8F0;border-radius:7px;background:#fff;
+                                   cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                                   opacity:@(_page >= TotalPages ? "0.4" : "1");">›</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div style="padding:60px 20px;text-align:center;color:#94A3B8;">
+                <div style="font-size:36px;margin-bottom:12px;">💊</div>
+                <div style="font-size:14px;font-weight:600;color:#64748B;">No medicines found</div>
+                <div style="font-size:12px;margin-top:4px;">Try clearing the filters or adding a new medicine.</div>
+            </div>
+        }
+    </div>
 }
 
 <!-- Create / Edit Dialog -->
-<MudDialog @bind-Visible="_dialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">@(_editingId.HasValue ? "Edit Medicine" : "Add Medicine")</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudGrid>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Name" Label="Name *" Variant="Variant.Outlined" Required="true" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.GenericName" Label="Generic Name" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.BrandName" Label="Brand Name" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudSelect T="Guid?" @bind-Value="_form.MedicineTypeId" Label="Medicine Type" Variant="Variant.Outlined" Clearable="true">
-                    <MudSelectItem T="Guid?" Value="@((Guid?)null)">None</MudSelectItem>
-                    @foreach (var type in _medicineTypes)
+@if (_dialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+         @onclick="CloseDialog"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:660px;max-width:96vw;max-height:90vh;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;display:flex;flex-direction:column;"
+         @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;">
+                @(_editingId.HasValue ? "Edit Medicine" : "Add Medicine")
+            </div>
+        </div>
+        <div style="padding:20px 24px;overflow-y:auto;flex:1;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Name *</label>
+                    <input class="form-input" type="text" @bind="_form.Name" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Generic Name</label>
+                    <input class="form-input" type="text" @bind="_form.GenericName" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Brand Name</label>
+                    <input class="form-input" type="text" @bind="_form.BrandName" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Medicine Type</label>
+                    <select class="form-input" @onchange="e => _form.MedicineTypeId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null">
+                        <option value="">None</option>
+                        @foreach (var type in _medicineTypes)
+                        {<option value="@type.Id" selected="@(_form.MedicineTypeId == type.Id)">@type.Name</option>}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Form (Tablet, Syrup…)</label>
+                    <input class="form-input" type="text" @bind="_form.Form" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Dosage</label>
+                    <input class="form-input" type="text" @bind="_form.Dosage" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Manufacturer</label>
+                    <input class="form-input" type="text" @bind="_form.Manufacturer" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Pack Size</label>
+                    <input class="form-input" type="text" @bind="_form.PackSize" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Composition</label>
+                    <input class="form-input" type="text" @bind="_form.Composition" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Composition 2</label>
+                    <input class="form-input" type="text" @bind="_form.Composition2" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-input" rows="2" @bind="_form.Description" style="resize:vertical;min-height:52px;"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
+                    <label class="form-label">Uses</label>
+                    <textarea class="form-input" rows="2" @bind="_form.Uses" style="resize:vertical;min-height:52px;"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
+                    <label class="form-label">Side Effects</label>
+                    <textarea class="form-input" rows="2" @bind="_form.SideEffects" style="resize:vertical;min-height:52px;"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
+                    <label class="form-label">Contraindications</label>
+                    <textarea class="form-input" rows="2" @bind="_form.Contraindications" style="resize:vertical;min-height:52px;"></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Storage Instructions</label>
+                    <input class="form-input" type="text" @bind="_form.Storage" />
+                </div>
+                <div style="display:flex;flex-direction:column;gap:10px;justify-content:flex-end;padding-bottom:2px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" @bind="_form.IsGeneric" style="width:15px;height:15px;accent-color:#1565C0;" />
+                        <span style="font-size:13px;color:#334155;font-weight:500;">Is Generic</span>
+                    </label>
+                    @if (_editingId.HasValue)
                     {
-                        <MudSelectItem T="Guid?" Value="@type.Id">@type.Name</MudSelectItem>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input type="checkbox" @bind="_form.IsActive" style="width:15px;height:15px;accent-color:#059669;" />
+                            <span style="font-size:13px;color:#334155;font-weight:500;">Is Active</span>
+                        </label>
                     }
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Form" Label="Form (Tablet, Syrup...)" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Dosage" Label="Dosage" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Manufacturer" Label="Manufacturer" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.PackSize" Label="Pack Size" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Composition" Label="Composition" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Composition2" Label="Composition 2" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_form.Description" Label="Description" Variant="Variant.Outlined" Lines="2" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_form.Uses" Label="Uses" Variant="Variant.Outlined" Lines="2" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_form.SideEffects" Label="Side Effects" Variant="Variant.Outlined" Lines="2" />
-            </MudItem>
-            <MudItem xs="12">
-                <MudTextField @bind-Value="_form.Contraindications" Label="Contraindications" Variant="Variant.Outlined" Lines="2" />
-            </MudItem>
-            <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="_form.Storage" Label="Storage Instructions" Variant="Variant.Outlined" />
-            </MudItem>
-            <MudItem xs="12" sm="3" Class="d-flex align-center">
-                <MudCheckBox @bind-Value="_form.IsGeneric" Label="Is Generic" Color="Color.Primary" />
-            </MudItem>
-            @if (_editingId.HasValue)
-            {
-                <MudItem xs="12" sm="3" Class="d-flex align-center">
-                    <MudCheckBox @bind-Value="_form.IsActive" Label="Is Active" Color="Color.Success" />
-                </MudItem>
-            }
-        </MudGrid>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CloseDialog">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync" Disabled="_saving">
-            @(_saving ? "Saving..." : "Save")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+                </div>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                           padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="CloseDialog">Cancel</button>
+            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;
+                           opacity:@(_saving ? "0.65" : "1");"
+                    @onclick="SaveAsync" disabled="@_saving">
+                @(_saving ? "Saving..." : "Save")
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     private bool _loading = true;
@@ -247,7 +327,7 @@ else if (_result is not null)
         if (response.Success)
             _result = response.Data;
         else
-            Snackbar.Add(response.Message, Severity.Error);
+            Toast.ShowError(response.Message);
         _loading = false;
     }
 
@@ -259,6 +339,13 @@ else if (_result is not null)
     }
 
     private async Task OnFilterChanged() { _page = 1; await LoadAsync(); }
+
+    private async Task OnMedTypeFilterChanged(ChangeEventArgs e)
+    {
+        _medicineTypeFilter = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
+        _page = 1;
+        await LoadAsync();
+    }
 
     private async Task ToggleIsGeneric(bool value)
     {
@@ -317,7 +404,7 @@ else if (_result is not null)
     {
         if (string.IsNullOrWhiteSpace(_form.Name))
         {
-            Snackbar.Add("Medicine name is required.", Severity.Warning);
+            Toast.ShowWarning("Medicine name is required.");
             return;
         }
         _saving = true;
@@ -344,13 +431,13 @@ else if (_result is not null)
 
         if (response.Success)
         {
-            Snackbar.Add(_editingId.HasValue ? "Medicine updated." : "Medicine added.", Severity.Success);
+            Toast.ShowSuccess(_editingId.HasValue ? "Medicine updated." : "Medicine added.");
             CloseDialog();
             await LoadAsync();
         }
         else
         {
-            Snackbar.Add(response.Message, Severity.Error);
+            Toast.ShowError(response.Message);
         }
         _saving = false;
     }

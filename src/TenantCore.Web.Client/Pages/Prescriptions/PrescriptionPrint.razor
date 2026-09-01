@@ -339,7 +339,9 @@ else
                             <tr>
                                 <th class="rx-th-num">#</th>
                                 <th class="rx-th-med">Medicine</th>
-                                <th class="rx-th-dur">Duration</th>
+                                <th class="rx-th-pattern">Freq</th>
+                                <th class="rx-th-dur">Days</th>
+                                <th class="rx-th-qty">Qty</th>
                                 <th class="rx-th-inst">Instructions</th>
                             </tr>
                         </thead>
@@ -351,16 +353,13 @@ else
                                 <tr class="@(i % 2 == 1 ? "rx-tr-alt" : "")">
                                     <td class="rx-td-num">@(i + 1)</td>
                                     <td class="rx-td-med">
-                                        <div class="rx-med-name">@item.MedicineName @item.Strength</div>
-                                        <div class="rx-med-form">@item.MedicineForm</div>
+                                        <div class="rx-med-name"><span class="rx-med-form">@item.MedicineForm</span> — @item.MedicineName @item.Strength</div>
                                     </td>
-                                    <td class="rx-td-dur">@item.DurationDays days</td>
+                                    <td class="rx-td-pattern">@BuildSlotPattern(item)</td>
+                                    <td class="rx-td-dur">@item.DurationDays</td>
+                                    <td class="rx-td-qty">@FormatAmount(item.Quantity)@(IsLiquidUnit(item.DosageUnit) ? " ml" : "")</td>
                                     <td class="rx-td-inst">
                                         <div>@instrText</div>
-                                        @if (!string.IsNullOrEmpty(item.Timing))
-                                        {
-                                            <div class="rx-timing">• @item.Timing</div>
-                                        }
                                     </td>
                                 </tr>
                             }
@@ -373,15 +372,8 @@ else
             @if (_prescription.Investigations.Count > 0)
             {
                 <div class="rx-section">
-                    <div class="rx-inv-box">
-                        <div class="rx-section-title">🔬 INVESTIGATIONS ADVISED</div>
-                        <ol class="rx-inv-list">
-                            @foreach (var inv in _prescription.Investigations)
-                            {
-                                <li>@inv</li>
-                            }
-                        </ol>
-                    </div>
+                    <div class="rx-section-title">🔬 INVESTIGATIONS ADVISED</div>
+                    <div class="rx-investigations">@string.Join(", ", _prescription.Investigations)</div>
                 </div>
             }
 
@@ -477,14 +469,14 @@ else
     .rx-rx-title { font-size:12px; }
 
     /* ── Vitals ───────────────────────────────────────── */
-    .rx-vitals { display:flex; gap:0; border:1px solid #E2E8F0; border-radius:6px; overflow:hidden; }
-    .rx-vital-cell { flex:1; text-align:center; padding:8px 6px;
-                     border-right:1px solid #E2E8F0; }
+    .rx-vitals { display:flex; gap:0; border:1.5px solid #94A3B8; border-radius:6px; overflow:hidden; }
+    .rx-vital-cell { flex:1; text-align:center; padding:5px 4px;
+                     border-right:1.5px solid #94A3B8; }
     .rx-vital-cell:last-child { border-right:none; }
-    .rx-vital-label { font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;
-                      letter-spacing:0.5px; margin-bottom:4px; }
-    .rx-vital-value { font-size:16px; font-weight:800; color:#1565C0; line-height:1; }
-    .rx-vital-unit { font-size:9px; color:#94A3B8; margin-top:3px; }
+    .rx-vital-label { font-size:8px; color:#64748B; font-weight:700; text-transform:uppercase;
+                      letter-spacing:0.4px; margin-bottom:2px; }
+    .rx-vital-value { font-size:13px; font-weight:800; color:#1565C0; line-height:1; }
+    .rx-vital-unit { font-size:8px; color:#94A3B8; margin-top:2px; }
 
     /* ── Obstetric History ───────────────────────────── */
     .rx-gpla { font-size:16px; font-weight:800; color:#1565C0; letter-spacing:1px; margin-bottom:8px; }
@@ -510,20 +502,22 @@ else
     .rx-table th { text-align:left; padding:8px 10px; font-size:10px; font-weight:700; color:#64748B;
                    text-transform:uppercase; letter-spacing:0.4px;
                    border-bottom:1.5px solid #E2E8F0; border-top:1px solid #E2E8F0; }
-    .rx-th-num { width:32px; }
-    .rx-th-dur { width:80px; }
-    .rx-table td { padding:10px 10px; border-bottom:1px solid #F1F5F9; vertical-align:top; }
+    .rx-th-num { width:28px; }
+    .rx-th-pattern { width:64px; text-align:center; }
+    .rx-th-dur { width:50px; text-align:center; }
+    .rx-th-qty { width:60px; text-align:center; }
+    .rx-table td { padding:8px 10px; border-bottom:1px solid #F1F5F9; vertical-align:top; }
     .rx-tr-alt td { background:#FAFAFA; }
     .rx-td-num { font-weight:800; color:#1565C0; font-size:13px; }
+    .rx-td-pattern { text-align:center; font-weight:700; color:#0F172A; font-size:12px; white-space:nowrap; font-family:'Courier New',monospace; }
     .rx-med-name { font-size:13px; font-weight:700; color:#0F172A; }
-    .rx-med-form { font-size:10px; color:#64748B; margin-top:1px; }
-    .rx-td-inst { color:#374151; font-style:italic; font-size:12px; }
-    .rx-timing { font-size:11px; color:#1565C0; margin-top:3px; }
+    .rx-med-form { font-size:10px; font-weight:800; color:#1565C0; text-transform:uppercase; letter-spacing:0.3px; }
+    .rx-td-dur { text-align:center; font-weight:700; color:#0F172A; }
+    .rx-td-qty { text-align:center; font-weight:700; color:#1565C0; white-space:nowrap; }
+    .rx-td-inst { color:#374151; font-style:italic; font-size:11px; line-height:1.4; }
 
     /* ── Investigations ───────────────────────────────── */
-    .rx-inv-box { background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:12px 16px; }
-    .rx-inv-list { margin:0; padding-left:18px; }
-    .rx-inv-list li { font-size:13px; color:#0F172A; margin-bottom:4px; font-weight:500; }
+    .rx-investigations { font-size:13px; color:#0F172A; font-weight:600; }
 
     /* ── Notes ────────────────────────────────────────── */
     .rx-notes { font-size:13px; color:#374151; line-height:1.6; }
@@ -661,19 +655,10 @@ else
     {
         var lang = _config?.DefaultLanguage ?? PrescriptionLanguage.English;
 
-        var stored = lang switch
-        {
-            PrescriptionLanguage.Marathi => item.RemarkMarathi,
-            PrescriptionLanguage.Hindi   => item.RemarkHindi,
-            _                            => item.RemarkEnglish
-        };
-        if (!string.IsNullOrWhiteSpace(stored)) return stored;
-
-        // Fall back to English remark if the target language remark was not saved
-        if (!string.IsNullOrWhiteSpace(item.RemarkEnglish) && lang == PrescriptionLanguage.English)
-            return item.RemarkEnglish;
-
-        // Auto-generate in the configured language
+        // Always regenerate rather than trust the stored Remark* text: there is no manual
+        // free-text editor for it in the composer (it's auto-filled on save), so regenerating
+        // here means formatting fixes apply to every prescription immediately, not only ones
+        // re-saved after the fix.
         return lang switch
         {
             PrescriptionLanguage.Marathi => BuildMarathiRemark(item),
@@ -682,15 +667,72 @@ else
         };
     }
 
+    // ── Dose / Pattern helpers ───────────────────────────────────────────────
+    private static string FormatAmount(decimal d) => d == Math.Floor(d) ? d.ToString("0") : d.ToString("0.##");
+
+    // Standard prescription pattern: 3 numbers (Morning-Afternoon-Night) for the common cases —
+    // "1-0-1" for twice a day, "1-0-0" for morning only, "0-0-1" for night only, "1-1-1" for
+    // three times a day. The 4th (Evening) slot only appears — becoming "1-1-1-1" — when a dose
+    // is actually given in the evening, since that's the one pattern that needs it.
+    private static bool HasActiveDoseSlot(PrescriptionItemDto item) =>
+        item.DosageMorning is > 0 || item.DosageAfternoon is > 0 || item.DosageEvening is > 0 || item.DosageNight is > 0;
+
+    private static string BuildSlotPattern(PrescriptionItemDto item)
+    {
+        if (item.Frequency == "SOS" && !HasActiveDoseSlot(item)) return "SOS";
+        string Slot(decimal? d) => d is > 0 ? FormatAmount(d.Value) : "0";
+        if (item.DosageEvening is > 0)
+            return $"{Slot(item.DosageMorning)}-{Slot(item.DosageAfternoon)}-{Slot(item.DosageEvening)}-{Slot(item.DosageNight)}";
+        return $"{Slot(item.DosageMorning)}-{Slot(item.DosageAfternoon)}-{Slot(item.DosageNight)}";
+    }
+
+    // A bare count ("14") is self-explanatory for tablets/capsules/drops etc., but a liquid
+    // dose needs its measure shown (e.g. "140 ml") or it reads as an ambiguous number.
+    private static bool IsLiquidUnit(string? unit) => string.Equals(unit, "ml", StringComparison.OrdinalIgnoreCase);
+
+    private static string UnitLabel(string? unit, PrescriptionLanguage lang)
+    {
+        var key = string.IsNullOrWhiteSpace(unit) ? "unit" : unit.ToLowerInvariant();
+        var en = new Dictionary<string, string> { ["tablet"] = "tab", ["capsule"] = "cap", ["ml"] = "ml", ["drops"] = "drops", ["sachet"] = "sachet", ["application"] = "application", ["puff"] = "puff", ["dose"] = "dose", ["unit"] = "unit" };
+        var hi = new Dictionary<string, string> { ["tablet"] = "गोली", ["capsule"] = "कैप्सूल", ["ml"] = "मि.ली.", ["drops"] = "बूंद", ["sachet"] = "पुड़िया", ["application"] = "लेप", ["puff"] = "पफ", ["dose"] = "खुराक", ["unit"] = "इकाई" };
+        var mr = new Dictionary<string, string> { ["tablet"] = "गोळी", ["capsule"] = "कॅप्सूल", ["ml"] = "मि.ली.", ["drops"] = "थेंब", ["sachet"] = "पुडी", ["application"] = "लेप", ["puff"] = "पफ", ["dose"] = "मात्रा", ["unit"] = "युनिट" };
+        var dict = lang switch { PrescriptionLanguage.Hindi => hi, PrescriptionLanguage.Marathi => mr, _ => en };
+        return dict.TryGetValue(key, out var label) ? label : key;
+    }
+
+    // "1 tablet" when every active slot takes the same amount, or a per-slot breakdown
+    // ("1 tablet – Morning, 0.5 tablet – Night") when doses differ (e.g. half a tablet at night only).
+    private static string DescribeDose(PrescriptionItemDto item, PrescriptionLanguage lang)
+    {
+        var unit = UnitLabel(item.DosageUnit, lang);
+        var slots = new (string Key, decimal? Val)[]
+        {
+            ("Morning", item.DosageMorning), ("Afternoon", item.DosageAfternoon),
+            ("Evening", item.DosageEvening), ("Night", item.DosageNight),
+        };
+        var active = slots.Where(s => s.Val is > 0).Select(s => (s.Key, Val: s.Val!.Value)).ToList();
+
+        if (active.Count == 0)
+            return lang switch { PrescriptionLanguage.Hindi => $"1 {unit} लें", PrescriptionLanguage.Marathi => $"1 {unit} घ्या", _ => $"Take 1 {unit}" };
+
+        var sameAmount = active.Select(a => a.Val).Distinct().Count() == 1;
+        if (sameAmount)
+        {
+            var amt = FormatAmount(active[0].Val);
+            return lang switch { PrescriptionLanguage.Hindi => $"{amt} {unit} लें", PrescriptionLanguage.Marathi => $"{amt} {unit} घ्या", _ => $"Take {amt} {unit}" };
+        }
+
+        var slotLabels = lang switch
+        {
+            PrescriptionLanguage.Hindi   => new Dictionary<string, string> { ["Morning"] = "सुबह", ["Afternoon"] = "दोपहर", ["Evening"] = "शाम", ["Night"] = "रात" },
+            PrescriptionLanguage.Marathi => new Dictionary<string, string> { ["Morning"] = "सकाळी", ["Afternoon"] = "दुपारी", ["Evening"] = "संध्याकाळी", ["Night"] = "रात्री" },
+            _                            => new Dictionary<string, string> { ["Morning"] = "Morning", ["Afternoon"] = "Afternoon", ["Evening"] = "Evening", ["Night"] = "Night" },
+        };
+        return string.Join(", ", active.Select(a => $"{FormatAmount(a.Val)} {unit} – {slotLabels[a.Key]}"));
+    }
+
     private static string BuildEnglishRemark(PrescriptionItemDto item)
     {
-        var unit = item.MedicineForm switch
-        {
-            MedicineFormType.Tab     => "tablet",
-            MedicineFormType.Capsule => "capsule",
-            MedicineFormType.Syrup   => "ml",
-            _                        => "unit"
-        };
         var freq = item.Frequency switch
         {
             "OD"  => "once a day",       "BD"  => "twice a day",
@@ -699,23 +741,14 @@ else
             "OW"  => "once weekly",      "BW"  => "twice weekly",
             _     => item.Frequency ?? ""
         };
-        var parts = new List<string> { $"Take 1 {unit}" };
+        var parts = new List<string> { DescribeDose(item, PrescriptionLanguage.English) };
         if (!string.IsNullOrEmpty(freq)) parts.Add(freq);
-        if (!string.IsNullOrEmpty(item.Timing)) parts.Add(item.Timing.ToLower());
-        parts.Add($"for {item.DurationDays} days");
         if (!string.IsNullOrEmpty(item.Instructions)) parts.Add(item.Instructions);
         return string.Join(", ", parts);
     }
 
     private static string BuildHindiRemark(PrescriptionItemDto item)
     {
-        var unit = item.MedicineForm switch
-        {
-            MedicineFormType.Tab     => "गोली",
-            MedicineFormType.Capsule => "कैप्सूल",
-            MedicineFormType.Syrup   => "मिली",
-            _                        => "यूनिट"
-        };
         var freq = item.Frequency switch
         {
             "OD"  => "दिन में एक बार",   "BD"  => "दिन में दो बार",
@@ -724,22 +757,14 @@ else
             "OW"  => "हफ्ते में एक बार", "BW"  => "हफ्ते में दो बार",
             _     => item.Frequency ?? ""
         };
-        var parts = new List<string> { $"1 {unit} लें" };
+        var parts = new List<string> { DescribeDose(item, PrescriptionLanguage.Hindi) };
         if (!string.IsNullOrEmpty(freq)) parts.Add(freq);
-        parts.Add($"{item.DurationDays} दिनों के लिए");
         if (!string.IsNullOrEmpty(item.Instructions)) parts.Add(item.Instructions);
         return string.Join(", ", parts);
     }
 
     private static string BuildMarathiRemark(PrescriptionItemDto item)
     {
-        var unit = item.MedicineForm switch
-        {
-            MedicineFormType.Tab     => "गोळी",
-            MedicineFormType.Capsule => "कॅप्सूल",
-            MedicineFormType.Syrup   => "मिली",
-            _                        => "युनिट"
-        };
         var freq = item.Frequency switch
         {
             "OD"  => "दिवसातून एकदा",    "BD"  => "दिवसातून दोनदा",
@@ -748,9 +773,8 @@ else
             "OW"  => "आठवड्यातून एकदा", "BW"  => "आठवड्यातून दोनदा",
             _     => item.Frequency ?? ""
         };
-        var parts = new List<string> { $"1 {unit} घ्या" };
+        var parts = new List<string> { DescribeDose(item, PrescriptionLanguage.Marathi) };
         if (!string.IsNullOrEmpty(freq)) parts.Add(freq);
-        parts.Add($"{item.DurationDays} दिवसांसाठी");
         if (!string.IsNullOrEmpty(item.Instructions)) parts.Add(item.Instructions);
         return string.Join(", ", parts);
     }

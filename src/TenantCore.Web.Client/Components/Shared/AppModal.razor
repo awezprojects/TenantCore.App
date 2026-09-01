@@ -1,0 +1,59 @@
+@* Reusable modal dialog.
+   Usage:
+     <AppModal @bind-Visible="_show" Title="Add Item" Size="md" OnClose="HandleClose">
+         ...body content...
+         <Footer>
+             <button class="btn btn-outline" @onclick="Close">Cancel</button>
+             <button class="btn btn-primary" @onclick="Save">Save</button>
+         </Footer>
+     </AppModal>
+   Sizes: sm (360px) | md (480px, default) | lg (660px) | xl (860px)
+*@
+
+@if (Visible)
+{
+    <div class="app-modal-backdrop" @onclick="HandleBackdropClick"></div>
+    <div class="app-modal-wrap">
+        <div class="app-modal app-modal--@Size" @onclick:stopPropagation="true">
+            <div class="app-modal-header">
+                <div class="app-modal-title">@Title</div>
+                @if (ShowClose)
+                {
+                    <button class="app-modal-close" @onclick="Close" title="Close">✕</button>
+                }
+            </div>
+            <div class="app-modal-body">
+                @ChildContent
+            </div>
+            @if (Footer != null)
+            {
+                <div class="app-modal-footer">
+                    @Footer
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Size { get; set; } = "md";
+    [Parameter] public bool ShowClose { get; set; } = true;
+    [Parameter] public bool CloseOnBackdrop { get; set; } = true;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+
+    private async Task Close()
+    {
+        await VisibleChanged.InvokeAsync(false);
+        if (OnClose.HasDelegate) await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleBackdropClick()
+    {
+        if (CloseOnBackdrop) await Close();
+    }
+}

@@ -17,6 +17,7 @@ public interface IClinicApiClient
     Task<ApiResponse<OpdRegistrationDto>> GetOpdRegistrationByIdAsync(Guid id);
     Task<ApiResponse<OpdRegistrationDto>> CreateOpdRegistrationAsync(CreateOpdRegistrationDto dto);
     Task<ApiResponse<OpdRegistrationDto>> UpdateOpdRegistrationAsync(Guid id, UpdateOpdRegistrationDto dto);
+    Task<ApiResponse<bool>> DeleteOpdRegistrationAsync(Guid id);
 
     Task<ApiResponse<PagedResult<IpdRegistrationDto>>> GetIpdRegistrationsAsync(int page = 1, int pageSize = 20, string? search = null);
     Task<ApiResponse<IpdRegistrationDto>> GetIpdRegistrationByIdAsync(Guid id);
@@ -26,6 +27,8 @@ public interface IClinicApiClient
 
     Task<ApiResponse<ClinicFeeConfigDto>> GetFeesAsync();
     Task<ApiResponse<ClinicFeeConfigDto>> UpdateFeesAsync(UpdateClinicFeeConfigDto dto);
+    Task<ApiResponse<ClinicFeatureFlagsDto>> GetFeatureFlagsAsync();
+    Task<ApiResponse<ClinicFeatureFlagsDto>> UpdateFeatureFlagsAsync(UpdateClinicFeatureFlagsDto dto);
     Task<ApiResponse<IEnumerable<DoctorDto>>> GetDoctorsAsync();
     Task<ApiResponse<int>> GetDoctorOpdCountAsync(Guid doctorUserId, CancellationToken ct = default);
 

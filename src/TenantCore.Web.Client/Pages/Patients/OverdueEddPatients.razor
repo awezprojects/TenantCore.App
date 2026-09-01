@@ -1,7 +1,7 @@
 @page "/patients/edd-overdue"
 @layout AuthorizedLayout
 @inject IPregnancyTenureApiClient TenureClient
-@inject ISnackbar Snackbar
+
 @inject NavigationManager Navigation
 @using TenantCore.Shared.Dtos
 @using TenantCore.Shared.Enums
@@ -25,7 +25,9 @@
 
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        <div style="display:flex;justify-content:center;padding:32px 0;">
+        <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+    </div>
     }
     else if (!string.IsNullOrWhiteSpace(_error))
     {

@@ -113,4 +113,60 @@ public class ClinicSettingsControllerTests
             It.Is<GetClinicDoctorsQuery>(q => q.ApplicationId == _applicationId),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    // ── GET /api/clinic-settings/feature-flags ──────────────────────────────
+
+    [Fact]
+    public async Task GetFeatureFlags_ReturnsOk_WithFlagsDto()
+    {
+        var dto = new ClinicFeatureFlagsDto { Id = Guid.NewGuid(), ApplicationId = _applicationId, PrepaidOpdEnabled = true };
+        _sender.Setup(s => s.Send(It.IsAny<GetClinicFeatureFlagsQuery>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(dto);
+
+        var result = await _controller.GetFeatureFlags(CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().BeSameAs(dto);
+    }
+
+    [Fact]
+    public async Task GetFeatureFlags_SendsQueryWithApplicationId()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<GetClinicFeatureFlagsQuery>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new ClinicFeatureFlagsDto());
+
+        await _controller.GetFeatureFlags(CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<GetClinicFeatureFlagsQuery>(q => q.ApplicationId == _applicationId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── PUT /api/clinic-settings/feature-flags ──────────────────────────────
+
+    [Fact]
+    public async Task UpdateFeatureFlags_ReturnsOk_WithUpdatedDto()
+    {
+        var dto = new ClinicFeatureFlagsDto { PrepaidOpdEnabled = false };
+        _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(dto);
+
+        var result = await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().BeSameAs(dto);
+    }
+
+    [Fact]
+    public async Task UpdateFeatureFlags_SendsCommandWithCorrectValueAndApplicationId()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new ClinicFeatureFlagsDto());
+
+        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<UpdateClinicFeatureFlagsCommand>(c => c.ApplicationId == _applicationId && c.PrepaidOpdEnabled == false),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

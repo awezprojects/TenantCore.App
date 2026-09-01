@@ -7,7 +7,7 @@
 @inject IDoctorProfileApiClient DoctorProfileClient
 @inject IObstetricApiClient ObstetricClient
 @inject IPregnancyTenureApiClient PregnancyTenureClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @inject NavigationManager Navigation
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
@@ -23,7 +23,7 @@
 @if (_loading)
 {
     <div style="padding:40px; text-align:center;">
-        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+        <div class="auth-spinner" style="width:48px;height:48px;border-width:4px;margin:0 auto;"></div>
         <div style="margin-top:12px; color:#64748B; font-size:13px;">Loading prescription...</div>
     </div>
 }
@@ -54,25 +54,33 @@ else
                 </button>
                 @if (PrescriptionId != Guid.Empty)
                 {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Medium"
-                               StartIcon="@Icons.Material.Filled.Print"
-                               OnClick='async () => await JS.InvokeVoidAsync("window.open", $"/prescriptions/{PrescriptionId}/print", "_blank")'>
-                        Print
-                    </MudButton>
+                    <button style="padding:8px 16px;border-radius:8px;border:1.5px solid #64748B;background:#fff;
+                                   cursor:pointer;font-size:13px;font-weight:600;color:#334155;"
+                            @onclick='async () => await JS.InvokeVoidAsync("window.open", $"/prescriptions/{PrescriptionId}/print", "_blank")'>
+                        🖨 Print
+                    </button>
                 }
                 @if (_prescription?.Status != PrescriptionStatus.Submitted)
                 {
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving">
+                    <button style="padding:8px 18px;border-radius:8px;border:1.5px solid #1565C0;background:#fff;
+                                   cursor:pointer;font-size:13px;font-weight:600;color:#1565C0;
+                                   opacity:@(_saving ? "0.65" : "1");"
+                            @onclick="SaveAsync" disabled="@_saving">
                         Save Draft
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SubmitAsync" Disabled="_saving"
-                               StartIcon="@Icons.Material.Filled.Send">
-                        Save &amp; Finalise
-                    </MudButton>
+                    </button>
+                    <button style="padding:8px 18px;border-radius:8px;border:none;background:#059669;color:#fff;
+                                   cursor:pointer;font-size:13px;font-weight:700;
+                                   opacity:@(_saving ? "0.65" : "1");"
+                            @onclick="SubmitAsync" disabled="@_saving">
+                        ✓ Save &amp; Finalise
+                    </button>
                 }
                 else
                 {
-                    <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Submitted</MudChip>
+                    <span style="background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;
+                                 padding:7px 14px;border-radius:8px;border:1.5px solid #A7F3D0;">
+                        ✓ Submitted
+                    </span>
                 }
             </div>
         </div>
@@ -120,18 +128,36 @@ else
                     @foreach (var v in _vitalFields)
                     {
                         var field = v;
-                        <div style="background:#F8FAFC; border-radius:10px; padding:10px; text-align:center;">
-                            <div style="font-size:16px; margin-bottom:2px;">@field.Icon</div>
+                        <div style="background:#F8FAFC; border-radius:10px; padding:12px 10px; text-align:center;">
+                            <div style="font-size:18px; margin-bottom:3px;">@field.Icon</div>
                             <input value="@GetVital(field.Key)"
                                    @oninput="e => SetVital(field.Key, e.Value?.ToString())"
                                    placeholder="@field.Placeholder"
-                                   style="width:100%; border:none; background:transparent; text-align:center; font-size:14px; font-weight:700; outline:none; color:#0F172A;" />
-                            <div style="font-size:9px; color:#94A3B8; margin-top:2px;">@field.Label</div>
+                                   style="width:100%; border:none; background:transparent; text-align:center; font-size:16px; font-weight:700; outline:none; color:#0F172A;" />
+                            <div style="font-size:10px; color:#94A3B8; margin-top:2px;">@field.Label</div>
+                            <select value="" class="vital-quickpick" @onchange="e => SetVital(field.Key, e.Value?.ToString())"
+                                    title="Quick-pick a common value, or type your own above"
+                                    style="width:100%; margin-top:6px; font-size:11px; padding:5px 4px; border:1.5px solid #DBEAFE; border-radius:6px; background:#EFF6FF; color:#2563EB; font-weight:600; outline:none;">
+                                <option value="">Quick pick…</option>
+                                @foreach (var p in _vitalPresets[field.Key])
+                                {
+                                    <option value="@p">@p</option>
+                                }
+                            </select>
                         </div>
                     }
                 </div>
             </div>
         </div>
+
+        <style>
+            .vital-quickpick { accent-color:#2563EB; color-scheme:light; }
+            .vital-quickpick:hover { background:#DBEAFE; border-color:#2563EB; }
+            .vital-quickpick:focus { border-color:#2563EB; box-shadow:0 0 0 2px rgba(37,99,235,0.15); }
+            .vital-quickpick option:checked { background:#2563EB; color:#fff; }
+            .vital-quickpick option:hover,
+            .vital-quickpick option:focus { background:#2563EB !important; color:#fff !important; }
+        </style>
 
         <!-- ── Patient History & Trends ───────────────────────────────────────── -->
         <div style="border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); background:#fff;">
@@ -539,7 +565,7 @@ else
                 </div>
 
                 <!-- Medicines -->
-                <div style="background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,0.08); overflow:hidden;">
+                <div style="background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
                     <div style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #E2E8F0;">
                         <div style="font-weight:700; font-size:14px; color:#0F172A;">℞ Medicines Prescribed</div>
                         <span style="background:#EFF6FF; color:#2563EB; font-weight:700; font-size:11px; padding:3px 10px; border-radius:14px;">
@@ -569,6 +595,10 @@ else
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                                             <span style="font-weight:700; font-size:14px; color:#0F172A;">@(idx + 1). @item.MedicineName</span>
+                                            @if (!string.IsNullOrEmpty(item.Strength))
+                                            {
+                                                <span style="font-size:12px; font-weight:600; color:#64748B;">@item.Strength</span>
+                                            }
                                             <span style="font-size:10px; font-weight:700; color:#64748B; padding:3px 9px; background:#fff; border:1.5px solid #E2E8F0; border-radius:5px; text-transform:uppercase; letter-spacing:0.5px;">@item.MedicineForm</span>
                                         </div>
                                     </div>
@@ -577,17 +607,25 @@ else
                                             title="Remove">🗑</button>
                                 </div>
 
-                                <!-- Row 2: STRENGTH | QUANTITY | DURATION (DAYS) | TIMING -->
-                                <div style="padding:12px 14px; display:grid; grid-template-columns:1.2fr 0.9fr 1.1fr 1.5fr; gap:12px; align-items:end; border-bottom:1px solid #E2E8F0;">
+                                <!-- Row 2: DOSE PER INTAKE (amount + unit) | DURATION (DAYS) | QUANTITY -->
+                                <div style="padding:12px 14px; display:grid; grid-template-columns:1.4fr 1fr 0.8fr; gap:12px; align-items:end; border-bottom:1px solid #E2E8F0;">
                                     <div>
-                                        <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Strength</div>
-                                        <input @bind="item.Strength" placeholder="e.g. 5mg"
-                                               style="width:100%; padding:9px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:600; outline:none; box-sizing:border-box; color:#0F172A;" />
-                                    </div>
-                                    <div>
-                                        <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Quantity</div>
-                                        <input type="number" min="1" @bind="item.Quantity"
-                                               style="width:100%; padding:9px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; text-align:center;" />
+                                        <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Dose per intake</div>
+                                        <div style="display:flex; gap:6px;">
+                                            <input type="number" min="0" step="@DoseStepAttr(item)" @bind="item.DoseAmountStr"
+                                                   @bind:after="() => OnDoseAmountChanged(item, idx)"
+                                                   disabled="@IsDoseLocked(item)"
+                                                   title="@(IsDoseLocked(item) ? "Fixed at 1 application" : IsIntegerDoseUnit(item.DosageUnit) ? "Whole drops only" : "e.g. 0.5 for half a tablet")"
+                                                   style="width:64px; padding:9px 8px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; text-align:center; @(IsDoseLocked(item) ? "background:#F1F5F9;color:#94A3B8;" : "")" />
+                                            <select @bind="item.DosageUnit" @bind:after="() => OnDoseAmountChanged(item, idx)"
+                                                    disabled="@IsDoseLocked(item)"
+                                                    style="flex:1; min-width:0; padding:9px 8px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A; background:#fff;">
+                                                @foreach (var u in _doseUnits)
+                                                {
+                                                    <option value="@u">@u</option>
+                                                }
+                                            </select>
+                                        </div>
                                     </div>
                                     <div>
                                         <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Duration (Days)</div>
@@ -599,19 +637,21 @@ else
                                         </div>
                                     </div>
                                     <div>
-                                        <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Timing</div>
-                                        <select @bind="item.Timing"
-                                                style="width:100%; padding:9px 8px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A; background:#fff;">
-                                            <option value="">Select timing</option>
-                                            @foreach (var t in _timingOptions)
+                                        <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Quantity</div>
+                                        <div style="position:relative;">
+                                            <input type="number" min="0" step="0.5" @bind="item.Quantity"
+                                                   style="width:100%; padding:9px 34px 9px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; text-align:center;" />
+                                            @if (string.Equals(item.DosageUnit, "ml", StringComparison.OrdinalIgnoreCase))
                                             {
-                                                <option value="@t">@t</option>
+                                                <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:10px; color:#94A3B8; font-weight:600; pointer-events:none;">ml</span>
                                             }
-                                        </select>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <!-- Row 3: HOW OFTEN (FREQUENCY) — 6 segmented buttons with pattern labels -->
+                                <!-- Row 3: HOW OFTEN (FREQUENCY) — 6 segmented buttons with pattern labels.
+                                     Timing is never chosen separately: it's always derived from these slots,
+                                     so Frequency and Timing can no longer disagree. -->
                                 <div style="padding:12px 14px; border-bottom:1px solid #E2E8F0;">
                                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
                                         <div style="font-size:10px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">How Often (Frequency)</div>
@@ -629,6 +669,53 @@ else
                                             </button>
                                         }
                                     </div>
+
+                                    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+                                        <div style="font-size:12px; color:#334155;">
+                                            🕐 Timing: <strong>@BuildTimingLabel(GetActiveSlots(item), _lang)</strong>
+                                            <span style="color:#94A3B8; font-family:'Courier New',monospace; margin-left:6px;">(@BuildSlotPattern(item))</span>
+                                        </div>
+                                        <button @onclick="() => item.CustomizePerSlot = !item.CustomizePerSlot"
+                                                style="background:none; border:none; cursor:pointer; color:#2563EB; font-size:11px; font-weight:700; padding:0;">
+                                            @(item.CustomizePerSlot ? "✕ Hide fine-tuning" : "✎ Fine-tune individual doses (e.g. half tablet at night)")
+                                        </button>
+                                    </div>
+
+                                    @if (item.CustomizePerSlot)
+                                    {
+                                        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; padding:10px; background:#F8FAFC; border-radius:8px; border:1px solid #E2E8F0;">
+                                            @if (IsDoseLocked(item))
+                                            {
+                                                <div style="grid-column:1/-1; font-size:11px; color:#94A3B8; font-style:italic;">
+                                                    Amount is fixed at 1 application — use the frequency buttons above to choose which times of day.
+                                                </div>
+                                            }
+                                            <div>
+                                                <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:4px;">🌅 Morning</div>
+                                                <input type="number" min="0" step="@DoseStepAttr(item)" @bind="item.DosageMorningStr" @bind:after="() => OnSlotDoseChanged(item, idx)"
+                                                       disabled="@IsDoseLocked(item)"
+                                                       style="width:100%; padding:7px; border:1.5px solid #E2E8F0; border-radius:6px; font-size:12px; text-align:center; box-sizing:border-box;" />
+                                            </div>
+                                            <div>
+                                                <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:4px;">☀️ Afternoon</div>
+                                                <input type="number" min="0" step="@DoseStepAttr(item)" @bind="item.DosageAfternoonStr" @bind:after="() => OnSlotDoseChanged(item, idx)"
+                                                       disabled="@IsDoseLocked(item)"
+                                                       style="width:100%; padding:7px; border:1.5px solid #E2E8F0; border-radius:6px; font-size:12px; text-align:center; box-sizing:border-box;" />
+                                            </div>
+                                            <div>
+                                                <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:4px;">🌇 Evening</div>
+                                                <input type="number" min="0" step="@DoseStepAttr(item)" @bind="item.DosageEveningStr" @bind:after="() => OnSlotDoseChanged(item, idx)"
+                                                       disabled="@IsDoseLocked(item)"
+                                                       style="width:100%; padding:7px; border:1.5px solid #E2E8F0; border-radius:6px; font-size:12px; text-align:center; box-sizing:border-box;" />
+                                            </div>
+                                            <div>
+                                                <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:4px;">🌙 Night</div>
+                                                <input type="number" min="0" step="@DoseStepAttr(item)" @bind="item.DosageNightStr" @bind:after="() => OnSlotDoseChanged(item, idx)"
+                                                       disabled="@IsDoseLocked(item)"
+                                                       style="width:100%; padding:7px; border:1.5px solid #E2E8F0; border-radius:6px; font-size:12px; text-align:center; box-sizing:border-box;" />
+                                            </div>
+                                        </div>
+                                    }
                                 </div>
 
                                 <!-- Row 4: INSTRUCTIONS — chip-based with "+ Add from library" -->
@@ -714,26 +801,36 @@ else
                         <!-- Drug Search -->
                         <div style="margin-top:16px;">
                             <div style="font-size:12px; font-weight:600; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.3px;">Add Medicine</div>
-                            <MudAutocomplete T="MedicineDto" Label="Search drug name…"
-                                             SearchFunc="SearchMedicines"
-                                             ToStringFunc="MedicineDisplay"
-                                             Variant="Variant.Outlined"
-                                             ValueChanged="AddMedicine"
-                                             MinCharacters="1"
-                                             DebounceInterval="250"
-                                             MaxItems="5"
-                                             Style="font-size:13px;">
-                                <ItemTemplate Context="med">
-                                    <div style="padding:2px 0;">
-                                        <div style="font-weight:600; font-size:13px;">@med.Name</div>
-                                        <div style="font-size:11px; color:#64748B;">
-                                            @(med.DosageFormName ?? med.Form ?? "—")
-                                            @if (!string.IsNullOrEmpty(med.Dosage)) { <text> · @med.Dosage</text> }
-                                            @if (!string.IsNullOrEmpty(med.GenericName)) { <text> · @med.GenericName</text> }
-                                        </div>
+                            <div style="position:relative;">
+                                <input class="form-input" type="text" placeholder="Search drug name…"
+                                       value="@_medSearchText"
+                                       @oninput="OnMedSearchInput"
+                                       autocomplete="off"
+                                       style="font-size:13px;" />
+                                @if (_medSearchOpen && _medSearchResults.Count > 0)
+                                {
+                                    <div @onclick="() => { _medSearchOpen = false; _medSearchResults = []; }"
+                                         style="position:fixed;inset:0;z-index:198;" />
+                                    <div style="position:absolute;top:100%;left:0;right:0;z-index:199;
+                                                background:#fff;border-radius:8px;border:1px solid #E2E8F0;
+                                                box-shadow:0 8px 24px rgba(0,0,0,0.12);overflow:hidden;margin-top:2px;">
+                                        @foreach (var med in _medSearchResults)
+                                        {
+                                            var m = med;
+                                            <div @onclick="() => SelectMedicineSuggestion(m)"
+                                                 style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F1F5F9;
+                                                        background:#fff;">
+                                                <div style="font-weight:600;font-size:13px;">@m.Name</div>
+                                                <div style="font-size:11px;color:#64748B;">
+                                                    @(m.DosageFormName ?? m.Form ?? "—")
+                                                    @if (!string.IsNullOrEmpty(m.Dosage)) { <text> · @m.Dosage</text> }
+                                                    @if (!string.IsNullOrEmpty(m.GenericName)) { <text> · @m.GenericName</text> }
+                                                </div>
+                                            </div>
+                                        }
                                     </div>
-                                </ItemTemplate>
-                            </MudAutocomplete>
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -782,13 +879,12 @@ else
                             }
                         </div>
                     }
-                    <MudFileUpload T="IBrowserFile" FilesChanged="OnFileUploaded" Accept=".pdf,.jpg,.jpeg,.png,.bmp">
-                        <ActivatorContent>
-                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Upload">
-                                Upload Report
-                            </MudButton>
-                        </ActivatorContent>
-                    </MudFileUpload>
+                    <label style="display:inline-flex;align-items:center;gap:7px;padding:8px 18px;
+                                  border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;
+                                  font-size:13px;font-weight:600;color:#334155;">
+                        📎 Upload Report
+                        <InputFile accept=".pdf,.jpg,.jpeg,.png,.bmp" OnChange="OnFileInputChanged" style="display:none;" />
+                    </label>
                 </div>
 
             </div>
@@ -869,97 +965,173 @@ else
             </div>
         </div>
 
+        <!-- ── Bottom Action Bar — mirrors the header actions so a doctor doesn't have
+             to scroll back up after adding a long list of medicines ─────────────────── -->
+        <div style="display:flex; justify-content:flex-end; gap:10px; align-items:center; padding-top:4px; border-top:1px solid #E2E8F0;">
+            <button @onclick="() => _showSettings = true"
+                    style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:#334155;">
+                ⚙️ Settings
+            </button>
+            @if (PrescriptionId != Guid.Empty)
+            {
+                <button style="padding:8px 16px;border-radius:8px;border:1.5px solid #64748B;background:#fff;
+                               cursor:pointer;font-size:13px;font-weight:600;color:#334155;"
+                        @onclick='async () => await JS.InvokeVoidAsync("window.open", $"/prescriptions/{PrescriptionId}/print", "_blank")'>
+                    🖨 Print
+                </button>
+            }
+            @if (_prescription?.Status != PrescriptionStatus.Submitted)
+            {
+                <button style="padding:8px 18px;border-radius:8px;border:1.5px solid #1565C0;background:#fff;
+                               cursor:pointer;font-size:13px;font-weight:600;color:#1565C0;
+                               opacity:@(_saving ? "0.65" : "1");"
+                        @onclick="SaveAsync" disabled="@_saving">
+                    Save Draft
+                </button>
+                <button style="padding:8px 18px;border-radius:8px;border:none;background:#059669;color:#fff;
+                               cursor:pointer;font-size:13px;font-weight:700;
+                               opacity:@(_saving ? "0.65" : "1");"
+                        @onclick="SubmitAsync" disabled="@_saving">
+                    ✓ Save &amp; Finalise
+                </button>
+            }
+            else
+            {
+                <span style="background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;
+                             padding:7px 14px;border-radius:8px;border:1.5px solid #A7F3D0;">
+                    ✓ Submitted
+                </span>
+            }
+        </div>
+
     </div>
 }
 
 <!-- ── Settings Modal ────────────────────────────────────────────────────────── -->
-<MudDialog @bind-Visible="_showSettings" Options='new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }'>
-    <TitleContent><MudText Typo="Typo.h6">⚙️ Prescription Settings</MudText></TitleContent>
-    <DialogContent>
-        <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="true" PanelClass="pt-3" @bind-ActivePanelIndex="_settingsTab">
-
-            <!-- Tab 1: Language -->
-            <MudTabPanel Text="🌐 Language">
-                <MudText Typo="Typo.subtitle2" Class="mb-1" Color="Color.Secondary">Remark Language</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+@if (_showSettings)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+         @onclick="() => _showSettings = false"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;" @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;">⚙️ Prescription Settings</div>
+        </div>
+        <!-- Tabs -->
+        <div style="display:flex;gap:0;border-bottom:1px solid #E2E8F0;padding:0 24px;">
+            @foreach (var (idx, label) in new[] { (0, "🌐 Language"), (1, "🖨️ Print Settings") })
+            {
+                var ti = idx;
+                <button @onclick="() => _settingsTab = ti"
+                        style="padding:10px 16px;border:none;border-bottom:2.5px solid @(_settingsTab == ti ? "#1565C0" : "transparent");
+                               background:transparent;cursor:pointer;font-size:13px;font-weight:@(_settingsTab == ti ? "700" : "500");
+                               color:@(_settingsTab == ti ? "#1565C0" : "#64748B");margin-bottom:-1px;">@label</button>
+            }
+        </div>
+        <div style="padding:20px 24px;">
+            @if (_settingsTab == 0)
+            {
+                <div style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:4px;">Remark Language</div>
+                <div style="font-size:12px;color:#94A3B8;margin-bottom:12px;">
                     Auto-generated dosage remarks will appear in this language on the prescription.
-                </MudText>
-                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
                     @foreach (var (id, label, sample) in _langOptions)
                     {
                         var langId = id;
                         <button @onclick="() => _lang = langId"
-                                style="padding:12px; border-radius:10px; border:2px solid @(_lang == langId ? "#2563EB" : "#E2E8F0"); background:@(_lang == langId ? "#EFF6FF" : "#fff"); cursor:pointer; text-align:left;">
-                            <div style="font-weight:700; font-size:13px; color:@(_lang == langId ? "#2563EB" : "#0F172A"); margin-bottom:4px;">@label</div>
-                            <div style="font-size:10px; color:#94A3B8; line-height:1.4; font-style:italic;">@sample</div>
+                                style="padding:12px;border-radius:10px;border:2px solid @(_lang == langId ? "#2563EB" : "#E2E8F0");
+                                       background:@(_lang == langId ? "#EFF6FF" : "#fff");cursor:pointer;text-align:left;">
+                            <div style="font-weight:700;font-size:13px;color:@(_lang == langId ? "#2563EB" : "#0F172A");margin-bottom:4px;">@label</div>
+                            <div style="font-size:10px;color:#94A3B8;line-height:1.4;font-style:italic;">@sample</div>
                         </button>
                     }
                 </div>
-            </MudTabPanel>
-
-            <!-- Tab 2: Print Settings -->
-            <MudTabPanel Text="🖨️ Print Settings">
-                <MudText Typo="Typo.subtitle2" Class="mb-1" Color="Color.Secondary">Print Margins</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            }
+            else
+            {
+                <div style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:4px;">Print Margins</div>
+                <div style="font-size:12px;color:#94A3B8;margin-bottom:12px;">
                     Set margins (in mm) so the printout fits on your pre-printed prescription pad.
                     Increase the top margin to skip a printed letterhead.
-                </MudText>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
-                    <MudNumericField T="int" Label="Top margin (mm)" @bind-Value="_pMarginTop"
-                                     Min="0" Max="150" Variant="Variant.Outlined" Dense="true"
-                                     HelperText="Skip pre-printed header" />
-                    <MudNumericField T="int" Label="Bottom margin (mm)" @bind-Value="_pMarginBottom"
-                                     Min="0" Max="150" Variant="Variant.Outlined" Dense="true" />
-                    <MudNumericField T="int" Label="Left margin (mm)" @bind-Value="_pMarginLeft"
-                                     Min="0" Max="100" Variant="Variant.Outlined" Dense="true" />
-                    <MudNumericField T="int" Label="Right margin (mm)" @bind-Value="_pMarginRight"
-                                     Min="0" Max="100" Variant="Variant.Outlined" Dense="true" />
                 </div>
-
-                <MudDivider Class="mb-3" />
-
-                <MudText Typo="Typo.subtitle2" Class="mb-1" Color="Color.Secondary">Header on Print</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Top margin (mm)</label>
+                        <input class="form-input" type="number" min="0" max="150" @bind="_pMarginTop" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Bottom margin (mm)</label>
+                        <input class="form-input" type="number" min="0" max="150" @bind="_pMarginBottom" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Left margin (mm)</label>
+                        <input class="form-input" type="number" min="0" max="100" @bind="_pMarginLeft" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Right margin (mm)</label>
+                        <input class="form-input" type="number" min="0" max="100" @bind="_pMarginRight" />
+                    </div>
+                </div>
+                <hr style="border:none;border-top:1px solid #E2E8F0;margin:0 0 16px;" />
+                <div style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:4px;">Header on Print</div>
+                <div style="font-size:12px;color:#94A3B8;margin-bottom:12px;">
                     If your prescription pad already has the clinic name and doctor info printed, hide the digital header.
-                </MudText>
-                <MudSwitch T="bool" @bind-Value="_pHideHeader" Color="Color.Primary"
-                           Label="@(_pHideHeader ? "Clinic header hidden on print" : "Show clinic header on print")" />
-
+                </div>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                    <input type="checkbox" @bind="_pHideHeader" style="width:16px;height:16px;accent-color:#1565C0;" />
+                    <span style="font-size:13px;color:#334155;font-weight:500;">
+                        @(_pHideHeader ? "Clinic header hidden on print" : "Show clinic header on print")
+                    </span>
+                </label>
                 @if (_pMarginTop > 0 || _pHideHeader)
                 {
-                    <div style="margin-top:12px; padding:10px 12px; background:#FFF7ED; border:1px solid #FED7AA; border-radius:8px; font-size:12px; color:#92400E;">
+                    <div style="margin-top:12px;padding:10px 12px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;font-size:12px;color:#92400E;">
                         💡 Top margin: <strong>@_pMarginTop mm</strong>
                         @if (_pHideHeader) { <text> · Clinic header hidden</text> }
                         — content will start lower to fit your pre-printed pad.
                     </div>
                 }
-            </MudTabPanel>
-
-        </MudTabs>
-    </DialogContent>
-    <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="() => _showSettings = false">Cancel</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync">Save</MudButton>
-    </DialogActions>
-</MudDialog>
+            }
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                           padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="() => _showSettings = false">Cancel</button>
+            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;"
+                    @onclick="SaveSettingsAsync">Save</button>
+        </div>
+    </div>
+}
 
 <!-- ── Investigations Picker Modal ───────────────────────────────────────────── -->
-<MudDialog @bind-Visible="_showInvPicker" Options='new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true }'>
-    <TitleContent><MudText Typo="Typo.h6">🔬 Add Investigations</MudText></TitleContent>
-    <DialogContent>
-        <div style="max-height:480px; overflow-y:auto;">
+@if (_showInvPicker)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+         @onclick="() => _showInvPicker = false"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:600px;max-width:96vw;max-height:90vh;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;display:flex;flex-direction:column;"
+         @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;">🔬 Add Investigations</div>
+        </div>
+        <div style="padding:20px 24px;overflow-y:auto;flex:1;">
             @foreach (var (category, tests) in _investigationsMaster)
             {
                 <div style="margin-bottom:16px;">
-                    <div style="font-weight:700; font-size:12px; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">@category</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <div style="font-weight:700;font-size:12px;color:#94A3B8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">@category</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">
                         @foreach (var test in tests)
                         {
                             var t = test;
                             var selected = _investigations.Contains(t);
                             <button @onclick="() => ToggleInvestigation(t)"
-                                    style="padding:6px 12px; border-radius:18px; border:1.5px solid @(selected ? "#7C3AED" : "#E2E8F0"); background:@(selected ? "#F5F3FF" : "#fff"); color:@(selected ? "#7C3AED" : "#334155"); font-size:12px; font-weight:@(selected ? "700" : "500"); cursor:pointer;">
+                                    style="padding:6px 12px;border-radius:18px;border:1.5px solid @(selected ? "#7C3AED" : "#E2E8F0");
+                                           background:@(selected ? "#F5F3FF" : "#fff");color:@(selected ? "#7C3AED" : "#334155");
+                                           font-size:12px;font-weight:@(selected ? "700" : "500");cursor:pointer;">
                                 @(selected ? "✓ " : "+ ")@t
                             </button>
                         }
@@ -967,29 +1139,34 @@ else
                 </div>
             }
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:14px; border-top:1px solid #E2E8F0; margin-top:8px;">
-            <span style="font-size:13px; color:#64748B;">@_investigations.Count selected</span>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:13px;color:#64748B;">@_investigations.Count selected</span>
+            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;"
+                    @onclick="() => _showInvPicker = false">Done</button>
         </div>
-    </DialogContent>
-    <DialogActions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="() => _showInvPicker = false">Done</MudButton>
-    </DialogActions>
-</MudDialog>
+    </div>
+}
 
 <!-- ── Visit Detail Modal ────────────────────────────────────────────────────── -->
-<MudDialog @bind-Visible="_showVisitDetail" Options='new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true }'>
-    <TitleContent>
-        <div style="display:flex; align-items:center; gap:10px;">
-            <MudText Typo="Typo.h6">Visit Detail</MudText>
-            @if (_selectedVisit is not null)
-            {
-                <span style="font-size:11px; font-weight:700; color:#2563EB; background:#EFF6FF; padding:3px 10px; border-radius:20px;">
-                    @_selectedVisit.PrescriptionNumber
-                </span>
-            }
-        </div>
-    </TitleContent>
-    <DialogContent>
+@if (_showVisitDetail)
+{
+<div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+     @onclick="() => _showVisitDetail = false"></div>
+<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+            background:#fff;border-radius:14px;width:700px;max-width:96vw;max-height:90vh;
+            box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;display:flex;flex-direction:column;"
+     @onclick:stopPropagation="true">
+    <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px;">
+        <div style="font-size:16px;font-weight:800;color:#1E293B;">Visit Detail</div>
+        @if (_selectedVisit is not null)
+        {
+            <span style="font-size:11px;font-weight:700;color:#2563EB;background:#EFF6FF;padding:3px 10px;border-radius:20px;">
+                @_selectedVisit.PrescriptionNumber
+            </span>
+        }
+    </div>
+    <div style="padding:20px 24px;overflow-y:auto;flex:1;">
         @if (_selectedVisit is not null)
         {
             var v = _selectedVisit;
@@ -1096,6 +1273,7 @@ else
                             {
                                 var m = v.Items[mi];
                                 var isLast = mi == v.Items.Count - 1;
+                                var alreadyAdded = _items.Any(i => i.MedicineId == m.MedicineId);
                                 <div style="padding:10px 14px; display:flex; gap:10px; align-items:flex-start; border-bottom:@(isLast ? "none" : "1px solid rgba(21,101,192,0.12)");">
                                     <div style="width:22px; height:22px; border-radius:6px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#2563EB; flex-shrink:0;">@(mi + 1)</div>
                                     <div style="flex:1;">
@@ -1115,6 +1293,12 @@ else
                                             <div style="font-size:11px; color:#2563EB; font-style:italic; margin-top:4px;">📝 @m.RemarkEnglish</div>
                                         }
                                     </div>
+                                    <button @onclick="() => AddMedicineFromHistory(m)" disabled="@alreadyAdded"
+                                            style="flex-shrink:0; padding:5px 12px; border-radius:7px; border:1.5px solid @(alreadyAdded ? "#CBD5E1" : "#2563EB");
+                                                   background:@(alreadyAdded ? "#F1F5F9" : "#2563EB"); color:@(alreadyAdded ? "#94A3B8" : "#fff");
+                                                   font-size:11px; font-weight:700; cursor:@(alreadyAdded ? "default" : "pointer"); white-space:nowrap;">
+                                        @(alreadyAdded ? "✓ Added" : "+ Add")
+                                    </button>
                                 </div>
                             }
                         </div>
@@ -1161,23 +1345,36 @@ else
                 }
             </div>
         }
-    </DialogContent>
-    <DialogActions>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
         @if (_selectedVisit is not null)
         {
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
-                       StartIcon="@Icons.Material.Filled.Print"
-                       OnClick='async () => await JS.InvokeVoidAsync("window.open", $"/prescriptions/{_selectedVisit.Id}/print", "_blank")'>
-                Print
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       OnClick='() => { _showVisitDetail = false; Navigation.NavigateTo($"/prescriptions/{_selectedVisit.Id}"); }'>
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                           padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick='async () => await JS.InvokeVoidAsync("window.open", $"/prescriptions/{_selectedVisit.Id}/print", "_blank")'>
+                🖨 Print
+            </button>
+            <button style="background:transparent;color:#1565C0;border:1.5px solid #1565C0;border-radius:8px;
+                           padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick='() => { _showVisitDetail = false; Navigation.NavigateTo($"/prescriptions/{_selectedVisit.Id}"); }'>
                 Edit
-            </MudButton>
+            </button>
+            @if (_selectedVisit.Items.Count > 0)
+            {
+                <div style="flex:1;"></div>
+                <button style="background:#ECFDF5;color:#059669;border:1.5px solid #059669;border-radius:8px;
+                               padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;"
+                        @onclick="() => AddAllMedicinesFromHistory(_selectedVisit)">
+                    + Add All Medicines to Prescription
+                </button>
+            }
         }
-        <MudButton OnClick="() => _showVisitDetail = false">Close</MudButton>
-    </DialogActions>
-</MudDialog>
+        <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                       padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;"
+                @onclick="() => _showVisitDetail = false">Close</button>
+    </div>
+</div>
+}
 
 <CloseTenureModal Visible="_showCloseTenureModal"
                   Tenure="_activeTenure"
@@ -1258,6 +1455,19 @@ else
         ("sugar", "Sugar (F)",  "95",     "🩸"),
     ];
 
+    // 5 common values per vital for one-tap entry — the text box above stays free-form
+    // so a doctor can always type an out-of-range reading manually.
+    private static readonly Dictionary<string, string[]> _vitalPresets = new()
+    {
+        ["bp"]     = ["110/70", "120/80", "130/85", "140/90", "150/95"],
+        ["pulse"]  = ["60", "72", "80", "90", "100"],
+        ["temp"]   = ["97.5", "98.4", "98.6", "99.5", "100.4"],
+        ["weight"] = ["50", "60", "70", "80", "90"],
+        ["spo2"]   = ["94", "96", "97", "98", "99"],
+        ["rr"]     = ["12", "14", "16", "18", "20"],
+        ["sugar"]  = ["80", "90", "100", "110", "126"],
+    };
+
     private record FreqPreset(string Code, string Line1, string Line2, string Pattern);
     private static readonly FreqPreset[] _freqPresets =
     [
@@ -1269,7 +1479,6 @@ else
         new("SOS", "As",          "Needed",  "When required"),
     ];
 
-    private static readonly string[] _timingOptions = ["Morning", "Afternoon", "Evening", "Night", "Morning & Night", "Morning, Afternoon & Night", "Before meals", "After meals", "Empty stomach"];
     private static readonly string[] _diagnosisChips = ["Hypertension", "Type 2 DM", "CAD", "GERD", "URTI", "Anaemia", "Hypothyroid", "Asthma", "CKD"];
     private static readonly string[] _quickInstructions = ["After meals", "Before meals", "On empty stomach", "With a full glass of water", "Avoid alcohol"];
 
@@ -1280,6 +1489,8 @@ else
         ["Activity"]     = ["Avoid driving", "Avoid heavy machinery", "Rest advised", "Light exercise only"],
         ["Storage"]      = ["Refrigerate", "Keep away from sunlight", "Keep away from moisture"],
         ["Special"]      = ["Do not crush or chew", "Swallow whole", "Dissolve under tongue", "Apply externally only"],
+        ["Application"]  = ["Apply externally on affected area", "Apply thin layer", "Avoid contact with eyes", "For external use only"],
+        ["Device Use"]   = ["Shake well before use", "Instill as directed", "Use with nebulizer machine", "Rinse mouth after use", "To be administered by healthcare professional"],
     };
 
     private static readonly string[] _menstrualSuggestions =
@@ -1466,6 +1677,13 @@ else
             RemarkMarathi = i.RemarkMarathi,
         }).ToList();
 
+        foreach (var item in _items)
+        {
+            item.DoseAmountStr = item.DosageMorningStr ?? item.DosageAfternoonStr
+                ?? item.DosageEveningStr ?? item.DosageNightStr ?? "1";
+            UpdateTimingSummary(item);
+        }
+
         if (_isGynecologist && dto.ObstetricData is not null)
             CarryForwardObstetricData(dto.ObstetricData);
 
@@ -1506,6 +1724,62 @@ else
         _showVisitDetail = true;
     }
 
+    // Re-prescribes a medicine from a previous visit — carries the dose/frequency/instructions
+    // forward exactly as they were, so a doctor repeating a drug doesn't have to rebuild it from scratch.
+    private void AddMedicineFromHistory(PrescriptionItemDto m)
+    {
+        if (TryAddMedicineFromHistory(m))
+        {
+            CheckInteractions();
+            Toast.ShowSuccess($"{m.MedicineName} added to prescription.");
+        }
+        else
+            Toast.ShowWarning($"{m.MedicineName} is already in this prescription.");
+    }
+
+    private void AddAllMedicinesFromHistory(PrescriptionDto visit)
+    {
+        var addedCount = visit.Items.Count(TryAddMedicineFromHistory);
+        if (addedCount > 0)
+        {
+            CheckInteractions();
+            Toast.ShowSuccess($"{addedCount} medicine{(addedCount != 1 ? "s" : "")} added to prescription.");
+        }
+        else
+            Toast.ShowWarning("All medicines from this visit are already in the prescription.");
+    }
+
+    private bool TryAddMedicineFromHistory(PrescriptionItemDto m)
+    {
+        if (_items.Any(i => i.MedicineId == m.MedicineId)) return false;
+
+        var duration = m.DurationDays > 0 ? m.DurationDays : 7;
+        var item = new PrescriptionItemRow
+        {
+            MedicineId = m.MedicineId,
+            MedicineName = m.MedicineName,
+            MedicineForm = m.MedicineForm,
+            Strength = m.Strength ?? string.Empty,
+            DosageUnit = string.IsNullOrWhiteSpace(m.DosageUnit) ? GetDefaultUnit(m.MedicineForm) : m.DosageUnit,
+            DosageMorningStr = m.DosageMorning?.ToString(),
+            DosageAfternoonStr = m.DosageAfternoon?.ToString(),
+            DosageEveningStr = m.DosageEvening?.ToString(),
+            DosageNightStr = m.DosageNight?.ToString(),
+            DurationDays = duration,
+            DurationInput = $"{duration} days",
+            Frequency = m.Frequency ?? "OD",
+            InstructionList = string.IsNullOrWhiteSpace(m.Instructions)
+                ? GetDefaultInstructions(m.MedicineForm)
+                : m.Instructions.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList(),
+        };
+        item.DoseAmountStr = item.DosageMorningStr ?? item.DosageAfternoonStr
+            ?? item.DosageEveningStr ?? item.DosageNightStr ?? "1";
+        UpdateTimingSummary(item);
+        _items.Add(item);
+        RecalcQuantity(_items.Count - 1);
+        return true;
+    }
+
     private string GetVital(string key) => key switch
     {
         "bp" => _vBP, "pulse" => _vPulse, "temp" => _vTemp,
@@ -1528,37 +1802,132 @@ else
         }
     }
 
+    // Tube/ointment doses aren't counted (you don't say "2 ointments") — always exactly 1 application.
+    private static bool IsDoseLocked(PrescriptionItemRow item) => item.MedicineForm == MedicineFormType.Tube;
+
+    // Eye/ear/nose drops are counted individually — "1.5 drops" isn't a real instruction.
+    private static bool IsIntegerDoseUnit(string? unit) => string.Equals(unit, "drops", StringComparison.OrdinalIgnoreCase);
+
+    private static string DoseStepAttr(PrescriptionItemRow item) =>
+        IsDoseLocked(item) || IsIntegerDoseUnit(item.DosageUnit) ? "1" : "0.5";
+
+    // Enforces the locked/whole-number rules above whenever a dose value is entered or changed.
+    private static string? SanitizeDoseStr(PrescriptionItemRow item, string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return IsDoseLocked(item) ? null : raw;
+        if (IsDoseLocked(item)) return "1";
+        if (!decimal.TryParse(raw, out var v) || v <= 0) return raw;
+        if (IsIntegerDoseUnit(item.DosageUnit)) v = Math.Round(v, MidpointRounding.AwayFromZero);
+        return FormatAmount(v);
+    }
+
     private void SelectFrequency(PrescriptionItemRow item, int idx, string code)
     {
         item.Frequency = code;
+        var dose = SanitizeDoseStr(item, string.IsNullOrWhiteSpace(item.DoseAmountStr) ? "1" : item.DoseAmountStr) ?? "1";
+        item.DoseAmountStr = dose;
         switch (code)
         {
             case "OD":
-                item.DosageMorningStr = "1"; item.DosageAfternoonStr = null;
+                item.DosageMorningStr = dose; item.DosageAfternoonStr = null;
                 item.DosageEveningStr = null; item.DosageNightStr = null;
                 break;
             case "BD":
-                item.DosageMorningStr = "1"; item.DosageAfternoonStr = null;
-                item.DosageEveningStr = null; item.DosageNightStr = "1";
+                item.DosageMorningStr = dose; item.DosageAfternoonStr = null;
+                item.DosageEveningStr = null; item.DosageNightStr = dose;
                 break;
             case "TDS":
-                item.DosageMorningStr = "1"; item.DosageAfternoonStr = "1";
-                item.DosageEveningStr = null; item.DosageNightStr = "1";
+                item.DosageMorningStr = dose; item.DosageAfternoonStr = dose;
+                item.DosageEveningStr = null; item.DosageNightStr = dose;
                 break;
             case "QID":
-                item.DosageMorningStr = "1"; item.DosageAfternoonStr = "1";
-                item.DosageEveningStr = "1"; item.DosageNightStr = "1";
+                item.DosageMorningStr = dose; item.DosageAfternoonStr = dose;
+                item.DosageEveningStr = dose; item.DosageNightStr = dose;
                 break;
             case "HS":
                 item.DosageMorningStr = null; item.DosageAfternoonStr = null;
-                item.DosageEveningStr = null; item.DosageNightStr = "1";
+                item.DosageEveningStr = null; item.DosageNightStr = dose;
                 break;
             case "SOS":
                 item.DosageMorningStr = null; item.DosageAfternoonStr = null;
                 item.DosageEveningStr = null; item.DosageNightStr = null;
                 break;
         }
+        UpdateTimingSummary(item);
         RecalcQuantity(idx);
+    }
+
+    // Re-applies the "dose per intake" amount to whichever slots are currently active,
+    // keeping the frequency pattern intact while changing only the quantity taken each time.
+    private void OnDoseAmountChanged(PrescriptionItemRow item, int idx)
+    {
+        var dose = SanitizeDoseStr(item, string.IsNullOrWhiteSpace(item.DoseAmountStr) ? "1" : item.DoseAmountStr) ?? "1";
+        item.DoseAmountStr = dose;
+        if (item.DosageMorningStr is not null) item.DosageMorningStr = dose;
+        if (item.DosageAfternoonStr is not null) item.DosageAfternoonStr = dose;
+        if (item.DosageEveningStr is not null) item.DosageEveningStr = dose;
+        if (item.DosageNightStr is not null) item.DosageNightStr = dose;
+        RecalcQuantity(idx);
+    }
+
+    // Called when a doctor manually edits a single time-slot dose (e.g. half tablet at night only).
+    // The per-slot fields become the source of truth from this point on.
+    private void OnSlotDoseChanged(PrescriptionItemRow item, int idx)
+    {
+        item.DosageMorningStr = SanitizeDoseStr(item, item.DosageMorningStr);
+        item.DosageAfternoonStr = SanitizeDoseStr(item, item.DosageAfternoonStr);
+        item.DosageEveningStr = SanitizeDoseStr(item, item.DosageEveningStr);
+        item.DosageNightStr = SanitizeDoseStr(item, item.DosageNightStr);
+        UpdateTimingSummary(item);
+        RecalcQuantity(idx);
+    }
+
+    // ── Timing is always derived from which dose slots are filled — never chosen independently,
+    // so Frequency and Timing can never disagree (fixes the two controls drifting apart).
+    private static List<string> GetActiveSlots(PrescriptionItemRow item)
+    {
+        var list = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.DosageMorningStr)) list.Add("Morning");
+        if (!string.IsNullOrWhiteSpace(item.DosageAfternoonStr)) list.Add("Afternoon");
+        if (!string.IsNullOrWhiteSpace(item.DosageEveningStr)) list.Add("Evening");
+        if (!string.IsNullOrWhiteSpace(item.DosageNightStr)) list.Add("Night");
+        return list;
+    }
+
+    private static string BuildTimingLabel(List<string> slots, string lang)
+    {
+        if (slots.Count == 0)
+            return lang switch { "hi" => "आवश्यकतानुसार", "mr" => "आवश्यकतेनुसार", _ => "As needed" };
+
+        var map = lang switch
+        {
+            "hi" => new Dictionary<string, string> { ["Morning"] = "सुबह", ["Afternoon"] = "दोपहर", ["Evening"] = "शाम", ["Night"] = "रात" },
+            "mr" => new Dictionary<string, string> { ["Morning"] = "सकाळी", ["Afternoon"] = "दुपारी", ["Evening"] = "संध्याकाळी", ["Night"] = "रात्री" },
+            _    => new Dictionary<string, string> { ["Morning"] = "Morning", ["Afternoon"] = "Afternoon", ["Evening"] = "Evening", ["Night"] = "Night" },
+        };
+        var and = lang switch { "hi" => "और", "mr" => "आणि", _ => "&" };
+        var labels = slots.Select(s => map[s]).ToList();
+        return labels.Count == 1
+            ? labels[0]
+            : string.Join(", ", labels.Take(labels.Count - 1)) + $" {and} " + labels[^1];
+    }
+
+    // item.Timing stores the canonical English label (back-compat with the saved DTO / older prescriptions);
+    // on-screen and print always re-derive the localized label from the dose slots via BuildTimingLabel.
+    private static void UpdateTimingSummary(PrescriptionItemRow item)
+        => item.Timing = BuildTimingLabel(GetActiveSlots(item), "en");
+
+    // Standard prescription pattern: 3 numbers (Morning-Afternoon-Night) for the common cases —
+    // "1-0-1" for twice a day, "1-0-0" for morning only, "0-0-1" for night only, "1-1-1" for
+    // three times a day. The 4th (Evening) slot only appears — becoming "1-1-1-1" — when a dose
+    // is actually given in the evening, since that's the one pattern that needs it.
+    private static string BuildSlotPattern(PrescriptionItemRow item)
+    {
+        if (item.Frequency == "SOS" && GetActiveSlots(item).Count == 0) return "SOS";
+        string Slot(string? s) => decimal.TryParse(s, out var v) && v > 0 ? FormatAmount(v) : "0";
+        if (decimal.TryParse(item.DosageEveningStr, out var e) && e > 0)
+            return $"{Slot(item.DosageMorningStr)}-{Slot(item.DosageAfternoonStr)}-{Slot(item.DosageEveningStr)}-{Slot(item.DosageNightStr)}";
+        return $"{Slot(item.DosageMorningStr)}-{Slot(item.DosageAfternoonStr)}-{Slot(item.DosageNightStr)}";
     }
 
     private static void AddInstruction(PrescriptionItemRow item, string inst)
@@ -1588,6 +1957,40 @@ else
         return r.Success ? r.Data ?? [] : [];
     }
 
+    // ── Medicine autocomplete state ────────────────────────────────────────────
+    private string _medSearchText = string.Empty;
+    private List<MedicineDto> _medSearchResults = [];
+    private bool _medSearchOpen;
+    private CancellationTokenSource? _medSearchDebounce;
+
+    private async Task OnMedSearchInput(ChangeEventArgs e)
+    {
+        _medSearchText = e.Value?.ToString() ?? string.Empty;
+        if (_medSearchText.Length < 1) { _medSearchResults = []; _medSearchOpen = false; return; }
+        _medSearchDebounce?.Cancel();
+        _medSearchDebounce = new CancellationTokenSource();
+        var token = _medSearchDebounce.Token;
+        try
+        {
+            await Task.Delay(250, token);
+            var results = await SearchMedicines(_medSearchText, token);
+            _medSearchResults = results.Take(5).ToList();
+            _medSearchOpen = _medSearchResults.Count > 0;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void SelectMedicineSuggestion(MedicineDto med)
+    {
+        AddMedicine(med);
+        _medSearchText = string.Empty;
+        _medSearchResults = [];
+        _medSearchOpen = false;
+    }
+
+    private async Task OnFileInputChanged(InputFileChangeEventArgs e)
+        => await OnFileUploaded(e.File);
+
     private void AddMedicine(MedicineDto? medicine)
     {
         if (medicine is null) return;
@@ -1595,7 +1998,7 @@ else
         // Map DosageFormName → MedicineFormType
         var formType = MapFormType(medicine.DosageFormName ?? medicine.Form ?? string.Empty);
 
-        _items.Add(new PrescriptionItemRow
+        var item = new PrescriptionItemRow
         {
             MedicineId = medicine.Id,
             MedicineName = medicine.Name,
@@ -1606,10 +2009,12 @@ else
             DurationDays = 7,
             DurationInput = "7 days",
             Frequency = "OD",
-            Timing = "After meals",
+            DoseAmountStr = "1",
             DosageMorningStr = "1",
-            InstructionList = ["After meals"],
-        });
+            InstructionList = GetDefaultInstructions(formType),
+        };
+        UpdateTimingSummary(item);
+        _items.Add(item);
         RecalcQuantity(_items.Count - 1);
         CheckInteractions();
     }
@@ -1621,10 +2026,11 @@ else
         if (f.Contains("syr") || f.Contains("liquid") || f.Contains("suspension")) return MedicineFormType.Syrup;
         if (f.Contains("drop")) return MedicineFormType.Drops;
         if (f.Contains("inj") || f.Contains("vial") || f.Contains("amp")) return MedicineFormType.Injection;
-        if (f.Contains("cream") || f.Contains("ointment") || f.Contains("gel") || f.Contains("tube")) return MedicineFormType.Tube;
+        if (f.Contains("cream") || f.Contains("ointment") || f.Contains("gel") || f.Contains("lotion") || f.Contains("tube")) return MedicineFormType.Tube;
         if (f.Contains("powder") || f.Contains("sachet")) return MedicineFormType.Powder;
+        if (f.Contains("neb") || f.Contains("inhal") || f.Contains("rotacap") || f.Contains("respule") || f.Contains("spray")) return MedicineFormType.Other;
         if (f.Contains("tab")) return MedicineFormType.Tab;
-        return MedicineFormType.Tab;
+        return MedicineFormType.Other;
     }
 
     private void RemoveMedicine(int idx)
@@ -1682,7 +2088,7 @@ else
             if (PrescriptionId == Guid.Empty)
             {
                 var user = AuthState.CurrentUser;
-                if (user is null) { Snackbar.Add("Not authenticated.", Severity.Error); return; }
+                if (user is null) { Toast.ShowError("Not authenticated."); return; }
                 var dto = new CreatePrescriptionDto(
                     OpdRegistrationId, user.UserId, user.FullName,
                     _followup, _diagnosis, _investigations,
@@ -1694,10 +2100,10 @@ else
                 {
                     _prescription = r.Data;
                     PrescriptionId = r.Data.Id;
-                    Snackbar.Add("Prescription saved.", Severity.Success);
+                    Toast.ShowSuccess("Prescription saved.");
                     Navigation.NavigateTo($"/prescriptions/{PrescriptionId}");
                 }
-                else Snackbar.Add(r.Message ?? "Failed to save.", Severity.Error);
+                else Toast.ShowError(r.Message ?? "Failed to save.");
             }
             else
             {
@@ -1707,8 +2113,8 @@ else
                     ParseDecimal(_vWeight), ParseDecimal(_vSpO2), ParseInt(_vRR), ParseDecimal(_vSugar),
                     items, BuildObstetricDto());
                 var r = await PrescriptionClient.UpdatePrescriptionAsync(PrescriptionId, dto);
-                if (r.Success) { _prescription = r.Data; Snackbar.Add("Prescription updated.", Severity.Success); }
-                else Snackbar.Add(r.Message ?? "Failed to update.", Severity.Error);
+                if (r.Success) { _prescription = r.Data; Toast.ShowSuccess("Prescription updated."); }
+                else Toast.ShowError(r.Message ?? "Failed to update.");
             }
         }
         finally { _saving = false; }
@@ -1721,30 +2127,33 @@ else
 
         _saving = true;
         var r = await PrescriptionClient.SubmitPrescriptionAsync(PrescriptionId);
-        if (r.Success) { _prescription = r.Data; Snackbar.Add("Prescription submitted successfully.", Severity.Success); }
-        else Snackbar.Add(r.Message ?? "Failed to submit.", Severity.Error);
+        if (r.Success) { _prescription = r.Data; Toast.ShowSuccess("Prescription submitted successfully."); }
+        else Toast.ShowError(r.Message ?? "Failed to submit.");
         _saving = false;
     }
 
     private async Task OnFileUploaded(IBrowserFile file)
     {
-        if (PrescriptionId == Guid.Empty) { Snackbar.Add("Save the prescription first.", Severity.Warning); return; }
+        if (PrescriptionId == Guid.Empty) { Toast.ShowWarning("Save the prescription first."); return; }
         using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
         var r = await PrescriptionClient.UploadReportAsync(PrescriptionId, stream, file.Name);
         if (r.Success)
         {
-            Snackbar.Add("Report uploaded.", Severity.Success);
+            Toast.ShowSuccess("Report uploaded.");
             var pr = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
             if (pr.Success) _prescription = pr.Data;
         }
-        else Snackbar.Add(r.Message ?? "Upload failed.", Severity.Error);
+        else Toast.ShowError(r.Message ?? "Upload failed.");
     }
 
-    private IReadOnlyList<CreatePrescriptionItemDto> BuildItemDtos() =>
-        _items.Select((item, idx) => new CreatePrescriptionItemDto(
+    private IReadOnlyList<CreatePrescriptionItemDto> BuildItemDtos()
+    {
+        for (var i = 0; i < _items.Count; i++) AutoFillRemark(i);
+
+        return _items.Select((item, idx) => new CreatePrescriptionItemDto(
             item.MedicineId, item.MedicineName, item.MedicineForm,
             NullIfEmpty(item.Strength),
-            GetDefaultUnit(item.MedicineForm),
+            string.IsNullOrWhiteSpace(item.DosageUnit) ? GetDefaultUnit(item.MedicineForm) : item.DosageUnit,
             decimal.TryParse(item.DosageMorningStr, out var m) ? m : null,
             decimal.TryParse(item.DosageAfternoonStr, out var a) ? a : null,
             decimal.TryParse(item.DosageEveningStr, out var e) ? e : null,
@@ -1753,6 +2162,7 @@ else
             NullIfEmpty(item.Frequency), NullIfEmpty(item.Timing),
             NullIfEmpty(string.Join(", ", item.InstructionList)),
             item.RemarkEnglish, item.RemarkHindi, item.RemarkMarathi, idx)).ToList();
+    }
 
     private static string GetDefaultUnit(MedicineFormType form) => form switch
     {
@@ -1762,7 +2172,20 @@ else
         MedicineFormType.Tube => "application",
         MedicineFormType.Injection => "dose",
         MedicineFormType.Powder => "sachet",
+        MedicineFormType.Other => "dose",
         _ => "unit"
+    };
+
+    private static readonly string[] _doseUnits = ["tablet", "capsule", "ml", "drops", "sachet", "application", "puff", "dose", "unit"];
+
+    private static List<string> GetDefaultInstructions(MedicineFormType form) => form switch
+    {
+        MedicineFormType.Tab or MedicineFormType.Capsule or MedicineFormType.Powder or MedicineFormType.Syrup => ["After meals"],
+        MedicineFormType.Tube => ["Apply externally on affected area"],
+        MedicineFormType.Drops => ["Instill as directed"],
+        MedicineFormType.Injection => ["To be administered by healthcare professional"],
+        MedicineFormType.Other => ["Use as directed"],
+        _ => []
     };
 
     private static int? ParseInt(string? s) => int.TryParse(s, out var v) ? v : null;
@@ -1867,9 +2290,9 @@ else
         if (r.Success)
         {
             _eddByUsgValue = r.Data?.EddByUsg ?? _eddByUsgValue;
-            Snackbar.Add("LMP saved.", Severity.Success);
+            Toast.ShowSuccess("LMP saved.");
         }
-        else Snackbar.Add(r.Message ?? "Failed to save LMP.", Severity.Error);
+        else Toast.ShowError(r.Message ?? "Failed to save LMP.");
     }
 
     private async Task QuickSaveEddByUsgAsync()
@@ -1878,8 +2301,8 @@ else
         _savingEddUsg = true;
         var r = await ObstetricClient.SetEddByUsgAsync(PrescriptionId, new SetEddByUsgRequest { EddByUsg = _eddByUsgValue.Value });
         _savingEddUsg = false;
-        if (r.Success) Snackbar.Add("EDD by USG saved.", Severity.Success);
-        else Snackbar.Add(r.Message ?? "Failed to save EDD by USG.", Severity.Error);
+        if (r.Success) Toast.ShowSuccess("EDD by USG saved.");
+        else Toast.ShowError(r.Message ?? "Failed to save EDD by USG.");
     }
 
     private async Task LoadActiveTenureAsync(Guid patientId)
@@ -1901,53 +2324,85 @@ else
         {
             _activeTenure = null;
             _tenureOverdue = false;
-            Snackbar.Add("Tenure closed. You can now set a new LMP.", Severity.Success);
+            Toast.ShowSuccess("Tenure closed. You can now set a new LMP.");
         }
     }
 
     // ── Remark Generator ──────────────────────────────────────────────────────
+    private static string FormatAmount(decimal d) => d == Math.Floor(d) ? d.ToString("0") : d.ToString("0.##");
+
+    private static string UnitLabel(string unit, string lang)
+    {
+        var en = new Dictionary<string, string> { ["tablet"] = "tab", ["capsule"] = "cap", ["ml"] = "ml", ["drops"] = "drops", ["sachet"] = "sachet", ["application"] = "application", ["puff"] = "puff", ["dose"] = "dose", ["unit"] = "unit" };
+        var hi = new Dictionary<string, string> { ["tablet"] = "गोली", ["capsule"] = "कैप्सूल", ["ml"] = "मि.ली.", ["drops"] = "बूंद", ["sachet"] = "पुड़िया", ["application"] = "लेप", ["puff"] = "पफ", ["dose"] = "खुराक", ["unit"] = "इकाई" };
+        var mr = new Dictionary<string, string> { ["tablet"] = "गोळी", ["capsule"] = "कॅप्सूल", ["ml"] = "मि.ली.", ["drops"] = "थेंब", ["sachet"] = "पुडी", ["application"] = "लेप", ["puff"] = "पफ", ["dose"] = "मात्रा", ["unit"] = "युनिट" };
+        var dict = lang switch { "hi" => hi, "mr" => mr, _ => en };
+        return dict.TryGetValue(unit, out var label) ? label : unit;
+    }
+
+    // Describes the dose amount(s): "1 tablet" when every active slot takes the same amount,
+    // or a per-slot breakdown ("1 tablet – Morning, 0.5 tablet – Night") when they differ
+    // (e.g. half a tablet at night only).
+    private static string DescribeDose(PrescriptionItemRow item, string lang)
+    {
+        var unit = UnitLabel(string.IsNullOrWhiteSpace(item.DosageUnit) ? GetDefaultUnit(item.MedicineForm) : item.DosageUnit, lang);
+        var slots = new (string Key, string? Str)[]
+        {
+            ("Morning", item.DosageMorningStr), ("Afternoon", item.DosageAfternoonStr),
+            ("Evening", item.DosageEveningStr), ("Night", item.DosageNightStr),
+        };
+        var active = slots.Where(s => decimal.TryParse(s.Str, out var v) && v > 0)
+                           .Select(s => (s.Key, Val: decimal.Parse(s.Str!))).ToList();
+
+        if (active.Count == 0)
+            return lang switch { "hi" => $"1 {unit} लें", "mr" => $"1 {unit} घ्या", _ => $"Take 1 {unit}" };
+
+        var sameAmount = active.Select(a => a.Val).Distinct().Count() == 1;
+        if (sameAmount)
+        {
+            var amt = FormatAmount(active[0].Val);
+            return lang switch { "hi" => $"{amt} {unit} लें", "mr" => $"{amt} {unit} घ्या", _ => $"Take {amt} {unit}" };
+        }
+
+        var slotLabels = lang switch
+        {
+            "hi" => new Dictionary<string, string> { ["Morning"] = "सुबह", ["Afternoon"] = "दोपहर", ["Evening"] = "शाम", ["Night"] = "रात" },
+            "mr" => new Dictionary<string, string> { ["Morning"] = "सकाळी", ["Afternoon"] = "दुपारी", ["Evening"] = "संध्याकाळी", ["Night"] = "रात्री" },
+            _    => new Dictionary<string, string> { ["Morning"] = "Morning", ["Afternoon"] = "Afternoon", ["Evening"] = "Evening", ["Night"] = "Night" },
+        };
+        return string.Join(", ", active.Select(a => $"{FormatAmount(a.Val)} {unit} – {slotLabels[a.Key]}"));
+    }
+
+    // Always regenerated live from the item's current fields — there's no manual free-text
+    // editor for the remark, so a stored value would only ever be stale leftover formatting
+    // from a previous version of this logic. AutoFillRemark still populates RemarkEnglish/
+    // Hindi/Marathi on save purely so the print page (and any external consumer) has a value.
     private static string GenerateRemark(PrescriptionItemRow item, string lang)
     {
-        if (!string.IsNullOrWhiteSpace(item.RemarkEnglish) && lang == "en") return item.RemarkEnglish;
-        if (!string.IsNullOrWhiteSpace(item.RemarkHindi) && lang == "hi") return item.RemarkHindi;
-        if (!string.IsNullOrWhiteSpace(item.RemarkMarathi) && lang == "mr") return item.RemarkMarathi;
-
         var freq = item.Frequency;
-        var timing = item.Timing;
-        var duration = item.DurationDays > 0 ? $"{item.DurationDays} days" : item.DurationInput;
-        var form = item.MedicineForm;
+        var dose = DescribeDose(item, lang);
 
+        // Duration/quantity have their own dedicated display (composer row fields + the Freq
+        // pattern column on print), so they're deliberately left out of the remark text.
         if (lang == "hi")
         {
-            var unit = form is MedicineFormType.Tab ? "गोली" : form is MedicineFormType.Capsule ? "कैप्सूल" : form is MedicineFormType.Syrup ? "मि.ली." : "इकाई";
             var freqHi = freq switch { "OD" => "दिन में एक बार", "BD" => "दिन में दो बार", "TDS" => "दिन में तीन बार", "QID" => "दिन में चार बार", "HS" => "सोते समय", "SOS" => "ज़रूरत पड़ने पर", _ => freq ?? "" };
-            var timingHi = timing switch { "Morning" => "सुबह", "Night" => "रात को", "After meals" => "भोजन के बाद", "Before meals" => "भोजन से पहले", "Morning & Night" => "सुबह और रात को", _ => timing ?? "" };
-            var parts = new List<string> { $"1 {unit} लें" };
+            var parts = new List<string> { dose };
             if (!string.IsNullOrEmpty(freqHi)) parts.Add(freqHi);
-            if (!string.IsNullOrEmpty(timingHi)) parts.Add(timingHi);
-            if (!string.IsNullOrEmpty(duration)) parts.Add($"{duration} के लिए");
             return string.Join(", ", parts);
         }
         else if (lang == "mr")
         {
-            var unit = form is MedicineFormType.Tab ? "गोळी" : form is MedicineFormType.Capsule ? "कॅप्सूल" : form is MedicineFormType.Syrup ? "मि.ली." : "युनिट";
             var freqMr = freq switch { "OD" => "दिवसातून एकदा", "BD" => "दिवसातून दोनदा", "TDS" => "दिवसातून तीनदा", "QID" => "दिवसातून चार वेळा", "HS" => "झोपण्यापूर्वी", "SOS" => "आवश्यक असल्यास", _ => freq ?? "" };
-            var timingMr = timing switch { "Morning" => "सकाळी", "Night" => "रात्री", "After meals" => "जेवणानंतर", "Before meals" => "जेवणापूर्वी", "Morning & Night" => "सकाळी आणि रात्री", _ => timing ?? "" };
-            var parts = new List<string> { $"1 {unit} घ्या" };
+            var parts = new List<string> { dose };
             if (!string.IsNullOrEmpty(freqMr)) parts.Add(freqMr);
-            if (!string.IsNullOrEmpty(timingMr)) parts.Add(timingMr);
-            if (!string.IsNullOrEmpty(duration)) parts.Add($"{duration} साठी");
             return string.Join(", ", parts);
         }
         else
         {
-            var unit = form is MedicineFormType.Tab ? "tablet" : form is MedicineFormType.Capsule ? "capsule" : form is MedicineFormType.Syrup ? "ml" : "unit";
             var freqEn = freq switch { "OD" => "once a day", "BD" => "twice a day", "TDS" => "three times a day", "QID" => "four times a day", "HS" => "at bedtime", "SOS" => "when required", "OW" => "once weekly", "BW" => "twice weekly", _ => freq ?? "" };
-            var timingEn = timing switch { "Morning" => "in the morning", "Night" => "at night", "After meals" => "after meals", "Before meals" => "before meals", "Morning & Night" => "morning and night", "Empty stomach" => "on empty stomach", _ => timing?.ToLower() ?? "" };
-            var parts = new List<string> { $"Take 1 {unit}" };
+            var parts = new List<string> { dose };
             if (!string.IsNullOrEmpty(freqEn)) parts.Add(freqEn);
-            if (!string.IsNullOrEmpty(timingEn)) parts.Add(timingEn);
-            if (!string.IsNullOrEmpty(duration)) parts.Add($"for {duration}");
             var instrStr = string.Join(", ", item.InstructionList);
             if (!string.IsNullOrEmpty(instrStr)) parts.Add(instrStr);
             return string.Join(", ", parts);
@@ -1962,6 +2417,10 @@ else
         public MedicineFormType MedicineForm { get; set; } = MedicineFormType.Tab;
         public string Strength { get; set; } = string.Empty;
         public string DosageUnit { get; set; } = "tablet";
+        // UI convenience only — the "dose per intake" the frequency presets apply to every active slot.
+        // Not sent to the backend directly; per-slot Dosage*Str values are the source of truth.
+        public string DoseAmountStr { get; set; } = "1";
+        public bool CustomizePerSlot { get; set; }
         public string? DosageMorningStr { get; set; }
         public string? DosageAfternoonStr { get; set; }
         public string? DosageEveningStr { get; set; }

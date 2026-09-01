@@ -3,7 +3,7 @@
 @inject IApplicationApiClient AppClient
 @inject AuthStateService AuthState
 @inject NavigationManager Nav
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @using TenantCore.Web.Client.Clients
 @using TenantCore.Shared.Dtos.Auth
 
@@ -32,87 +32,90 @@
             <div style="font-size:16px;font-weight:800;color:#1E293B;">Clinic Details</div>
         </div>
         <div style="padding:24px;">
-            <MudForm @ref="_form" @bind-IsValid="_formValid">
 
-                <!-- Basic info -->
-                <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
-                            text-transform:uppercase;letter-spacing:0.5px;">Basic Information</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-                    <MudTextField @bind-Value="_model.ClinicName"
-                                  Label="Clinic Name *"
-                                  Required="true"
-                                  RequiredError="Clinic name is required."
-                                  Variant="Variant.Outlined"
-                                  Disabled="_submitting" />
-                    <MudTextField @bind-Value="_model.ClinicCode"
-                                  Label="Clinic Code *"
-                                  Required="true"
-                                  RequiredError="Clinic code is required."
-                                  Variant="Variant.Outlined"
-                                  HelperText="Unique short code, letters/digits/hyphens only (e.g. DMC-001)"
-                                  Disabled="_submitting" />
-                    <MudTextField @bind-Value="_model.RegistrationNumber"
-                                  Label="Clinic Registration No."
-                                  Variant="Variant.Outlined"
-                                  Disabled="_submitting"
-                                  Placeholder="Official license or registration number" />
-                    <MudTextField @bind-Value="_model.ContactPerson"
-                                  Label="Contact Person"
-                                  Variant="Variant.Outlined"
-                                  Disabled="_submitting" />
+            <!-- Basic info -->
+            <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
+                        text-transform:uppercase;letter-spacing:0.5px;">Basic Information</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Clinic Name *</label>
+                    <input class="form-input" type="text" @bind="_model.ClinicName" disabled="@_submitting" />
                 </div>
-
-                <!-- Contact info -->
-                <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
-                            text-transform:uppercase;letter-spacing:0.5px;">Contact Information</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-                    <MudTextField @bind-Value="_model.ContactNumber"
-                                  Label="Contact Number"
-                                  Variant="Variant.Outlined"
-                                  Disabled="_submitting" />
-                    <MudTextField @bind-Value="_model.OfficialEmail"
-                                  Label="Official Email"
-                                  InputType="InputType.Email"
-                                  Variant="Variant.Outlined"
-                                  Disabled="_submitting" />
-                    <MudTextField @bind-Value="_model.Website"
-                                  Label="Website"
-                                  Variant="Variant.Outlined"
-                                  Disabled="_submitting" />
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Clinic Code *</label>
+                    <input class="form-input" type="text" @bind="_model.ClinicCode" disabled="@_submitting"
+                           placeholder="e.g. DMC-001" />
+                    <div class="form-helper">Unique short code, letters/digits/hyphens only</div>
                 </div>
-
-                <MudTextField @bind-Value="_model.Address"
-                              Label="Address"
-                              Lines="2"
-                              Variant="Variant.Outlined"
-                              Class="mb-6"
-                              Disabled="_submitting" />
-
-                <div style="display:flex;gap:12px;justify-content:flex-end;">
-                    <MudButton Variant="Variant.Text" Color="Color.Default"
-                               OnClick='() => Nav.NavigateTo("/select-clinic")'>
-                        Cancel
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                               OnClick="SubmitAsync" Disabled="_submitting"
-                               Style="min-width:160px;">
-                        @if (_submitting)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
-                            <span>Creating...</span>
-                        }
-                        else { <span>Register Clinic</span> }
-                    </MudButton>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Clinic Registration No.</label>
+                    <input class="form-input" type="text" @bind="_model.RegistrationNumber" disabled="@_submitting"
+                           placeholder="Official license or registration number" />
                 </div>
-            </MudForm>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Contact Person</label>
+                    <input class="form-input" type="text" @bind="_model.ContactPerson" disabled="@_submitting" />
+                </div>
+            </div>
+
+            <!-- Contact info -->
+            <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
+                        text-transform:uppercase;letter-spacing:0.5px;">Contact Information</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Contact Number</label>
+                    <input class="form-input" type="tel" @bind="_model.ContactNumber" disabled="@_submitting" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Official Email</label>
+                    <input class="form-input" type="email" @bind="_model.OfficialEmail" disabled="@_submitting" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Website</label>
+                    <input class="form-input" type="url" @bind="_model.Website" disabled="@_submitting" />
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:24px;">
+                <label class="form-label">Address</label>
+                <textarea class="form-input" rows="2" @bind="_model.Address" disabled="@_submitting"
+                          style="resize:vertical;min-height:60px;"></textarea>
+            </div>
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="auth-error" style="margin-bottom:16px;">@_error</div>
+            }
+
+            <div style="display:flex;gap:12px;justify-content:flex-end;">
+                <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                               padding:10px 20px;font-weight:600;font-size:13px;cursor:pointer;"
+                        @onclick='() => Nav.NavigateTo("/select-clinic")' disabled="@_submitting">
+                    Cancel
+                </button>
+                <button @onclick="SubmitAsync" disabled="@_submitting"
+                        style="display:inline-flex;align-items:center;justify-content:center;gap:8px;
+                               min-width:160px;padding:10px 24px;border-radius:8px;border:none;
+                               background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                               opacity:@(_submitting ? "0.75" : "1");">
+                    @if (_submitting)
+                    {
+                        <span class="auth-spinner" style="width:14px;height:14px;border-width:2px;"></span>
+                        <span>Creating...</span>
+                    }
+                    else
+                    {
+                        <span>Register Clinic</span>
+                    }
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
 @code {
-    private MudForm _form = null!;
-    private bool _formValid;
     private bool _submitting;
+    private string? _error;
     private CreateClinicRequestDto _model = new();
 
     protected override Task OnInitializedAsync()
@@ -132,8 +135,12 @@
 
     private async Task SubmitAsync()
     {
-        await _form.Validate();
-        if (!_formValid) return;
+        _error = null;
+        if (string.IsNullOrWhiteSpace(_model.ClinicName) || string.IsNullOrWhiteSpace(_model.ClinicCode))
+        {
+            _error = "Clinic Name and Clinic Code are required.";
+            return;
+        }
 
         _submitting = true;
         try
@@ -141,19 +148,21 @@
             var result = await AppClient.CreateClinicAsync(_model);
             if (result.Success)
             {
-                Snackbar.Add($"Clinic '{result.Data?.ApplicationName}' registered successfully!", Severity.Success);
+                Toast.ShowSuccess($"Clinic '{result.Data?.ApplicationName}' registered successfully!");
                 StateHasChanged();
                 await Task.Delay(1800);
                 Nav.NavigateTo("/select-clinic", forceLoad: true);
             }
             else
             {
-                Snackbar.Add(result.Message ?? "Failed to register clinic.", Severity.Error);
+                _error = result.Message ?? "Failed to register clinic.";
+                Toast.ShowError(_error);
             }
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            _error = $"Error: {ex.Message}";
+            Toast.ShowError(_error);
         }
         finally { _submitting = false; }
     }

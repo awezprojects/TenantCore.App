@@ -18,6 +18,13 @@ public static class OpdPaymentTranslator
         PaymentStatus = entity.PaymentStatus,
         AmountReceivedAt = entity.AmountReceivedAt,
         ReceivedByUserId = entity.ReceivedByUserId,
-        CounterSessionId = entity.CounterSessionId
+        CounterSessionId = entity.CounterSessionId,
+        CollectedAmount = entity.CollectedAmount,
+        RefundDue = entity.RefundDue,
+        RefundStatus = entity.RefundStatus,
+        RefundedAt = entity.RefundedAt.HasValue
+            ? DateTime.SpecifyKind(entity.RefundedAt.Value, DateTimeKind.Utc)
+            : null,
+        RefundedByUserId = entity.RefundedByUserId
     };
 }

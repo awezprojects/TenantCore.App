@@ -1,7 +1,7 @@
 @page "/patients"
 @layout AuthorizedLayout
 @inject IClinicApiClient ClinicClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @using Microsoft.AspNetCore.Components.Forms
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Components
@@ -40,7 +40,9 @@
         <!-- Table -->
         @if (_loading)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <div style="height:4px;background:linear-gradient(90deg,#1565C0 0%,#42A5F5 50%,#1565C0 100%);
+                        background-size:200% 100%;animation:ptload 1.2s ease infinite;border-radius:2px;margin-bottom:4px;"></div>
+            <style>@@keyframes ptload{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>
         }
         else
         {
@@ -153,7 +155,25 @@
                     Showing @((_page - 1) * PageSize + 1)–@(Math.Min(_page * PageSize, _result?.TotalCount ?? 0))
                     of @(_result?.TotalCount ?? 0) patients
                 </span>
-                <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" Color="Color.Primary" />
+                <div style="display:flex;align-items:center;gap:4px;">
+                    <button @onclick="() => OnPageChanged(_page - 1)" disabled="@(_page <= 1)"
+                            style="width:30px;height:30px;border:1.5px solid #E2E8F0;border-radius:7px;background:#fff;
+                                   cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                                   opacity:@(_page <= 1 ? "0.4" : "1");">‹</button>
+                    @for (int pg = Math.Max(1, _page - 2); pg <= Math.Min(TotalPages, _page + 2); pg++)
+                    {
+                        var p = pg;
+                        <button @onclick="() => OnPageChanged(p)"
+                                style="min-width:30px;height:30px;border:1.5px solid @(p == _page ? "#1565C0" : "#E2E8F0");
+                                       border-radius:7px;background:@(p == _page ? "#1565C0" : "#fff");cursor:pointer;
+                                       font-size:12px;font-weight:@(p == _page ? "700" : "500");
+                                       color:@(p == _page ? "#fff" : "#64748B");padding:0 6px;">@p</button>
+                    }
+                    <button @onclick="() => OnPageChanged(_page + 1)" disabled="@(_page >= TotalPages)"
+                            style="width:30px;height:30px;border:1.5px solid #E2E8F0;border-radius:7px;background:#fff;
+                                   cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                                   opacity:@(_page >= TotalPages ? "0.4" : "1");">›</button>
+                </div>
             </div>
         }
 
@@ -359,67 +379,80 @@ else if (_view == "register" || _view == "edit")
                         {
                             <div style="font-weight:700;margin-bottom:20px;font-size:15px;color:#1E293B;">Personal Information</div>
                         }
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12" sm="6">
-                                <MudTextField @bind-Value="_form.FirstName" Label="First Name" Variant="Variant.Outlined" Required="true" />
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField @bind-Value="_form.LastName" Label="Last Name" Variant="Variant.Outlined" Required="true" />
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudDatePicker @bind-Date="_dob" Label="Date of Birth" Variant="Variant.Outlined" />
-                            </MudItem>
-                            <MudItem xs="12" sm="3">
-                                <MudSelect T="string" @bind-Value="_gender" Label="Gender" Variant="Variant.Outlined">
-                                    <MudSelectItem Value="@("Male")">Male</MudSelectItem>
-                                    <MudSelectItem Value="@("Female")">Female</MudSelectItem>
-                                    <MudSelectItem Value="@("Other")">Other</MudSelectItem>
-                                </MudSelect>
-                            </MudItem>
-                            <MudItem xs="12" sm="3">
-                                <MudSelect T="string" @bind-Value="_form.BloodGroup" Label="Blood Group" Variant="Variant.Outlined">
-                                    <MudSelectItem Value="@("")">— Select —</MudSelectItem>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">First Name *</label>
+                                <input class="form-input" type="text" @bind="_form.FirstName" />
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Last Name *</label>
+                                <input class="form-input" type="text" @bind="_form.LastName" />
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Date of Birth</label>
+                                <input class="form-input" type="date"
+                                       value="@(_dob?.ToString("yyyy-MM-dd"))"
+                                       @onchange="e => { if (DateTime.TryParse(e.Value?.ToString(), out var d)) _dob = d; else _dob = null; }" />
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Gender</label>
+                                <select class="form-input" @bind="_gender">
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Blood Group</label>
+                                <select class="form-input" @bind="_form.BloodGroup">
+                                    <option value="">— Select —</option>
                                     @foreach (var bg in new[] { "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-" })
-                                    {
-                                        <MudSelectItem Value="@bg">@bg</MudSelectItem>
-                                    }
-                                </MudSelect>
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField @bind-Value="_form.PhoneNumber" Label="Phone Number" Variant="Variant.Outlined" Required="true" />
-                            </MudItem>
-                            <MudItem xs="12" sm="6">
-                                <MudTextField @bind-Value="_form.AadhaarNumber" Label="Aadhaar Number (optional)" Variant="Variant.Outlined" />
-                            </MudItem>
-                        </MudGrid>
+                                    {<option value="@bg">@bg</option>}
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Phone Number *</label>
+                                <input class="form-input" type="tel" @bind="_form.PhoneNumber" />
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
+                                <label class="form-label">Aadhaar Number (optional)</label>
+                                <input class="form-input" type="text" @bind="_form.AadhaarNumber" />
+                            </div>
+                        </div>
                         @if (isEdit)
                         {
                             <div style="font-weight:700;margin:24px 0 16px;font-size:15px;color:#1E293B;">Contact & Address</div>
-                            <MudGrid Spacing="3">
-                                <MudItem xs="12" sm="6">
-                                    <MudTextField @bind-Value="_form.Email" Label="Email (optional)" Variant="Variant.Outlined" />
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudTextField @bind-Value="_form.Address" Label="Address (optional)" Variant="Variant.Outlined" Lines="2" />
-                                </MudItem>
-                                <MudItem xs="12" sm="6">
-                                    <MudTextField @bind-Value="_form.EmergencyContactName" Label="Emergency Contact Name" Variant="Variant.Outlined" />
-                                </MudItem>
-                                <MudItem xs="12" sm="6">
-                                    <MudTextField @bind-Value="_form.EmergencyContactPhone" Label="Emergency Contact Phone" Variant="Variant.Outlined" />
-                                </MudItem>
-                            </MudGrid>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label">Email (optional)</label>
+                                    <input class="form-input" type="email" @bind="_form.Email" />
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
+                                    <label class="form-label">Address (optional)</label>
+                                    <textarea class="form-input" rows="2" @bind="_form.Address" style="resize:vertical;min-height:56px;"></textarea>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label">Emergency Contact Name</label>
+                                    <input class="form-input" type="text" @bind="_form.EmergencyContactName" />
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label">Emergency Contact Phone</label>
+                                    <input class="form-input" type="tel" @bind="_form.EmergencyContactPhone" />
+                                </div>
+                            </div>
                             <div style="font-weight:700;margin:24px 0 16px;font-size:15px;color:#1E293B;">Medical History</div>
-                            <MudGrid Spacing="3">
-                                <MudItem xs="12">
-                                    <MudTextField @bind-Value="_form.KnownAllergies" Label="Known Allergies" Variant="Variant.Outlined" Lines="2"
-                                                  Placeholder="e.g. Penicillin, Sulfa drugs, Peanuts..." />
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudTextField @bind-Value="_form.MedicalHistory" Label="Past Medical History" Variant="Variant.Outlined" Lines="3"
-                                                  Placeholder="Diabetes, Hypertension, previous surgeries..." />
-                                </MudItem>
-                            </MudGrid>
+                            <div style="display:flex;flex-direction:column;gap:12px;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label">Known Allergies</label>
+                                    <textarea class="form-input" rows="2" @bind="_form.KnownAllergies"
+                                              placeholder="e.g. Penicillin, Sulfa drugs, Peanuts..." style="resize:vertical;min-height:56px;"></textarea>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label">Past Medical History</label>
+                                    <textarea class="form-input" rows="3" @bind="_form.MedicalHistory"
+                                              placeholder="Diabetes, Hypertension, previous surgeries..." style="resize:vertical;min-height:70px;"></textarea>
+                                </div>
+                            </div>
                         }
                     </div>
                 }
@@ -428,25 +461,29 @@ else if (_view == "register" || _view == "edit")
                 {
                     <div class="cc-fade-in">
                         <div style="font-weight:700;margin-bottom:20px;font-size:15px;color:#1E293B;">Contact & Address</div>
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12" sm="6">
-                                <MudTextField @bind-Value="_form.Email" Label="Email Address" Variant="Variant.Outlined" />
-                            </MudItem>
-                            <MudItem xs="12">
-                                <MudTextField @bind-Value="_form.Address" Label="Address" Variant="Variant.Outlined" Lines="2"
-                                              Placeholder="Street, locality..." />
-                            </MudItem>
-                        </MudGrid>
+                        <div style="display:flex;flex-direction:column;gap:12px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Email Address</label>
+                                <input class="form-input" type="email" @bind="_form.Email" />
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Address</label>
+                                <textarea class="form-input" rows="2" @bind="_form.Address"
+                                          placeholder="Street, locality..." style="resize:vertical;min-height:56px;"></textarea>
+                            </div>
+                        </div>
                         <div style="margin-top:16px;padding:14px 16px;background:#F8FAFC;border-radius:10px;border:1px solid #E2E8F0;">
                             <div style="font-weight:700;font-size:13px;margin-bottom:12px;color:#1E293B;">Emergency Contact</div>
-                            <MudGrid Spacing="3">
-                                <MudItem xs="12" sm="6">
-                                    <MudTextField @bind-Value="_form.EmergencyContactName" Label="Contact Name" Variant="Variant.Outlined" />
-                                </MudItem>
-                                <MudItem xs="12" sm="6">
-                                    <MudTextField @bind-Value="_form.EmergencyContactPhone" Label="Contact Phone" Variant="Variant.Outlined" />
-                                </MudItem>
-                            </MudGrid>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label">Contact Name</label>
+                                    <input class="form-input" type="text" @bind="_form.EmergencyContactName" />
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="form-label">Contact Phone</label>
+                                    <input class="form-input" type="tel" @bind="_form.EmergencyContactPhone" />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 }
@@ -455,16 +492,18 @@ else if (_view == "register" || _view == "edit")
                 {
                     <div class="cc-fade-in">
                         <div style="font-weight:700;margin-bottom:20px;font-size:15px;color:#1E293B;">Medical History</div>
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12">
-                                <MudTextField @bind-Value="_form.KnownAllergies" Label="Known Allergies" Variant="Variant.Outlined" Lines="2"
-                                              Placeholder="e.g. Penicillin, Sulfa drugs, Peanuts..." />
-                            </MudItem>
-                            <MudItem xs="12">
-                                <MudTextField @bind-Value="_form.MedicalHistory" Label="Past Medical History" Variant="Variant.Outlined" Lines="4"
-                                              Placeholder="Diabetes, Hypertension, previous surgeries..." />
-                            </MudItem>
-                        </MudGrid>
+                        <div style="display:flex;flex-direction:column;gap:12px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Known Allergies</label>
+                                <textarea class="form-input" rows="2" @bind="_form.KnownAllergies"
+                                          placeholder="e.g. Penicillin, Sulfa drugs, Peanuts..." style="resize:vertical;min-height:56px;"></textarea>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label class="form-label">Past Medical History</label>
+                                <textarea class="form-input" rows="4" @bind="_form.MedicalHistory"
+                                          placeholder="Diabetes, Hypertension, previous surgeries..." style="resize:vertical;min-height:80px;"></textarea>
+                            </div>
+                        </div>
                         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;">
                             @foreach (var condition in _conditions)
                             {
@@ -485,10 +524,12 @@ else if (_view == "register" || _view == "edit")
                     @if (isEdit)
                     {
                         <div></div>
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving"
-                                   Style="border-radius:8px;font-weight:600;text-transform:none;">
+                        <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                                       padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;
+                                       opacity:@(_saving ? "0.65" : "1");"
+                                @onclick="SaveAsync" disabled="@_saving">
                             @(_saving ? "Saving..." : "Save Changes")
-                        </MudButton>
+                        </button>
                     }
                     else
                     {
@@ -506,10 +547,12 @@ else if (_view == "register" || _view == "edit")
                         }
                         else
                         {
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_saving"
-                                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+                            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;
+                                           opacity:@(_saving ? "0.65" : "1");"
+                                    @onclick="SaveAsync" disabled="@_saving">
                                 @(_saving ? "Registering..." : "✅ Register Patient")
-                            </MudButton>
+                            </button>
                         }
                     }
                 </div>
@@ -551,7 +594,10 @@ else if (_view == "register" || _view == "edit")
                     }
                     @if (_uploadingPhoto)
                     {
-                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Style="margin-top:8px;" />
+                        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+                            <div class="auth-spinner" style="width:14px;height:14px;border-width:2px;"></div>
+                            <span style="font-size:11px;color:#64748B;">Uploading…</span>
+                        </div>
                     }
                 </div>
 
@@ -598,23 +644,34 @@ else if (_view == "register" || _view == "edit")
                             OnClose="CloseLmpDialog" />
 
 <!-- Delete Confirmation Dialog -->
-<MudDialog @bind-Visible="_deleteDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Delete Patient</MudText>
-    </TitleContent>
-    <DialogContent>
-        <MudText>
+@if (_deleteDialogOpen)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+         @onclick="() => _deleteDialogOpen = false"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:380px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;"
+         @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#EF4444;">Delete Patient</div>
+        </div>
+        <div style="padding:20px 24px;font-size:14px;color:#1E293B;">
             Are you sure you want to deactivate <strong>@_deleteTarget?.FullName</strong>?
             This will remove them from active patient lists.
-        </MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _deleteDialogOpen = false)">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="ExecuteDelete" Disabled="_deleting">
-            @(_deleting ? "Deleting..." : "Delete")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                           padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="() => _deleteDialogOpen = false">Cancel</button>
+            <button style="background:#EF4444;color:#fff;border:none;border-radius:8px;
+                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;
+                           opacity:@(_deleting ? "0.65" : "1");"
+                    @onclick="ExecuteDelete" disabled="@_deleting">
+                @(_deleting ? "Deleting..." : "Delete")
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     // ── View state ───────────────────────────────────────────────────────────
@@ -666,7 +723,7 @@ else if (_view == "register" || _view == "edit")
         _loading = true;
         var response = await ClinicClient.GetPatientsAsync(_page, PageSize, _search);
         if (response.Success) _result = response.Data;
-        else Snackbar.Add(response.Message, Severity.Error);
+        else Toast.ShowError(response.Message ?? "Failed.");
         _loading = false;
     }
 
@@ -728,7 +785,7 @@ else if (_view == "register" || _view == "edit")
     {
         if (_step == 1 && (string.IsNullOrWhiteSpace(_form.FirstName) || string.IsNullOrWhiteSpace(_form.LastName) || string.IsNullOrWhiteSpace(_form.PhoneNumber)))
         {
-            Snackbar.Add("First name, last name, and phone number are required.", Severity.Warning);
+            Toast.ShowWarning("First name, last name, and phone number are required.");
             return;
         }
         if (_step < 3) _step++;
@@ -763,7 +820,7 @@ else if (_view == "register" || _view == "edit")
         if (string.IsNullOrWhiteSpace(_form.FirstName) || string.IsNullOrWhiteSpace(_form.LastName) ||
             string.IsNullOrWhiteSpace(_form.PhoneNumber))
         {
-            Snackbar.Add("First name, last name, and phone number are required.", Severity.Warning);
+            Toast.ShowWarning("First name, last name, and phone number are required.");
             return;
         }
 
@@ -817,12 +874,12 @@ else if (_view == "register" || _view == "edit")
                 }
                 else
                 {
-                    Snackbar.Add($"Patient saved but photo upload failed: {photoResult.Message}", Severity.Warning);
+                    Toast.ShowWarning($"Patient saved but photo upload failed: {photoResult.Message}");
                 }
             }
 
             _saved = true;
-            Snackbar.Add(_editingPatient is not null ? "Patient updated." : "Patient registered.", Severity.Success);
+            Toast.ShowSuccess(_editingPatient is not null ? "Patient updated." : "Patient registered.");
 
             await Task.Delay(1400);
             _saved = false;
@@ -844,7 +901,7 @@ else if (_view == "register" || _view == "edit")
         }
         else
         {
-            Snackbar.Add(response.Message, Severity.Error);
+            Toast.ShowError(response.Message ?? "Failed.");
         }
 
         _saving = false;
@@ -874,14 +931,14 @@ else if (_view == "register" || _view == "edit")
         var response = await ClinicClient.DeletePatientAsync(_deleteTarget.Id);
         if (response.Success)
         {
-            Snackbar.Add("Patient deactivated.", Severity.Success);
+            Toast.ShowSuccess("Patient deactivated.");
             _deleteDialogOpen = false;
             _deleteTarget = null;
             await LoadAsync();
         }
         else
         {
-            Snackbar.Add(response.Message, Severity.Error);
+            Toast.ShowError(response.Message ?? "Failed.");
         }
         _deleting = false;
     }

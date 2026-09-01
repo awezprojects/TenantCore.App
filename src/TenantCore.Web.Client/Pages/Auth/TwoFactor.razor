@@ -3,102 +3,85 @@
 @inject IAuthApiClient AuthClient
 @inject AuthStateService AuthState
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 <PageTitle>Two-Factor Authentication — ClinicCore</PageTitle>
 
 <div class="auth-brand">
-    <MudAvatar Size="Size.Small" Color="Color.Primary">
-        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
-    </MudAvatar>
-    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+    <span style="font-size:22px;">🏥</span>
+    <span style="font-weight:700;color:#1a56db;font-size:15px;">ClinicCore</span>
 </div>
 
 @if (AuthState.IsFirstTimeSetup)
 {
-    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Set Up Authenticator</MudText>
-    <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 1.5rem;">
+    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Set Up Authenticator</h2>
+    <p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">
         Scan the QR code with Google Authenticator or Authy to get started.
-    </MudText>
+    </p>
 
     @if (!string.IsNullOrEmpty(AuthState.QrCodeBase64))
     {
-        <MudStack AlignItems="AlignItems.Center" Class="mb-4">
-            <MudPaper Elevation="2" Class="pa-3" Style="border-radius: 12px; display: inline-block;">
+        <div style="display:flex;justify-content:center;margin-bottom:16px;">
+            <div style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.12);display:inline-block;">
                 <img src="@($"data:image/png;base64,{AuthState.QrCodeBase64}")"
                      alt="Authenticator QR Code"
-                     style="width: 180px; height: 180px; display: block;" />
-            </MudPaper>
-        </MudStack>
-        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="mb-4">
+                     style="width:180px;height:180px;display:block;" />
+            </div>
+        </div>
+        <p style="text-align:center;font-size:12px;color:#94A3B8;margin-bottom:20px;">
             After scanning, enter the 6-digit code from your authenticator app below.
-        </MudText>
+        </p>
     }
 }
 else
 {
-    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Two-Factor Authentication</MudText>
-    <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 1.5rem;">
+    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Two-Factor Authentication</h2>
+    <p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">
         Enter the 6-digit code from your authenticator app.
-    </MudText>
+    </p>
 
     @if (!string.IsNullOrEmpty(AuthState.UserDisplayName))
     {
-        <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+        <div class="auth-info" style="margin-bottom:16px;">
             Signing in as: <strong>@AuthState.UserDisplayName</strong>
-        </MudAlert>
+        </div>
     }
 }
 
 <EditForm Model="_model" OnValidSubmit="HandleValidate">
     <DataAnnotationsValidator />
 
-    <MudTextField @bind-Value="_model.OtpCode"
-                  Label="6-Digit Code"
-                  Variant="Variant.Outlined"
-                  Adornment="Adornment.Start"
-                  AdornmentIcon="@Icons.Material.Filled.Pin"
-                  For="@(() => _model.OtpCode)"
-                  Disabled="_loading"
-                  MaxLength="6"
-                  Placeholder="000000"
-                  Class="mb-4"
-                  Style="font-size: 1.5rem; letter-spacing: 0.5rem;" />
+    <div class="auth-input-wrap">
+        <label class="auth-label">6-Digit Code</label>
+        <input class="auth-input" type="text" @bind="_model.OtpCode"
+               maxlength="6" placeholder="000000" disabled="@_loading"
+               style="font-size:1.5rem;letter-spacing:0.5rem;text-align:center;" />
+    </div>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
-            @_errorMessage
-        </MudAlert>
+        <div class="auth-error">@_errorMessage</div>
     }
 
-    <MudButton ButtonType="ButtonType.Submit"
-               Variant="Variant.Filled"
-               Color="Color.Primary"
-               FullWidth="true"
-               Size="Size.Large"
-               Disabled="_loading"
-               Class="mb-4"
-               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
+    <button type="submit" class="auth-btn-primary" disabled="@_loading"
+            style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;">
         @if (_loading)
         {
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+            <span class="auth-spinner"></span>
             <span>Verifying...</span>
         }
         else
         {
-            <MudIcon Icon="@Icons.Material.Filled.Verified" Class="mr-2" />
             <span>Verify Code</span>
         }
-    </MudButton>
+    </button>
 </EditForm>
 
-<MudStack AlignItems="AlignItems.Center">
-    <MudLink Typo="Typo.body2" Color="Color.Secondary" @onclick="BackToLogin" Style="cursor: pointer;">
-        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Style="font-size: 1rem; vertical-align: middle; margin-right: 4px;" />
-        Back to Login
-    </MudLink>
-</MudStack>
+<div style="text-align:center;">
+    <button type="button" class="auth-link"
+            style="font-size:13px;background:none;border:none;cursor:pointer;padding:0;"
+            @onclick="BackToLogin">← Back to Login</button>
+</div>
 
 @code {
     [SupplyParameterFromQuery]
@@ -128,12 +111,11 @@ else
             if (response.Success && response.Data != null)
             {
                 await AuthState.SetAuthenticatedStateAsync(response.Data);
-                Snackbar.Add("Login successful!", Severity.Success);
+                Toast.ShowSuccess("Login successful!");
 
                 if (!string.IsNullOrEmpty(ReturnUrl))
                 {
                     var decoded = Uri.UnescapeDataString(ReturnUrl);
-                    // Only allow same-app relative paths; reject external URLs and protocol-relative references
                     if (decoded.StartsWith("/") && !decoded.StartsWith("//")
                         && !decoded.StartsWith("/auth/login", StringComparison.OrdinalIgnoreCase))
                     {
@@ -149,7 +131,7 @@ else
                 _errorMessage = response.Message ?? "Invalid code. Please try again.";
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _errorMessage = "Verification failed. Please try again.";
         }

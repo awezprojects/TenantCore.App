@@ -34,6 +34,7 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<ExpenseRecord> ExpenseRecords => Set<ExpenseRecord>();
     public DbSet<CounterSession> CounterSessions => Set<CounterSession>();
     public DbSet<AmountHandover> AmountHandovers => Set<AmountHandover>();
+    public DbSet<ClinicFeatureFlags> ClinicFeatureFlags => Set<ClinicFeatureFlags>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

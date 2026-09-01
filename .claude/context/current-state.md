@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-06-18 (updated after role-authorization-hardening execution — no new DbSets or DI registrations; authorization-only changes)
+**Last verified:** 2026-08-31 (updated after prepaid-opd-fee-collection execution — added ClinicFeatureFlags DbSet/repo; no schema change to existing OpdPayments DbSet, only new columns)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -36,10 +36,19 @@
 | Rooms | Room | Yes |
 | Beds | Bed | Yes |
 | ClinicUsgTemplates | ClinicUsgTemplate | Yes |
-| UsgTemplateRows | UsgTemplateRow | Yes |
 | PregnancyTenures | PregnancyTenure | Yes |
+| UsgTemplateRows | UsgTemplateRow | Yes |
+| DoctorFeeConfigs | DoctorFeeConfig | Yes |
+| Particulars | Particular | Yes |
+| OpdParticulars | OpdParticular | Yes |
+| OpdPayments | OpdPayment | Yes |
+| ExpenseCategories | ExpenseCategory | Yes |
+| ExpenseRecords | ExpenseRecord | Yes |
+| CounterSessions | CounterSession | Yes |
+| AmountHandovers | AmountHandover | Yes |
+| ClinicFeatureFlags | ClinicFeatureFlags | Yes |
 
-**Total DbSets: 21**
+**Total DbSets: 30**
 
 ---
 
@@ -69,6 +78,15 @@
 | IBedRepository | BedRepository |
 | IClinicUsgTemplateRepository | ClinicUsgTemplateRepository |
 | IPregnancyTenureRepository | PregnancyTenureRepository |
+| IDoctorFeeConfigRepository | DoctorFeeConfigRepository |
+| IParticularRepository | ParticularRepository |
+| IOpdParticularRepository | OpdParticularRepository |
+| IOpdPaymentRepository | OpdPaymentRepository |
+| IExpenseCategoryRepository | ExpenseCategoryRepository |
+| IExpenseRecordRepository | ExpenseRecordRepository |
+| ICounterSessionRepository | CounterSessionRepository |
+| IAmountHandoverRepository | AmountHandoverRepository |
+| IClinicFeatureFlagsRepository | ClinicFeatureFlagsRepository |
 
 ### Services (Scoped)
 

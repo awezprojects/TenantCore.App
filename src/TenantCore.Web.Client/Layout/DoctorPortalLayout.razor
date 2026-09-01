@@ -4,24 +4,31 @@
 @inject ClinicContextService ClinicContext
 @implements IDisposable
 
-<MudThemeProvider Theme="_theme" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<ToastContainer />
 
 @if (_checkingAuth)
 {
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#F0F4F9;">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                min-height:100vh;background:#F0F4F9;gap:16px;">
+        <div style="width:56px;height:56px;border-radius:16px;
+                    background:linear-gradient(135deg,#1565C0,#42A5F5);
+                    display:flex;align-items:center;justify-content:center;">
+            <svg width="30" height="30" viewBox="0 0 40 40" fill="none">
+                <rect x="15" y="4" width="10" height="32" rx="3" fill="white"/>
+                <rect x="4" y="15" width="32" height="10" rx="3" fill="white"/>
+            </svg>
+        </div>
+        <div class="auth-spinner" style="width:36px;height:36px;border-width:3px;"></div>
+        <div style="font-size:13px;color:#94A3B8;font-weight:500;">Loading CloudClinic…</div>
     </div>
 }
 else if (_isAuthenticated)
 {
-    <div style="display:flex;min-height:100vh;background:#F0F4F9;">
+    <div style="display:flex;height:100vh;overflow:hidden;background:#F0F4F9;">
 
         <!-- Sidebar -->
         <div style="width:@(_sidebarOpen ? "230px" : "68px");flex-shrink:0;background:#0A1628;
-                    display:flex;flex-direction:column;
+                    display:flex;flex-direction:column;height:100vh;
                     transition:width 0.2s ease;overflow:hidden;">
 
             <!-- Logo -->
@@ -88,12 +95,12 @@ else if (_isAuthenticated)
         </div>
 
         <!-- Main area -->
-        <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden;">
 
-            <!-- Top bar -->
+            <!-- Top bar — fixed, does not scroll -->
             <div style="background:#fff;border-bottom:1px solid #E2E8F0;padding:14px 28px;
                         display:flex;justify-content:space-between;align-items:center;
-                        position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+                        flex-shrink:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                 <div>
                     <div style="font-size:16px;font-weight:700;color:#1E293B;">@_pageTitle</div>
                     <div style="font-size:11px;color:#94A3B8;margin-top:1px;">
@@ -108,8 +115,8 @@ else if (_isAuthenticated)
                 </div>
             </div>
 
-            <!-- Page Content -->
-            <div style="flex:1;padding:28px 32px;overflow-y:auto;">
+            <!-- Page Content — only this div scrolls -->
+            <div style="flex:1;padding:28px 32px;overflow-y:auto;min-height:0;">
                 @Body
             </div>
         </div>
@@ -134,18 +141,6 @@ else if (_isAuthenticated)
         ["/doctor/profile"]          = "My Profile",
         ["/doctor/change-password"]  = "Change Password",
         ["/doctor/register-clinic"]  = "Register Your Clinic",
-    };
-
-    private readonly MudTheme _theme = new()
-    {
-        PaletteLight = new PaletteLight
-        {
-            Primary       = "#1565C0",
-            Background    = "#F0F4F9",
-            Surface       = "#ffffff",
-            TextPrimary   = "#1E293B",
-            TextSecondary = "#64748B",
-        },
     };
 
     protected override void OnInitialized()

@@ -100,4 +100,11 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
         => await DbSet
             .Include(o => o.Patient)
             .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+
+    public async Task<IEnumerable<OpdRegistration>> GetByIdsAsync(IEnumerable<Guid> ids, Guid applicationId, CancellationToken ct = default)
+        => await DbSet
+            .AsNoTracking()
+            .Include(o => o.Patient)
+            .Where(o => o.ApplicationId == applicationId && ids.Contains(o.Id))
+            .ToListAsync(ct);
 }

@@ -2,7 +2,7 @@
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Clients
 @inject IPregnancyTenureApiClient TenureClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 @if (Visible)
 {
@@ -105,7 +105,7 @@
 
         if (result.Success)
         {
-            Snackbar.Add("Tenure closed successfully.", MudBlazor.Severity.Success);
+            Toast.ShowSuccess("Tenure closed successfully.");
             await OnClosed.InvokeAsync(result.Data);
         }
         else

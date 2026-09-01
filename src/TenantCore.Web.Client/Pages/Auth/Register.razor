@@ -2,120 +2,87 @@
 @layout AuthLayout
 @inject IAuthApiClient AuthClient
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 <PageTitle>Create Account — ClinicCore</PageTitle>
 
 <div class="auth-brand">
-    <MudAvatar Size="Size.Small" Color="Color.Primary">
-        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
-    </MudAvatar>
-    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+    <span style="font-size:22px;">🏥</span>
+    <span style="font-weight:700;color:#1a56db;font-size:15px;">ClinicCore</span>
 </div>
 
-<MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Create Your Account</MudText>
-<MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">Start managing your clinic today.</MudText>
+<h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Create Your Account</h2>
+<p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">Start managing your clinic today.</p>
 
 <EditForm Model="_model" OnValidSubmit="HandleRegister">
     <DataAnnotationsValidator />
 
-    <MudGrid>
-        <MudItem xs="12" md="6">
-            <MudTextField @bind-Value="_model.FirstName"
-                          Label="First Name"
-                          Variant="Variant.Outlined"
-                          For="@(() => _model.FirstName)"
-                          Disabled="_loading"
-                          Required="true" />
-        </MudItem>
-        <MudItem xs="12" md="6">
-            <MudTextField @bind-Value="_model.LastName"
-                          Label="Last Name"
-                          Variant="Variant.Outlined"
-                          For="@(() => _model.LastName)"
-                          Disabled="_loading"
-                          Required="true" />
-        </MudItem>
-        <MudItem xs="12">
-            <MudTextField @bind-Value="_model.EmailId"
-                          Label="Email Address"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Email"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Email"
-                          For="@(() => _model.EmailId)"
-                          Disabled="_loading"
-                          Required="true" />
-        </MudItem>
-        <MudItem xs="12">
-            <MudTextField @bind-Value="_model.MobileNo"
-                          Label="Mobile Number (Optional)"
-                          Variant="Variant.Outlined"
-                          Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.Phone"
-                          Disabled="_loading" />
-        </MudItem>
-        <MudItem xs="12">
-            <MudTextField @bind-Value="_model.Password"
-                          Label="Password"
-                          Variant="Variant.Outlined"
-                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                          Adornment="Adornment.End"
-                          AdornmentIcon="@(_showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                          OnAdornmentClick="@(() => _showPassword = !_showPassword)"
-                          For="@(() => _model.Password)"
-                          Disabled="_loading"
-                          Required="true"
-                          HelperText="At least 8 characters" />
-        </MudItem>
-        <MudItem xs="12">
-            <MudTextField @bind-Value="_confirmPassword"
-                          Label="Confirm Password"
-                          Variant="Variant.Outlined"
-                          InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                          Disabled="_loading"
-                          Required="true" />
-        </MudItem>
-    </MudGrid>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="auth-input-wrap" style="margin-bottom:0;">
+            <label class="auth-label">First Name</label>
+            <input class="auth-input" type="text" @bind="_model.FirstName" disabled="@_loading" />
+        </div>
+        <div class="auth-input-wrap" style="margin-bottom:0;">
+            <label class="auth-label">Last Name</label>
+            <input class="auth-input" type="text" @bind="_model.LastName" disabled="@_loading" />
+        </div>
+    </div>
+    <div style="height:16px;"></div>
+
+    <div class="auth-input-wrap">
+        <label class="auth-label">Email Address</label>
+        <input class="auth-input" type="email" @bind="_model.EmailId"
+               placeholder="you@example.com" disabled="@_loading" />
+    </div>
+
+    <div class="auth-input-wrap">
+        <label class="auth-label">Mobile Number (Optional)</label>
+        <input class="auth-input" type="tel" @bind="_model.MobileNo"
+               placeholder="+91 00000 00000" disabled="@_loading" />
+    </div>
+
+    <div class="auth-input-wrap">
+        <label class="auth-label">Password</label>
+        <div class="auth-input-with-toggle">
+            <input class="auth-input" type="@(_showPassword ? "text" : "password")"
+                   @bind="_model.Password" disabled="@_loading" />
+            <button type="button" class="auth-input-toggle" @onclick="@(() => _showPassword = !_showPassword)">
+                @(_showPassword ? "Hide" : "Show")
+            </button>
+        </div>
+        <span style="font-size:11px;color:#94A3B8;margin-top:3px;">At least 8 characters</span>
+    </div>
+
+    <div class="auth-input-wrap">
+        <label class="auth-label">Confirm Password</label>
+        <input class="auth-input" type="@(_showPassword ? "text" : "password")"
+               @bind="_confirmPassword" disabled="@_loading" />
+    </div>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <MudAlert Severity="Severity.Error" Class="mt-4" Dense="true" Variant="Variant.Filled">
-            @_errorMessage
-        </MudAlert>
+        <div class="auth-error">@_errorMessage</div>
     }
 
-    <MudButton ButtonType="ButtonType.Submit"
-               Variant="Variant.Filled"
-               Color="Color.Primary"
-               FullWidth="true"
-               Size="Size.Large"
-               Disabled="_loading"
-               Class="mt-4 mb-4"
-               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
+    <button type="submit" class="auth-btn-primary" disabled="@_loading"
+            style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;">
         @if (_loading)
         {
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+            <span class="auth-spinner"></span>
             <span>Creating Account...</span>
         }
         else
         {
-            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
             <span>Create Account</span>
         }
-    </MudButton>
+    </button>
 </EditForm>
 
-<MudDivider Class="my-4" />
+<hr class="auth-divider" />
 
-<MudStack AlignItems="AlignItems.Center">
-    <MudText Typo="Typo.body2">
-        Already have an account?
-        <MudLink Href="/auth/login" Color="Color.Primary" Typo="Typo.body2" Style="font-weight: 600;">
-            Sign in
-        </MudLink>
-    </MudText>
-</MudStack>
+<div style="text-align:center;font-size:14px;color:#374151;">
+    Already have an account? <a href="/auth/login" class="auth-link">Sign in</a>
+</div>
 
 @code {
     private RegisterRequestDto _model = new();
@@ -142,7 +109,7 @@
 
             if (response.Success)
             {
-                Snackbar.Add("Account created successfully! Please check your email to verify your account.", Severity.Success);
+                Toast.ShowSuccess("Account created! Please check your email to verify your account.");
                 NavigationManager.NavigateTo("/auth/login");
             }
             else
@@ -150,7 +117,7 @@
                 _errorMessage = response.Message ?? "Registration failed. Please try again.";
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _errorMessage = "An unexpected error occurred. Please try again.";
         }

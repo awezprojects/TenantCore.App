@@ -4,28 +4,37 @@
 @inject ClinicContextService ClinicContext
 @implements IDisposable
 
-<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
-<MudPopoverProvider />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<ToastContainer />
 
 @if (_checkingAuth)
 {
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#F4F6FA;">
-        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                min-height:100vh;background:#F4F6FA;gap:16px;">
+        <div style="width:56px;height:56px;border-radius:16px;
+                    background:linear-gradient(135deg,#1565C0,#42A5F5);
+                    display:flex;align-items:center;justify-content:center;">
+            <svg width="30" height="30" viewBox="0 0 40 40" fill="none">
+                <rect x="15" y="4" width="10" height="32" rx="3" fill="white"/>
+                <rect x="4" y="15" width="32" height="10" rx="3" fill="white"/>
+            </svg>
+        </div>
+        <div class="auth-spinner" style="width:36px;height:36px;border-width:3px;"></div>
+        <div style="font-size:13px;color:#94A3B8;font-weight:500;">Loading CloudClinic…</div>
     </div>
 }
 else if (_isAuthenticated)
 {
-    <MudLayout>
-        <!-- Sidebar / Drawer -->
-        <MudDrawer @bind-Open="_drawerOpen" Elevation="0" ClipMode="DrawerClipMode.Never"
-                   Variant="DrawerVariant.Mini" MiniWidth="68px" Width="230px"
-                   Style="background:#0A1628;border-right:none;">
+    <div style="display:flex;height:100vh;overflow:hidden;background:#F4F6FA;">
+
+        <!-- Sidebar -->
+        <div style="width:@(_drawerOpen ? "230px" : "68px");flex-shrink:0;background:#0A1628;
+                    display:flex;flex-direction:column;height:100vh;
+                    transition:width 0.2s ease;overflow:hidden;">
+
             <!-- Logo -->
             <div style="display:flex;align-items:center;gap:10px;padding:@(_drawerOpen ? "18px 20px" : "18px 0");
                         justify-content:@(_drawerOpen ? "flex-start" : "center");
-                        border-bottom:1px solid rgba(255,255,255,0.08);min-height:68px;">
+                        border-bottom:1px solid rgba(255,255,255,0.08);min-height:68px;flex-shrink:0;">
                 <div style="width:36px;height:36px;border-radius:10px;
                             background:linear-gradient(135deg,#1976D2,#42A5F5);
                             display:flex;align-items:center;justify-content:center;
@@ -42,7 +51,7 @@ else if (_isAuthenticated)
             <!-- User info -->
             @if (_drawerOpen && AuthState.CurrentUser != null)
             {
-                <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);">
+                <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;">
                     <div style="display:flex;align-items:center;gap:10px;">
                         <div style="width:38px;height:38px;border-radius:10px;
                                     background:rgba(255,255,255,0.1);
@@ -65,7 +74,7 @@ else if (_isAuthenticated)
             <NavMenu DrawerOpen="_drawerOpen" />
 
             <!-- Bottom: collapse + logout -->
-            <div style="margin-top:auto;padding:12px 8px;border-top:1px solid rgba(255,255,255,0.08);">
+            <div style="margin-top:auto;padding:12px 8px;border-top:1px solid rgba(255,255,255,0.08);flex-shrink:0;">
                 <button class="cc-nav-btn" @onclick="ToggleDrawer" title="@(_drawerOpen ? "" : "Expand")">
                     <span style="font-size:16px;">@(_drawerOpen ? "←" : "→")</span>
                     @if (_drawerOpen) { <span>Collapse</span> }
@@ -75,101 +84,114 @@ else if (_isAuthenticated)
                     @if (_drawerOpen) { <span>Sign Out</span> }
                 </button>
             </div>
-        </MudDrawer>
+        </div>
 
-        <!-- Top AppBar -->
-        <MudAppBar Elevation="0" Style="background:#ffffff;border-bottom:1px solid #E2E8F0;color:#1E293B;"
-                   Dense="false">
-            <div style="display:flex;align-items:center;gap:14px;flex:1;">
+        <!-- Main area -->
+        <div style="flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden;">
+
+            <!-- Top bar -->
+            <div style="background:#ffffff;border-bottom:1px solid #E2E8F0;padding:14px 24px;
+                        display:flex;align-items:center;justify-content:space-between;
+                        position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                 <div>
                     <div style="font-size:17px;font-weight:700;color:#1E293B;">@_screenTitle</div>
                     <div style="font-size:11px;color:#94A3B8;">
                         @DateTime.Now.ToString("dddd, dd MMMM yyyy") &nbsp;·&nbsp; @_currentTime
                     </div>
                 </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:12px;">
-                @if (_isDoctor && !string.IsNullOrEmpty(ClinicContext.SelectedApplicationName))
-                {
-                    <div style="display:flex;align-items:center;gap:6px;">
-                        <div style="padding:5px 12px;background:#EFF6FF;border-radius:20px;
-                                    font-size:12px;font-weight:700;color:#1565C0;
-                                    border:1px solid #BFDBFE;white-space:nowrap;">
-                            🏥 @ClinicContext.SelectedApplicationName
+                <div style="display:flex;align-items:center;gap:12px;position:relative;">
+                    @if (_isDoctor && !string.IsNullOrEmpty(ClinicContext.SelectedApplicationName))
+                    {
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <div style="padding:5px 12px;background:#EFF6FF;border-radius:20px;
+                                        font-size:12px;font-weight:700;color:#1565C0;
+                                        border:1px solid #BFDBFE;white-space:nowrap;">
+                                🏥 @ClinicContext.SelectedApplicationName
+                            </div>
+                            <button @onclick="SwitchClinic"
+                                    style="padding:5px 12px;background:transparent;border:1px solid #E2E8F0;
+                                           border-radius:20px;font-size:11px;font-weight:600;color:#64748B;
+                                           cursor:pointer;white-space:nowrap;">
+                                Switch Clinic
+                            </button>
                         </div>
-                        <button @onclick="SwitchClinic"
-                                style="padding:5px 12px;background:transparent;border:1px solid #E2E8F0;
-                                       border-radius:20px;font-size:11px;font-weight:600;color:#64748B;
-                                       cursor:pointer;white-space:nowrap;">
-                            Switch Clinic
-                        </button>
+                    }
+                    <div style="padding:6px 14px;background:#EFF6FF;border-radius:20px;
+                                font-size:12px;font-weight:600;color:#1565C0;">
+                        🟢 Online
                     </div>
-                }
-                <div style="padding:6px 14px;background:#EFF6FF;border-radius:20px;
-                            font-size:12px;font-weight:600;color:#1565C0;">
-                    🟢 Online
-                </div>
-                <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
-                               Style="color:#64748B;" OnClick="ToggleDarkMode" />
-                <MudMenu Icon="@Icons.Material.Filled.AccountCircle"
-                         Style="color:#64748B;"
-                         AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-                    <ChildContent>
-                        @if (_isDoctor)
-                        {
-                            <MudMenuItem Href="/doctor/profile" Icon="@Icons.Material.Filled.Person">My Profile</MudMenuItem>
-                            <MudMenuItem Href="/doctor/change-password" Icon="@Icons.Material.Filled.Lock">Change Password</MudMenuItem>
-                            <MudMenuItem OnClick="SwitchClinic" Icon="@Icons.Material.Filled.SwapHoriz">Switch Clinic</MudMenuItem>
-                        }
-                        else
-                        {
-                            <MudMenuItem Href="/auth/profile" Icon="@Icons.Material.Filled.Person">My Profile</MudMenuItem>
-                        }
-                        <MudDivider />
-                        <MudMenuItem OnClick="Logout" Icon="@Icons.Material.Filled.Logout">Sign Out</MudMenuItem>
-                    </ChildContent>
-                </MudMenu>
-            </div>
-        </MudAppBar>
 
-        <MudMainContent Style="background:#F4F6FA;min-height:100vh;">
-            <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="pt-5 pb-6">
+                    <!-- Account dropdown -->
+                    <div style="position:relative;">
+                        <button @onclick="ToggleUserMenu"
+                                style="padding:6px 14px;background:#F1F5F9;border:1px solid #E2E8F0;
+                                       border-radius:20px;font-size:12px;font-weight:600;color:#475569;
+                                       cursor:pointer;white-space:nowrap;">
+                            👤 Account ▾
+                        </button>
+                        @if (_userMenuOpen)
+                        {
+                            <div style="position:absolute;right:0;top:calc(100% + 6px);background:#fff;
+                                        border:1px solid #E2E8F0;border-radius:10px;
+                                        box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:180px;z-index:200;">
+                                @if (_isDoctor)
+                                {
+                                    <a href="/doctor/profile" @onclick="CloseUserMenu"
+                                       style="display:block;padding:10px 16px;font-size:13px;font-weight:600;
+                                              color:#1E293B;text-decoration:none;">
+                                        👤 My Profile
+                                    </a>
+                                    <a href="/doctor/change-password" @onclick="CloseUserMenu"
+                                       style="display:block;padding:10px 16px;font-size:13px;font-weight:600;
+                                              color:#1E293B;text-decoration:none;">
+                                        🔒 Change Password
+                                    </a>
+                                    <button @onclick="SwitchClinicAndClose"
+                                            style="display:block;width:100%;padding:10px 16px;font-size:13px;
+                                                   font-weight:600;color:#1E293B;background:none;border:none;
+                                                   cursor:pointer;text-align:left;">
+                                        🔄 Switch Clinic
+                                    </button>
+                                }
+                                else
+                                {
+                                    <a href="/auth/profile" @onclick="CloseUserMenu"
+                                       style="display:block;padding:10px 16px;font-size:13px;font-weight:600;
+                                              color:#1E293B;text-decoration:none;">
+                                        👤 My Profile
+                                    </a>
+                                }
+                                <div style="height:1px;background:#E2E8F0;margin:4px 0;"></div>
+                                <button @onclick="Logout"
+                                        style="display:block;width:100%;padding:10px 16px;font-size:13px;
+                                               font-weight:600;color:#DC2626;background:none;border:none;
+                                               cursor:pointer;text-align:left;">
+                                    🚪 Sign Out
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page content — only this div scrolls -->
+            <div style="flex:1;padding:28px 32px;overflow-y:auto;min-height:0;">
                 @Body
-            </MudContainer>
-        </MudMainContent>
-    </MudLayout>
+            </div>
+        </div>
+    </div>
 }
 
 @code {
     private bool _drawerOpen = true;
     private bool _checkingAuth = true;
     private bool _isAuthenticated;
-    private bool _isDarkMode;
     private bool _isDoctor;
     private bool _isAdmin;
+    private bool _userMenuOpen;
     private string _currentTime = DateTime.Now.ToString("hh:mm tt");
     private string _roleLabel = string.Empty;
     private string _screenTitle = "Dashboard";
-
-    private readonly MudTheme _theme = new()
-    {
-        PaletteLight = new PaletteLight
-        {
-            Primary = "#1565C0",
-            PrimaryDarken = "#0D47A1",
-            PrimaryLighten = "#42A5F5",
-            Secondary = "#7C3AED",
-            Background = "#F4F6FA",
-            Surface = "#ffffff",
-            AppbarBackground = "#ffffff",
-            AppbarText = "#1E293B",
-            DrawerBackground = "#0A1628",
-            DrawerText = "rgba(255,255,255,0.7)",
-            DrawerIcon = "rgba(255,255,255,0.7)",
-            TextPrimary = "#1E293B",
-            TextSecondary = "#64748B",
-        },
-    };
 
     private static readonly Dictionary<string, string> _titles = new()
     {
@@ -188,6 +210,7 @@ else if (_isAuthenticated)
 
         ["/settings/prescription"]  = "Prescription Settings",
         ["/settings/dosage-remarks"]= "Dosage Remarks",
+        ["/settings/feature-flags"] = "Feature Flags",
     };
 
     protected override void OnInitialized()
@@ -196,9 +219,6 @@ else if (_isAuthenticated)
         UpdateScreenTitle(NavigationManager.Uri);
     }
 
-    // Initialize auth + clinic context in OnInitializedAsync so every page's
-    // OnParametersSetAsync / OnInitializedAsync already has SelectedApplicationId
-    // populated before making any API calls.
     protected override async Task OnInitializedAsync()
     {
         await AuthState.InitializeAsync();
@@ -213,6 +233,7 @@ else if (_isAuthenticated)
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
+        _userMenuOpen = false;
         UpdateScreenTitle(e.Location);
         InvokeAsync(StateHasChanged);
     }
@@ -227,15 +248,10 @@ else if (_isAuthenticated)
     {
         try
         {
-            // InitializeAsync already called in OnInitializedAsync — read current state
             _isAuthenticated = AuthState.IsAuthenticated;
 
             if (_isAuthenticated && AuthState.CurrentUser != null)
             {
-                // Scope role display to the currently selected clinic so a user who is
-                // "Clinic Admin" in Clinic A and "Doctor" in Clinic B sees the correct
-                // label when inside Clinic B.  Falls back to all roles when no clinic is
-                // selected (e.g. the /doctor/home landing page).
                 var selectedAppId = ClinicContext.SelectedApplicationId;
                 var clinicRoles = selectedAppId != Guid.Empty
                     ? AuthState.GetRolesForApplication(selectedAppId)
@@ -268,8 +284,6 @@ else if (_isAuthenticated)
         var baseUri = NavigationManager.BaseUri;
         var path = uri.Replace(baseUri, "/");
 
-        // Guard: all users must select a clinic before accessing clinic-scoped pages.
-        // /select-clinic and /doctor/* are exempt — they work without a selected clinic.
         if (_isAuthenticated && ClinicContext.SelectedApplicationId == Guid.Empty
             && !path.StartsWith("/select-clinic")
             && !path.StartsWith("/doctor/")
@@ -292,7 +306,6 @@ else if (_isAuthenticated)
         {
             if (path.StartsWith("/auth/login"))
             {
-                // Always go to clinic selection after login — users pick their clinic first.
                 NavigationManager.NavigateTo("/select-clinic", forceLoad: true);
                 return;
             }
@@ -302,7 +315,8 @@ else if (_isAuthenticated)
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
-    private void ToggleDarkMode() => _isDarkMode = !_isDarkMode;
+    private void ToggleUserMenu() => _userMenuOpen = !_userMenuOpen;
+    private void CloseUserMenu() => _userMenuOpen = false;
 
     private async Task SwitchClinic()
     {
@@ -310,8 +324,15 @@ else if (_isAuthenticated)
         NavigationManager.NavigateTo("/select-clinic");
     }
 
+    private async Task SwitchClinicAndClose()
+    {
+        _userMenuOpen = false;
+        await SwitchClinic();
+    }
+
     private async Task Logout()
     {
+        _userMenuOpen = false;
         await ClinicContext.ClearClinicAsync();
         await AuthState.ClearAuthStateAsync();
         NavigationManager.NavigateTo("/auth/login", forceLoad: true);

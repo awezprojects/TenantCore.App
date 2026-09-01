@@ -7,6 +7,7 @@ using TenantCore.Domain.Entities;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Interfaces;
 using TenantCore.Shared.Dtos;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Features.OpdRegistrations.Handlers;
 
@@ -14,8 +15,10 @@ public sealed class CreateOpdRegistrationHandler(
     IOpdRegistrationRepository opdRepository,
     IPatientRepository patientRepository,
     IClinicFeeConfigRepository feeRepository,
+    IClinicFeatureFlagsRepository featureFlagsRepository,
     IDoctorProfileRepository doctorProfileRepository,
     ICounterSessionRepository counterSessionRepository,
+    IOpdPaymentRepository paymentRepository,
     ISender sender,
     ILogger<CreateOpdRegistrationHandler> logger)
     : IRequestHandler<CreateOpdRegistrationCommand, OpdRegistrationDto>
@@ -53,6 +56,18 @@ public sealed class CreateOpdRegistrationHandler(
         var doctorProfile = await doctorProfileRepository.GetByUserIdAsync(request.DoctorUserId, cancellationToken);
         var doctorProfileId = doctorProfile?.Id ?? Guid.Empty;
         await sender.Send(new EnsureOpdPaymentCommand(registration.Id, doctorProfileId, request.ApplicationId), cancellationToken);
+
+        var flags = await featureFlagsRepository.GetByApplicationAsync(request.ApplicationId, cancellationToken);
+        if (flags?.PrepaidOpdEnabled ?? true)
+        {
+            var payment = await paymentRepository.GetByOpdRegistrationIdAsync(registration.Id, request.ApplicationId, cancellationToken);
+            if (payment is not null && payment.PaymentStatus == PaymentStatus.Pending)
+            {
+                payment.AcceptVisitFee(request.ReceivedByUserId, activeSession.Id);
+                paymentRepository.Update(payment);
+                await paymentRepository.SaveChangesAsync(cancellationToken);
+            }
+        }
 
         var loaded = await opdRepository.GetByIdAsync(registration.Id, cancellationToken);
         return OpdRegistrationTranslator.ToDto(loaded!);

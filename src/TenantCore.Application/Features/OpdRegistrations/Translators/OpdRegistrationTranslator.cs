@@ -27,6 +27,8 @@ public static class OpdRegistrationTranslator
         CreatedAt = entity.CreatedAt,
         PaymentStatus = payment?.PaymentStatus,
         FinalAmount = payment?.FinalAmount,
-        HasDiscount = payment?.Discount > 0
+        HasDiscount = payment?.Discount > 0,
+        RefundStatus = payment?.RefundStatus,
+        RefundDue = payment?.RefundDue ?? 0
     };
 }

@@ -7,7 +7,7 @@
 @inject ICounterSessionApiClient CounterSessionClient
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 <PageTitle>Expenses - CloudClinic</PageTitle>
 
@@ -24,7 +24,7 @@
     <!-- Date filter bar -->
     <div class="opd-filter-bar" style="flex-direction:row;align-items:center;gap:10px;flex-wrap:wrap;">
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="opd-btn @(_preset == "today" ? "active" : "")" style="padding:6px 14px;font-size:12px;@(_preset=="today"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("today")'>Today</button>
+            <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="today"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("today")'>Today</button>
             <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="yesterday"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("yesterday")'>Yesterday</button>
             <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="7d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("7d")'>Last 7 Days</button>
             <button class="opd-btn" style="padding:6px 14px;font-size:12px;@(_preset=="30d"?"background:#2563EB;color:#fff;border-color:#2563EB;":"")" @onclick='() => ApplyPreset("30d")'>Last 30 Days</button>
@@ -42,7 +42,9 @@
 
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        <div style="display:flex;justify-content:center;padding:32px 0;">
+            <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+        </div>
     }
     else
     {
@@ -81,7 +83,7 @@
                         <th>Status</th>
                         <th>Notes</th>
                         <th>Recorded At</th>
-                        <th style="width:110px;">Actions</th>
+                        <th style="white-space:nowrap;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -105,24 +107,15 @@
                                 <td style="color:#64748B;font-size:12px;">@(item.Notes ?? "—")</td>
                                 <td style="font-size:12px;color:#475569;">@DateTimeHelper.ToLocalString(item.RecordedAt, "dd MMM HH:mm")</td>
                                 <td>
-                                    <div style="display:flex;align-items:center;gap:6px;">
+                                    <div class="opd-actions">
                                         @if (!isPaid)
                                         {
-                                            <button style="background:#2563EB;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;"
-                                                    @onclick="@(() => OpenPayDialog(item))">
-                                                Pay
-                                            </button>
+                                            <button class="opd-btn edit-btn" @onclick="@(() => OpenPayDialog(item))">Pay</button>
                                         }
                                         @if (_isAdmin)
                                         {
-                                            <button style="background:#2563EB;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:14px;cursor:pointer;line-height:1;"
-                                                    title="Edit" @onclick="@(() => OpenEditDialog(item))">
-                                                ✏️
-                                            </button>
-                                            <button style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:4px 8px;font-size:14px;cursor:pointer;line-height:1;"
-                                                    title="Delete" @onclick="@(() => ConfirmDelete(item.Id))">
-                                                🗑
-                                            </button>
+                                            <button class="opd-btn edit-btn" @onclick="@(() => OpenEditDialog(item))">Edit</button>
+                                            <button class="opd-btn delete-btn" @onclick="@(() => ConfirmDelete(item.Id))">Delete</button>
                                         }
                                     </div>
                                 </td>
@@ -135,111 +128,167 @@
     }
 </div>
 
-<!-- Add Expense Dialog -->
-<MudDialog @bind-Visible="_addVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">Add Expense</MudText></TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudSelect T="Guid?" @bind-Value="_expenseCategoryId" Label="Category *" Variant="Variant.Outlined" Placeholder="Select category">
-                @foreach (var cat in _categories)
-                {
-                    <MudSelectItem T="Guid?" Value="@((Guid?)cat.Id)">@cat.Name</MudSelectItem>
-                }
-            </MudSelect>
-            <MudNumericField @bind-Value="_amount" Label="Bill Amount (Rs.) *" Min="0.01m" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _addVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync"
-                   Disabled="@(_saving || _expenseCategoryId is null)">
-            @(_saving ? "Saving..." : "Save")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+<!-- Add Expense Modal -->
+@if (_addVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _addVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:440px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">Add Expense</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Category *</label>
+                <select class="form-input" style="margin-bottom:0;"
+                        value="@_expenseCategoryId"
+                        @onchange="OnCategoryChanged">
+                    <option value="">— Select category —</option>
+                    @foreach (var cat in _categories)
+                    {
+                        <option value="@cat.Id">@cat.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Bill Amount (Rs.) *</label>
+                <input class="form-input" type="number" min="0.01" step="0.01" @bind="_amount" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Notes</label>
+                <textarea class="form-input" rows="2" @bind="_notes" style="resize:vertical;min-height:60px;"></textarea>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _addVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="SaveAsync" disabled="@(_saving || _expenseCategoryId is null)"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@((_saving || _expenseCategoryId is null) ? "0.6" : "1");">
+                @(_saving ? "Saving..." : "Save")
+            </button>
+        </div>
+    </div>
+}
 
-<!-- Pay Dialog -->
-<MudDialog @bind-Visible="_payVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">Record Payment — @_payingItem?.CategoryName</MudText></TitleContent>
-    <DialogContent>
-        @if (_payingItem is not null)
-        {
-            var remaining = _payingItem.Amount - _payingItem.PaidAmount;
-            <MudStack Spacing="3">
-                <div style="background:#F8FAFC;border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;">
-                    <div>
-                        <div style="font-size:11px;color:#64748B;font-weight:600;">TOTAL BILL</div>
-                        <div style="font-size:18px;font-weight:700;color:#DC2626;">Rs. @_payingItem.Amount.ToString("N2")</div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;color:#64748B;font-weight:600;">ALREADY PAID</div>
-                        <div style="font-size:18px;font-weight:700;color:#16A34A;">Rs. @_payingItem.PaidAmount.ToString("N2")</div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;color:#64748B;font-weight:600;">REMAINING</div>
-                        <div style="font-size:18px;font-weight:700;color:#D97706;">Rs. @remaining.ToString("N2")</div>
-                    </div>
+<!-- Pay Modal -->
+@if (_payVisible && _payingItem is not null)
+{
+    var remaining = _payingItem.Amount - _payingItem.PaidAmount;
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _payVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:440px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">Record Payment — @_payingItem.CategoryName</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div style="background:#F8FAFC;border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;">
+                <div>
+                    <div style="font-size:11px;color:#64748B;font-weight:600;">TOTAL BILL</div>
+                    <div style="font-size:18px;font-weight:700;color:#DC2626;">Rs. @_payingItem.Amount.ToString("N2")</div>
                 </div>
-                <MudNumericField @bind-Value="_payAmount" Label="Amount Paying Now (Rs.) *"
-                                 Min="0.01m" Max="@remaining" Variant="Variant.Outlined" />
-                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary"
-                           OnClick="@(() => _payAmount = remaining)">
-                    Pay Full Remaining (Rs. @remaining.ToString("N2"))
-                </MudButton>
-            </MudStack>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _payVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ConfirmPayAsync"
-                   Disabled="@(_saving || _payAmount <= 0)">
-            @(_saving ? "Processing..." : "Confirm Payment")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+                <div>
+                    <div style="font-size:11px;color:#64748B;font-weight:600;">ALREADY PAID</div>
+                    <div style="font-size:18px;font-weight:700;color:#16A34A;">Rs. @_payingItem.PaidAmount.ToString("N2")</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;color:#64748B;font-weight:600;">REMAINING</div>
+                    <div style="font-size:18px;font-weight:700;color:#D97706;">Rs. @remaining.ToString("N2")</div>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Amount Paying Now (Rs.) *</label>
+                <input class="form-input" type="number" min="0.01" max="@remaining" step="0.01" @bind="_payAmount" />
+            </div>
+            <button type="button" @onclick="@(() => _payAmount = remaining)"
+                    style="background:none;border:none;color:#2563EB;font-size:12px;font-weight:600;cursor:pointer;text-align:left;padding:0;">
+                Pay Full Remaining (Rs. @remaining.ToString("N2"))
+            </button>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _payVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="ConfirmPayAsync" disabled="@(_saving || _payAmount <= 0)"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#059669;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@((_saving || _payAmount <= 0) ? "0.6" : "1");">
+                @(_saving ? "Processing..." : "Confirm Payment")
+            </button>
+        </div>
+    </div>
+}
 
-<!-- Edit Expense Dialog -->
-<MudDialog @bind-Visible="_editVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">Edit Expense — @_editingItem?.CategoryName</MudText></TitleContent>
-    <DialogContent>
-        @if (_editingItem is not null)
-        {
-            <MudStack Spacing="3">
-                @if (_editingItem.PaidAmount > 0)
-                {
-                    <div style="background:#FEF9C3;border:1px solid #FDE68A;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400E;">
-                        ⚠️ Rs. @_editingItem.PaidAmount.ToString("N2") already paid — new amount cannot be less than this.
-                    </div>
-                }
-                <MudNumericField @bind-Value="_editAmount" Label="Amount (Rs.) *"
-                                 Min="@_editingItem.PaidAmount" Variant="Variant.Outlined" />
-                <MudTextField @bind-Value="_editNotes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
-            </MudStack>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _editVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveEditAsync"
-                   Disabled="@(_saving || _editAmount <= 0)">
-            @(_saving ? "Saving..." : "Save Changes")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+<!-- Edit Modal -->
+@if (_editVisible && _editingItem is not null)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _editVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:440px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">Edit Expense — @_editingItem.CategoryName</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            @if (_editingItem.PaidAmount > 0)
+            {
+                <div style="background:#FEF9C3;border:1px solid #FDE68A;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400E;">
+                    Rs. @_editingItem.PaidAmount.ToString("N2") already paid — new amount cannot be less than this.
+                </div>
+            }
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Amount (Rs.) *</label>
+                <input class="form-input" type="number" min="@_editingItem.PaidAmount" step="0.01" @bind="_editAmount" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Notes</label>
+                <textarea class="form-input" rows="2" @bind="_editNotes" style="resize:vertical;min-height:60px;"></textarea>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _editVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="SaveEditAsync" disabled="@(_saving || _editAmount <= 0)"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@((_saving || _editAmount <= 0) ? "0.6" : "1");">
+                @(_saving ? "Saving..." : "Save Changes")
+            </button>
+        </div>
+    </div>
+}
 
-<!-- Delete Confirmation Dialog -->
-<MudDialog @bind-Visible="_deleteVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">Delete Expense?</MudText></TitleContent>
-    <DialogContent>
-        <MudText>This expense record will be permanently removed. Are you sure?</MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _deleteVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeleteAsync" Disabled="_saving">
-            @(_saving ? "Deleting..." : "Delete")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+<!-- Delete Confirmation Modal -->
+@if (_deleteVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _deleteVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:380px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">Delete Expense?</div>
+        </div>
+        <div style="padding:20px 24px;font-size:13px;color:#374151;">
+            This expense record will be permanently removed. Are you sure?
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _deleteVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="DeleteAsync" disabled="@_saving"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#DC2626;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@(_saving ? "0.6" : "1");">
+                @(_saving ? "Deleting..." : "Delete")
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     private bool _loading = true;
@@ -315,6 +364,12 @@
 
     private void ClearPreset() => _preset = string.Empty;
 
+    private void OnCategoryChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id)) _expenseCategoryId = id;
+        else _expenseCategoryId = null;
+    }
+
     private void OpenAddDialog()
     {
         _expenseCategoryId = _categories.Count > 0 ? (Guid?)_categories[0].Id : null;
@@ -325,7 +380,7 @@
 
     private async Task SaveAsync()
     {
-        if (_expenseCategoryId is null) { Snackbar.Add("Select a category.", Severity.Warning); return; }
+        if (_expenseCategoryId is null) { Toast.ShowWarning("Select a category."); return; }
         _saving = true;
         var response = await ExpenseRecordClient.CreateAsync(new CreateExpenseRecordRequest
         {
@@ -334,8 +389,8 @@
             Notes = _notes,
             CounterSessionId = _activeSessionId
         });
-        if (response.Success) { Snackbar.Add("Expense recorded.", Severity.Success); _addVisible = false; await LoadAsync(); }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Expense recorded."); _addVisible = false; await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed.");
         _saving = false;
     }
 
@@ -351,8 +406,8 @@
         if (_payingItem is null || _payAmount <= 0) return;
         _saving = true;
         var response = await ExpenseRecordClient.PayAsync(_payingItem.Id, new PayExpenseRecordRequest { PayAmount = _payAmount });
-        if (response.Success) { Snackbar.Add($"Rs. {_payAmount:N2} payment recorded.", Severity.Success); _payVisible = false; await LoadAsync(); }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) { Toast.ShowSuccess($"Rs. {_payAmount:N2} payment recorded."); _payVisible = false; await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed.");
         _saving = false;
     }
 
@@ -373,8 +428,8 @@
             Amount = _editAmount,
             Notes = _editNotes
         });
-        if (response.Success) { Snackbar.Add("Expense updated.", Severity.Success); _editVisible = false; await LoadAsync(); }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Expense updated."); _editVisible = false; await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed.");
         _saving = false;
     }
 
@@ -384,8 +439,8 @@
     {
         _saving = true;
         var response = await ExpenseRecordClient.DeleteAsync(_deletingId);
-        if (response.Success) { Snackbar.Add("Expense deleted.", Severity.Success); _deleteVisible = false; await LoadAsync(); }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Expense deleted."); _deleteVisible = false; await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed.");
         _saving = false;
     }
 

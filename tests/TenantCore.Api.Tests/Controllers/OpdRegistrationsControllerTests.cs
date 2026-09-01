@@ -166,6 +166,34 @@ public class OpdRegistrationsControllerTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    // ?? DELETE /api/opd-registrations/{id} ??????????????????????????????????
+
+    [Fact]
+    public async Task Delete_ReturnsNoContent()
+    {
+        var id = Guid.NewGuid();
+        _sender.Setup(s => s.Send(It.IsAny<DeleteOpdRegistrationCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.CompletedTask);
+
+        var result = await _controller.Delete(id, CancellationToken.None);
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task Delete_SendsCommandWithCorrectIdAndApplicationId()
+    {
+        var id = Guid.NewGuid();
+        _sender.Setup(s => s.Send(It.IsAny<DeleteOpdRegistrationCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.CompletedTask);
+
+        await _controller.Delete(id, CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<DeleteOpdRegistrationCommand>(c => c.Id == id && c.ApplicationId == _applicationId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ?? GET /api/opd-registrations/doctor-count ????????????????????????????
 
     [Fact]

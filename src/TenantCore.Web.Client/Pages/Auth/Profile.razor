@@ -3,14 +3,14 @@
 @inject AuthStateService AuthState
 @inject IAuthApiClient AuthClient
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 <PageTitle>My Profile - CloudClinic</PageTitle>
 
 @if (_loading)
 {
     <div style="display:flex;justify-content:center;padding:60px 0;">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
     </div>
 }
 else if (AuthState.CurrentUser != null)
@@ -73,14 +73,22 @@ else if (AuthState.CurrentUser != null)
                     <EditForm Model="_profileModel" OnValidSubmit="SaveProfile">
                         <DataAnnotationsValidator />
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-                            <MudTextField @bind-Value="_profileModel.FirstName" Label="First Name" Variant="Variant.Outlined"
-                                          For="@(() => _profileModel.FirstName)" Disabled="_savingProfile" />
-                            <MudTextField @bind-Value="_profileModel.LastName" Label="Last Name" Variant="Variant.Outlined"
-                                          For="@(() => _profileModel.LastName)" Disabled="_savingProfile" />
-                            <MudTextField @bind-Value="_profileModel.MiddleName" Label="Middle Name (optional)" Variant="Variant.Outlined"
-                                          Disabled="_savingProfile" />
-                            <MudTextField @bind-Value="_profileModel.MobileNo" Label="Mobile Number" Variant="Variant.Outlined"
-                                          Disabled="_savingProfile" />
+                            <div class="form-group">
+                                <label class="form-label">First Name</label>
+                                <input class="form-input" type="text" @bind="_profileModel.FirstName" disabled="@_savingProfile" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Last Name</label>
+                                <input class="form-input" type="text" @bind="_profileModel.LastName" disabled="@_savingProfile" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Middle Name (optional)</label>
+                                <input class="form-input" type="text" @bind="_profileModel.MiddleName" disabled="@_savingProfile" />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Mobile Number</label>
+                                <input class="form-input" type="tel" @bind="_profileModel.MobileNo" disabled="@_savingProfile" />
+                            </div>
                         </div>
                         <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;
                                     background:#F8FAFC;border-radius:10px;margin-bottom:14px;">
@@ -91,17 +99,25 @@ else if (AuthState.CurrentUser != null)
                             </div>
                         </div>
                         <div style="display:flex;gap:10px;">
-                            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
-                                       Disabled="_savingProfile" Style="min-width:130px;">
+                            <button type="submit" disabled="@_savingProfile"
+                                    style="display:flex;align-items:center;gap:8px;padding:9px 20px;border-radius:8px;border:none;
+                                           background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                                           opacity:@(_savingProfile ? "0.7" : "1");">
                                 @if (_savingProfile)
                                 {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+                                    <span class="auth-spinner" style="width:14px;height:14px;border-width:2px;"></span>
                                     <span>Saving…</span>
                                 }
-                                else { <span>Save Changes</span> }
-                            </MudButton>
-                            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="CancelEditProfile"
-                                       Disabled="_savingProfile">Cancel</MudButton>
+                                else
+                                {
+                                    <span>Save Changes</span>
+                                }
+                            </button>
+                            <button type="button" @onclick="CancelEditProfile" disabled="@_savingProfile"
+                                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;
+                                           background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                                Cancel
+                            </button>
                         </div>
                     </EditForm>
                 }
@@ -211,39 +227,55 @@ else if (AuthState.CurrentUser != null)
                         <EditForm Model="_pwModel" OnValidSubmit="SavePassword">
                             <DataAnnotationsValidator />
                             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-                                <div style="grid-column:1/-1;">
-                                    <MudTextField @bind-Value="_pwModel.CurrentPassword" Label="Current Password"
-                                                  Variant="Variant.Outlined"
-                                                  InputType="@(_showCurr ? InputType.Text : InputType.Password)"
-                                                  Adornment="Adornment.End"
-                                                  AdornmentIcon="@(_showCurr ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                                                  OnAdornmentClick="@(() => _showCurr = !_showCurr)"
-                                                  For="@(() => _pwModel.CurrentPassword)" Disabled="_savingPw" />
+                                <div class="form-group" style="grid-column:1/-1;">
+                                    <label class="form-label">Current Password</label>
+                                    <div class="auth-input-with-toggle">
+                                        <input class="form-input auth-input" style="margin-bottom:0;"
+                                               type="@(_showCurr ? "text" : "password")"
+                                               @bind="_pwModel.CurrentPassword" disabled="@_savingPw" />
+                                        <button type="button" class="auth-input-toggle" @onclick="@(() => _showCurr = !_showCurr)">
+                                            @(_showCurr ? "Hide" : "Show")
+                                        </button>
+                                    </div>
                                 </div>
-                                <MudTextField @bind-Value="_pwModel.NewPassword" Label="New Password"
-                                              Variant="Variant.Outlined"
-                                              InputType="@(_showNew ? InputType.Text : InputType.Password)"
-                                              Adornment="Adornment.End"
-                                              AdornmentIcon="@(_showNew ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                                              OnAdornmentClick="@(() => _showNew = !_showNew)"
-                                              For="@(() => _pwModel.NewPassword)" Disabled="_savingPw" />
-                                <MudTextField @bind-Value="_pwModel.ConfirmPassword" Label="Confirm New Password"
-                                              Variant="Variant.Outlined"
-                                              InputType="@(_showConfirm ? InputType.Text : InputType.Password)"
-                                              Adornment="Adornment.End"
-                                              AdornmentIcon="@(_showConfirm ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                                              OnAdornmentClick="@(() => _showConfirm = !_showConfirm)"
-                                              For="@(() => _pwModel.ConfirmPassword)" Disabled="_savingPw" />
+                                <div class="form-group">
+                                    <label class="form-label">New Password</label>
+                                    <div class="auth-input-with-toggle">
+                                        <input class="form-input auth-input" style="margin-bottom:0;"
+                                               type="@(_showNew ? "text" : "password")"
+                                               @bind="_pwModel.NewPassword" disabled="@_savingPw" />
+                                        <button type="button" class="auth-input-toggle" @onclick="@(() => _showNew = !_showNew)">
+                                            @(_showNew ? "Hide" : "Show")
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Confirm New Password</label>
+                                    <div class="auth-input-with-toggle">
+                                        <input class="form-input auth-input" style="margin-bottom:0;"
+                                               type="@(_showConfirm ? "text" : "password")"
+                                               @bind="_pwModel.ConfirmPassword" disabled="@_savingPw" />
+                                        <button type="button" class="auth-input-toggle" @onclick="@(() => _showConfirm = !_showConfirm)">
+                                            @(_showConfirm ? "Hide" : "Show")
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             @if (!string.IsNullOrEmpty(_pwError))
                             {
-                                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@_pwError</MudAlert>
+                                <div class="auth-error" style="margin-bottom:12px;">@_pwError</div>
                             }
-                            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
-                                       Disabled="_savingPw" Style="min-width:150px;">
-                                @if (_savingPw) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" /><span>Updating…</span> }
+                            <button type="submit" disabled="@_savingPw"
+                                    style="display:flex;align-items:center;gap:8px;padding:9px 20px;border-radius:8px;border:none;
+                                           background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                                           opacity:@(_savingPw ? "0.7" : "1");">
+                                @if (_savingPw)
+                                {
+                                    <span class="auth-spinner" style="width:14px;height:14px;border-width:2px;"></span>
+                                    <span>Updating…</span>
+                                }
                                 else { <span>Update Password</span> }
-                            </MudButton>
+                            </button>
                         </EditForm>
                     </div>
                 }
@@ -272,95 +304,125 @@ else if (AuthState.CurrentUser != null)
     </div>
 }
 
-<!-- Sign Out All Confirmation -->
-<MudDialog @bind-Visible="_signOutAllDialogVisible">
-    <TitleContent><MudText Typo="Typo.h6">Sign Out All Devices</MudText></TitleContent>
-    <DialogContent>
-        <MudText>Are you sure you want to sign out from <b>all devices</b>? You'll need to log in again everywhere.</MudText>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _signOutAllDialogVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="SignOutAllDevices">Sign Out All</MudButton>
-    </DialogActions>
-</MudDialog>
+<!-- Sign Out All Confirmation Modal -->
+@if (_signOutAllDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _signOutAllDialogVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;padding:28px 30px;width:440px;max-width:95vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;">
+        <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:12px;">Sign Out All Devices</div>
+        <p style="font-size:14px;color:#475569;margin-bottom:20px;">
+            Are you sure you want to sign out from <strong>all devices</strong>? You'll need to log in again everywhere.
+        </p>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button @onclick="@(() => _signOutAllDialogVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;
+                           font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="SignOutAllDevices"
+                    style="padding:9px 22px;border-radius:8px;border:none;background:#D97706;color:#fff;
+                           font-size:13px;font-weight:700;cursor:pointer;">
+                Sign Out All
+            </button>
+        </div>
+    </div>
+}
 
-<!-- Enable 2FA Dialog -->
-<MudDialog @bind-Visible="_enable2faDialogVisible"
-           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = false })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.Security" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">Enable Two-Factor Authentication</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        @if (_enable2faStep == 1 && !string.IsNullOrEmpty(_enable2faQrCode))
+<!-- Enable 2FA Modal -->
+@if (_enable2faDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;padding:28px 30px;width:480px;max-width:95vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;">
+        <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:16px;">🔐 Enable Two-Factor Authentication</div>
+        @if (string.IsNullOrEmpty(_enable2faQrCode))
         {
-            <MudStack AlignItems="AlignItems.Center" Spacing="3">
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
-                    Scan this QR code with your authenticator app, then enter the 6-digit code below.
-                </MudText>
-                <MudPaper Elevation="2" Class="pa-3">
-                    <img src="@($"data:image/png;base64,{_enable2faQrCode}")" alt="2FA QR Code" style="width:200px;height:200px;" />
-                </MudPaper>
-                <MudTextField @bind-Value="_enable2faOtp" Label="6-Digit Code" Variant="Variant.Outlined"
-                              InputType="InputType.Number" MaxLength="6" Placeholder="000000" FullWidth="true"
-                              Disabled="_processing2fa" />
-                @if (!string.IsNullOrEmpty(_twoFaError))
-                {
-                    <MudAlert Severity="Severity.Error" Dense="true">@_twoFaError</MudAlert>
-                }
-            </MudStack>
+            <div style="display:flex;justify-content:center;padding:32px 0;">
+                <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
+            </div>
         }
-        else if (string.IsNullOrEmpty(_enable2faQrCode))
+        else if (_enable2faStep == 1)
         {
-            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <p style="font-size:13px;color:#64748B;margin-bottom:16px;text-align:center;">
+                Scan this QR code with your authenticator app, then enter the 6-digit code below.
+            </p>
+            <div style="display:flex;justify-content:center;margin-bottom:16px;">
+                <div style="background:#fff;border-radius:10px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                    <img src="@($"data:image/png;base64,{_enable2faQrCode}")" alt="2FA QR Code" style="width:200px;height:200px;display:block;" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">6-Digit Code</label>
+                <input class="form-input" type="text" @bind="_enable2faOtp" maxlength="6" placeholder="000000"
+                       disabled="@_processing2fa" style="text-align:center;letter-spacing:0.4rem;font-size:1.2rem;" />
+            </div>
+            @if (!string.IsNullOrEmpty(_twoFaError))
+            {
+                <div class="auth-error">@_twoFaError</div>
+            }
         }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="CancelEnable2fa" Disabled="_processing2fa">Cancel</MudButton>
-        @if (_enable2faStep == 1)
-        {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmEnable2faAsync"
-                       Disabled="_processing2fa || _enable2faOtp.Length != 6">
-                @if (_processing2fa) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
-                Verify &amp; Enable
-            </MudButton>
-        }
-    </DialogActions>
-</MudDialog>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+            <button @onclick="CancelEnable2fa" disabled="@_processing2fa"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;
+                           font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            @if (_enable2faStep == 1)
+            {
+                <button @onclick="ConfirmEnable2faAsync"
+                        disabled="@(_processing2fa || _enable2faOtp.Length != 6)"
+                        style="display:flex;align-items:center;gap:8px;padding:9px 22px;border-radius:8px;border:none;
+                               background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                               opacity:@(_processing2fa || _enable2faOtp.Length != 6 ? "0.6" : "1");">
+                    @if (_processing2fa) { <span class="auth-spinner" style="width:14px;height:14px;border-width:2px;"></span> }
+                    Verify &amp; Enable
+                </button>
+            }
+        </div>
+    </div>
+}
 
-<!-- Disable 2FA Dialog -->
-<MudDialog @bind-Visible="_disable2faDialogVisible"
-           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true })">
-    <TitleContent>
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.SecurityUpdateWarning" Color="Color.Warning" />
-            <MudText Typo="Typo.h6">Disable Two-Factor Authentication</MudText>
-        </MudStack>
-    </TitleContent>
-    <DialogContent>
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+<!-- Disable 2FA Modal -->
+@if (_disable2faDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => { _disable2faDialogVisible = false; _disable2faOtp = string.Empty; _twoFaError = null; })"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;padding:28px 30px;width:420px;max-width:95vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;">
+        <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:12px;">⚠️ Disable Two-Factor Authentication</div>
+        <p style="font-size:13px;color:#64748B;margin-bottom:16px;">
             Enter the current 6-digit code from your authenticator app to confirm.
-        </MudText>
-        <MudTextField @bind-Value="_disable2faOtp" Label="6-Digit Code" Variant="Variant.Outlined"
-                      InputType="InputType.Number" MaxLength="6" Placeholder="000000" FullWidth="true"
-                      Disabled="_processing2fa" />
+        </p>
+        <div class="form-group">
+            <label class="form-label">6-Digit Code</label>
+            <input class="form-input" type="text" @bind="_disable2faOtp" maxlength="6" placeholder="000000"
+                   disabled="@_processing2fa" style="text-align:center;letter-spacing:0.4rem;font-size:1.2rem;" />
+        </div>
         @if (!string.IsNullOrEmpty(_twoFaError))
         {
-            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_twoFaError</MudAlert>
+            <div class="auth-error">@_twoFaError</div>
         }
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => { _disable2faDialogVisible = false; _disable2faOtp = string.Empty; _twoFaError = null; })"
-                   Disabled="_processing2fa">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Disable2faAsync"
-                   Disabled="_processing2fa || _disable2faOtp.Length != 6">
-            @if (_processing2fa) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
-            Disable 2FA
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+            <button @onclick="@(() => { _disable2faDialogVisible = false; _disable2faOtp = string.Empty; _twoFaError = null; })"
+                    disabled="@_processing2fa"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;
+                           font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="Disable2faAsync"
+                    disabled="@(_processing2fa || _disable2faOtp.Length != 6)"
+                    style="display:flex;align-items:center;gap:8px;padding:9px 22px;border-radius:8px;border:none;
+                           background:#DC2626;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@(_processing2fa || _disable2faOtp.Length != 6 ? "0.6" : "1");">
+                @if (_processing2fa) { <span class="auth-spinner" style="width:14px;height:14px;border-width:2px;"></span> }
+                Disable 2FA
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     private bool _loading = true;
@@ -448,12 +510,12 @@ else if (AuthState.CurrentUser != null)
                 _initials = string.Join("", result.Data.FullName
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     .Take(2).Select(p => p[0].ToString().ToUpper()));
-                Snackbar.Add("Profile updated successfully!", Severity.Success);
+                Toast.ShowSuccess("Profile updated successfully!");
                 _editingProfile = false;
             }
-            else { Snackbar.Add(result.Message ?? "Failed to update profile.", Severity.Error); }
+            else { Toast.ShowError(result.Message ?? "Failed to update profile."); }
         }
-        catch { Snackbar.Add("An error occurred. Please try again.", Severity.Error); }
+        catch { Toast.ShowError("An error occurred. Please try again."); }
         finally { _savingProfile = false; }
     }
 
@@ -471,7 +533,7 @@ else if (AuthState.CurrentUser != null)
             var result = await AuthClient.ChangePasswordAsync(AuthState.CurrentUser!.UserId, _pwModel);
             if (result.Success)
             {
-                Snackbar.Add("Password updated successfully.", Severity.Success);
+                Toast.ShowSuccess("Password updated successfully.");
                 _pwModel = new ChangePasswordRequestDto();
                 _showPasswordForm = false;
             }
@@ -489,7 +551,7 @@ else if (AuthState.CurrentUser != null)
             await AuthState.ClearAuthStateAsync();
             NavigationManager.NavigateTo("/auth/login", forceLoad: true);
         }
-        else { Snackbar.Add(result.Message ?? "Failed to sign out.", Severity.Error); }
+        else { Toast.ShowError(result.Message ?? "Failed to sign out."); }
     }
 
     private async Task InitiateEnable2faAsync()
@@ -524,7 +586,7 @@ else if (AuthState.CurrentUser != null)
             {
                 _enable2faDialogVisible = false; _enable2faOtp = string.Empty; _enable2faQrCode = string.Empty;
                 _isTwoFactorEnabled = true;
-                Snackbar.Add("Two-factor authentication enabled successfully.", Severity.Success);
+                Toast.ShowSuccess("Two-factor authentication enabled successfully.");
             }
             else { _twoFaError = response.Message ?? "Invalid code. Please try again."; }
         }
@@ -550,7 +612,7 @@ else if (AuthState.CurrentUser != null)
             {
                 _disable2faDialogVisible = false; _disable2faOtp = string.Empty;
                 _isTwoFactorEnabled = false;
-                Snackbar.Add("Two-factor authentication disabled.", Severity.Success);
+                Toast.ShowSuccess("Two-factor authentication disabled.");
             }
             else { _twoFaError = response.Message ?? "Invalid code. Please try again."; }
         }

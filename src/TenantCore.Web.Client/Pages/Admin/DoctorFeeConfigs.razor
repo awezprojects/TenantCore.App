@@ -2,7 +2,7 @@
 @layout AuthorizedLayout
 @inject IDoctorFeeConfigApiClient FeeConfigClient
 @inject IClinicApiClient ClinicClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 <PageTitle>Doctor Fee Configs - TenantCore</PageTitle>
 
@@ -31,7 +31,7 @@
                         <th>Doctor</th>
                         <th>Visit Fee</th>
                         <th>Status</th>
-                        <th style="width:110px;">Actions</th>
+                        <th style="white-space:nowrap;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -157,7 +157,7 @@
         if (response.Success && response.Data is not null)
             _items = response.Data.ToList();
         else if (!response.Success)
-            Snackbar.Add(response.Message, Severity.Error);
+            Toast.ShowError(response.Message ?? "An error occurred.");
         _loading = false;
     }
 
@@ -206,21 +206,21 @@
         {
             var response = await FeeConfigClient.UpdateAsync(_editingId.Value,
                 new UpdateDoctorFeeConfigRequest { VisitFee = _visitFee, IsActive = _isActive });
-            if (response.Success) { Snackbar.Add("Updated.", Severity.Success); CloseDialog(); await LoadAsync(); }
-            else Snackbar.Add(response.Message, Severity.Error);
+            if (response.Success) { Toast.ShowSuccess("Updated."); CloseDialog(); await LoadAsync(); }
+            else Toast.ShowError(response.Message ?? "An error occurred.");
         }
         else
         {
             if (_selectedDoctorProfileId is null)
             {
-                Snackbar.Add("Please select a doctor.", Severity.Warning);
+                Toast.ShowWarning("Please select a doctor.");
                 _saving = false;
                 return;
             }
             var response = await FeeConfigClient.CreateAsync(
                 new CreateDoctorFeeConfigRequest { DoctorProfileId = _selectedDoctorProfileId.Value, VisitFee = _visitFee });
-            if (response.Success) { Snackbar.Add("Fee config created.", Severity.Success); CloseDialog(); await LoadAsync(); }
-            else Snackbar.Add(response.Message, Severity.Error);
+            if (response.Success) { Toast.ShowSuccess("Fee config created."); CloseDialog(); await LoadAsync(); }
+            else Toast.ShowError(response.Message ?? "An error occurred.");
         }
         _saving = false;
     }
@@ -228,7 +228,7 @@
     private async Task DeleteAsync(Guid id)
     {
         var response = await FeeConfigClient.DeleteAsync(id);
-        if (response.Success) { Snackbar.Add("Deleted.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(response.Message, Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Deleted."); await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "An error occurred.");
     }
 }

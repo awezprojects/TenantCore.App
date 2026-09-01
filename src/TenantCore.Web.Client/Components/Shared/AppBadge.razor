@@ -1,0 +1,14 @@
+@* Reusable status badge.
+   Variants: success | danger | warning | info | primary | purple | neutral
+   Usage:
+     <AppBadge Text="Active" Variant="success" />
+     <AppBadge Text="@(item.IsActive ? "Active" : "Inactive")"
+               Variant="@(item.IsActive ? "success" : "danger")" />
+*@
+
+<span class="badge badge-@Variant">@Text</span>
+
+@code {
+    [Parameter] public string Text { get; set; } = string.Empty;
+    [Parameter] public string Variant { get; set; } = "neutral";
+}

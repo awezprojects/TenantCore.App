@@ -1,0 +1,33 @@
+@* Reusable empty state. Shows when a list has no items.
+   Usage:
+     <AppEmptyState Icon="💊" Title="No medicines found"
+                    Message="Try clearing the filters or adding a new medicine." />
+     <AppEmptyState Icon="🏥" Title="No records">
+         <Actions>
+             <button class="btn btn-primary" @onclick="OpenCreate">+ Add First</button>
+         </Actions>
+     </AppEmptyState>
+*@
+
+<div class="app-empty-state">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <div class="app-empty-icon">@Icon</div>
+    }
+    <div class="app-empty-title">@Title</div>
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="app-empty-text">@Message</div>
+    }
+    @if (Actions != null)
+    {
+        <div style="margin-top:16px;">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = "No records found";
+    [Parameter] public string Message { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

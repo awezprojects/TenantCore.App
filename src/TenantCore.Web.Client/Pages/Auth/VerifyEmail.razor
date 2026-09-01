@@ -2,97 +2,61 @@
 @layout AuthLayout
 @inject IAuthApiClient AuthClient
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
 
 <PageTitle>Verify Email — ClinicCore</PageTitle>
 
 <div class="auth-brand">
-    <MudAvatar Size="Size.Small" Color="Color.Primary">
-        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
-    </MudAvatar>
-    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+    <span style="font-size:22px;">🏥</span>
+    <span style="font-weight:700;color:#1a56db;font-size:15px;">ClinicCore</span>
 </div>
 
 @if (_verifying)
 {
-    <MudStack AlignItems="AlignItems.Center" Class="mb-6">
-        <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary"
-                             Style="width: 64px; height: 64px;" />
-    </MudStack>
-    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Verifying Email…</MudText>
-    <MudText Typo="Typo.body2" Style="color: #6B7280;">Please wait while we verify your email address.</MudText>
+    <div style="display:flex;justify-content:center;margin-bottom:24px;">
+        <div class="auth-spinner" style="width:64px;height:64px;border-width:5px;"></div>
+    </div>
+    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Verifying Email…</h2>
+    <p style="color:#6B7280;font-size:14px;">Please wait while we verify your email address.</p>
 }
 else if (_verified)
 {
-    <MudStack AlignItems="AlignItems.Center" Class="mb-6">
-        <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
-                 Style="font-size: 5rem; color: #22C55E; display: block;" />
-    </MudStack>
-    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #22C55E; margin-bottom: 4px;">Email Verified!</MudText>
-    <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">
+    <div style="text-align:center;margin-bottom:20px;"><span style="font-size:80px;">✅</span></div>
+    <h2 style="font-size:22px;font-weight:700;color:#22C55E;margin:0 0 4px;">Email Verified!</h2>
+    <p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">
         Your email is confirmed. You can now sign in to your account.
-    </MudText>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               FullWidth="true"
-               Href="/auth/login"
-               Size="Size.Large"
-               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
-        <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
+    </p>
+    <a href="/auth/login" class="auth-btn-primary"
+       style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
         Sign In
-    </MudButton>
+    </a>
 }
 else if (_error)
 {
-    <MudStack AlignItems="AlignItems.Center" Class="mb-6">
-        <MudIcon Icon="@Icons.Material.Filled.Cancel"
-                 Style="font-size: 5rem; color: #EF4444; display: block;" />
-    </MudStack>
-    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Verification Failed</MudText>
-    <MudAlert Severity="Severity.Error" Class="mb-4" Variant="Variant.Filled">
-        @_errorMessage
-    </MudAlert>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               FullWidth="true"
-               Href="/auth/login"
-               Size="Size.Large"
-               Class="mb-3"
-               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
-        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-2" />
+    <div style="text-align:center;margin-bottom:20px;"><span style="font-size:80px;">❌</span></div>
+    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 12px;">Verification Failed</h2>
+    <div class="auth-error" style="margin-bottom:16px;">@_errorMessage</div>
+    <a href="/auth/login" class="auth-btn-primary"
+       style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:12px;">
         Back to Login
-    </MudButton>
-    <MudStack AlignItems="AlignItems.Center">
-        <MudLink Href="/auth/resend-verification" Typo="Typo.body2" Color="Color.Secondary">
-            Resend Verification Email
-        </MudLink>
-    </MudStack>
+    </a>
+    <div style="text-align:center;">
+        <a href="/auth/resend-verification" class="auth-link" style="font-size:13px;">Resend Verification Email</a>
+    </div>
 }
 else
 {
-    <MudStack AlignItems="AlignItems.Center" Class="mb-6">
-        <MudIcon Icon="@Icons.Material.Filled.LinkOff"
-                 Style="font-size: 5rem; color: #F59E0B; display: block;" />
-    </MudStack>
-    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Invalid Link</MudText>
-    <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">
+    <div style="text-align:center;margin-bottom:20px;"><span style="font-size:80px;">🔗</span></div>
+    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Invalid Link</h2>
+    <p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">
         The verification link is invalid or missing required parameters.
-    </MudText>
-    <MudButton Variant="Variant.Filled"
-               Color="Color.Primary"
-               FullWidth="true"
-               Href="/auth/login"
-               Size="Size.Large"
-               Class="mb-3"
-               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
-        <MudIcon Icon="@Icons.Material.Filled.ArrowBack" Class="mr-2" />
+    </p>
+    <a href="/auth/login" class="auth-btn-primary"
+       style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:12px;">
         Back to Login
-    </MudButton>
-    <MudStack AlignItems="AlignItems.Center">
-        <MudLink Href="/auth/resend-verification" Typo="Typo.body2" Color="Color.Secondary">
-            Resend Verification Email
-        </MudLink>
-    </MudStack>
+    </a>
+    <div style="text-align:center;">
+        <a href="/auth/resend-verification" class="auth-link" style="font-size:13px;">Resend Verification Email</a>
+    </div>
 }
 
 @code {
@@ -134,7 +98,7 @@ else
                 _errorMessage = response.Message ?? "Email verification failed. The link may have expired.";
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _error = true;
             _errorMessage = "An unexpected error occurred during verification. Please try again.";

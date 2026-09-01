@@ -151,6 +151,36 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("Beds", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicFeatureFlags", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("PrepaidOpdEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicFeatureFlags", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicFeeConfig", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1510,6 +1540,19 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .HasColumnType("int");
 
                     b.Property<Guid?>("ReceivedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("RefundDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("RefundStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("RefundedByUserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("RowVersion")

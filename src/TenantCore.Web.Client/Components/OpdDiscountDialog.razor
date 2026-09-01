@@ -1,25 +1,91 @@
 @inject IOpdPaymentApiClient OpdPaymentClient
-@inject ISnackbar Snackbar
+@inject IToastService Toast
+@using TenantCore.Shared.Enums
 
-<MudDialog Visible="Visible" VisibleChanged="VisibleChanged" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">Apply Discount</MudText>
-    </TitleContent>
-    <DialogContent>
+@if (Visible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="Close"></div>
+
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;padding:28px 30px;width:420px;max-width:95vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;">
+
+        <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:18px;">Apply Discount</div>
+
         @if (_payment is not null)
         {
-            <MudText Class="mb-2">Total: Rs. @_payment.TotalAmount.ToString("N2")</MudText>
-            <MudText Class="mb-3">Current Discount: Rs. @_payment.Discount.ToString("N2")</MudText>
+            <div style="font-size:13px;color:#475569;margin-bottom:6px;">
+                Total: <strong>Rs. @_payment.TotalAmount.ToString("N2")</strong>
+            </div>
+            <div style="font-size:13px;color:#475569;margin-bottom:16px;">
+                Current Discount: <strong>Rs. @_payment.Discount.ToString("N2")</strong>
+            </div>
+
+            @if (_payment.RefundStatus == RefundStatus.PendingRefund)
+            {
+                <div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:8px;padding:10px 14px;
+                            font-size:12px;color:#92400E;margin-bottom:16px;">
+                    Refund due to patient: <strong>Rs. @_payment.RefundDue.ToString("N2")</strong> — the fee was
+                    already collected. Hand the amount back, then confirm below.
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+                    <button @onclick="ProcessRefundAsync" disabled="@_applying"
+                            style="padding:9px 20px;border-radius:8px;border:none;background:#16A34A;color:#fff;
+                                   font-size:13px;font-weight:700;cursor:pointer;opacity:@(_applying ? "0.6" : "1");">
+                        @(_applying ? "Processing..." : "Confirm Refund Returned")
+                    </button>
+                </div>
+            }
+            else if (_payment.RefundStatus == RefundStatus.Refunded)
+            {
+                <div style="background:#DCFCE7;border:1.5px solid #BBF7D0;border-radius:8px;padding:10px 14px;
+                            font-size:12px;color:#166534;margin-bottom:16px;">
+                    Refund returned to patient.
+                </div>
+            }
+            else if (_payment.PaymentStatus == PaymentStatus.Received)
+            {
+                <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:8px;padding:10px 14px;
+                            font-size:12px;color:#1E40AF;margin-bottom:16px;">
+                    The fee was already collected (Rs. @_payment.CollectedAmount.ToString("N2")). Cancelling this
+                    appointment? Refund the full amount in one step below.
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+                    <button @onclick="RefundFullAmountAsync" disabled="@_applying"
+                            style="padding:9px 20px;border-radius:8px;border:none;background:#16A34A;color:#fff;
+                                   font-size:13px;font-weight:700;cursor:pointer;opacity:@(_applying ? "0.6" : "1");">
+                        @(_applying ? "Processing..." : $"Refund Full Amount (Rs. {_payment.CollectedAmount:N2})")
+                    </button>
+                </div>
+            }
         }
-        <MudNumericField @bind-Value="_discount" Label="Discount Amount" Min="0" Variant="Variant.Outlined" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="Close">Cancel</MudButton>
-        <MudButton Color="Color.Warning" Variant="Variant.Filled" OnClick="ApplyAsync" Disabled="_applying">
-            @(_applying ? "Applying..." : "Apply")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+
+        <div class="form-group">
+            <label class="form-label">Discount Amount</label>
+            <input type="number" class="form-input" @bind="_discount" min="0" step="0.01"
+                   placeholder="0.00" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:8px;padding:10px 14px;
+                        font-size:12px;color:#B91C1C;margin-bottom:16px;">@_error</div>
+        }
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button @onclick="Close" disabled="@_applying"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;
+                           font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="ApplyAsync" disabled="@_applying"
+                    style="padding:9px 22px;border-radius:8px;border:none;background:#D97706;color:#fff;
+                           font-size:13px;font-weight:700;cursor:pointer;opacity:@(_applying ? "0.6" : "1");">
+                @(_applying ? "Applying..." : "Apply Discount")
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter] public bool Visible { get; set; }
@@ -30,6 +96,7 @@
     private bool _applying;
     private OpdPaymentDto? _payment;
     private decimal _discount;
+    private string? _error;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -38,6 +105,7 @@
             var response = await OpdPaymentClient.GetByOpdAsync(OpdRegistrationId);
             _payment = response.Success ? response.Data : null;
             _discount = _payment?.Discount ?? 0;
+            _error = null;
         }
     }
 
@@ -45,15 +113,69 @@
     {
         if (_payment is null) return;
         _applying = true;
+        _error = null;
         var response = await OpdPaymentClient.ApplyDiscountAsync(_payment.Id,
             new ApplyOpdDiscountRequest { OpdRegistrationId = OpdRegistrationId, Discount = _discount });
         if (response.Success)
         {
-            Snackbar.Add("Discount applied.", Severity.Success);
+            Toast.ShowSuccess("Discount applied.");
             await OnDiscountApplied.InvokeAsync();
             await Close();
         }
-        else Snackbar.Add(response.Message, Severity.Error);
+        else
+        {
+            _error = response.Message ?? "Failed to apply discount.";
+        }
+        _applying = false;
+    }
+
+    private async Task RefundFullAmountAsync()
+    {
+        if (_payment is null) return;
+        _applying = true;
+        _error = null;
+
+        var discountResponse = await OpdPaymentClient.ApplyDiscountAsync(_payment.Id,
+            new ApplyOpdDiscountRequest { OpdRegistrationId = OpdRegistrationId, Discount = _payment.TotalAmount });
+        if (!discountResponse.Success)
+        {
+            _error = discountResponse.Message ?? "Failed to start refund.";
+            _applying = false;
+            return;
+        }
+
+        var refundResponse = await OpdPaymentClient.ProcessRefundAsync(_payment.Id,
+            new ProcessOpdRefundRequest { OpdRegistrationId = OpdRegistrationId });
+        if (refundResponse.Success)
+        {
+            Toast.ShowSuccess("Full amount refunded.");
+            _payment = refundResponse.Data;
+            await OnDiscountApplied.InvokeAsync();
+        }
+        else
+        {
+            _error = refundResponse.Message ?? "Failed to confirm refund.";
+        }
+        _applying = false;
+    }
+
+    private async Task ProcessRefundAsync()
+    {
+        if (_payment is null) return;
+        _applying = true;
+        _error = null;
+        var response = await OpdPaymentClient.ProcessRefundAsync(_payment.Id,
+            new ProcessOpdRefundRequest { OpdRegistrationId = OpdRegistrationId });
+        if (response.Success)
+        {
+            Toast.ShowSuccess("Refund confirmed.");
+            _payment = response.Data;
+            await OnDiscountApplied.InvokeAsync();
+        }
+        else
+        {
+            _error = response.Message ?? "Failed to confirm refund.";
+        }
         _applying = false;
     }
 

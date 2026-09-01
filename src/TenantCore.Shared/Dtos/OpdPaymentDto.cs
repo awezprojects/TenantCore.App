@@ -16,6 +16,11 @@ public class OpdPaymentDto
     public DateTime? AmountReceivedAt { get; init; }
     public Guid? ReceivedByUserId { get; init; }
     public Guid? CounterSessionId { get; init; }
+    public decimal CollectedAmount { get; init; }
+    public decimal RefundDue { get; init; }
+    public RefundStatus RefundStatus { get; init; }
+    public DateTime? RefundedAt { get; init; }
+    public Guid? RefundedByUserId { get; init; }
 }
 
 public sealed record EnsureOpdPaymentRequest
@@ -42,4 +47,9 @@ public sealed record AcceptOpdPaymentFullRequest
 {
     public Guid OpdRegistrationId { get; init; }
     public Guid? CounterSessionId { get; init; }
+}
+
+public sealed record ProcessOpdRefundRequest
+{
+    public Guid OpdRegistrationId { get; init; }
 }

@@ -9,7 +9,7 @@
 @inject ICounterSessionApiClient CounterSessionClient
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @inject NavigationManager Navigation
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Services
@@ -137,7 +137,9 @@
     <!-- Table -->
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        <div style="height:4px;background:linear-gradient(90deg,#1565C0 0%,#42A5F5 50%,#1565C0 100%);
+                    background-size:200% 100%;animation:opdload 1.2s ease infinite;border-radius:2px;margin-bottom:8px;"></div>
+        <style>@@keyframes opdload{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>
     }
     else
     {
@@ -257,6 +259,14 @@
                                             {
                                                 <button class="opd-btn cancelled" @onclick="() => CancelAsync(reg)" disabled="@_updating">Cancel</button>
                                             }
+                                            @if (reg.Status == OpdStatus.Cancelled && NeedsRefund(reg))
+                                            {
+                                                <button class="opd-btn done-btn" @onclick="() => OpenDiscountDialog(reg)">Refund</button>
+                                            }
+                                            @if (reg.Status == OpdStatus.Cancelled && CanDelete(reg))
+                                            {
+                                                <button class="opd-btn delete-btn" @onclick="() => ConfirmDeleteOpd(reg)" disabled="@_updating">Delete</button>
+                                            }
                                         }
                                         @if (_isDoctor)
                                         {
@@ -279,8 +289,24 @@
                 of @(_result?.TotalCount ?? 0) records &mdash; @_dateRangeLabel
             </span>
 
-            <div style="flex:1;display:flex;justify-content:center;">
-                <MudPagination Count="@TotalPages" Selected="_page" SelectedChanged="OnPageChanged" Color="Color.Primary" />
+            <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:4px;">
+                <button @onclick="() => OnPageChanged(_page - 1)" disabled="@(_page <= 1)"
+                        style="width:32px;height:32px;border:1.5px solid #E2E8F0;border-radius:7px;
+                               background:#fff;cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                               opacity:@(_page <= 1 ? "0.4" : "1");">‹</button>
+                @for (int pg = Math.Max(1, _page - 2); pg <= Math.Min(TotalPages, _page + 2); pg++)
+                {
+                    var p = pg;
+                    <button @onclick="() => OnPageChanged(p)"
+                            style="min-width:32px;height:32px;border:1.5px solid @(p == _page ? "#1565C0" : "#E2E8F0");
+                                   border-radius:7px;background:@(p == _page ? "#1565C0" : "#fff");cursor:pointer;
+                                   font-size:12px;font-weight:@(p == _page ? "700" : "500");
+                                   color:@(p == _page ? "#fff" : "#64748B");padding:0 6px;">@p</button>
+                }
+                <button @onclick="() => OnPageChanged(_page + 1)" disabled="@(_page >= TotalPages)"
+                        style="width:32px;height:32px;border:1.5px solid #E2E8F0;border-radius:7px;
+                               background:#fff;cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                               opacity:@(_page >= TotalPages ? "0.4" : "1");">›</button>
             </div>
 
             <!-- Page size selector -->
@@ -396,55 +422,68 @@
 }
 
 <!-- ── New OPD Dialog (reception only) ── -->
-@if (!_isDoctor)
+@if (!_isDoctor && _newDialogVisible)
 {
-    <MudDialog @bind-Visible="_newDialogVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
-        <TitleContent>
-            <MudText Typo="Typo.h6">New OPD Registration</MudText>
-        </TitleContent>
-        <DialogContent>
-            <MudGrid>
-                <MudItem xs="12">
-                    <PatientSearchInput OnPatientSelected="OnOpdPatientSelected"
-                                        Placeholder="Type patient name or phone to search…" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudSelect T="Guid?" Value="_selectedDoctorId" ValueChanged="OnDoctorSelectedAsync"
-                               Label="Select Doctor (optional)" Variant="Variant.Outlined">
-                        <MudSelectItem T="Guid?" Value="null">— No Doctor —</MudSelectItem>
-                        @foreach (var d in _doctors)
-                        {
-                            <MudSelectItem T="Guid?" Value="d.UserId">@d.FullName</MudSelectItem>
-                        }
-                    </MudSelect>
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudNumericField @bind-Value="_fee" Label="Fee (₹)" Variant="Variant.Outlined" Min="0" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudNumericField @bind-Value="_weight" Label="Weight (kg)" Variant="Variant.Outlined" Min="0" Format="F1" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudTextField @bind-Value="_bloodPressure" Label="BP (e.g. 120/80)" Variant="Variant.Outlined" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudNumericField @bind-Value="_pulseRate" Label="Pulse (bpm)" Variant="Variant.Outlined" Min="0" />
-                </MudItem>
-                <MudItem xs="12" sm="3">
-                    <MudNumericField @bind-Value="_oxygenSaturation" Label="O2 Sat. (%)" Variant="Variant.Outlined" Min="0" Max="100" Format="F1" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudTextField @bind-Value="_notes" Label="Reason / Notes" Variant="Variant.Outlined" Lines="2" />
-                </MudItem>
-            </MudGrid>
-        </DialogContent>
-        <DialogActions>
-            <MudButton OnClick="@(() => _newDialogVisible = false)">Cancel</MudButton>
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateOpdAsync" Disabled="_saving">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+         @onclick="@(() => _newDialogVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:540px;max-width:96vw;max-height:90vh;overflow-y:auto;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;" @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;">New OPD Registration</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <PatientSearchInput OnPatientSelected="OnOpdPatientSelected"
+                                Placeholder="Type patient name or phone to search…" />
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Select Doctor (optional)</label>
+                <select class="form-input" @onchange="OnNewOpdDoctorChanged">
+                    <option value="">— No Doctor —</option>
+                    @foreach (var d in _doctors)
+                    {
+                        <option value="@d.UserId" selected="@(_selectedDoctorId == d.UserId)">@d.FullName</option>
+                    }
+                </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Fee (₹)</label>
+                    <input class="form-input" type="number" min="0" @bind="_fee" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Weight (kg)</label>
+                    <input class="form-input" type="number" min="0" step="0.1" @bind="_weight" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">BP (e.g. 120/80)</label>
+                    <input class="form-input" type="text" @bind="_bloodPressure" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Pulse (bpm)</label>
+                    <input class="form-input" type="number" min="0" @bind="_pulseRate" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">O2 Sat. (%)</label>
+                    <input class="form-input" type="number" min="0" max="100" step="0.1" @bind="_oxygenSaturation" />
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Reason / Notes</label>
+                <textarea class="form-input" rows="2" @bind="_notes" style="resize:vertical;min-height:56px;"></textarea>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                           padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="@(() => _newDialogVisible = false)">Cancel</button>
+            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;
+                           opacity:@(_saving ? "0.75" : "1");"
+                    @onclick="CreateOpdAsync" disabled="@_saving">
                 @(_saving ? "Saving..." : "Register")
-            </MudButton>
-        </DialogActions>
-    </MudDialog>
+            </button>
+        </div>
+    </div>
 }
 
 <!-- OPD Particulars Popup (reception) -->
@@ -456,7 +495,40 @@
 <!-- OPD Discount Dialog (doctor) -->
 <OpdDiscountDialog @bind-Visible="_discountVisible" OpdRegistrationId="_discountOpdId" OnDiscountApplied="ReloadAll" />
 
+<!-- Delete Confirmation Dialog -->
+@if (_deleteDialogOpen)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+         @onclick="() => _deleteDialogOpen = false"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:400px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;"
+         @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#EF4444;">Delete OPD Registration</div>
+        </div>
+        <div style="padding:20px 24px;font-size:14px;color:#1E293B;">
+            Permanently delete this cancelled OPD record for <strong>@_deleteTarget?.PatientName</strong>?
+            This cannot be undone.
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                           padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="() => _deleteDialogOpen = false">Cancel</button>
+            <button style="background:#EF4444;color:#fff;border:none;border-radius:8px;
+                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;
+                           opacity:@(_updating ? "0.65" : "1");"
+                    @onclick="ExecuteDeleteOpdAsync" disabled="@_updating">
+                @(_updating ? "Deleting..." : "Delete")
+            </button>
+        </div>
+    </div>
+}
+
 @code {
+    private bool _deleteDialogOpen;
+    private OpdRegistrationDto? _deleteTarget;
+
     private record DatePreset(string Key, string Label, DateTime From, DateTime To);
     private List<DatePreset> _datePresets = [];
 
@@ -597,7 +669,7 @@
             applicationId: _clinicAppId);
 
         if (response.Success) _result = response.Data;
-        else Snackbar.Add(response.Message, Severity.Error);
+        else Toast.ShowError(response.Message ?? "Failed to load.");
         _loading = false;
     }
 
@@ -733,7 +805,7 @@
         if (existing.Success && existing.Data is not null)
             Navigation.NavigateTo($"/prescriptions/{existing.Data.Id}");
         else
-            Snackbar.Add("No prescription found for this visit.", Severity.Warning);
+            Toast.ShowWarning("No prescription found for this visit.");
     }
 
     private async Task StartAsync(OpdRegistrationDto reg)
@@ -741,8 +813,8 @@
         _updating = true;
         var dto = new UpdateOpdRegistrationDto(reg.DoctorUserId, reg.DoctorName, reg.Fee, OpdStatus.InProgress, reg.Notes);
         var result = await ClinicClient.UpdateOpdRegistrationAsync(reg.Id, dto);
-        if (result.Success) { Snackbar.Add("Consultation started.", Severity.Success); await ReloadAll(); }
-        else Snackbar.Add(result.Message, Severity.Error);
+        if (result.Success) { Toast.ShowSuccess("Consultation started."); await ReloadAll(); }
+        else Toast.ShowError(result.Message ?? "Failed.");
         _updating = false;
     }
 
@@ -751,8 +823,8 @@
         _updating = true;
         var dto = new UpdateOpdRegistrationDto(reg.DoctorUserId, reg.DoctorName, reg.Fee, OpdStatus.Completed, reg.Notes);
         var result = await ClinicClient.UpdateOpdRegistrationAsync(reg.Id, dto);
-        if (result.Success) { Snackbar.Add("Visit marked as completed.", Severity.Success); await ReloadAll(); }
-        else Snackbar.Add(result.Message, Severity.Error);
+        if (result.Success) { Toast.ShowSuccess("Visit marked as completed."); await ReloadAll(); }
+        else Toast.ShowError(result.Message ?? "Failed.");
         _updating = false;
     }
 
@@ -761,8 +833,39 @@
         _updating = true;
         var dto = new UpdateOpdRegistrationDto(reg.DoctorUserId, reg.DoctorName, reg.Fee, OpdStatus.Cancelled, reg.Notes);
         var result = await ClinicClient.UpdateOpdRegistrationAsync(reg.Id, dto);
-        if (result.Success) { Snackbar.Add("Appointment cancelled.", Severity.Success); await ReloadAll(); }
-        else Snackbar.Add(result.Message, Severity.Error);
+        if (result.Success) { Toast.ShowSuccess("Appointment cancelled."); await ReloadAll(); }
+        else Toast.ShowError(result.Message ?? "Failed.");
+        _updating = false;
+    }
+
+    private static bool CanDelete(OpdRegistrationDto reg) =>
+        reg.PaymentStatus is null or PaymentStatus.Pending || reg.RefundStatus == RefundStatus.Refunded;
+
+    private static bool NeedsRefund(OpdRegistrationDto reg) =>
+        reg.PaymentStatus == PaymentStatus.Received && reg.RefundStatus != RefundStatus.Refunded;
+
+    private void ConfirmDeleteOpd(OpdRegistrationDto reg)
+    {
+        _deleteTarget = reg;
+        _deleteDialogOpen = true;
+    }
+
+    private async Task ExecuteDeleteOpdAsync()
+    {
+        if (_deleteTarget is null) return;
+        _updating = true;
+        var result = await ClinicClient.DeleteOpdRegistrationAsync(_deleteTarget.Id);
+        if (result.Success)
+        {
+            Toast.ShowSuccess("OPD registration deleted.");
+            _deleteDialogOpen = false;
+            _deleteTarget = null;
+            await ReloadAll();
+        }
+        else
+        {
+            Toast.ShowError(result.Message ?? "Failed to delete.");
+        }
         _updating = false;
     }
 
@@ -772,7 +875,7 @@
 
         if (_activeSessionId is null)
         {
-            Snackbar.Add("No active counter session. Open a counter session first.", Severity.Warning);
+            Toast.ShowWarning("No active counter session. Open a counter session first.", "Open counter session", "/counter-session");
             _updating = false;
             return;
         }
@@ -780,7 +883,7 @@
         var paymentResp = await OpdPaymentClient.GetByOpdAsync(reg.Id);
         if (!paymentResp.Success || paymentResp.Data is null)
         {
-            Snackbar.Add("Payment record not found for this visit.", Severity.Error);
+            Toast.ShowError("Payment record not found for this visit.");
             _updating = false;
             return;
         }
@@ -807,11 +910,11 @@
 
         if (acceptResp.Success)
         {
-            Snackbar.Add($"₹{collectedAmount:N0} collected for {reg.PatientName}.", Severity.Success);
+            Toast.ShowSuccess($"₹{collectedAmount:N0} collected for {reg.PatientName}.");
             await ReloadAll();
         }
         else
-            Snackbar.Add(acceptResp.Message, Severity.Error);
+            Toast.ShowError(acceptResp.Message ?? "Payment failed.");
 
         _updating = false;
     }
@@ -843,7 +946,7 @@
 
     private async Task CreateOpdAsync()
     {
-        if (_selectedPatientId == Guid.Empty) { Snackbar.Add("Please select a patient.", Severity.Warning); return; }
+        if (_selectedPatientId == Guid.Empty) { Toast.ShowWarning("Please select a patient."); return; }
         _saving = true;
         var doctor = _selectedDoctorId.HasValue ? _doctors.FirstOrDefault(d => d.UserId == _selectedDoctorId) : null;
         var dto = new CreateOpdRegistrationDto(
@@ -857,11 +960,13 @@
         var response = await ClinicClient.CreateOpdRegistrationAsync(dto);
         if (response.Success)
         {
-            Snackbar.Add($"OPD registration {response.Data?.RegistrationNumber} created.", Severity.Success);
+            Toast.ShowSuccess($"OPD registration {response.Data?.RegistrationNumber} created.");
             _newDialogVisible = false;
             await ReloadAll();
         }
-        else Snackbar.Add(response.Message, Severity.Error);
+        else if (response.Message?.Contains("counter session", StringComparison.OrdinalIgnoreCase) == true)
+            Toast.ShowError(response.Message, "Open counter session", "/counter-session");
+        else Toast.ShowError(response.Message ?? "Failed to create.");
         _saving = false;
     }
 
@@ -897,5 +1002,12 @@
     {
         _filterDoctorId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
         await ReloadAll();
+    }
+
+    private async Task OnNewOpdDoctorChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        Guid? newId = string.IsNullOrEmpty(val) ? null : Guid.TryParse(val, out var id) ? id : (Guid?)null;
+        await OnDoctorSelectedAsync(newId);
     }
 }

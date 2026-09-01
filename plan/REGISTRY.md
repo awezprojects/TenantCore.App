@@ -45,6 +45,8 @@ This table is the fastest way for the plan command to check "does this already e
 | Counter Sessions | CounterSession | Executed | Reception daily shift session tracking collections and expenses |
 | Amount Handovers | AmountHandover | Executed | Handover workflow from reception to doctor/admin with acceptance status |
 | Finance Reports | — (no new entity) | Executed | Day/week/month/date-range/reception-wise/expense-summary reports dashboard |
+| Clinic Feature Flags | ClinicFeatureFlags | Executed | Extensible per-clinic settings/toggle area; ships with PrepaidOpdEnabled (default true) |
+| Prepaid OPD Fee Collection & Refund | — (extends OpdPayment) | Executed | When PrepaidOpdEnabled, visit fee auto-collected at booking; RefundDue/RefundStatus on OpdPayment track post-collection discount refunds; reception confirms refund via new endpoint; cancelled OPD registrations can be hard-deleted once refund-clear |
 
 ---
 
@@ -59,6 +61,8 @@ This table is the fastest way for the plan command to check "does this already e
 | auth-screens-redesign | 2026-06-18 | 2026-06-18 | — | — | 0 | 9 |
 | clinic-admin-role-ui-fixes | 2026-06-18 | 2026-06-18 | — | — | 0 | 3 |
 | role-authorization-hardening | 2026-06-18 | 2026-06-18 | — | — | 0 | 11 |
+| remove-mudblazor | 2026-06-22 | 2026-06-22 | — | — | 0 | 10 |
+| prepaid-opd-fee-collection | 2026-08-31 | 2026-08-31 | ClinicFeatureFlags | ClinicFeatureFlags | 19 | 18 |
 
 ---
 
@@ -67,6 +71,7 @@ This table is the fastest way for the plan command to check "does this already e
 | Feature | Plan Date | Plan File |
 |---------|-----------|-----------|
 | counter-expenses-management | 2026-06-18 | [plan/counter-expenses-management/PLAN.md](counter-expenses-management/PLAN.md) |
+| auth-consolidation-monolith | 2026-07-21 | [plan/auth-consolidation-monolith/PLAN.md](auth-consolidation-monolith/PLAN.md) — merges TenantCore.Auth into App as internal projects (single deployment, single DB, two DbContexts) |
 
 ---
 

@@ -21,6 +21,12 @@ public class OpdPayment : AuditableEntity
     // AcceptVisitFee sets this to VisitFee; AcceptFull sets it to FinalAmount (discount case).
     public decimal CollectedAmount { get; private set; }
 
+    // Amount still owed back to the patient after a post-collection discount. 0 when nothing is due.
+    public decimal RefundDue { get; private set; }
+    public RefundStatus RefundStatus { get; private set; }
+    public DateTime? RefundedAt { get; private set; }
+    public Guid? RefundedByUserId { get; private set; }
+
     private OpdPayment() { }
 
     public static OpdPayment Create(Guid applicationId, Guid opdRegistrationId, decimal visitFee) => new()
@@ -34,6 +40,8 @@ public class OpdPayment : AuditableEntity
         FinalAmount = visitFee,
         PaymentStatus = PaymentStatus.Pending,
         CollectedAmount = 0,
+        RefundDue = 0,
+        RefundStatus = RefundStatus.None,
         CreatedAt = DateTime.UtcNow
     };
 
@@ -49,6 +57,28 @@ public class OpdPayment : AuditableEntity
     {
         Discount = discount;
         FinalAmount = TotalAmount - discount;
+
+        // If the fee was already collected, a lower FinalAmount means cash is now owed back to the patient.
+        if (PaymentStatus == PaymentStatus.Received && FinalAmount < CollectedAmount)
+        {
+            RefundDue = CollectedAmount - FinalAmount;
+            RefundStatus = RefundStatus.PendingRefund;
+        }
+
+        SetUpdatedAt();
+    }
+
+    // Reception confirms the refund-due amount was physically handed back to the patient.
+    public void ProcessRefund(Guid refundedByUserId)
+    {
+        if (RefundStatus != RefundStatus.PendingRefund)
+            throw new InvalidOperationException("No refund is pending for this payment.");
+
+        CollectedAmount -= RefundDue;
+        RefundDue = 0;
+        RefundStatus = RefundStatus.Refunded;
+        RefundedAt = DateTime.UtcNow;
+        RefundedByUserId = refundedByUserId;
         SetUpdatedAt();
     }
 

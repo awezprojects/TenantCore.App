@@ -1,0 +1,44 @@
+@* Reusable pagination bar with count label + page buttons.
+   Usage:
+     <AppPagination CurrentPage="_page" TotalPages="TotalPages" TotalCount="_result.TotalCount"
+                    ItemLabel="medicines" PageSize="PageSize" ItemCount="_result.Items.Count"
+                    OnPageChanged="OnPageChanged" />
+*@
+
+<div class="app-pagination">
+    <span>
+        Showing @ItemCount of @TotalCount @ItemLabel
+    </span>
+    <div class="app-pagination-controls">
+        <button class="app-page-btn" @onclick="() => Go(CurrentPage - 1)"
+                disabled="@(CurrentPage <= 1)">‹</button>
+        @foreach (var p in Pages)
+        {
+            var pg = p;
+            <button class="app-page-btn @(pg == CurrentPage ? "app-page-btn--active" : "")"
+                    @onclick="() => Go(pg)">@pg</button>
+        }
+        <button class="app-page-btn" @onclick="() => Go(CurrentPage + 1)"
+                disabled="@(CurrentPage >= TotalPages)">›</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; } = 1;
+    [Parameter] public int TotalCount { get; set; }
+    [Parameter] public int ItemCount { get; set; }
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public string ItemLabel { get; set; } = "items";
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+
+    private IEnumerable<int> Pages =>
+        Enumerable.Range(Math.Max(1, CurrentPage - 2), Math.Min(5, TotalPages))
+                  .Where(p => p >= 1 && p <= TotalPages);
+
+    private async Task Go(int page)
+    {
+        if (page < 1 || page > TotalPages || page == CurrentPage) return;
+        await OnPageChanged.InvokeAsync(page);
+    }
+}

@@ -1,0 +1,76 @@
+@page "/settings/feature-flags"
+@layout AuthorizedLayout
+@inject IClinicApiClient ClinicClient
+@inject IToastService Toast
+@using TenantCore.Shared.Dtos
+
+<PageTitle>Feature Flags - Settings</PageTitle>
+
+<div class="opd-header">
+    <div>
+        <div class="opd-header-title">Feature Flags</div>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:40px 0;">
+        <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+    </div>
+}
+else
+{
+    <div style="background:#fff;border-radius:14px;border:1px solid #E2E8F0;padding:22px;max-width:520px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+            <div>
+                <div style="font-size:14px;font-weight:800;color:#1E293B;">Prepaid OPD Fee Collection</div>
+                <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.5;">
+                    When enabled, the OPD visit fee is collected automatically the moment a receptionist
+                    books an appointment. When disabled, the fee stays Pending until reception collects it manually.
+                </div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;cursor:pointer;">
+                <input type="checkbox" checked="@_prepaidOpdEnabled" @onchange="TogglePrepaidOpdAsync"
+                       disabled="@_saving" style="opacity:0;width:0;height:0;" />
+                <span style="position:absolute;inset:0;background:@(_prepaidOpdEnabled ? "#1565C0" : "#CBD5E1");
+                             border-radius:24px;transition:background 0.15s;"></span>
+                <span style="position:absolute;top:3px;left:@(_prepaidOpdEnabled ? "23px" : "3px");
+                             width:18px;height:18px;background:#fff;border-radius:50%;transition:left 0.15s;
+                             box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
+            </label>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private bool _prepaidOpdEnabled = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await ClinicClient.GetFeatureFlagsAsync();
+        if (r.Success && r.Data is not null)
+            _prepaidOpdEnabled = r.Data.PrepaidOpdEnabled;
+        else if (!r.Success)
+            Toast.ShowError(r.Message ?? "Failed to load feature flags.");
+        _loading = false;
+    }
+
+    private async Task TogglePrepaidOpdAsync(ChangeEventArgs e)
+    {
+        var newValue = e.Value is bool b && b;
+        _saving = true;
+        var r = await ClinicClient.UpdateFeatureFlagsAsync(new UpdateClinicFeatureFlagsDto(newValue));
+        if (r.Success)
+        {
+            _prepaidOpdEnabled = newValue;
+            Toast.ShowSuccess("Feature flag updated.");
+        }
+        else
+        {
+            Toast.ShowError(r.Message ?? "Failed to update feature flag.");
+        }
+        _saving = false;
+    }
+}

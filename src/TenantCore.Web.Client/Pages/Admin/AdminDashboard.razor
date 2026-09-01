@@ -12,7 +12,7 @@
 @if (_loading)
 {
     <div style="display:flex;justify-content:center;align-items:center;padding:60px 0;">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <div class="auth-spinner" style="width:48px;height:48px;border-width:4px;"></div>
     </div>
 }
 else
@@ -30,72 +30,64 @@ else
                 </div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.HolidayVillage"
-                           Href="/admin/wards"
-                           Style="border-radius:8px;font-weight:600;text-transform:none;">
+                <a href="/admin/wards"
+                   style="display:inline-flex;align-items:center;padding:9px 18px;border-radius:8px;
+                          border:1.5px solid #1565C0;background:#fff;color:#1565C0;font-size:13px;font-weight:700;
+                          text-decoration:none;">
                     Manage Wards
-                </MudButton>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Bed"
-                           Href="/ipd"
-                           Style="border-radius:8px;font-weight:600;text-transform:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
-                    IPD & Beds
-                </MudButton>
+                </a>
+                <a href="/ipd"
+                   style="display:inline-flex;align-items:center;padding:9px 18px;border-radius:8px;
+                          border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;
+                          text-decoration:none;box-shadow:0 3px 10px rgba(21,101,192,0.3);">
+                    IPD &amp; Beds
+                </a>
             </div>
         </div>
 
         <!-- Stat Cards -->
-        <MudGrid Spacing="3">
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#EFF6FF;cursor:pointer;" @onclick='() => Nav.NavigateTo("/admin/wards")'>
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">TOTAL WARDS</div>
-                            <div class="cc-stat-value">@_totalWards</div>
-                            <div class="cc-stat-sub">Active wards</div>
-                        </div>
-                        <div class="cc-stat-icon">🏨</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+            <div class="cc-stat-card" style="background:#EFF6FF;cursor:pointer;" @onclick='() => Nav.NavigateTo("/admin/wards")'>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">TOTAL WARDS</div>
+                        <div class="cc-stat-value">@_totalWards</div>
+                        <div class="cc-stat-sub">Active wards</div>
                     </div>
+                    <div class="cc-stat-icon">🏨</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#FAF5FF;cursor:pointer;" @onclick='() => Nav.NavigateTo("/admin/wards")'>
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">TOTAL ROOMS</div>
-                            <div class="cc-stat-value" style="color:#7C3AED;">@_totalRooms</div>
-                            <div class="cc-stat-sub">Across all wards</div>
-                        </div>
-                        <div class="cc-stat-icon">🚪</div>
+            </div>
+            <div class="cc-stat-card" style="background:#FAF5FF;cursor:pointer;" @onclick='() => Nav.NavigateTo("/admin/wards")'>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">TOTAL ROOMS</div>
+                        <div class="cc-stat-value" style="color:#7C3AED;">@_totalRooms</div>
+                        <div class="cc-stat-sub">Across all wards</div>
                     </div>
+                    <div class="cc-stat-icon">🚪</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#ECFDF5;cursor:pointer;" @onclick='() => Nav.NavigateTo("/ipd")'>
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">AVAILABLE BEDS</div>
-                            <div class="cc-stat-value" style="color:#16A34A;">@_availableBeds</div>
-                            <div class="cc-stat-sub">Ready for patients</div>
-                        </div>
-                        <div class="cc-stat-icon">🛏</div>
+            </div>
+            <div class="cc-stat-card" style="background:#ECFDF5;cursor:pointer;" @onclick='() => Nav.NavigateTo("/ipd")'>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">AVAILABLE BEDS</div>
+                        <div class="cc-stat-value" style="color:#16A34A;">@_availableBeds</div>
+                        <div class="cc-stat-sub">Ready for patients</div>
                     </div>
+                    <div class="cc-stat-icon">🛏</div>
                 </div>
-            </MudItem>
-            <MudItem xs="12" sm="6" md="3">
-                <div class="cc-stat-card" style="background:#FEF3C7;cursor:pointer;" @onclick='() => Nav.NavigateTo("/ipd")'>
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <div>
-                            <div class="cc-stat-label">OCCUPIED BEDS</div>
-                            <div class="cc-stat-value" style="color:#D97706;">@_occupiedBeds</div>
-                            <div class="cc-stat-sub">Currently in use</div>
-                        </div>
-                        <div class="cc-stat-icon">🩺</div>
+            </div>
+            <div class="cc-stat-card" style="background:#FEF3C7;cursor:pointer;" @onclick='() => Nav.NavigateTo("/ipd")'>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                    <div>
+                        <div class="cc-stat-label">OCCUPIED BEDS</div>
+                        <div class="cc-stat-value" style="color:#D97706;">@_occupiedBeds</div>
+                        <div class="cc-stat-sub">Currently in use</div>
                     </div>
+                    <div class="cc-stat-icon">🩺</div>
                 </div>
-            </MudItem>
-        </MudGrid>
+            </div>
+        </div>
 
         <!-- Ward Overview -->
         <div class="cc-card">
@@ -212,24 +204,21 @@ else
 
         <!-- Quick Actions -->
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.HolidayVillage"
-                       Href="/admin/wards"
-                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+            <a href="/admin/wards"
+               style="display:inline-flex;align-items:center;padding:10px 20px;border-radius:8px;
+                      border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;text-decoration:none;">
                 Manage Wards &amp; Rooms
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
-                       StartIcon="@Icons.Material.Filled.Bed"
-                       Href="/ipd"
-                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+            </a>
+            <a href="/ipd"
+               style="display:inline-flex;align-items:center;padding:10px 20px;border-radius:8px;
+                      border:1.5px solid #1565C0;background:#fff;color:#1565C0;font-size:13px;font-weight:700;text-decoration:none;">
                 IPD &amp; Bed Management
-            </MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Secondary"
-                       StartIcon="@Icons.Material.Filled.People"
-                       Href="/patients"
-                       Style="border-radius:8px;font-weight:600;text-transform:none;">
+            </a>
+            <a href="/patients"
+               style="display:inline-flex;align-items:center;padding:10px 20px;border-radius:8px;
+                      border:1.5px solid #7C3AED;background:#fff;color:#7C3AED;font-size:13px;font-weight:700;text-decoration:none;">
                 Patient Registry
-            </MudButton>
+            </a>
         </div>
 
     </div>

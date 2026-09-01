@@ -1,7 +1,7 @@
 @page "/admin/wards"
 @layout AuthorizedLayout
 @inject IClinicApiClient ClinicApi
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject NavigationManager Navigation
@@ -12,7 +12,7 @@
 @if (_loading)
 {
     <div style="display:flex;justify-content:center;align-items:center;padding:80px 0;">
-        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <div class="auth-spinner" style="width:48px;height:48px;border-width:4px;"></div>
     </div>
 }
 else
@@ -29,7 +29,7 @@ else
         </div>
 
         <!-- ── Summary stat row ── -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;">
             <div style="background:#EFF6FF;border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;">
                 <div>
                     <div style="font-size:11px;font-weight:700;color:#94A3B8;letter-spacing:0.6px;margin-bottom:4px;">WARDS</div>
@@ -82,7 +82,6 @@ else
                     var occ      = ward.BedCount - ward.AvailableBeds;
                     var pct      = ward.BedCount == 0 ? 0 : (int)(occ * 100.0 / ward.BedCount);
 
-                    <!-- Ward card -->
                     <div style="background:#fff;border:1px solid #E2E8F0;border-radius:16px;overflow:visible;">
 
                         <!-- Ward header row -->
@@ -91,14 +90,12 @@ else
                                      border-radius:@(isOpen ? "16px 16px 0 0" : "16px");"
                              @onclick="() => ToggleWard(ward.Id)">
 
-                            <!-- Color indicator -->
                             <div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;
                                          background:@($"{color}18");
                                          display:flex;align-items:center;justify-content:center;">
                                 <div style="width:16px;height:16px;border-radius:5px;background:@color;"></div>
                             </div>
 
-                            <!-- Ward info -->
                             <div style="flex:1;min-width:0;">
                                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                                     <span style="font-size:15px;font-weight:800;color:#1E293B;">@ward.Name</span>
@@ -117,13 +114,10 @@ else
                                 </div>
                             </div>
 
-                            <!-- Actions -->
                             <div style="display:flex;gap:8px;align-items:center;" @onclick:stopPropagation="true">
                                 <button style="@BtnLight" @onclick="() => OpenCreateRoom(ward)">＋ Room</button>
                                 <button style="@BtnGhost" @onclick="() => OpenEditWard(ward)">Edit</button>
-                                <button style="@BtnIcon" title="Delete ward"
-                                        @onmouseenter="@(e => { })" @onmouseleave="@(e => { })"
-                                        @onclick="() => OpenDeleteWard(ward)">🗑</button>
+                                <button style="@BtnGhost;color:#EF4444;border-color:#FECACA;" @onclick="() => OpenDeleteWard(ward)">Delete</button>
                                 <span style="font-size:13px;color:#94A3B8;transition:transform 0.2s;
                                              transform:@(isOpen ? "rotate(90deg)" : "none");display:inline-block;">▸</span>
                             </div>
@@ -149,7 +143,6 @@ else
                                         var rOcc = room.BedCount - room.AvailableBeds;
 
                                         <div style="border:1px solid #E2E8F0;border-radius:12px;padding:14px 16px;margin-top:12px;">
-                                            <!-- Room header -->
                                             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
                                                 <span style="font-size:14px;font-weight:700;color:#1E293B;">@room.RoomNumber</span>
                                                 @if (!string.IsNullOrEmpty(room.RoomType))
@@ -169,11 +162,9 @@ else
                                                 <div style="flex:1;"></div>
                                                 <button style="@BtnLight;font-size:12px;padding:5px 12px;" @onclick="() => OpenAddBed(room, ward)">＋ Bed</button>
                                                 <button style="@BtnGhost;font-size:12px;padding:5px 12px;" @onclick="() => OpenEditRoom(room, ward)">Edit</button>
-                                                <button style="@BtnIcon;width:28px;height:28px;" title="Delete room"
-                                                        @onclick="() => OpenDeleteRoom(room, ward)">🗑</button>
+                                                <button style="@BtnGhost;font-size:12px;padding:5px 12px;color:#EF4444;border-color:#FECACA;" @onclick="() => OpenDeleteRoom(room, ward)">Delete</button>
                                             </div>
 
-                                            <!-- Bed chips -->
                                             <div style="display:flex;flex-wrap:wrap;gap:7px;">
                                                 @if (!room.Beds.Any())
                                                 {
@@ -196,7 +187,6 @@ else
                                                                            color:#CBD5E1;font-size:15px;line-height:1;padding:0;
                                                                            margin-left:2px;"
                                                                     title="Remove bed"
-                                                                    @onmouseover="@((e) => { })"
                                                                     @onclick:stopPropagation="true"
                                                                     @onclick="() => ConfirmDeleteBed(bed, room, ward)">×</button>
                                                         }
@@ -216,118 +206,134 @@ else
     </div>
 }
 
-<!-- ── Create / Edit Ward Dialog ── -->
-<MudDialog @bind-Visible="_wardDialogVisible"
-           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
-    <TitleContent>
-        <div style="font-size:17px;font-weight:700;color:#1E293B;">
-            @(_editingWard == null ? "New Ward" : "Edit Ward")
+<!-- Create / Edit Ward Modal -->
+@if (_wardDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _wardDialogVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:440px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:17px;font-weight:700;color:#1E293B;">@(_editingWard == null ? "New Ward" : "Edit Ward")</div>
         </div>
-    </TitleContent>
-    <DialogContent>
-        <div style="display:flex;flex-direction:column;gap:14px;padding-top:4px;">
-            <MudTextField @bind-Value="_wardName" Label="Ward Name *" Variant="Variant.Outlined"
-                          Placeholder="e.g. General Ward, ICU, Maternity" Disabled="_saving" />
-            <MudTextField @bind-Value="_wardDescription" Label="Description (optional)"
-                          Variant="Variant.Outlined" Lines="2" Disabled="_saving" />
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Ward Name *</label>
+                <input class="form-input" type="text" placeholder="e.g. General Ward, ICU, Maternity"
+                       @bind="_wardName" disabled="@_saving" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Description (optional)</label>
+                <textarea class="form-input" rows="2" @bind="_wardDescription" disabled="@_saving"
+                          style="resize:vertical;min-height:60px;"></textarea>
+            </div>
         </div>
-    </DialogContent>
-    <DialogActions>
-        <div style="display:flex;gap:10px;padding:4px;">
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
             <button style="@BtnGhost" @onclick="@(() => _wardDialogVisible = false)" disabled="@_saving">Cancel</button>
-            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_wardName) || _saving ? "opacity:0.5;cursor:not-allowed;" : "")"
+            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_wardName)||_saving?"opacity:0.5;cursor:not-allowed;":"")"
                     @onclick="SaveWard" disabled="@(string.IsNullOrWhiteSpace(_wardName) || _saving)">
                 @(_saving ? "Saving…" : (_editingWard == null ? "Create Ward" : "Save Changes"))
             </button>
         </div>
-    </DialogActions>
-</MudDialog>
+    </div>
+}
 
-<!-- ── Create / Edit Room Dialog ── -->
-<MudDialog @bind-Visible="_roomDialogVisible"
-           Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true })">
-    <TitleContent>
-        <div style="font-size:17px;font-weight:700;color:#1E293B;">
-            @(_editingRoom == null ? $"New Room · {_targetWard?.Name}" : "Edit Room")
+<!-- Create / Edit Room Modal -->
+@if (_roomDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _roomDialogVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:440px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:17px;font-weight:700;color:#1E293B;">
+                @(_editingRoom == null ? $"New Room · {_targetWard?.Name}" : "Edit Room")
+            </div>
         </div>
-    </TitleContent>
-    <DialogContent>
-        <div style="display:flex;flex-direction:column;gap:14px;padding-top:4px;">
-            <MudTextField @bind-Value="_roomNumber" Label="Room Number *" Variant="Variant.Outlined"
-                          Placeholder="e.g. 101, A-1, ICU Bay A" Disabled="_saving" />
-            <MudSelect @bind-Value="_roomType" Label="Room Type" Variant="Variant.Outlined" Disabled="_saving">
-                <MudSelectItem T="string?" Value="@((string?)null)">— Select type —</MudSelectItem>
-                @foreach (var t in _roomTypes)
-                {
-                    <MudSelectItem T="string?" Value="t">@t</MudSelectItem>
-                }
-            </MudSelect>
-            <MudNumericField @bind-Value="_roomPrice" Label="Price Per Day (₹) *"
-                             Variant="Variant.Outlined" Min="0m" Disabled="_saving" />
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Room Number *</label>
+                <input class="form-input" type="text" placeholder="e.g. 101, A-1, ICU Bay A"
+                       @bind="_roomNumber" disabled="@_saving" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Room Type</label>
+                <select class="form-input" style="margin-bottom:0;" @bind="_roomType" disabled="@_saving">
+                    <option value="">— Select type —</option>
+                    @foreach (var t in _roomTypes)
+                    {
+                        <option value="@t">@t</option>
+                    }
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Price Per Day (₹) *</label>
+                <input class="form-input" type="number" min="0" step="0.01"
+                       @bind="_roomPrice" disabled="@_saving" />
+            </div>
         </div>
-    </DialogContent>
-    <DialogActions>
-        <div style="display:flex;gap:10px;padding:4px;">
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
             <button style="@BtnGhost" @onclick="@(() => _roomDialogVisible = false)" disabled="@_saving">Cancel</button>
-            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_roomNumber) || _saving ? "opacity:0.5;cursor:not-allowed;" : "")"
+            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_roomNumber)||_saving?"opacity:0.5;cursor:not-allowed;":"")"
                     @onclick="SaveRoom" disabled="@(string.IsNullOrWhiteSpace(_roomNumber) || _saving)">
                 @(_saving ? "Saving…" : (_editingRoom == null ? "Create Room" : "Save Changes"))
             </button>
         </div>
-    </DialogActions>
-</MudDialog>
+    </div>
+}
 
-<!-- ── Add Bed Dialog ── -->
-<MudDialog @bind-Visible="_bedDialogVisible"
-           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
-    <TitleContent>
-        <div style="font-size:17px;font-weight:700;color:#1E293B;">
-            Add Bed · Room @_targetRoom?.RoomNumber
+<!-- Add Bed Modal -->
+@if (_bedDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _bedDialogVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:380px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:17px;font-weight:700;color:#1E293B;">Add Bed · Room @_targetRoom?.RoomNumber</div>
         </div>
-    </TitleContent>
-    <DialogContent>
-        <div style="padding-top:4px;">
-            <MudTextField @bind-Value="_bedNumber" Label="Bed Number *" Variant="Variant.Outlined"
-                          Placeholder="e.g. B1, 1, A" Disabled="_saving"
-                          @onkeyup="@(async (e) => { if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_bedNumber)) await SaveBed(); })" />
+        <div style="padding:20px 24px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Bed Number *</label>
+                <input class="form-input" type="text" placeholder="e.g. B1, 1, A"
+                       @bind="_bedNumber" disabled="@_saving"
+                       @onkeyup="@(async (e) => { if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_bedNumber)) await SaveBed(); })" />
+            </div>
         </div>
-    </DialogContent>
-    <DialogActions>
-        <div style="display:flex;gap:10px;padding:4px;">
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
             <button style="@BtnGhost" @onclick="@(() => _bedDialogVisible = false)" disabled="@_saving">Cancel</button>
-            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_bedNumber) || _saving ? "opacity:0.5;cursor:not-allowed;" : "")"
+            <button style="@BtnPrimary;@(string.IsNullOrWhiteSpace(_bedNumber)||_saving?"opacity:0.5;cursor:not-allowed;":"")"
                     @onclick="SaveBed" disabled="@(string.IsNullOrWhiteSpace(_bedNumber) || _saving)">
                 @(_saving ? "Saving…" : "Add Bed")
             </button>
         </div>
-    </DialogActions>
-</MudDialog>
+    </div>
+}
 
-<!-- ── Delete Confirm Dialog ── -->
-<MudDialog @bind-Visible="_deleteDialogVisible"
-           Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseButton = true })">
-    <TitleContent>
-        <div style="font-size:17px;font-weight:700;color:#EF4444;">⚠ Confirm Delete</div>
-    </TitleContent>
-    <DialogContent>
-        <div style="font-size:14px;color:#1E293B;line-height:1.6;padding-top:4px;">@_deleteMessage</div>
-    </DialogContent>
-    <DialogActions>
-        <div style="display:flex;gap:10px;padding:4px;">
+<!-- Delete Confirm Modal -->
+@if (_deleteDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _deleteDialogVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:380px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:17px;font-weight:700;color:#EF4444;">Confirm Delete</div>
+        </div>
+        <div style="padding:20px 24px;font-size:14px;color:#1E293B;line-height:1.6;">@_deleteMessage</div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
             <button style="@BtnGhost" @onclick="@(() => _deleteDialogVisible = false)" disabled="@_saving">Cancel</button>
             <button style="@BtnDanger" @onclick="ExecuteDelete" disabled="@_saving">
                 @(_saving ? "Deleting…" : "Delete")
             </button>
         </div>
-    </DialogActions>
-</MudDialog>
+    </div>
+}
 
 @code {
-    // ── Button style constants ────────────────────────────────────────────────
     private const string BtnPrimary = "background:#1565C0;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;";
     private const string BtnLight   = "background:#EFF6FF;color:#1565C0;border:1.5px solid #BFDBFE;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;";
     private const string BtnGhost   = "background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;padding:6px 14px;font-weight:600;font-size:13px;cursor:pointer;";
-    private const string BtnIcon    = "width:32px;height:32px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center;";
     private const string BtnDanger  = "background:#EF4444;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;";
 
     private static readonly string[] WardColors = ["#3B82F6", "#10B981", "#EF4444", "#EC4899", "#8B5CF6", "#F59E0B", "#0891B2", "#6366F1"];
@@ -335,19 +341,16 @@ else
 
     private static readonly string[] _roomTypes = ["Private", "Semi-Private", "General (4-bed)", "General (6-bed)", "Critical Care", "Delivery Suite", "Isolation"];
 
-    // ── State ────────────────────────────────────────────────────────────────
     private bool _loading = true;
     private bool _saving;
     private List<WardDto> _wards = [];
     private HashSet<Guid> _expandedWards = [];
 
-    // Ward dialog
     private bool _wardDialogVisible;
     private WardDto? _editingWard;
     private string _wardName = string.Empty;
     private string? _wardDescription;
 
-    // Room dialog
     private bool _roomDialogVisible;
     private RoomDto? _editingRoom;
     private WardDto? _targetWard;
@@ -355,17 +358,14 @@ else
     private string? _roomType;
     private decimal _roomPrice;
 
-    // Bed dialog
     private bool _bedDialogVisible;
     private RoomDto? _targetRoom;
     private string _bedNumber = string.Empty;
 
-    // Delete dialog
     private bool _deleteDialogVisible;
     private string _deleteMessage = string.Empty;
     private Func<Task>? _deleteAction;
 
-    // ── Lifecycle ────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         await AuthState.InitializeAsync();
@@ -385,11 +385,10 @@ else
         if (result.Success && result.Data != null)
         {
             _wards = result.Data.ToList();
-            // auto-expand first ward
             if (_expandedWards.Count == 0 && _wards.Any())
                 _expandedWards.Add(_wards[0].Id);
         }
-        else Snackbar.Add(result.Message, Severity.Error);
+        else Toast.ShowError(result.Message ?? "Failed to load wards.");
         _loading = false;
     }
 
@@ -398,7 +397,6 @@ else
         if (!_expandedWards.Remove(id)) _expandedWards.Add(id);
     }
 
-    // ── Ward CRUD ─────────────────────────────────────────────────────────────
     private void OpenCreateWard()
     {
         _editingWard = null; _wardName = string.Empty; _wardDescription = null;
@@ -430,22 +428,21 @@ else
 
         if (result.Success)
         {
-            Snackbar.Add(_editingWard == null ? "Ward created." : "Ward updated.", Severity.Success);
+            Toast.ShowSuccess(_editingWard == null ? "Ward created." : "Ward updated.");
             _wardDialogVisible = false;
             await LoadAsync();
         }
-        else Snackbar.Add(result.Message, Severity.Error);
+        else Toast.ShowError(result.Message ?? "Failed.");
         _saving = false;
     }
 
     private async Task DeleteWardAsync(Guid id)
     {
         var r = await ClinicApi.DeleteWardAsync(id);
-        if (r.Success) { Snackbar.Add("Ward deleted.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(r.Message, Severity.Error);
+        if (r.Success) { Toast.ShowSuccess("Ward deleted."); await LoadAsync(); }
+        else Toast.ShowError(r.Message ?? "Failed.");
     }
 
-    // ── Room CRUD ─────────────────────────────────────────────────────────────
     private void OpenCreateRoom(WardDto ward)
     {
         _editingRoom = null; _targetWard = ward;
@@ -479,22 +476,21 @@ else
 
         if (result.Success)
         {
-            Snackbar.Add(_editingRoom == null ? "Room created." : "Room updated.", Severity.Success);
+            Toast.ShowSuccess(_editingRoom == null ? "Room created." : "Room updated.");
             _roomDialogVisible = false;
             await LoadAsync();
         }
-        else Snackbar.Add(result.Message, Severity.Error);
+        else Toast.ShowError(result.Message ?? "Failed.");
         _saving = false;
     }
 
     private async Task DeleteRoomAsync(Guid id)
     {
         var r = await ClinicApi.DeleteRoomAsync(id);
-        if (r.Success) { Snackbar.Add("Room deleted.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(r.Message, Severity.Error);
+        if (r.Success) { Toast.ShowSuccess("Room deleted."); await LoadAsync(); }
+        else Toast.ShowError(r.Message ?? "Failed.");
     }
 
-    // ── Bed CRUD ──────────────────────────────────────────────────────────────
     private void OpenAddBed(RoomDto room, WardDto ward)
     {
         _targetRoom  = room; _targetWard = ward; _bedNumber = string.Empty;
@@ -515,22 +511,21 @@ else
         var r = await ClinicApi.CreateBedAsync(new CreateBedDto(_targetRoom!.Id, _bedNumber));
         if (r.Success)
         {
-            Snackbar.Add("Bed added.", Severity.Success);
+            Toast.ShowSuccess("Bed added.");
             _bedDialogVisible = false;
             await LoadAsync();
         }
-        else Snackbar.Add(r.Message, Severity.Error);
+        else Toast.ShowError(r.Message ?? "Failed.");
         _saving = false;
     }
 
     private async Task DeleteBedAsync(Guid id)
     {
         var r = await ClinicApi.DeleteBedAsync(id);
-        if (r.Success) { Snackbar.Add("Bed removed.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(r.Message, Severity.Error);
+        if (r.Success) { Toast.ShowSuccess("Bed removed."); await LoadAsync(); }
+        else Toast.ShowError(r.Message ?? "Failed.");
     }
 
-    // ── Delete executor ───────────────────────────────────────────────────────
     private async Task ExecuteDelete()
     {
         if (_deleteAction == null) return;

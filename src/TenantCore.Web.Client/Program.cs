@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using MudBlazor.Services;
 using TenantCore.Web.Client;
 using TenantCore.Web.Client.Clients;
 using TenantCore.Web.Client.Services;
@@ -8,7 +7,8 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<Microsoft.AspNetCore.Components.Web.HeadOutlet>("head::after");
 
-builder.Services.AddMudServices();
+// Toast notification service
+builder.Services.AddSingleton<IToastService, ToastService>();
 
 // Register Auth services
 builder.Services.AddScoped<TokenStorageService>();

@@ -6,46 +6,73 @@
 
 <PageTitle>Accept Invitation</PageTitle>
 
-<MudPaper Class="pa-6 mx-auto mt-12" MaxWidth="400px" Elevation="4">
-    <MudStack Spacing="3">
-        <MudText Typo="Typo.h5" Align="Align.Center">Accept Invitation</MudText>
-        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Dense="true">
-            Please set your password to activate your account.
-        </MudAlert>
-        <MudForm @ref="_form" @bind-IsValid="_formValid">
-            <MudTextField @bind-Value="_model.Password" Label="Password" InputType="InputType.Password" Required="true" RequiredError="Password is required" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_model.ConfirmPassword" Label="Confirm Password" InputType="InputType.Password" Required="true" RequiredError="Confirm password is required" Variant="Variant.Outlined" />
-        </MudForm>
+<div style="max-width:440px;width:100%;background:#fff;border-radius:14px;padding:32px;
+            box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+
+    <div class="auth-brand" style="margin-bottom:20px;">
+        <span style="font-size:22px;">🏥</span>
+        <span style="font-weight:700;color:#1a56db;font-size:15px;">ClinicCore</span>
+    </div>
+
+    <h2 style="font-size:20px;font-weight:700;color:#111827;margin:0 0 8px;">Accept Invitation</h2>
+    <div class="auth-info" style="margin-bottom:20px;">
+        Please set your password to activate your account.
+    </div>
+
+    <EditForm Model="_model" OnValidSubmit="AcceptInvitationAsync">
+        <DataAnnotationsValidator />
+
+        <div class="auth-input-wrap">
+            <label class="auth-label">Password</label>
+            <div class="auth-input-with-toggle">
+                <input class="auth-input" type="@(_showPassword ? "text" : "password")"
+                       @bind="_model.Password" disabled="@(_loading || _success)" />
+                <button type="button" class="auth-input-toggle" @onclick="@(() => _showPassword = !_showPassword)">
+                    @(_showPassword ? "Hide" : "Show")
+                </button>
+            </div>
+        </div>
+
+        <div class="auth-input-wrap">
+            <label class="auth-label">Confirm Password</label>
+            <input class="auth-input" type="@(_showPassword ? "text" : "password")"
+                   @bind="_model.ConfirmPassword" disabled="@(_loading || _success)" />
+        </div>
+
         @if (!string.IsNullOrEmpty(_error))
         {
-            <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+            <div class="auth-error">@_error</div>
         }
+
         @if (_success)
         {
-            <MudAlert Severity="Severity.Success" Dense="true">Invitation accepted! You can now <MudLink Href="/auth/login">sign in</MudLink>.</MudAlert>
+            <div class="auth-success-msg" style="margin-bottom:16px;">
+                Invitation accepted! You can now <a href="/auth/login" class="auth-link">sign in</a>.
+            </div>
         }
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_loading || _success" OnClick="AcceptInvitationAsync" FullWidth="true">
+
+        <button type="submit" class="auth-btn-primary" disabled="@(_loading || _success)"
+                style="display:flex;align-items:center;justify-content:center;gap:8px;">
             @if (_loading)
             {
-                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2" />
+                <span class="auth-spinner"></span>
                 <span>Submitting...</span>
             }
             else
             {
                 <span>Accept Invitation</span>
             }
-        </MudButton>
-    </MudStack>
-</MudPaper>
+        </button>
+    </EditForm>
+</div>
 
 @code {
     [Parameter] public string Token { get; set; } = string.Empty;
 
     private AcceptInvitationRequestDto _model = new();
-    private MudForm _form = null!;
-    private bool _formValid;
     private bool _loading;
     private bool _success;
+    private bool _showPassword;
     private string _error = string.Empty;
 
     protected override void OnInitialized()
@@ -56,9 +83,13 @@
     private async Task AcceptInvitationAsync()
     {
         _error = string.Empty;
-        await _form.Validate();
-        if (!_formValid)
+
+        if (_model.Password != _model.ConfirmPassword)
+        {
+            _error = "Passwords do not match.";
             return;
+        }
+
         _loading = true;
         try
         {

@@ -25,6 +25,8 @@ public class OpdRegistrationDto
     public PaymentStatus? PaymentStatus { get; init; }
     public decimal? FinalAmount { get; init; }
     public bool HasDiscount { get; init; }
+    public RefundStatus? RefundStatus { get; init; }
+    public decimal RefundDue { get; init; }
 }
 
 public sealed record CreateOpdRegistrationDto(

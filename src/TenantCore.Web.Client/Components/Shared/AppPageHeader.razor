@@ -1,0 +1,28 @@
+@* Reusable page header: title + optional subtitle + optional actions slot.
+   Usage:
+     <AppPageHeader Title="Medicines" Subtitle="127 medicines registered">
+         <Actions>
+             <button class="btn btn-primary" @onclick="OpenDialog">+ Add Medicine</button>
+         </Actions>
+     </AppPageHeader>
+*@
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@Title</h1>
+        @if (!string.IsNullOrEmpty(Subtitle))
+        {
+            <p class="page-subtitle">@Subtitle</p>
+        }
+    </div>
+    @if (Actions != null)
+    {
+        <div class="page-header-actions">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

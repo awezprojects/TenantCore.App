@@ -5,7 +5,7 @@
 @inject ICounterSessionApiClient CounterSessionClient
 @inject IApplicationApiClient AppClient
 @inject ClinicContextService ClinicContext
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 @inject AuthStateService AuthState
 @using TenantCore.Shared.Enums
 @using TenantCore.Shared.Authorization
@@ -51,7 +51,9 @@
 
     @if (_loading)
     {
-        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        <div style="display:flex;justify-content:center;padding:32px 0;">
+            <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+        </div>
     }
     else
     {
@@ -64,7 +66,7 @@
             <div class="opd-table-card" style="padding:0;margin-bottom:20px;">
                 <table class="opd-table">
                     <thead>
-                        <tr><th>Amount</th><th>Sent To Role</th><th>Status</th><th>Sent At</th><th style="width:160px;">Actions</th></tr>
+                        <tr><th>Amount</th><th>Sent To Role</th><th>Status</th><th>Sent At</th><th style="white-space:nowrap;">Actions</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var item in _forMe)
@@ -81,14 +83,14 @@
                                 <td>
                                     @if (item.Status == HandoverStatus.Pending)
                                     {
-                                        <div style="display:flex;gap:6px;">
-                                            <button style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;"
+                                        <div class="opd-actions">
+                                            <button class="opd-btn" style="background:#16A34A;color:#fff;border-color:#16A34A;"
                                                     @onclick="@(() => AcceptAsync(item.Id))" disabled="@_saving">
-                                                ✓ Accept
+                                                Accept
                                             </button>
-                                            <button style="background:transparent;border:1px solid #DC2626;color:#DC2626;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;"
+                                            <button class="opd-btn delete-btn"
                                                     @onclick="@(() => OpenDisputeDialog(item.Id))" disabled="@_saving">
-                                                ✕ Dispute
+                                                Dispute
                                             </button>
                                         </div>
                                     }
@@ -133,102 +135,147 @@
     }
 </div>
 
-<!-- Create Handover Dialog -->
-<MudDialog @bind-Visible="_createVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">New Amount Handover</MudText></TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            @if (_usersLoading)
-            {
-                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="56px" />
-            }
-            else if (_handoverUsers.Count == 0)
-            {
-                <MudAlert Severity="Severity.Warning" Dense="true">No admin or doctor users found.</MudAlert>
-            }
-            else
-            {
-                @* Each entry is one user+role — a user with two roles appears twice *@
-                <MudSelect T="ApplicationUserResponseDto?" @bind-Value="_selectedHandoverUser"
-                           Label="Handover To *"
-                           Variant="Variant.Outlined"
-                           AnchorOrigin="Origin.BottomLeft"
-                           Placeholder="Select recipient and role">
-                    @foreach (var user in _handoverUsers)
-                    {
-                        <MudSelectItem T="ApplicationUserResponseDto?" Value="@user">
-                            @user.FullName
-                            <span style="color:#94A3B8;font-size:0.75rem;margin-left:8px;">(@user.RoleName)</span>
-                        </MudSelectItem>
-                    }
-                </MudSelect>
-            }
-            <MudNumericField @bind-Value="_amount" Label="Amount (Rs.) *" Min="0.01m" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_notes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _createVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CreateAsync"
-                   Disabled="@(_saving || _selectedHandoverUser is null || _handoverUsers.Count == 0)">
-            @(_saving ? "Sending..." : "Send")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+<!-- Create Handover Modal -->
+@if (_createVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _createVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:460px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">New Amount Handover</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Handover To *</label>
+                @if (_usersLoading)
+                {
+                    <div style="font-size:13px;color:#94A3B8;padding:8px 0;">Loading users...</div>
+                }
+                else if (_handoverUsers.Count == 0)
+                {
+                    <div class="auth-warning" style="font-size:12px;">No admin or doctor users found.</div>
+                }
+                else
+                {
+                    <select class="form-input" style="margin-bottom:0;"
+                            value="@_selectedHandoverUserId"
+                            @onchange="OnHandoverUserChanged">
+                        <option value="">— Select recipient and role —</option>
+                        @foreach (var user in _handoverUsers)
+                        {
+                            <option value="@user.UserId|@user.RoleName">@user.FullName (@user.RoleName)</option>
+                        }
+                    </select>
+                }
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Amount (Rs.) *</label>
+                <input class="form-input" type="number" min="0.01" step="0.01" @bind="_amount" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Notes</label>
+                <textarea class="form-input" rows="2" @bind="_notes" style="resize:vertical;min-height:60px;"></textarea>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _createVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="CreateAsync"
+                    disabled="@(_saving || _selectedHandoverUser is null || _handoverUsers.Count == 0)"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#1565C0;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@((_saving || _selectedHandoverUser is null || _handoverUsers.Count == 0) ? "0.6" : "1");">
+                @(_saving ? "Sending..." : "Send")
+            </button>
+        </div>
+    </div>
+}
 
-<!-- Collect from Reception Dialog (admin/doctor) -->
-<MudDialog @bind-Visible="_collectVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">💰 Collect from Reception</MudText></TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
+<!-- Collect from Reception Modal -->
+@if (_collectVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _collectVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:460px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">💰 Collect from Reception</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
             @if (_activeSessions.Count == 0)
             {
-                <MudAlert Severity="Severity.Warning" Dense="true">No active counter sessions found.</MudAlert>
+                <div class="auth-warning" style="font-size:12px;">No active counter sessions found.</div>
             }
             else
             {
-                <MudSelect T="CounterSessionSummaryDto?" Value="_selectedSession"
-                           ValueChanged="OnSessionSelected"
-                           Label="Reception Session *" Variant="Variant.Outlined"
-                           AnchorOrigin="Origin.BottomLeft">
-                    @foreach (var s in _activeSessions)
-                    {
-                        <MudSelectItem T="CounterSessionSummaryDto?" Value="@s">
-                            @s.SessionDate.ToString("dd MMM yyyy")
-                            <span style="color:#94A3B8;font-size:0.75rem;margin-left:6px;">
-                                — Net: Rs. @s.NetAmount.ToString("N0")
-                            </span>
-                        </MudSelectItem>
-                    }
-                </MudSelect>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Reception Session *</label>
+                    <select class="form-input" style="margin-bottom:0;"
+                            value="@_selectedSessionId"
+                            @onchange="OnSessionChanged">
+                        <option value="">— Select session —</option>
+                        @foreach (var s in _activeSessions)
+                        {
+                            <option value="@s.Id">@s.SessionDate.ToString("dd MMM yyyy") — Net: Rs. @s.NetAmount.ToString("N0")</option>
+                        }
+                    </select>
+                </div>
             }
-            <MudNumericField @bind-Value="_collectAmount" Label="Amount (Rs.) *" Min="0.01m" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_collectNotes" Label="Notes" Variant="Variant.Outlined" Lines="2" />
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _collectVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Success" Variant="Variant.Filled"
-                   OnClick="CollectAsync"
-                   Disabled="@(_saving || _selectedSession is null)">
-            @(_saving ? "Collecting..." : "✓ Collect & Accept")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Amount (Rs.) *</label>
+                <input class="form-input" type="number" min="0.01" step="0.01" @bind="_collectAmount" />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Notes</label>
+                <textarea class="form-input" rows="2" @bind="_collectNotes" style="resize:vertical;min-height:60px;"></textarea>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _collectVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="CollectAsync"
+                    disabled="@(_saving || _selectedSession is null)"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#059669;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@((_saving || _selectedSession is null) ? "0.6" : "1");">
+                @(_saving ? "Collecting..." : "Collect & Accept")
+            </button>
+        </div>
+    </div>
+}
 
-<!-- Dispute Dialog -->
-<MudDialog @bind-Visible="_disputeVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">Dispute Handover</MudText></TitleContent>
-    <DialogContent>
-        <MudTextField @bind-Value="_resolutionNotes" Label="Resolution Notes *" Variant="Variant.Outlined" Lines="3" />
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _disputeVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DisputeAsync" Disabled="@_saving">
-            @(_saving ? "Disputing..." : "Dispute")
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+<!-- Dispute Modal -->
+@if (_disputeVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="@(() => _disputeVisible = false)"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:420px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;">
+        <div style="padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#0F172A;">Dispute Handover</div>
+        </div>
+        <div style="padding:20px 24px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Resolution Notes *</label>
+                <textarea class="form-input" rows="3" @bind="_resolutionNotes" style="resize:vertical;min-height:80px;"></textarea>
+            </div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button @onclick="@(() => _disputeVisible = false)"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="DisputeAsync" disabled="@_saving"
+                    style="padding:9px 20px;border-radius:8px;border:none;background:#DC2626;color:#fff;font-size:13px;font-weight:700;cursor:pointer;
+                           opacity:@(_saving ? "0.6" : "1");">
+                @(_saving ? "Disputing..." : "Dispute")
+            </button>
+        </div>
+    </div>
+}
 
 @code {
     private static readonly string[] HandoverTargetRoles =
@@ -252,7 +299,6 @@
     private CounterSessionDto? _activeSession;
     private Guid? _disputingId;
 
-    // Role helpers
     private bool _isReception => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
         .Any(r => string.Equals(r, AppRoles.Receptionist, StringComparison.OrdinalIgnoreCase));
     private bool _isAdminOrDoctor => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
@@ -260,13 +306,15 @@
                || string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase)
                || string.Equals(r, AppRoles.ClinicManager, StringComparison.OrdinalIgnoreCase));
 
-    // Create dialog (reception)
+    // Create dialog
     private ApplicationUserResponseDto? _selectedHandoverUser;
+    private string? _selectedHandoverUserId;
     private decimal _amount;
     private string? _notes;
 
-    // Collect dialog (admin/doctor)
+    // Collect dialog
     private CounterSessionSummaryDto? _selectedSession;
+    private string? _selectedSessionId;
     private decimal _collectAmount;
     private string? _collectNotes;
 
@@ -283,7 +331,6 @@
     {
         _loading = true;
         var currentUserId = AuthState.CurrentUser?.UserId;
-        // Current user's roles — used to filter "for me" correctly when user holds multiple roles
         var currentRoles = AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -291,8 +338,6 @@
         if (response.Success && response.Data is not null)
         {
             _all = response.Data.ToList();
-            // A handover is "for me" only if it was addressed to my userId AND to a role I actually hold.
-            // This correctly handles users with two roles (Doctor + Clinic Admin).
             _forMe = currentUserId.HasValue
                 ? _all.Where(h =>
                     h.HandedOverToUserId == currentUserId.Value &&
@@ -326,21 +371,45 @@
     private async Task OpenCreateDialog()
     {
         _selectedHandoverUser = null;
+        _selectedHandoverUserId = null;
         _amount = _activeSession?.NetAmount ?? 0;
         _notes = null;
         _createVisible = true;
         await LoadHandoverUsersAsync();
     }
 
-    private void OnSessionSelected(CounterSessionSummaryDto? session)
+    private void OnHandoverUserChanged(ChangeEventArgs e)
     {
-        _selectedSession = session;
-        _collectAmount   = session?.NetAmount ?? 0;
+        var val = e.Value?.ToString();
+        _selectedHandoverUserId = val;
+        if (string.IsNullOrEmpty(val)) { _selectedHandoverUser = null; return; }
+        var parts = val.Split('|');
+        if (parts.Length == 2 && Guid.TryParse(parts[0], out var uid))
+            _selectedHandoverUser = _handoverUsers.FirstOrDefault(u => u.UserId == uid && u.RoleName == parts[1]);
+        else
+            _selectedHandoverUser = null;
+    }
+
+    private void OnSessionChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        _selectedSessionId = val;
+        if (Guid.TryParse(val, out var id))
+        {
+            _selectedSession = _activeSessions.FirstOrDefault(s => s.Id == id);
+            _collectAmount = _selectedSession?.NetAmount ?? 0;
+        }
+        else
+        {
+            _selectedSession = null;
+            _collectAmount = 0;
+        }
     }
 
     private async Task OpenCollectDialog()
     {
         _selectedSession = null;
+        _selectedSessionId = null;
         _collectAmount = 0;
         _collectNotes = null;
         _collectVisible = true;
@@ -349,6 +418,7 @@
         if (_activeSessions.Count == 1)
         {
             _selectedSession = _activeSessions[0];
+            _selectedSessionId = _selectedSession.Id.ToString();
             _collectAmount = _selectedSession.NetAmount;
         }
         StateHasChanged();
@@ -360,8 +430,6 @@
         StateHasChanged();
         var currentUserId = AuthState.CurrentUser?.UserId;
         var response = await AppClient.GetApplicationUsersAsync(ClinicContext.SelectedApplicationId);
-        // One entry per user-role assignment — a user with Doctor + ClinicAdmin gets 2 entries.
-        // Reception selects exactly which role to hand money to.
         _handoverUsers = response.Success && response.Data is not null
             ? response.Data
                 .Where(u => u.IsActive
@@ -377,8 +445,8 @@
 
     private async Task CreateAsync()
     {
-        if (_selectedHandoverUser is null) { Snackbar.Add("Select a recipient and role.", Severity.Warning); return; }
-        if (_activeSession is null) { Snackbar.Add("No active session. Open a counter session first.", Severity.Warning); return; }
+        if (_selectedHandoverUser is null) { Toast.ShowWarning("Select a recipient and role."); return; }
+        if (_activeSession is null) { Toast.ShowWarning("No active session. Open a counter session first."); return; }
         _saving = true;
         var response = await HandoverClient.CreateAsync(new CreateAmountHandoverRequest
         {
@@ -388,14 +456,14 @@
             Amount = _amount,
             Notes = _notes
         });
-        if (response.Success) { Snackbar.Add("Handover sent.", Severity.Success); _createVisible = false; await LoadAsync(); }
-        else Snackbar.Add(response.Message ?? "Failed to create handover.", Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Handover sent."); _createVisible = false; await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed to create handover.");
         _saving = false;
     }
 
     private async Task CollectAsync()
     {
-        if (_selectedSession is null) { Snackbar.Add("Select a reception session.", Severity.Warning); return; }
+        if (_selectedSession is null) { Toast.ShowWarning("Select a reception session."); return; }
         _saving = true;
         var response = await HandoverClient.CollectAsync(new CollectAmountHandoverRequest
         {
@@ -405,11 +473,11 @@
         });
         if (response.Success)
         {
-            Snackbar.Add("Collected and accepted.", Severity.Success);
+            Toast.ShowSuccess("Collected and accepted.");
             _collectVisible = false;
             await LoadAsync();
         }
-        else Snackbar.Add(response.Message ?? "Failed.", Severity.Error);
+        else Toast.ShowError(response.Message ?? "Failed.");
         _saving = false;
     }
 
@@ -417,8 +485,8 @@
     {
         _saving = true;
         var response = await HandoverClient.AcceptAsync(id);
-        if (response.Success) { Snackbar.Add("Handover accepted.", Severity.Success); await LoadAsync(); }
-        else Snackbar.Add(response.Message ?? "Failed to accept.", Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Handover accepted."); await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed to accept.");
         _saving = false;
     }
 
@@ -430,15 +498,15 @@
         _saving = true;
         var response = await HandoverClient.DisputeAsync(_disputingId.Value,
             new ResolveAmountHandoverRequest { ResolutionNotes = _resolutionNotes });
-        if (response.Success) { Snackbar.Add("Handover disputed.", Severity.Success); _disputeVisible = false; await LoadAsync(); }
-        else Snackbar.Add(response.Message ?? "Failed to dispute.", Severity.Error);
+        if (response.Success) { Toast.ShowSuccess("Handover disputed."); _disputeVisible = false; await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed to dispute.");
         _saving = false;
     }
 
     private static MarkupString StatusBadge(HandoverStatus status) => status switch
     {
-        HandoverStatus.Accepted => new MarkupString("<span style=\"background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">✓ Accepted</span>"),
-        HandoverStatus.Disputed => new MarkupString("<span style=\"background:#FEE2E2;color:#991B1B;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">✕ Disputed</span>"),
-        _                       => new MarkupString("<span style=\"background:#FEF3C7;color:#92400E;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">⏳ Pending</span>")
+        HandoverStatus.Accepted => new MarkupString("<span style=\"background:#DCFCE7;color:#166534;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">Accepted</span>"),
+        HandoverStatus.Disputed => new MarkupString("<span style=\"background:#FEE2E2;color:#991B1B;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">Disputed</span>"),
+        _                       => new MarkupString("<span style=\"background:#FEF3C7;color:#92400E;border-radius:12px;padding:2px 12px;font-size:11px;font-weight:700;\">Pending</span>")
     };
 }

@@ -1,0 +1,37 @@
+@* Reusable stat card with icon, label, and value.
+   Colors: blue | green | yellow | red | purple | white
+   Usage:
+     <AppStatCard Icon="🏥" Label="Total Wards" Value="@_totalWards.ToString()" Color="blue"
+                  OnClick='() => Nav.NavigateTo("/admin/wards")' />
+*@
+
+<div class="stat-card stat-card-@Color @(OnClick.HasDelegate ? "cc-clickable" : "")"
+     style="@(OnClick.HasDelegate ? "cursor:pointer;" : "")"
+     @onclick="HandleClick">
+    <div>
+        <div class="stat-label">@Label</div>
+        <div class="stat-value">@Value</div>
+        @if (!string.IsNullOrEmpty(Sub))
+        {
+            <div style="font-size:12px;color:var(--cc-text-muted);margin-top:4px;">@Sub</div>
+        }
+    </div>
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        <div class="stat-icon">@Icon</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Sub { get; set; } = string.Empty;
+    [Parameter] public string Color { get; set; } = "white";
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private async Task HandleClick()
+    {
+        if (OnClick.HasDelegate) await OnClick.InvokeAsync();
+    }
+}

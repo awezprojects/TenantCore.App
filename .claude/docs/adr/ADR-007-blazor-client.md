@@ -157,7 +157,7 @@ Print pages open in a **new browser tab** and use `PrintLayout` instead of `Auth
 
 ### Why `OnInitializedAsync` Is Unsafe for Print Pages
 
-`PrintLayout` is intentionally minimal — it renders only MudBlazor providers and `@Body`. It performs **no auth or clinic context initialization**. This creates a Blazor WASM race condition:
+`PrintLayout` is intentionally minimal — it renders only `@Body`. It performs **no auth or clinic context initialization**. This creates a Blazor WASM race condition:
 
 - `App.razor` calls `AuthState.InitializeAsync()` in its own `OnInitializedAsync`
 - A child page's `OnInitializedAsync` can start **before** `App.razor`'s completes
@@ -452,40 +452,45 @@ Then call it in the template as `@StatusBadge(item.Status)`.
 
 #### Dialogs within OPD pages
 
-Forms and dialogs on OPD pages still use MudBlazor dialog components (`<MudDialog>`, `<MudTextField>`, `<MudSelect>`, `<MudNumericField>`) — that is intentional. Only the **page layout and tables** use the OPD custom CSS. Do not replace MudBlazor form inputs with raw HTML inputs.
+All modals use the **custom fixed-position modal pattern** — no MudBlazor dialog components. MudBlazor has been fully removed from the project.
 
 ```razor
-<!-- Correct: OPD page layout + MudBlazor dialog -->
+<!-- Correct: OPD page layout + custom fixed modal -->
 <div class="opd-page">
     <div class="opd-header">...</div>
     <div class="opd-table-card"><table class="opd-table">...</table></div>
 </div>
 
-<MudDialog @bind-Visible="_addVisible" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
-    <TitleContent><MudText Typo="Typo.h6">Add Item</MudText></TitleContent>
-    <DialogContent>
-        <MudStack Spacing="3">
-            <MudTextField @bind-Value="_name" Label="Name *" Variant="Variant.Outlined" />
-            <MudNumericField @bind-Value="_amount" Label="Amount *" Min="0.01m" Variant="Variant.Outlined" />
-        </MudStack>
-    </DialogContent>
-    <DialogActions>
-        <MudButton OnClick="@(() => _addVisible = false)">Cancel</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAsync">Save</MudButton>
-    </DialogActions>
-</MudDialog>
+@if (_addVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="() => _addVisible = false"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:420px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;"
+         @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;">Add Item</div>
+        </div>
+        <div style="padding:20px 24px;">
+            <div class="form-group"><label class="form-label">Name *</label>
+                <input class="form-input" type="text" @bind="_name" /></div>
+            <div class="form-group"><label class="form-label">Amount *</label>
+                <input class="form-input" type="number" min="0.01" @bind="_amount" /></div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="() => _addVisible = false">Cancel</button>
+            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;"
+                    @onclick="SaveAsync">Save</button>
+        </div>
+    </div>
+}
 ```
-
-### Theme 2 — MudBlazor Material Design
-
-**Use for:** Auth pages (login, register), dashboard/home pages, and any page that does **not** deal with clinical or counter workflows.
-
-Do not use `<MudTable>`, `<MudDataGrid>`, MudBlazor layout components, or Material Design cards on OPD/counter management pages. Those are Theme 2 only.
 
 ### Theme decision rule
 
-> **Is this page a management/list/detail page for clinical or counter data?** → OPD theme (`opd-*` classes).  
-> **Is this an auth flow, dashboard, or admin settings page?** → MudBlazor Material Design.
+> **All pages** use the custom CSS theme (`opd-*`, `form-*`, `cc-*` classes) and native HTML elements.  
+> MudBlazor has been fully removed — do not re-introduce any MudBlazor components, CSS, or NuGet references.
 
 ---
 
@@ -589,7 +594,7 @@ return all
 - Do NOT make API calls in `OnInitializedAsync` on print pages — always use `OnAfterRenderAsync(firstRender)` with explicit auth init first
 - Do NOT use `Navigation.NavigateTo` to open print pages — use `JS.InvokeVoidAsync("window.open", url, "_blank")`
 - Do NOT put a "← Back" button on print pages — use a red "✕ Close" button that calls `window.close()`
-- Do NOT use `<MudTable>`, `<MudDataGrid>`, or MudBlazor card/layout components on OPD/counter pages — use `opd-table-card` + `opd-table` instead
+- Do NOT use any MudBlazor components — MudBlazor has been fully removed from this project; use native HTML with `opd-*`, `form-*`, and `cc-*` CSS classes
 - Do NOT return `RenderFragment` from a method to render status chips — use inline `@if`/`@else` blocks or a `static MarkupString` helper instead
 - Do NOT call `.ToString(...)` directly on UTC-stored datetimes — always use `DateTimeHelper.ToLocalString()`
 - Do NOT use `DateTime.UtcNow.Date` to record "today" on the client — use `DateTime.Today`

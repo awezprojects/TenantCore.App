@@ -4,96 +4,70 @@
 @inject IAuthApiClient AuthClient
 @inject AuthStateService AuthState
 @inject NavigationManager NavigationManager
-@inject ISnackbar Snackbar
+@inject IToastService Toast
 
 <PageTitle>Sign In — ClinicCore</PageTitle>
 
 <div class="auth-brand">
-    <MudAvatar Size="Size.Small" Color="Color.Primary">
-        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
-    </MudAvatar>
-    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+    <span style="font-size:22px;">🏥</span>
+    <span style="font-weight:700;color:#1a56db;font-size:15px;">ClinicCore</span>
 </div>
 
-<MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Log in to your Account</MudText>
-<MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">Welcome back! Enter your credentials to continue.</MudText>
+<h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Log in to your Account</h2>
+<p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">Welcome back! Enter your credentials to continue.</p>
 
 <EditForm Model="_loginModel" OnValidSubmit="HandleLogin">
     <DataAnnotationsValidator />
 
-    <MudTextField @bind-Value="_loginModel.EmailId"
-                  Label="Email Address"
-                  Variant="Variant.Outlined"
-                  InputType="InputType.Email"
-                  Adornment="Adornment.Start"
-                  AdornmentIcon="@Icons.Material.Filled.Email"
-                  Class="mb-4"
-                  For="@(() => _loginModel.EmailId)"
-                  Disabled="_loading"
-                  Placeholder="you@example.com" />
+    <div class="auth-input-wrap">
+        <label class="auth-label">Email Address</label>
+        <input class="auth-input" type="email" @bind="_loginModel.EmailId"
+               placeholder="you@example.com" disabled="@_loading" />
+    </div>
 
-    <MudTextField @bind-Value="_loginModel.Password"
-                  Label="Password"
-                  Variant="Variant.Outlined"
-                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
-                  Adornment="Adornment.End"
-                  AdornmentIcon="@(_showPassword ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                  OnAdornmentClick="@(() => _showPassword = !_showPassword)"
-                  Class="mb-2"
-                  For="@(() => _loginModel.Password)"
-                  Disabled="_loading"
-                  Placeholder="Enter your password" />
+    <div class="auth-input-wrap">
+        <label class="auth-label">Password</label>
+        <div class="auth-input-with-toggle">
+            <input class="auth-input" type="@(_showPassword ? "text" : "password")"
+                   @bind="_loginModel.Password" placeholder="Enter your password" disabled="@_loading" />
+            <button type="button" class="auth-input-toggle" @onclick="@(() => _showPassword = !_showPassword)">
+                @(_showPassword ? "Hide" : "Show")
+            </button>
+        </div>
+    </div>
 
-    <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-4">
-        <MudLink Href="/auth/forgot-password" Typo="Typo.body2" Color="Color.Primary" Style="font-weight: 600;">
-            Forgot Password?
-        </MudLink>
-    </MudStack>
+    <div style="text-align:right;margin-bottom:16px;">
+        <a href="/auth/forgot-password" class="auth-link" style="font-size:13px;">Forgot Password?</a>
+    </div>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" Variant="Variant.Filled">
-            @_errorMessage
-        </MudAlert>
+        <div class="auth-error">@_errorMessage</div>
     }
 
-    <MudButton ButtonType="ButtonType.Submit"
-               Variant="Variant.Filled"
-               Color="Color.Primary"
-               FullWidth="true"
-               Size="Size.Large"
-               Disabled="_loading"
-               Class="mb-4"
-               Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
+    <button type="submit" class="auth-btn-primary" disabled="@_loading" style="display:flex;align-items:center;justify-content:center;gap:8px;">
         @if (_loading)
         {
-            <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Surface" Class="mr-2" />
+            <span class="auth-spinner"></span>
             <span>Signing In...</span>
         }
         else
         {
-            <MudIcon Icon="@Icons.Material.Filled.Login" Class="mr-2" />
             <span>Sign In</span>
         }
-    </MudButton>
+    </button>
 </EditForm>
 
-<MudDivider Class="my-4" />
+<hr class="auth-divider" />
 
-<MudStack AlignItems="AlignItems.Center" Spacing="2">
-    <MudText Typo="Typo.body2">
-        Don't have an account?
-        <MudLink Href="/auth/register" Color="Color.Primary" Typo="Typo.body2" Style="font-weight: 600;">
-            Create one
-        </MudLink>
-    </MudText>
-    <MudText Typo="Typo.body2">
-        Need to verify your email?
-        <MudLink Href="/auth/resend-verification" Color="Color.Secondary" Typo="Typo.body2">
-            Resend verification
-        </MudLink>
-    </MudText>
-</MudStack>
+<div style="text-align:center;font-size:14px;color:#374151;">
+    Don't have an account?
+    <a href="/auth/register" class="auth-link">Create one</a>
+</div>
+<div style="text-align:center;font-size:14px;color:#374151;margin-top:8px;">
+    Need to verify your email?
+    <a href="/auth/resend-verification" class="auth-link">Resend verification</a>
+</div>
 
 @code {
     [SupplyParameterFromQuery]
@@ -137,7 +111,7 @@
                 if (data.RequiresPasswordReset)
                 {
                     AuthState.SetTempLoginState(data);
-                    Snackbar.Add("Please reset your password to continue.", Severity.Warning);
+                    Toast.ShowWarning("Please reset your password to continue.");
                     NavigationManager.NavigateTo($"/auth/reset-password?userId={data.User?.UserId}");
                 }
                 else if (data.RequiresTwoFactor)
@@ -149,7 +123,7 @@
                 else
                 {
                     await AuthState.SetAuthenticatedStateAsync(data);
-                    Snackbar.Add("Login successful!", Severity.Success);
+                    Toast.ShowSuccess("Login successful!");
                     NavigateToReturn();
                 }
             }
@@ -162,7 +136,7 @@
         {
             _errorMessage = "Unable to connect to the authentication server. Please try again later.";
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _errorMessage = "An unexpected error occurred. Please try again.";
         }
@@ -179,7 +153,6 @@
             try
             {
                 var decodedUrl = Uri.UnescapeDataString(ReturnUrl);
-                // Only allow same-app relative paths; reject external URLs and protocol-relative references
                 if (decodedUrl.StartsWith("/") && !decodedUrl.StartsWith("//")
                     && !decodedUrl.StartsWith("/auth/login", StringComparison.OrdinalIgnoreCase))
                 {

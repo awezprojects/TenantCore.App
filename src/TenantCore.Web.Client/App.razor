@@ -9,31 +9,26 @@
         <NotFound>
             <LayoutView Layout="typeof(AuthLayout)">
                 <div class="auth-brand">
-                    <MudAvatar Size="Size.Small" Color="Color.Primary">
-                        <MudIcon Icon="@Icons.Material.Filled.LocalHospital" />
-                    </MudAvatar>
-                    <MudText Typo="Typo.subtitle1" Style="font-weight: 700; color: #1a56db;">ClinicCore</MudText>
+                    <div style="width:32px;height:32px;border-radius:50%;background:#1565C0;
+                                display:flex;align-items:center;justify-content:center;font-size:16px;">🏥</div>
+                    <span style="font-weight:700;color:#1a56db;font-size:15px;">ClinicCore</span>
                 </div>
 
-                <MudStack AlignItems="AlignItems.Center" Class="mb-5">
-                    <MudIcon Icon="@Icons.Material.Filled.SearchOff"
-                             Style="font-size: 6rem; color: #F59E0B; display: block;" />
-                </MudStack>
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="font-size:5rem;">🔍</div>
+                </div>
 
-                <MudText Typo="Typo.h5" Style="font-weight: 700; color: #111827; margin-bottom: 4px;">Page Not Found</MudText>
-                <MudText Typo="Typo.body2" Style="color: #6B7280; margin-bottom: 2rem;">
+                <div style="font-weight:700;color:#111827;font-size:1.2rem;margin-bottom:4px;">Page Not Found</div>
+                <div style="color:#6B7280;margin-bottom:2rem;font-size:14px;">
                     The page you're looking for doesn't exist or has been moved.
-                </MudText>
+                </div>
 
-                <MudButton Variant="Variant.Filled"
-                           Color="Color.Primary"
-                           FullWidth="true"
-                           Href="/select-clinic"
-                           Size="Size.Large"
-                           Style="height: 48px; text-transform: none; border-radius: 8px; font-weight: 600;">
-                    <MudIcon Icon="@Icons.Material.Filled.Home" Class="mr-2" />
-                    Go to Home
-                </MudButton>
+                <a href="/select-clinic"
+                   style="display:block;width:100%;padding:13px;background:#1565C0;color:#fff;
+                          border-radius:8px;font-weight:600;text-align:center;text-decoration:none;
+                          font-size:14px;">
+                    🏠 Go to Home
+                </a>
             </LayoutView>
         </NotFound>
     </Router>

@@ -48,8 +48,20 @@ public class OpdRegistrationsController(ISender sender) : ClinicControllerBase
         var result = await sender.Send(new CreateOpdRegistrationCommand(
             GetApplicationId(), dto.PatientId, dto.DoctorUserId,
             dto.DoctorName, dto.Fee, dto.Notes,
-            dto.Weight, dto.BloodPressure, dto.PulseRate, dto.OxygenSaturation), ct);
+            dto.Weight, dto.BloodPressure, dto.PulseRate, dto.OxygenSaturation,
+            GetCurrentUserId()), ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await sender.Send(new DeleteOpdRegistrationCommand(id, GetApplicationId()), ct);
+        return NoContent();
     }
 
     [HttpPut("{id:guid}")]

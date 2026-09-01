@@ -33,6 +33,13 @@ internal sealed class OpdPaymentConfiguration : IEntityTypeConfiguration<OpdPaym
         builder.Property(o => o.ReceivedByUserId);
         builder.Property(o => o.CounterSessionId);
 
+        builder.Property(o => o.RefundDue).IsRequired().HasPrecision(18, 2);
+        builder.Property(o => o.RefundStatus)
+               .IsRequired()
+               .HasConversion<int>();
+        builder.Property(o => o.RefundedAt);
+        builder.Property(o => o.RefundedByUserId);
+
         builder.Property(o => o.CreatedAt).IsRequired();
         builder.Property(o => o.CreatedBy).HasMaxLength(256);
         builder.Property(o => o.UpdatedBy).HasMaxLength(256);
