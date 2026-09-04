@@ -44,6 +44,29 @@ public abstract class ClinicControllerBase : ControllerBase
         return string.Empty;
     }
 
+    // Unlike GetCurrentUserRole() (first match only), this returns every role the user
+    // holds for the current clinic. A user can hold more than one role for the same
+    // clinic — most commonly a doctor who self-registered their own clinic and is
+    // therefore also that clinic's Clinic Admin — so "does this user hold role X for
+    // this clinic" must check the whole set, not just whichever role happens to appear
+    // first in the app_roles claim.
+    protected IReadOnlyList<string> GetCurrentUserRoles()
+    {
+        var appId = GetApplicationId();
+        var claim = User.FindFirst("app_roles");
+        if (claim is not null)
+        {
+            try
+            {
+                var entries = JsonSerializer.Deserialize<AppRoleEntry[]>(claim.Value, _jsonOpts);
+                if (entries is not null)
+                    return entries.Where(e => e.AppId == appId).Select(e => e.RoleName).ToList();
+            }
+            catch (JsonException) { }
+        }
+        return [];
+    }
+
     // Reads appName from the app_roles JWT claim: [{"appId":"...","appName":"..."}]
     protected string GetApplicationName()
     {

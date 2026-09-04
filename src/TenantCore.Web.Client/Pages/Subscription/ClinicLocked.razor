@@ -1,0 +1,19 @@
+@inject ClinicContextService ClinicContext
+
+<PageTitle>Clinic Locked - CloudClinic</PageTitle>
+
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+            min-height:calc(100vh - 68px);text-align:center;padding:40px 20px;">
+    <div style="width:64px;height:64px;border-radius:18px;background:#FEE2E2;
+                display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:20px;">
+        🔒
+    </div>
+    <div style="font-size:18px;font-weight:800;color:#1E293B;">This clinic isn't active yet</div>
+    <div style="font-size:13px;color:#64748B;margin-top:8px;max-width:380px;line-height:1.6;">
+        @(string.IsNullOrWhiteSpace(ClinicContext.SelectedApplicationName)
+            ? "This clinic"
+            : ClinicContext.SelectedApplicationName)
+        does not have an active subscription. Please contact your Clinic Admin to choose a plan —
+        once activated, you'll be able to use the clinic right away.
+    </div>
+</div>

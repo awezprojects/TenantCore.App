@@ -2,6 +2,7 @@
 @inject NavigationManager NavigationManager
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
+@inject SubscriptionContextService SubscriptionContext
 @implements IDisposable
 
 <ToastContainer />
@@ -116,6 +117,11 @@ else if (_isAuthenticated)
                             </button>
                         </div>
                     }
+                    @if (NeedsSubscriptionGate)
+                    {
+                        <SubscriptionStatusPill />
+                    }
+
                     <div style="padding:6px 14px;background:#EFF6FF;border-radius:20px;
                                 font-size:12px;font-weight:600;color:#1565C0;">
                         🟢 Online
@@ -176,7 +182,27 @@ else if (_isAuthenticated)
 
             <!-- Page content — only this div scrolls -->
             <div style="flex:1;padding:28px 32px;overflow-y:auto;min-height:0;">
-                @Body
+                @if (NeedsSubscriptionGate && !SubscriptionContext.IsLoaded)
+                {
+                    <div style="display:flex;justify-content:center;padding:60px 0;">
+                        <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
+                    </div>
+                }
+                else if (NeedsSubscriptionGate && SubscriptionContext.IsLocked)
+                {
+                    @if (_isAdmin)
+                    {
+                        <SubscriptionPlans />
+                    }
+                    else
+                    {
+                        <ClinicLocked />
+                    }
+                }
+                else
+                {
+                    @Body
+                }
             </div>
         </div>
     </div>
@@ -205,6 +231,7 @@ else if (_isAuthenticated)
         ["/opd"]                    = "My OPD Queue",
         ["/ipd"]                    = "IPD & Bed Management",
         ["/medicines"]              = "Medicine Management",
+        ["/subscription"]           = "Subscription",
 
         ["/auth/profile"]           = "My Profile",
 
@@ -225,10 +252,27 @@ else if (_isAuthenticated)
         await ClinicContext.InitializeAsync();
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
+    // True once a clinic is selected and the user is authenticated — the only
+    // state in which the subscription gate applies. False while on /select-clinic
+    // or before login, matching the conditions CheckAuthAndRedirect already uses
+    // to decide whether to redirect away instead of rendering @Body.
+    private bool NeedsSubscriptionGate => _isAuthenticated && ClinicContext.SelectedApplicationId != Guid.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender) CheckAuthAndRedirect();
-        return Task.CompletedTask;
+        if (firstRender)
+        {
+            CheckAuthAndRedirect();
+
+            // Only fetch once a clinic is actually selected — CheckAuthAndRedirect
+            // already navigates away (to /select-clinic or /auth/login) for every
+            // other case, so NeedsSubscriptionGate is false there and this is skipped.
+            if (NeedsSubscriptionGate)
+            {
+                await SubscriptionContext.RefreshAsync();
+                StateHasChanged();
+            }
+        }
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -320,6 +364,7 @@ else if (_isAuthenticated)
 
     private async Task SwitchClinic()
     {
+        SubscriptionContext.Clear();
         await ClinicContext.ClearClinicAsync();
         NavigationManager.NavigateTo("/select-clinic");
     }
@@ -333,6 +378,7 @@ else if (_isAuthenticated)
     private async Task Logout()
     {
         _userMenuOpen = false;
+        SubscriptionContext.Clear();
         await ClinicContext.ClearClinicAsync();
         await AuthState.ClearAuthStateAsync();
         NavigationManager.NavigateTo("/auth/login", forceLoad: true);

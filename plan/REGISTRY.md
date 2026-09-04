@@ -47,6 +47,7 @@ This table is the fastest way for the plan command to check "does this already e
 | Finance Reports | — (no new entity) | Executed | Day/week/month/date-range/reception-wise/expense-summary reports dashboard |
 | Clinic Feature Flags | ClinicFeatureFlags | Executed | Extensible per-clinic settings/toggle area; ships with PrepaidOpdEnabled (default true) |
 | Prepaid OPD Fee Collection & Refund | — (extends OpdPayment) | Executed | When PrepaidOpdEnabled, visit fee auto-collected at booking; RefundDue/RefundStatus on OpdPayment track post-collection discount refunds; reception confirms refund via new endpoint; cancelled OPD registrations can be hard-deleted once refund-clear |
+| Clinic Subscription & Access Gating | SubscriptionPlan, ClinicSubscription, SubscriptionAlertSetting | Executed | Every clinic needs an active subscription to be used — SubscriptionGuardMiddleware blocks all clinic-scoped API requests (402) when none is active; Blazor AuthorizedLayout renders the plan picker (Clinic Admin) or a locked screen (everyone else) in place of @Body. 4 seeded plans (Trial/Monthly/Quarterly/Yearly); Clinic Admin only may subscribe; trial is once-per-clinic forever (including a cancelled trial); renewal before expiry starts the day after the current term ends. Dashboard banner + top-bar pill show days remaining. Email sending and the twice-daily reminder sweep are OUT OF SCOPE — deferred to a separate Azure Function; SubscriptionAlertSetting ships now as configuration-only (seeded 10/5/2/0-day thresholds, admin CRUD endpoints) with no consumer in this repo yet |
 
 ---
 
@@ -63,6 +64,7 @@ This table is the fastest way for the plan command to check "does this already e
 | role-authorization-hardening | 2026-06-18 | 2026-06-18 | — | — | 0 | 11 |
 | remove-mudblazor | 2026-06-22 | 2026-06-22 | — | — | 0 | 10 |
 | prepaid-opd-fee-collection | 2026-08-31 | 2026-08-31 | ClinicFeatureFlags | ClinicFeatureFlags | 19 | 18 |
+| clinic-subscription-gating | 2026-09-04 | 2026-09-04 | SubscriptionPlan, ClinicSubscription, SubscriptionAlertSetting | SubscriptionPlans, ClinicSubscriptions, SubscriptionAlertSettings | 61 | 13 |
 
 ---
 

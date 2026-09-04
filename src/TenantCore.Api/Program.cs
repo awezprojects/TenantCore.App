@@ -118,6 +118,7 @@ try
     app.UseCors("AllowAll");
     app.UseAuthentication();
     app.UseMiddleware<ClinicContextMiddleware>();  // validates X-Application-Id header
+    app.UseMiddleware<SubscriptionGuardMiddleware>();  // blocks clinic-scoped requests when the clinic has no active subscription
     app.UseAuthorization();
     app.MapControllers();
     app.MapHealthChecks("/health");

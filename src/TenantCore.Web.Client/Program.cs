@@ -133,4 +133,12 @@ builder.Services.AddHttpClient<IFinanceReportApiClient, FinanceReportApiClient>(
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
+// Register Subscription API Client + the shared status cache used by
+// AuthorizedLayout, the dashboards and the top-bar status pill.
+builder.Services.AddHttpClient<ISubscriptionApiClient, SubscriptionApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+builder.Services.AddScoped<SubscriptionContextService>();
+
 await builder.Build().RunAsync();

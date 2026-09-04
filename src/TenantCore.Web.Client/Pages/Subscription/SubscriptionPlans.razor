@@ -1,0 +1,186 @@
+@page "/subscription"
+@layout AuthorizedLayout
+@inject ISubscriptionApiClient SubscriptionApi
+@inject SubscriptionContextService SubscriptionContext
+@inject ClinicContextService ClinicContext
+@inject IToastService Toast
+@inject NavigationManager Nav
+@using TenantCore.Shared.Dtos.Subscriptions
+
+<PageTitle>Subscription - CloudClinic</PageTitle>
+
+<div class="opd-page">
+
+    <div class="opd-header">
+        <div>
+            <div class="opd-title">Activate your clinic</div>
+            <div class="opd-subtitle">@ClinicContext.SelectedApplicationName</div>
+        </div>
+    </div>
+
+    @if (SubscriptionContext.IsLocked)
+    {
+        <div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:10px;padding:14px 18px;margin-bottom:20px;
+                    display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">🔒</span>
+            <div style="font-size:13px;color:#991B1B;font-weight:600;">
+                This clinic has no active subscription. Every feature stays disabled until a plan is chosen below.
+            </div>
+        </div>
+    }
+
+    @if (_loading)
+    {
+        <div style="display:flex;justify-content:center;padding:60px 0;">
+            <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
+        </div>
+    }
+    else
+    {
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;">
+            @foreach (var plan in _plans.OrderBy(p => p.DisplayOrder))
+            {
+                var disabled = plan.AlreadyUsed;
+                <div style="position:relative;background:#fff;border-radius:14px;padding:22px 20px;
+                            border:@(plan.IsPopular ? "2px solid #1565C0" : "1.5px solid #E2E8F0");
+                            box-shadow:@(plan.IsPopular ? "0 10px 30px rgba(21,101,192,0.15)" : "0 2px 8px rgba(0,0,0,0.04)");
+                            opacity:@(disabled ? "0.55" : "1");">
+
+                    @if (plan.IsPopular)
+                    {
+                        <div style="position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+                                    background:#1565C0;color:#fff;font-size:10px;font-weight:800;
+                                    letter-spacing:0.5px;padding:4px 12px;border-radius:20px;white-space:nowrap;">
+                            MOST POPULAR
+                        </div>
+                    }
+
+                    <div style="font-size:15px;font-weight:800;color:#1E293B;margin-top:@(plan.IsPopular ? "8px" : "0");">@plan.Name</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:4px;min-height:32px;">@plan.Description</div>
+
+                    <div style="margin-top:14px;">
+                        @if (plan.IsTrial)
+                        {
+                            <span style="font-size:26px;font-weight:800;color:#16A34A;">Free</span>
+                        }
+                        else
+                        {
+                            <span style="font-size:26px;font-weight:800;color:#1E293B;">@plan.Currency @plan.Price.ToString("N0")</span>
+                        }
+                    </div>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:2px;">
+                        @plan.DurationDays days
+                        @if (!plan.IsTrial)
+                        {
+                            <text> &middot; @((plan.Price / plan.DurationDays).ToString("N2")) @plan.Currency / day</text>
+                        }
+                    </div>
+
+                    @if (plan.IsTrial)
+                    {
+                        <div style="margin-top:10px;">
+                            <span style="background:@(disabled ? "#F1F5F9" : "#DCFCE7");color:@(disabled ? "#475569" : "#166534");
+                                        border-radius:12px;padding:3px 10px;font-size:10px;font-weight:700;">
+                                @(disabled ? "ALREADY USED" : "FREE · ONCE PER CLINIC")
+                            </span>
+                        </div>
+                    }
+
+                    <button disabled="@(disabled || SubscriptionContext.Status?.CanSubscribe != true)"
+                            @onclick="@(() => OpenConfirm(plan))"
+                            style="width:100%;margin-top:18px;padding:10px;border-radius:8px;border:none;
+                                   background:@(disabled ? "#E2E8F0" : "#1565C0");color:@(disabled ? "#94A3B8" : "#fff");
+                                   font-size:13px;font-weight:700;cursor:@(disabled ? "not-allowed" : "pointer");">
+                        @(disabled ? "Already Used" : "Choose Plan")
+                    </button>
+                </div>
+            }
+        </div>
+
+        @if (SubscriptionContext.Status?.CanSubscribe != true)
+        {
+            <div style="margin-top:18px;font-size:12px;color:#94A3B8;">
+                Only a Clinic Admin can choose a subscription plan.
+            </div>
+        }
+    }
+</div>
+
+@if (_confirmPlan is not null)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="CloseConfirm"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:420px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;"
+         @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;">Confirm Subscription</div>
+        </div>
+        <div style="padding:20px 24px;font-size:13px;color:#334155;line-height:1.8;">
+            <div><strong>Plan:</strong> @_confirmPlan.Name</div>
+            <div><strong>Price:</strong> @(_confirmPlan.IsTrial ? "Free" : $"{_confirmPlan.Currency} {_confirmPlan.Price:N0}")</div>
+            <div><strong>Starts:</strong> @DateTime.UtcNow.ToString("dd MMM yyyy")</div>
+            <div><strong>Ends:</strong> @DateTime.UtcNow.AddDays(_confirmPlan.DurationDays).ToString("dd MMM yyyy")</div>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="CloseConfirm" disabled="@_subscribing">Cancel</button>
+            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;opacity:@(_subscribing ? "0.7" : "1");"
+                    @onclick="SubscribeAsync" disabled="@_subscribing">
+                @(_subscribing ? "Activating..." : "Confirm & Activate")
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _subscribing;
+    private List<SubscriptionPlanDto> _plans = [];
+    private SubscriptionPlanDto? _confirmPlan;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+
+        if (!SubscriptionContext.IsLoaded)
+            await SubscriptionContext.RefreshAsync();
+
+        var response = await SubscriptionApi.GetPlansAsync();
+        if (response.Success && response.Data is not null)
+            _plans = response.Data.ToList();
+        else
+            Toast.ShowError(response.Message ?? "Failed to load subscription plans.");
+
+        _loading = false;
+    }
+
+    private void OpenConfirm(SubscriptionPlanDto plan)
+    {
+        if (SubscriptionContext.Status?.CanSubscribe != true) return;
+        _confirmPlan = plan;
+    }
+
+    private void CloseConfirm() => _confirmPlan = null;
+
+    private async Task SubscribeAsync()
+    {
+        if (_confirmPlan is null) return;
+        _subscribing = true;
+
+        var response = await SubscriptionApi.SubscribeAsync(new SubscribeRequest { SubscriptionPlanId = _confirmPlan.Id });
+        if (response.Success)
+        {
+            Toast.ShowSuccess($"{_confirmPlan.Name} activated — your clinic is now unlocked.");
+            _confirmPlan = null;
+            await SubscriptionContext.RefreshAsync();
+            Nav.NavigateTo("/dashboard");
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Could not activate the plan. Please try again.");
+        }
+
+        _subscribing = false;
+    }
+}

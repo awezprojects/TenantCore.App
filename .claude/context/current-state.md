@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-08-31 (updated after prepaid-opd-fee-collection execution — added ClinicFeatureFlags DbSet/repo; no schema change to existing OpdPayments DbSet, only new columns)
+**Last verified:** 2026-09-04 (updated after clinic-subscription-gating execution — added SubscriptionPlan/ClinicSubscription/SubscriptionAlertSetting DbSets + repos. Email sending and the reminder background job are deferred to a separate Azure Function; SubscriptionAlertSetting ships as configuration-only with no consumer in this repo yet)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -47,8 +47,11 @@
 | CounterSessions | CounterSession | Yes |
 | AmountHandovers | AmountHandover | Yes |
 | ClinicFeatureFlags | ClinicFeatureFlags | Yes |
+| SubscriptionPlans | SubscriptionPlan | No (global catalogue) |
+| ClinicSubscriptions | ClinicSubscription | Yes |
+| SubscriptionAlertSettings | SubscriptionAlertSetting | No (global config) |
 
-**Total DbSets: 30**
+**Total DbSets: 33**
 
 ---
 
@@ -87,6 +90,9 @@
 | ICounterSessionRepository | CounterSessionRepository |
 | IAmountHandoverRepository | AmountHandoverRepository |
 | IClinicFeatureFlagsRepository | ClinicFeatureFlagsRepository |
+| ISubscriptionPlanRepository | SubscriptionPlanRepository |
+| IClinicSubscriptionRepository | ClinicSubscriptionRepository |
+| ISubscriptionAlertSettingRepository | SubscriptionAlertSettingRepository |
 
 ### Services (Scoped)
 

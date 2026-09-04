@@ -1,0 +1,19 @@
+@inject SubscriptionContextService SubscriptionContext
+
+@{
+    var status = SubscriptionContext.Status;
+}
+
+@if (status is { HasActiveSubscription: true })
+{
+    var isCritical = status.DaysRemaining <= 5;
+    var bg = isCritical ? "#FEE2E2" : status.IsExpiringSoon ? "#FEF3C7" : "#DCFCE7";
+    var fg = isCritical ? "#991B1B" : status.IsExpiringSoon ? "#92400E" : "#166534";
+    var label = status.DaysRemaining == 0 ? "Expires today" : $"{status.DaysRemaining}d left";
+
+    <div title="@status.PlanName — expires @status.EndDate?.ToString("dd MMM yyyy")"
+         style="padding:5px 12px;background:@bg;color:@fg;border-radius:20px;
+                font-size:11px;font-weight:700;white-space:nowrap;">
+        ⏳ @label
+    </div>
+}

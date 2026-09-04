@@ -1,0 +1,60 @@
+@inject SubscriptionContextService SubscriptionContext
+@inject NavigationManager Nav
+
+@{
+    var status = SubscriptionContext.Status;
+    var canSubscribe = status?.CanSubscribe == true;
+}
+
+@if (status is null || !status.HasActiveSubscription)
+{
+    @if (canSubscribe)
+    {
+        <div style="background:linear-gradient(135deg,#1565C0,#42A5F5);border-radius:14px;padding:18px 24px;
+                    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
+                    box-shadow:0 8px 24px rgba(21,101,192,0.25);">
+            <div style="color:#fff;">
+                <div style="font-size:15px;font-weight:800;">⚡ Subscribe to unlock all features</div>
+                <div style="font-size:12px;opacity:0.9;margin-top:2px;">
+                    Choose a plan to start using patients, prescriptions, OPD and every other feature.
+                </div>
+            </div>
+            <button @onclick="@(() => Nav.NavigateTo("/subscription"))"
+                    style="background:#fff;color:#1565C0;border:none;border-radius:8px;padding:10px 20px;
+                           font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">
+                Choose a plan
+            </button>
+        </div>
+    }
+    else
+    {
+        <div style="background:#F1F5F9;border-radius:10px;padding:14px 20px;font-size:13px;color:#475569;font-weight:600;">
+            This clinic has no active subscription. Contact your Clinic Admin.
+        </div>
+    }
+}
+else
+{
+    var isCritical = status.DaysRemaining <= 5;
+    var bg = isCritical ? "#FEE2E2" : status.IsExpiringSoon ? "#FEF3C7" : "#DCFCE7";
+    var fg = isCritical ? "#991B1B" : status.IsExpiringSoon ? "#92400E" : "#166534";
+    var border = isCritical ? "#FCA5A5" : status.IsExpiringSoon ? "#FDE68A" : "#BBF7D0";
+    var daysLabel = status.DaysRemaining == 0
+        ? "Expires today"
+        : $"{status.DaysRemaining} day{(status.DaysRemaining == 1 ? "" : "s")} remaining";
+
+    <div style="background:@bg;border:1px solid @border;border-radius:10px;padding:12px 20px;
+                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div style="font-size:13px;color:@fg;font-weight:700;">
+            @status.PlanName &middot; @daysLabel
+        </div>
+        @if (status.IsExpiringSoon && canSubscribe)
+        {
+            <button @onclick="@(() => Nav.NavigateTo("/subscription"))"
+                    style="background:@fg;color:#fff;border:none;border-radius:6px;padding:6px 14px;
+                           font-size:12px;font-weight:700;cursor:pointer;">
+                Renew now
+            </button>
+        }
+    </div>
+}
