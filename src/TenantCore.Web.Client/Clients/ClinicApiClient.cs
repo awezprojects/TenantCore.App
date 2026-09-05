@@ -331,6 +331,46 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
         catch (Exception ex) { return Fail<ClinicFeatureFlagsDto>(ex.Message); }
     }
 
+    public async Task<ApiResponse<IEnumerable<StateDto>>> GetStatesAsync()
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IEnumerable<StateDto>>(await httpClient.GetAsync("api/clinic-settings/states"));
+        }
+        catch (Exception ex) { return Fail<IEnumerable<StateDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IEnumerable<CityDto>>> GetCitiesByStateAsync(Guid stateId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IEnumerable<CityDto>>(await httpClient.GetAsync($"api/clinic-settings/states/{stateId}/cities"));
+        }
+        catch (Exception ex) { return Fail<IEnumerable<CityDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<ClinicLocationDto>> GetClinicLocationAsync()
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<ClinicLocationDto>(await httpClient.GetAsync("api/clinic-settings/location"));
+        }
+        catch (Exception ex) { return Fail<ClinicLocationDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<ClinicLocationDto>> UpsertClinicLocationAsync(UpsertClinicLocationDto dto)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<ClinicLocationDto>(await httpClient.PutAsJsonAsync("api/clinic-settings/location", dto, JsonOptions));
+        }
+        catch (Exception ex) { return Fail<ClinicLocationDto>(ex.Message); }
+    }
+
     public async Task<ApiResponse<IEnumerable<DoctorDto>>> GetDoctorsAsync()
     {
         try

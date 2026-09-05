@@ -46,4 +46,26 @@ public class ClinicSettingsController(ISender sender) : ClinicControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateFeatureFlags([FromBody] UpdateClinicFeatureFlagsDto dto, CancellationToken ct)
         => Ok(await sender.Send(new UpdateClinicFeatureFlagsCommand(GetApplicationId(), dto.PrepaidOpdEnabled), ct));
+
+    [HttpGet("states")]
+    [ProducesResponseType(typeof(IEnumerable<StateDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetStates(CancellationToken ct)
+        => Ok(await sender.Send(new GetStatesQuery(), ct));
+
+    [HttpGet("states/{stateId:guid}/cities")]
+    [ProducesResponseType(typeof(IEnumerable<CityDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCitiesByState(Guid stateId, CancellationToken ct)
+        => Ok(await sender.Send(new GetCitiesByStateQuery(stateId), ct));
+
+    [HttpGet("location")]
+    [ProducesResponseType(typeof(ClinicLocationDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLocation(CancellationToken ct)
+        => Ok(await sender.Send(new GetClinicLocationQuery(GetApplicationId()), ct));
+
+    [HttpPut("location")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
+    [ProducesResponseType(typeof(ClinicLocationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpsertLocation([FromBody] UpsertClinicLocationDto dto, CancellationToken ct)
+        => Ok(await sender.Send(new UpsertClinicLocationCommand(GetApplicationId(), dto.StateId, dto.CityId), ct));
 }

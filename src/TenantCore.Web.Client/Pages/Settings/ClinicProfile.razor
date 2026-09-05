@@ -1,10 +1,12 @@
 @page "/settings/clinic-profile"
 @layout AuthorizedLayout
 @inject IApplicationApiClient AppClient
+@inject IClinicApiClient ClinicClient
 @inject ClinicContextService ClinicContext
 @inject IToastService Toast
 @inject AuthStateService AuthState
 @inject NavigationManager Navigation
+@using TenantCore.Shared.Dtos
 @using TenantCore.Shared.Dtos.Auth
 @using TenantCore.Web.Client.Clients
 @using TenantCore.Web.Client.Services
@@ -90,6 +92,36 @@ else
                               style="resize:vertical;min-height:58px;"></textarea>
                     <span class="form-helper">Displayed below the clinic name on prescription prints</span>
                 </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">State *</label>
+                        <select class="form-input" value="@_stateId" @onchange="OnStateChangedAsync">
+                            <option value="">— Select State —</option>
+                            @foreach (var s in _states)
+                            {
+                                <option value="@s.Id">@s.Name</option>
+                            }
+                        </select>
+                        @if (!_stateId.HasValue && _touched)
+                        {
+                            <span class="form-helper" style="color:#DC2626;">State is required</span>
+                        }
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">City *</label>
+                        <select class="form-input" value="@_cityId" @onchange="OnCityChanged" disabled="@(!_stateId.HasValue)">
+                            <option value="">— Select City —</option>
+                            @foreach (var c in _cities)
+                            {
+                                <option value="@c.Id">@c.Name</option>
+                            }
+                        </select>
+                        @if (!_cityId.HasValue && _touched)
+                        {
+                            <span class="form-helper" style="color:#DC2626;">City is required</span>
+                        }
+                    </div>
+                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label">Contact Number</label>
@@ -152,6 +184,12 @@ else
     private string? _officialEmail;
     private string? _website;
 
+    private List<StateDto> _states = [];
+    private List<CityDto> _cities = [];
+    private Guid? _stateId;
+    private Guid? _cityId;
+    private bool _touched;
+
     protected override async Task OnInitializedAsync()
     {
         await AuthState.InitializeAsync();
@@ -183,14 +221,52 @@ else
             _officialEmail      = d.OfficialEmail;
             _website            = d.Website;
         }
+
+        var statesR = await ClinicClient.GetStatesAsync();
+        if (statesR.Success && statesR.Data is not null) _states = statesR.Data.ToList();
+
+        var locR = await ClinicClient.GetClinicLocationAsync();
+        if (locR.Success && locR.Data is not null)
+        {
+            _stateId = locR.Data.StateId;
+            _cityId = locR.Data.CityId;
+            var citiesR = await ClinicClient.GetCitiesByStateAsync(locR.Data.StateId);
+            if (citiesR.Success && citiesR.Data is not null) _cities = citiesR.Data.ToList();
+        }
+
         _loading = false;
+    }
+
+    private async Task OnStateChangedAsync(ChangeEventArgs e)
+    {
+        _stateId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        _cityId = null;
+        _cities = [];
+        if (_stateId.HasValue)
+        {
+            var r = await ClinicClient.GetCitiesByStateAsync(_stateId.Value);
+            if (r.Success && r.Data is not null) _cities = r.Data.ToList();
+        }
+    }
+
+    private void OnCityChanged(ChangeEventArgs e)
+    {
+        _cityId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
     }
 
     private async Task SaveAsync()
     {
+        _touched = true;
+
         if (string.IsNullOrWhiteSpace(_name))
         {
             Toast.ShowWarning("Clinic name is required.");
+            return;
+        }
+
+        if (!_stateId.HasValue || !_cityId.HasValue)
+        {
+            Toast.ShowWarning("State and City are required.");
             return;
         }
 
@@ -209,8 +285,10 @@ else
         };
 
         var r = await AppClient.EditApplicationAsync(_clinicId, dto);
-        if (r.Success) Toast.ShowSuccess("Clinic profile saved.");
-        else Toast.ShowError(r.Message ?? "Failed to save.");
+        var locR = await ClinicClient.UpsertClinicLocationAsync(new UpsertClinicLocationDto(_stateId.Value, _cityId.Value));
+
+        if (r.Success && locR.Success) Toast.ShowSuccess("Clinic profile saved.");
+        else Toast.ShowError(r.Message ?? locR.Message ?? "Failed to save.");
         _saving = false;
     }
 }

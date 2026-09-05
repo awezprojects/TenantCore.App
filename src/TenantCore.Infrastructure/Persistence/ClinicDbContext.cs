@@ -39,6 +39,9 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<ClinicSubscription> ClinicSubscriptions => Set<ClinicSubscription>();
     public DbSet<SubscriptionAlertSetting> SubscriptionAlertSettings => Set<SubscriptionAlertSetting>();
     public DbSet<HistoryLookupItem> HistoryLookupItems => Set<HistoryLookupItem>();
+    public DbSet<State> States => Set<State>();
+    public DbSet<City> Cities => Set<City>();
+    public DbSet<ClinicLocation> ClinicLocations => Set<ClinicLocation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -215,6 +215,9 @@ else
                 if (!string.IsNullOrWhiteSpace(_clinic.Address)) parts.Add(_clinic.Address);
                 _doctorAddress = string.Join(", ", parts);
             }
+
+            var locR = await ClinicClient.GetClinicLocationAsync();
+            if (locR.Success && locR.Data is not null) _place = locR.Data.CityName;
         }
         finally
         {

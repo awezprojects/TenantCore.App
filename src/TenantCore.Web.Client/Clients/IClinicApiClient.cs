@@ -32,6 +32,11 @@ public interface IClinicApiClient
     Task<ApiResponse<IEnumerable<DoctorDto>>> GetDoctorsAsync();
     Task<ApiResponse<int>> GetDoctorOpdCountAsync(Guid doctorUserId, CancellationToken ct = default);
 
+    Task<ApiResponse<IEnumerable<StateDto>>> GetStatesAsync();
+    Task<ApiResponse<IEnumerable<CityDto>>> GetCitiesByStateAsync(Guid stateId);
+    Task<ApiResponse<ClinicLocationDto>> GetClinicLocationAsync();
+    Task<ApiResponse<ClinicLocationDto>> UpsertClinicLocationAsync(UpsertClinicLocationDto dto);
+
     Task<ApiResponse<IEnumerable<WardDto>>> GetWardsAsync();
     Task<ApiResponse<WardDto>> CreateWardAsync(CreateWardDto dto);
     Task<ApiResponse<WardDto>> UpdateWardAsync(Guid id, UpdateWardDto dto);
