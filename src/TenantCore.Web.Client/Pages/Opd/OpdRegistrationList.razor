@@ -365,7 +365,8 @@
                     <div class="opd-modal-field-label">Fee</div>
                     <div class="opd-modal-field-value">₹@_selected.Fee.ToString("N0")</div>
                 </div>
-                @if (_selected.Weight.HasValue || !string.IsNullOrWhiteSpace(_selected.BloodPressure) || _selected.PulseRate.HasValue)
+                @if (_selected.Weight.HasValue || !string.IsNullOrWhiteSpace(_selected.BloodPressure) || _selected.PulseRate.HasValue
+                     || _selected.OxygenSaturation.HasValue || _selected.Temperature.HasValue || _selected.RespiratoryRate.HasValue || _selected.Sugar.HasValue)
                 {
                     <div class="opd-modal-field">
                         <div class="opd-modal-field-label">Weight</div>
@@ -374,6 +375,26 @@
                     <div class="opd-modal-field">
                         <div class="opd-modal-field-label">Blood Pressure</div>
                         <div class="opd-modal-field-value">@(_selected.BloodPressure ?? "—")</div>
+                    </div>
+                    <div class="opd-modal-field">
+                        <div class="opd-modal-field-label">Pulse</div>
+                        <div class="opd-modal-field-value">@(_selected.PulseRate.HasValue ? $"{_selected.PulseRate} bpm" : "—")</div>
+                    </div>
+                    <div class="opd-modal-field">
+                        <div class="opd-modal-field-label">O2 Sat.</div>
+                        <div class="opd-modal-field-value">@(_selected.OxygenSaturation.HasValue ? $"{_selected.OxygenSaturation:F1}%" : "—")</div>
+                    </div>
+                    <div class="opd-modal-field">
+                        <div class="opd-modal-field-label">Temp</div>
+                        <div class="opd-modal-field-value">@(_selected.Temperature.HasValue ? $"{_selected.Temperature:F1} °F" : "—")</div>
+                    </div>
+                    <div class="opd-modal-field">
+                        <div class="opd-modal-field-label">RR</div>
+                        <div class="opd-modal-field-value">@(_selected.RespiratoryRate.HasValue ? $"{_selected.RespiratoryRate} /min" : "—")</div>
+                    </div>
+                    <div class="opd-modal-field">
+                        <div class="opd-modal-field-label">Sugar</div>
+                        <div class="opd-modal-field-value">@(_selected.Sugar.HasValue ? $"{_selected.Sugar:F1}" : "—")</div>
                     </div>
                 }
                 @if (!string.IsNullOrWhiteSpace(_selected.Notes))
@@ -465,6 +486,18 @@
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">O2 Sat. (%)</label>
                     <input class="form-input" type="number" min="0" max="100" step="0.1" @bind="_oxygenSaturation" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Temp (°F)</label>
+                    <input class="form-input" type="number" min="0" step="0.1" @bind="_temperature" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">RR (/min)</label>
+                    <input class="form-input" type="number" min="0" @bind="_respiratoryRate" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label">Sugar (F)</label>
+                    <input class="form-input" type="number" min="0" step="0.1" @bind="_sugar" />
                 </div>
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -587,6 +620,9 @@
     private string?  _bloodPressure;
     private int?     _pulseRate;
     private decimal? _oxygenSaturation;
+    private decimal? _temperature;
+    private int?     _respiratoryRate;
+    private decimal? _sugar;
 
     // ── Computed ──────────────────────────────────────────────────────────────
     private int TotalPages => _result is null || _pageSize == 0
@@ -925,8 +961,14 @@
     private void OpenNewDialog()
     {
         _selectedPatientId = Guid.Empty; _selectedDoctorId = null;
-        _fee = 0; _notes = null; _weight = null;
-        _bloodPressure = null; _pulseRate = null; _oxygenSaturation = null;
+        _fee = 0; _notes = null;
+
+        // Pre-fill vitals with normal/typical values — reception only needs to touch
+        // whatever reading is actually abnormal for this patient, same convention as
+        // the doctor's prescription vitals defaults.
+        _weight = 70; _bloodPressure = "120/80"; _pulseRate = 72; _oxygenSaturation = 98;
+        _temperature = 98.6m; _respiratoryRate = 16; _sugar = 95;
+
         _newDialogVisible = true;
     }
 
@@ -956,7 +998,10 @@
             _weight > 0 ? _weight : null,
             string.IsNullOrWhiteSpace(_bloodPressure) ? null : _bloodPressure,
             _pulseRate > 0 ? _pulseRate : null,
-            _oxygenSaturation > 0 ? _oxygenSaturation : null);
+            _oxygenSaturation > 0 ? _oxygenSaturation : null,
+            _temperature > 0 ? _temperature : null,
+            _respiratoryRate > 0 ? _respiratoryRate : null,
+            _sugar > 0 ? _sugar : null);
         var response = await ClinicClient.CreateOpdRegistrationAsync(dto);
         if (response.Success)
         {

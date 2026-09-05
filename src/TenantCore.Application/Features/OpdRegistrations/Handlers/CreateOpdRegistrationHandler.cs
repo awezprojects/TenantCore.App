@@ -35,6 +35,12 @@ public sealed class CreateOpdRegistrationHandler(
         var patient = await patientRepository.GetByIdAsync(request.PatientId, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), request.PatientId);
 
+        var alreadyRegisteredToday = await opdRepository.ExistsForPatientDoctorOnDateAsync(
+            request.ApplicationId, request.PatientId, request.DoctorUserId, DateTime.Now, cancellationToken);
+        if (alreadyRegisteredToday)
+            throw new InvalidOperationException(
+                $"{patient.FirstName} {patient.LastName} already has an OPD appointment with {request.DoctorName} today.");
+
         var fee = request.Fee;
         if (fee is null)
         {
@@ -42,13 +48,13 @@ public sealed class CreateOpdRegistrationHandler(
             fee = config?.OpdFee ?? 0m;
         }
 
-        var todayCount = await opdRepository.CountTodayAsync(request.ApplicationId, cancellationToken);
-        var registrationNumber = $"OPD-{DateTime.Now:yyyyMMdd}-{(todayCount + 1):D4}";
+        var registrationNumber = await opdRepository.GetNextRegistrationNumberAsync(request.ApplicationId, cancellationToken);
 
         var registration = OpdRegistration.Create(
             request.ApplicationId, request.PatientId, request.DoctorUserId,
             request.DoctorName, registrationNumber, fee.Value, request.Notes,
-            request.Weight, request.BloodPressure, request.PulseRate, request.OxygenSaturation);
+            request.Weight, request.BloodPressure, request.PulseRate, request.OxygenSaturation,
+            request.Temperature, request.RespiratoryRate, request.Sugar);
 
         await opdRepository.AddAsync(registration, cancellationToken);
         await opdRepository.SaveChangesAsync(cancellationToken);

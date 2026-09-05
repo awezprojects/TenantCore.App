@@ -486,7 +486,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("DoctorProfiles");
+                    b.ToTable("DoctorProfiles", (string)null);
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.DoctorSpeciality", b =>
@@ -964,6 +964,42 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("ExpenseCategoryId");
 
                     b.ToTable("ExpenseRecords", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.HistoryLookupItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Type");
+
+                    b.HasIndex("ApplicationId", "Type", "Value")
+                        .IsUnique()
+                        .HasFilter("[ApplicationId] IS NOT NULL");
+
+                    b.ToTable("HistoryLookupItems", "clinic");
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.IpdRegistration", b =>
@@ -1502,11 +1538,23 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<string>("PastMedicalHistory")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PerAbdomen")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PerSpeculum")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PerVaginum")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("PrescriptionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<byte[]>("RowVersion")
                         .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("SurgicalHistory")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1728,6 +1776,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<int?>("RespiratoryRate")
+                        .HasColumnType("int");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -1735,6 +1786,14 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<decimal?>("Sugar")
+                        .HasPrecision(6, 1)
+                        .HasColumnType("decimal(6,1)");
+
+                    b.Property<decimal?>("Temperature")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("decimal(4,1)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1964,7 +2023,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasIndex("ApplicationId", "PatientId", "Status");
 
-                    b.ToTable("PregnancyTenures");
+                    b.ToTable("PregnancyTenures", (string)null);
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.Prescription", b =>
@@ -2382,7 +2441,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0001-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription is set to expire on {ExpiryDate}. Renew now to avoid any interruption to your clinic's access.",
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(2471),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(2645),
                             DaysBeforeExpiry = 10,
                             DisplayOrder = 1,
                             Headline = "Time to renew soon",
@@ -2394,7 +2453,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0002-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Only a few days left. Renew before {ExpiryDate} to keep your clinic running without interruption.",
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(2473),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(2647),
                             DaysBeforeExpiry = 5,
                             DisplayOrder = 2,
                             Headline = "Your subscription expires soon",
@@ -2406,7 +2465,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0003-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription expires on {ExpiryDate}. Renew today to avoid losing access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(2475),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(2650),
                             DaysBeforeExpiry = 2,
                             DisplayOrder = 3,
                             Headline = "Final reminder — act now",
@@ -2418,7 +2477,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0004-0000-0000-000000000000"),
                             AlertType = 2,
                             BodyMessage = "Your subscription expired on {ExpiryDate}. Choose a plan to restore access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(2476),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(2651),
                             DaysBeforeExpiry = 0,
                             DisplayOrder = 4,
                             Headline = "Subscription expired",
@@ -2508,7 +2567,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0001-0000-0000-000000000000"),
                             Code = 1,
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(5945),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(6865),
                             Currency = "INR",
                             Description = "Try every feature free for 14 days.",
                             DisplayOrder = 1,
@@ -2523,7 +2582,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0002-0000-0000-000000000000"),
                             Code = 2,
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(5957),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(6870),
                             Currency = "INR",
                             Description = "Billed every 30 days. Cancel anytime.",
                             DisplayOrder = 2,
@@ -2538,7 +2597,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0003-0000-0000-000000000000"),
                             Code = 3,
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(5959),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(6872),
                             Currency = "INR",
                             Description = "Our most popular plan — save versus monthly billing.",
                             DisplayOrder = 3,
@@ -2553,7 +2612,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0004-0000-0000-000000000000"),
                             Code = 4,
-                            CreatedAt = new DateTime(2026, 9, 4, 12, 18, 54, 513, DateTimeKind.Utc).AddTicks(5960),
+                            CreatedAt = new DateTime(2026, 9, 5, 9, 45, 32, 850, DateTimeKind.Utc).AddTicks(6874),
                             Currency = "INR",
                             Description = "The best value — a full year of every feature.",
                             DisplayOrder = 4,

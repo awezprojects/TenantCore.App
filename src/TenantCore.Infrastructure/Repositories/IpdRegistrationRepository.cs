@@ -31,11 +31,25 @@ public class IpdRegistrationRepository(ClinicDbContext dbContext)
         return (items, total);
     }
 
-    public async Task<int> CountTodayAsync(Guid applicationId, CancellationToken ct = default)
+    public async Task<string> GetNextAdmissionNumberAsync(Guid applicationId, CancellationToken ct = default)
     {
         var today = DateTime.UtcNow.Date;
-        return await DbSet.CountAsync(
-            i => i.ApplicationId == applicationId && i.AdmissionDate.Date == today, ct);
+        var prefix = $"IPD-{today:yyyyMMdd}-";
+
+        var lastNumber = await DbSet
+            .Where(i => i.ApplicationId == applicationId && i.AdmissionDate.Date == today)
+            .OrderByDescending(i => i.AdmissionNumber)
+            .Select(i => i.AdmissionNumber)
+            .FirstOrDefaultAsync(ct);
+
+        var nextSequence = 1;
+        if (lastNumber is not null && lastNumber.Length > prefix.Length &&
+            int.TryParse(lastNumber[prefix.Length..], out var lastSequence))
+        {
+            nextSequence = lastSequence + 1;
+        }
+
+        return $"{prefix}{nextSequence:D4}";
     }
 
     public async Task<bool> HasActiveAdmissionAsync(Guid patientId, Guid applicationId, CancellationToken ct = default)

@@ -27,6 +27,8 @@ internal sealed class OpdRegistrationConfiguration : IEntityTypeConfiguration<Op
         builder.Property(o => o.Weight).HasPrecision(5, 1);
         builder.Property(o => o.BloodPressure).HasMaxLength(20);
         builder.Property(o => o.OxygenSaturation).HasPrecision(4, 1);
+        builder.Property(o => o.Temperature).HasPrecision(4, 1);
+        builder.Property(o => o.Sugar).HasPrecision(6, 1);
 
         builder.Property(o => o.CreatedAt).IsRequired();
         builder.Property(o => o.CreatedBy).HasMaxLength(256);

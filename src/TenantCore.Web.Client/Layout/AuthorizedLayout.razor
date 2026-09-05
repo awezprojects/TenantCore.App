@@ -250,6 +250,26 @@ else if (_isAuthenticated)
     {
         await AuthState.InitializeAsync();
         await ClinicContext.InitializeAsync();
+
+        // Must run only after both awaits above truly complete — Blazor renders this
+        // component (showing the _checkingAuth spinner) as soon as OnInitializedAsync
+        // hits its first await, well before the localStorage reads finish. Calling this
+        // from OnAfterRenderAsync(firstRender) races that first render and reads
+        // ClinicContext.SelectedApplicationId as Guid.Empty even for an authenticated
+        // user who does have a clinic selected, incorrectly bouncing to /select-clinic.
+        CheckAuthAndRedirect();
+
+        // Same reasoning applies here: OnAfterRenderAsync(firstRender: true) fires only
+        // ONCE per component lifetime, and that one time is the premature render above,
+        // before CheckAuthAndRedirect has set _isAuthenticated. Gating this refresh on
+        // firstRender left NeedsSubscriptionGate reading false forever, so the refresh
+        // never ran and the page was stuck on the subscription-loading spinner. Running
+        // it here — after CheckAuthAndRedirect — guarantees the flags it depends on are
+        // already resolved.
+        if (NeedsSubscriptionGate)
+        {
+            await SubscriptionContext.RefreshAsync();
+        }
     }
 
     // True once a clinic is selected and the user is authenticated — the only
@@ -257,23 +277,6 @@ else if (_isAuthenticated)
     // or before login, matching the conditions CheckAuthAndRedirect already uses
     // to decide whether to redirect away instead of rendering @Body.
     private bool NeedsSubscriptionGate => _isAuthenticated && ClinicContext.SelectedApplicationId != Guid.Empty;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            CheckAuthAndRedirect();
-
-            // Only fetch once a clinic is actually selected — CheckAuthAndRedirect
-            // already navigates away (to /select-clinic or /auth/login) for every
-            // other case, so NeedsSubscriptionGate is false there and this is skipped.
-            if (NeedsSubscriptionGate)
-            {
-                await SubscriptionContext.RefreshAsync();
-                StateHasChanged();
-            }
-        }
-    }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {

@@ -73,4 +73,26 @@ public class ObstetricApiClient(HttpClient httpClient, AuthStateService authStat
         }
         catch (Exception ex) { return Fail<ObstetricDatesDto>(ex.Message); }
     }
+
+    public async Task<ApiResponse<IEnumerable<HistoryLookupItemDto>>> GetHistoryLookupItemsAsync()
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.GetAsync("api/obstetric/history-lookup");
+            return await Ok<IEnumerable<HistoryLookupItemDto>>(response);
+        }
+        catch (Exception ex) { return Fail<IEnumerable<HistoryLookupItemDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<HistoryLookupItemDto>> AddHistoryLookupItemAsync(AddHistoryLookupItemDto dto)
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.PostAsJsonAsync("api/obstetric/history-lookup", dto, JsonOptions);
+            return await Ok<HistoryLookupItemDto>(response);
+        }
+        catch (Exception ex) { return Fail<HistoryLookupItemDto>(ex.Message); }
+    }
 }

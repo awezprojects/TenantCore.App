@@ -14,6 +14,10 @@ public class ObstetricPrescriptionData : BaseEntity
     public string? MenstrualHistory { get; private set; }
     public string? PastMedicalHistory { get; private set; }
     public string? FamilyHistory { get; private set; }
+    public string? PerAbdomen { get; private set; }
+    public string? PerVaginum { get; private set; }
+    public string? SurgicalHistory { get; private set; }
+    public string? PerSpeculum { get; private set; }
     public DateOnly? Lmp { get; private set; }
     public DateOnly? EddByLmp { get; private set; }
     public DateOnly? EddByUsg { get; private set; }
@@ -36,6 +40,10 @@ public class ObstetricPrescriptionData : BaseEntity
             MenstrualHistory = SerializeList(dto.MenstrualHistory),
             PastMedicalHistory = SerializeList(dto.PastMedicalHistory),
             FamilyHistory = SerializeList(dto.FamilyHistory),
+            PerAbdomen = SerializeList(dto.PerAbdomen),
+            PerVaginum = SerializeList(dto.PerVaginum),
+            SurgicalHistory = SerializeList(dto.SurgicalHistory),
+            PerSpeculum = SerializeList(dto.PerSpeculum),
             CreatedAt = DateTime.UtcNow
         };
         if (dto.Lmp.HasValue) entity.SetLmp(dto.Lmp.Value);
@@ -53,6 +61,10 @@ public class ObstetricPrescriptionData : BaseEntity
         MenstrualHistory = SerializeList(dto.MenstrualHistory);
         PastMedicalHistory = SerializeList(dto.PastMedicalHistory);
         FamilyHistory = SerializeList(dto.FamilyHistory);
+        PerAbdomen = SerializeList(dto.PerAbdomen);
+        PerVaginum = SerializeList(dto.PerVaginum);
+        SurgicalHistory = SerializeList(dto.SurgicalHistory);
+        PerSpeculum = SerializeList(dto.PerSpeculum);
         if (dto.Lmp.HasValue) SetLmp(dto.Lmp.Value);
         if (dto.EddByUsg.HasValue) EddByUsg = dto.EddByUsg.Value;
         SetUpdatedAt();

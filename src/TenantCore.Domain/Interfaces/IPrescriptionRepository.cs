@@ -13,5 +13,5 @@ public interface IPrescriptionRepository : IClinicRepository<Prescription>
 
     Task<Prescription?> GetByOpdRegistrationIdAsync(Guid opdRegistrationId, CancellationToken ct = default);
 
-    Task<int> CountTodayByApplicationAsync(Guid applicationId, CancellationToken ct = default);
+    Task<string> GetNextPrescriptionNumberAsync(Guid applicationId, CancellationToken ct = default);
 }

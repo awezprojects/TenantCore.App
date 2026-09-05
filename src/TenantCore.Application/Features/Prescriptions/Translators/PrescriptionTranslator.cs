@@ -75,6 +75,10 @@ public static class PrescriptionTranslator
         MenstrualHistory = DeserializeStringList(data.MenstrualHistory),
         PastMedicalHistory = DeserializeStringList(data.PastMedicalHistory),
         FamilyHistory = DeserializeStringList(data.FamilyHistory),
+        PerAbdomen = DeserializeStringList(data.PerAbdomen),
+        PerVaginum = DeserializeStringList(data.PerVaginum),
+        SurgicalHistory = DeserializeStringList(data.SurgicalHistory),
+        PerSpeculum = DeserializeStringList(data.PerSpeculum),
         Lmp = data.Lmp,
         EddByLmp = data.EddByLmp,
         EddByUsg = data.EddByUsg

@@ -1,0 +1,270 @@
+@page "/patients/{PatientId:guid}/formc-print"
+@layout PrintLayout
+@inject IClinicApiClient ClinicClient
+@inject IApplicationApiClient AppClient
+@inject ClinicContextService ClinicContext
+@inject AuthStateService AuthState
+@inject IJSRuntime JS
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Dtos.Auth
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<PageTitle>MTP Act — Form C — Print</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
+        <div style="font-size:32px;">⏳</div>
+        <div style="font-size:14px;color:#64748B;">Loading...</div>
+    </div>
+}
+else
+{
+    var presentAddr = _sameAsPermanent ? _permanentAddress : _presentAddress;
+
+    <!-- ── Action Bar + Fill-in Panel (screen only) ─────────────────────── -->
+    <div class="no-print" style="background:#1E3A5F;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                    style="padding:7px 16px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">
+                ✕ Close
+            </button>
+            <div style="color:rgba(255,255,255,0.8);font-size:13px;">
+                <strong style="color:#fff;">MTP Act — Form C</strong>
+                @if (!string.IsNullOrEmpty(_patient?.FullName))
+                {
+                    <span> · @_patient.FullName</span>
+                }
+            </div>
+        </div>
+        <button @onclick="PrintPage"
+                style="padding:9px 22px;border-radius:8px;border:none;background:#fff;color:#1E3A5F;cursor:pointer;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;">
+            🖨️ Print
+        </button>
+    </div>
+
+    <div class="no-print" style="max-width:820px;margin:16px auto;background:#fff;border-radius:8px;padding:16px 20px;box-shadow:0 1px 6px rgba(0,0,0,0.08);">
+        <div style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+            Fill in before printing
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Relation</label>
+                <select @bind="_relation" style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;">
+                    <option value="daughter">Daughter of</option>
+                    <option value="wife">Wife of</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Father's / Husband's Name</label>
+                <input @bind="_relationName" placeholder="e.g. AYUB"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Age</label>
+                <input type="number" min="0" @bind="_age"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Mobile No.</label>
+                <input @bind="_mobile"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div style="grid-column:1/-1;">
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Permanent Address</label>
+                <textarea @bind="_permanentAddress" rows="2"
+                          style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+            <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="sameAddr" @bind="_sameAsPermanent" />
+                <label for="sameAddr" style="font-size:12px;color:#334155;">Present address same as permanent address</label>
+            </div>
+            @if (!_sameAsPermanent)
+            {
+                <div style="grid-column:1/-1;">
+                    <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Present Address</label>
+                    <textarea @bind="_presentAddress" rows="2"
+                              style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>
+                </div>
+            }
+            <div style="grid-column:1/-1;">
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Place of Termination (Nursing Home / Clinic name &amp; address)</label>
+                <textarea @bind="_terminationPlace" rows="2"
+                          style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Place</label>
+                <input @bind="_place" placeholder="e.g. Aurangabad"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Date</label>
+                <input type="date" @bind="_date"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Form Sheet ────────────────────────────────────────── -->
+    <div class="fc-bg">
+        <div class="fc-sheet">
+            <div class="fc-title">Form C</div>
+            <div class="fc-subtitle">As per Section 3(4) of Medical Termination of Pregnancy Act, 1971</div>
+            <div class="fc-subtitle">&amp; Rule 9 of Medical Termination of pregnancy Rules, 2003.</div>
+
+            <div class="fc-body">
+                I <span class="fc-bold">@(_patient?.FullName?.ToUpperInvariant())</span> @RelationLabel <span class="fc-bold">@_relationName</span> aged about <span class="fc-bold">@_age Years</span>
+            </div>
+
+            <div class="fc-body" style="margin-top:14px;">
+                Of <span class="fc-bold">@_permanentAddress@(string.IsNullOrWhiteSpace(_mobile) ? "" : $" , Mobile No. {_mobile}")</span>
+            </div>
+            <div class="fc-hint">(Here state the permanent address)</div>
+
+            <div class="fc-body" style="margin-top:14px;">
+                At present residing at <span class="fc-bold">@presentAddr@(string.IsNullOrWhiteSpace(_mobile) ? "" : $" , Mobile No. {_mobile}")</span>
+            </div>
+            <div class="fc-body">
+                do hereby give my consent to termination of my pregnancy at @_terminationPlace,
+            </div>
+            <div class="fc-hint">(State the name of place where the pregnancy is to be terminated)</div>
+
+            <div class="fc-footer-row">
+                <div>
+                    <div class="fc-body">Place : <span class="fc-bold">@_place</span></div>
+                    <div class="fc-body">Date : <span class="fc-bold">@_date.ToString("dd/MM/yyyy")</span></div>
+                </div>
+                <div class="fc-sign-label">Signature</div>
+            </div>
+
+            <div class="fc-rule"></div>
+
+            <div class="fc-body" style="text-align:center;">(To be filled by guardian where the woman is a mentally ill person or minor)</div>
+
+            <div class="fc-blank-line">I <span class="fc-line"></span></div>
+            <div class="fc-blank-line">Son /daughter / wife of <span class="fc-line"></span></div>
+            <div class="fc-blank-line">About <span class="fc-line-short"></span> Years <span class="fc-line"></span></div>
+            <div class="fc-body" style="text-align:center;">(Here state the permanent address)</div>
+            <div class="fc-blank-line">At present residing at<span class="fc-line"></span></div>
+            <div class="fc-blank-line">do hereby give my consent to the termination of the pregnancy of my ward<span class="fc-line"></span></div>
+            <div class="fc-blank-line"><span class="fc-line-short"></span> who is a minor / lunatic at<span class="fc-line"></span></div>
+            <div class="fc-body" style="text-align:center;">(Place of termination of pregnancy)</div>
+
+            <div class="fc-footer-row">
+                <div>
+                    <div class="fc-body">Place : <span class="fc-bold">@_place</span></div>
+                    <div class="fc-body">Date : <span class="fc-bold">@_date.ToString("dd/MM/yyyy")</span></div>
+                </div>
+                <div class="fc-sign-label">Signature</div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .fc-bg { background:#F0F4F8; min-height:calc(100vh - 44px); padding:28px 16px; }
+    .fc-sheet { max-width:820px; margin:0 auto; background:#fff; border-radius:4px;
+                box-shadow:0 2px 16px rgba(0,0,0,0.1); font-family:'Times New Roman',serif; color:#111;
+                padding:26px 44px 32px; }
+
+    .fc-title { text-align:center; font-size:15px; font-weight:700; margin-bottom:4px; }
+    .fc-subtitle { text-align:center; font-size:13px; margin-bottom:2px; }
+    .fc-body { font-size:13.5px; line-height:1.9; color:#1E293B; }
+    .fc-bold { font-weight:700; }
+    .fc-hint { font-size:12.5px; font-style:italic; text-align:center; color:#334155; margin:2px 0 4px; }
+
+    .fc-footer-row { display:flex; justify-content:space-between; align-items:flex-end; margin-top:22px; }
+    .fc-sign-label { font-size:13.5px; }
+
+    .fc-rule { border-top:1px dashed #64748B; margin:22px 0 16px; }
+
+    .fc-blank-line { font-size:13.5px; line-height:2.6; color:#1E293B; }
+    .fc-line { display:inline-block; border-bottom:1px solid #1E293B; width:70%; margin-left:6px; }
+    .fc-line-short { display:inline-block; border-bottom:1px solid #1E293B; width:120px; margin-left:6px; }
+
+    @@media print {
+        .no-print { display:none !important; }
+        .fc-bg { background:#fff !important; padding:0 !important; min-height:unset; }
+        .fc-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; }
+        body { background:#fff !important; margin:0 !important; padding:0 !important; }
+    }
+</style>
+
+@code {
+    [Parameter] public Guid PatientId { get; set; }
+
+    private PatientDto? _patient;
+    private ApplicationResponseDto? _clinic;
+    private bool _loading = true;
+
+    private string _relation = "daughter";
+    private string _relationName = string.Empty;
+    private int? _age;
+    private string _mobile = string.Empty;
+    private string _permanentAddress = string.Empty;
+    private string _presentAddress = string.Empty;
+    private bool _sameAsPermanent = true;
+    private string _terminationPlace = string.Empty;
+    private string _place = string.Empty;
+    private DateOnly _date = DateOnly.FromDateTime(DateTime.Today);
+
+    private string RelationLabel => _relation == "wife" ? "wife of" : "daughter / wife of";
+
+    // OnAfterRenderAsync is the only safe place in Blazor WASM to call JS interop
+    // (localStorage) and then fire authenticated API calls — see PrintUsgChart.razor
+    // for the same reasoning: PrintLayout has no code-behind to initialize context.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await AuthState.InitializeAsync();
+            await ClinicContext.InitializeAsync();
+            await Task.WhenAll(LoadPatient(), LoadClinic());
+
+            if (_patient?.DateOfBirth is not null)
+                _age = GetAge(_patient.DateOfBirth.Value);
+            _mobile = _patient?.PhoneNumber ?? string.Empty;
+            _permanentAddress = _patient?.Address ?? string.Empty;
+            _presentAddress = _permanentAddress;
+
+            if (_clinic is not null)
+            {
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(_clinic.ApplicationName)) parts.Add(_clinic.ApplicationName);
+                if (!string.IsNullOrWhiteSpace(_clinic.Address)) parts.Add(_clinic.Address);
+                _terminationPlace = string.Join(", ", parts);
+            }
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPatient()
+    {
+        var r = await ClinicClient.GetPatientByIdAsync(PatientId);
+        if (r.Success && r.Data is not null) _patient = r.Data;
+    }
+
+    private async Task LoadClinic()
+    {
+        var appId = ClinicContext.SelectedApplicationId;
+        if (appId == Guid.Empty) return;
+        var r = await AppClient.GetApplicationByIdAsync(appId);
+        if (r.Success && r.Data is not null) _clinic = r.Data;
+    }
+
+    private static int GetAge(DateOnly dob)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var age = today.Year - dob.Year;
+        if (dob > today.AddYears(-age)) age--;
+        return age;
+    }
+
+    private async Task PrintPage() => await JS.InvokeVoidAsync("window.print");
+}

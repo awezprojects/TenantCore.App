@@ -261,7 +261,7 @@ else
                 <div style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #E2E8F0;">
                     <div style="font-weight:700; font-size:14px; color:#0F172A;">🤱 Obstetric Details</div>
                     <div style="display:flex; gap:4px; background:#F1F5F9; border-radius:8px; padding:3px;">
-                        @foreach (var (tid, tlabel) in new[] { ("obstetric", "Obstetric History"), ("pathistory", "Patient History"), ("lmp", "LMP & EDD") })
+                        @foreach (var (tid, tlabel) in new[] { ("obstetric", "Obstetric History"), ("pathistory", "History & Examination"), ("lmp", "LMP & EDD"), ("printforms", "Print Forms") })
                         {
                             var tabId = tid; var tabLabel = tlabel;
                             <button @onclick="() => _obsTab = tabId"
@@ -309,108 +309,45 @@ else
                 {
                     <div style="padding:18px 22px; display:flex; flex-direction:column; gap:20px;">
 
-                        <!-- Menstrual History -->
-                        <div>
-                            <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">🩸 Menstrual History</div>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
-                                @foreach (var entry in _menstrualHistory.ToList())
-                                {
-                                    var e = entry;
-                                    <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:#FFF1F2; border-radius:14px; border:1px solid #FECDD3;">
-                                        <span style="font-size:12px; font-weight:600; color:#BE123C;">@e</span>
-                                        <button @onclick="() => _menstrualHistory.Remove(e)"
-                                                style="background:none; border:none; cursor:pointer; color:#BE123C; font-size:11px; padding:0; line-height:1;">✕</button>
-                                    </div>
-                                }
-                            </div>
-                            <div style="display:flex; gap:6px;">
-                                <input value="@_menstrualInput"
-                                       @oninput="e => _menstrualInput = e.Value?.ToString() ?? string.Empty"
-                                       @onkeydown="OnMenstrualKeyDown"
-                                       placeholder="Type and press Enter, or pick below…"
-                                       style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
-                                <button @onclick="AddMenstrualItem"
-                                        style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">Add</button>
-                            </div>
-                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
-                                @foreach (var s in _menstrualSuggestions.Where(x => !_menstrualHistory.Contains(x)).Take(6))
-                                {
-                                    var sug = s;
-                                    <button @onclick="() => AddHistoryItem(_menstrualHistory, sug)"
-                                            style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @sug</button>
-                                }
-                            </div>
-                        </div>
+                        <HistoryChipField Icon="🩸" Label="Menstrual History" Type="HistoryItemType.MenstrualHistory"
+                                           SelectedItems="_menstrualHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           ChipBg="#FFF1F2" ChipBorder="#FECDD3" ChipText="#BE123C" />
 
                         <div style="border-top:1px solid #F1F5F9;"></div>
 
-                        <!-- Past Medical History -->
-                        <div>
-                            <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">📋 Past Medical History (PAMH)</div>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
-                                @foreach (var entry in _pamHistory.ToList())
-                                {
-                                    var e = entry;
-                                    <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:#FFFBEB; border-radius:14px; border:1px solid #FDE68A;">
-                                        <span style="font-size:12px; font-weight:600; color:#92400E;">@e</span>
-                                        <button @onclick="() => _pamHistory.Remove(e)"
-                                                style="background:none; border:none; cursor:pointer; color:#92400E; font-size:11px; padding:0; line-height:1;">✕</button>
-                                    </div>
-                                }
-                            </div>
-                            <div style="display:flex; gap:6px;">
-                                <input value="@_pamInput"
-                                       @oninput="e => _pamInput = e.Value?.ToString() ?? string.Empty"
-                                       @onkeydown="OnPamKeyDown"
-                                       placeholder="Type and press Enter, or pick below…"
-                                       style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
-                                <button @onclick="AddPamItem"
-                                        style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">Add</button>
-                            </div>
-                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
-                                @foreach (var s in _pamhSuggestions.Where(x => !_pamHistory.Contains(x)).Take(6))
-                                {
-                                    var sug = s;
-                                    <button @onclick="() => AddHistoryItem(_pamHistory, sug)"
-                                            style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @sug</button>
-                                }
-                            </div>
-                        </div>
+                        <HistoryChipField Icon="📋" Label="Past Medical History (PAMH)" Type="HistoryItemType.PastMedicalHistory"
+                                           SelectedItems="_pamHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           ChipBg="#FFFBEB" ChipBorder="#FDE68A" ChipText="#92400E" />
 
                         <div style="border-top:1px solid #F1F5F9;"></div>
 
-                        <!-- Family History -->
-                        <div>
-                            <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">👨‍👩‍👧 Family History</div>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
-                                @foreach (var entry in _familyHistory.ToList())
-                                {
-                                    var e = entry;
-                                    <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:#F0FDF4; border-radius:14px; border:1px solid #BBF7D0;">
-                                        <span style="font-size:12px; font-weight:600; color:#166534;">@e</span>
-                                        <button @onclick="() => _familyHistory.Remove(e)"
-                                                style="background:none; border:none; cursor:pointer; color:#166534; font-size:11px; padding:0; line-height:1;">✕</button>
-                                    </div>
-                                }
-                            </div>
-                            <div style="display:flex; gap:6px;">
-                                <input value="@_familyInput"
-                                       @oninput="e => _familyInput = e.Value?.ToString() ?? string.Empty"
-                                       @onkeydown="OnFamilyKeyDown"
-                                       placeholder="Type and press Enter, or pick below…"
-                                       style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
-                                <button @onclick="AddFamilyItem"
-                                        style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">Add</button>
-                            </div>
-                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
-                                @foreach (var s in _familySuggestions.Where(x => !_familyHistory.Contains(x)).Take(6))
-                                {
-                                    var sug = s;
-                                    <button @onclick="() => AddHistoryItem(_familyHistory, sug)"
-                                            style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @sug</button>
-                                }
-                            </div>
-                        </div>
+                        <HistoryChipField Icon="👨‍👩‍👧" Label="Family History" Type="HistoryItemType.FamilyHistory"
+                                           SelectedItems="_familyHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           ChipBg="#F0FDF4" ChipBorder="#BBF7D0" ChipText="#166534" />
+
+                        <div style="border-top:1px solid #F1F5F9;"></div>
+
+                        <HistoryChipField Icon="🔪" Label="Surgical History" Type="HistoryItemType.SurgicalHistory"
+                                           SelectedItems="_surgicalHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           ChipBg="#FEF3C7" ChipBorder="#FDE68A" ChipText="#92400E" />
+
+                        <div style="border-top:1px solid #F1F5F9;"></div>
+
+                        <HistoryChipField Icon="🤰" Label="Per Abdomen" Type="HistoryItemType.PerAbdomen"
+                                           SelectedItems="_perAbdomenHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           ChipBg="#EFF6FF" ChipBorder="#BFDBFE" ChipText="#1D4ED8" />
+
+                        <div style="border-top:1px solid #F1F5F9;"></div>
+
+                        <HistoryChipField Icon="🩷" Label="Per Vaginum" Type="HistoryItemType.PerVaginum"
+                                           SelectedItems="_perVaginumHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           ChipBg="#FDF2F8" ChipBorder="#FBCFE8" ChipText="#BE185D" />
+
+                        <div style="border-top:1px solid #F1F5F9;"></div>
+
+                        <HistoryChipField Icon="🔬" Label="Per Speculum" Type="HistoryItemType.PerSpeculum"
+                                           SelectedItems="_perSpeculumHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           ChipBg="#F5F3FF" ChipBorder="#DDD6FE" ChipText="#5B21B6" />
 
                     </div>
                 }
@@ -489,13 +426,14 @@ else
                             </div>
                         }
 
-                        <!-- EDD by USG -->
+                        <!-- Corrected LMP by USG -->
                         <div>
-                            <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">EDD by USG (scan-confirmed)</div>
+                            <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Corrected LMP by USG (scan-confirmed)</div>
                             <div style="display:flex; gap:8px; align-items:center;">
                                 <input type="date"
-                                       value="@(_eddByUsgValue?.ToString("yyyy-MM-dd") ?? string.Empty)"
-                                       @onchange="@(e => { if (DateOnly.TryParse(e.Value?.ToString(), out var d)) _eddByUsgValue = d; else _eddByUsgValue = null; })"
+                                       value="@(_correctedLmpByUsgValue?.ToString("yyyy-MM-dd") ?? string.Empty)"
+                                       @onchange="OnCorrectedLmpByUsgChanged"
+                                       max="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")"
                                        style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A;" />
                                 @if (PrescriptionId != Guid.Empty && _eddByUsgValue.HasValue)
                                 {
@@ -506,6 +444,16 @@ else
                                 }
                             </div>
                         </div>
+
+                        <!-- EDD by USG (computed, read-only) -->
+                        @if (_eddByUsgValue.HasValue)
+                        {
+                            <div style="background:#ECFEFF; border:1.5px solid #A5F3FC; border-radius:10px; padding:12px 18px;">
+                                <div style="font-size:10px; font-weight:700; color:#0E7490; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">EDD by USG (auto-calculated)</div>
+                                <div style="font-size:17px; font-weight:800; color:#0E7490;">@_eddByUsgValue.Value.ToString("dd MMM yyyy")</div>
+                                <div style="font-size:11px; color:#22D3EE; margin-top:2px;">Corrected LMP + 280 days · Naegele's rule</div>
+                            </div>
+                        }
 
                         @if (_eddByUsgValue.HasValue && _lmpValue.HasValue)
                         {
@@ -533,6 +481,84 @@ else
                             </div>
                         }
 
+                    </div>
+                }
+                else if (_obsTab == "printforms")
+                {
+                    <div style="padding:18px 22px; display:flex; flex-direction:column; gap:14px;">
+                        <div style="font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">
+                            PCPNDT Consent Form
+                        </div>
+                        <div style="font-size:12px; color:#64748B; max-width:480px;">
+                            Prints the pregnant mother's and doctor's sonography consent affidavit (two copies),
+                            in the clinic's default prescription language.
+                        </div>
+                        @{ var consentPatientId = _opd?.PatientId ?? _patient?.Id; }
+                        @if (consentPatientId.HasValue && consentPatientId != Guid.Empty)
+                        {
+                            <div>
+                                <a href="/patients/@consentPatientId/consent-print"
+                                   target="_blank"
+                                   style="font-size:12px;color:#1565C0;font-weight:600;text-decoration:none;
+                                          padding:9px 20px;border:1.5px solid #1565C0;border-radius:8px;display:inline-block;">
+                                    🖨 Print Consent Form
+                                </a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="font-size:12px; color:#94A3B8; font-style:italic;">Select a patient first.</div>
+                        }
+
+                        <div style="border-top:1px solid #F1F5F9; margin:6px 0;"></div>
+
+                        <div style="font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">
+                            Form C — MTP Act Consent
+                        </div>
+                        <div style="font-size:12px; color:#64748B; max-width:480px;">
+                            Statutory consent for termination of pregnancy under Section 3(4) of the MTP Act, 1971.
+                            Opens a fill-in page — confirm the details there before printing.
+                        </div>
+                        @if (consentPatientId.HasValue && consentPatientId != Guid.Empty)
+                        {
+                            <div>
+                                <a href="/patients/@consentPatientId/formc-print"
+                                   target="_blank"
+                                   style="font-size:12px;color:#1565C0;font-weight:600;text-decoration:none;
+                                          padding:9px 20px;border:1.5px solid #1565C0;border-radius:8px;display:inline-block;">
+                                    🖨 Print Form C
+                                </a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="font-size:12px; color:#94A3B8; font-style:italic;">Select a patient first.</div>
+                        }
+
+                        <div style="border-top:1px solid #F1F5F9; margin:6px 0;"></div>
+
+                        <div style="font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">
+                            Form I — Doctor's Certificate of Opinion
+                        </div>
+                        <div style="font-size:12px; color:#64748B; max-width:480px;">
+                            Registered medical practitioner's certificate of opinion under Clause 3 of the MTP Regulations, 2003.
+                            Opens a fill-in page — confirm the details there before printing.
+                        </div>
+                        @if (consentPatientId.HasValue && consentPatientId != Guid.Empty)
+                        {
+                            <div>
+                                <a href="/patients/@consentPatientId/formi-print"
+                                   target="_blank"
+                                   style="font-size:12px;color:#1565C0;font-weight:600;text-decoration:none;
+                                          padding:9px 20px;border:1.5px solid #1565C0;border-radius:8px;display:inline-block;">
+                                    🖨 Print Form I
+                                </a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div style="font-size:12px; color:#94A3B8; font-style:italic;">Select a patient first.</div>
+                        }
                     </div>
                 }
             </div>
@@ -1426,6 +1452,7 @@ else
     // Obstetric state (gynecology only)
     private string _obsTab = "obstetric";
     private DateOnly? _lmpValue;
+    private DateOnly? _correctedLmpByUsgValue;
     private DateOnly? _eddByUsgValue;
     private bool _savingLmp;
     private bool _savingEddUsg;
@@ -1440,9 +1467,21 @@ else
     private List<string> _menstrualHistory = [];
     private List<string> _pamHistory = [];
     private List<string> _familyHistory = [];
-    private string _menstrualInput = string.Empty;
-    private string _pamInput = string.Empty;
-    private string _familyInput = string.Empty;
+    private List<string> _perAbdomenHistory = [];
+    private List<string> _perVaginumHistory = [];
+    private List<string> _surgicalHistory = [];
+    private List<string> _perSpeculumHistory = [];
+
+    // Global (system default) + this clinic's own custom additions — fetched once per
+    // page load and filtered client-side by each HistoryChipField, per the workspace's
+    // cost-conscious data fetching rule.
+    private List<HistoryLookupItemDto> _historyLookup = [];
+
+    private void OnHistoryItemCreated(HistoryLookupItemDto item)
+    {
+        if (!_historyLookup.Any(x => x.Id == item.Id))
+            _historyLookup.Add(item);
+    }
 
     private static readonly (string Key, string Label, string Placeholder, string Icon)[] _vitalFields =
     [
@@ -1492,18 +1531,6 @@ else
         ["Application"]  = ["Apply externally on affected area", "Apply thin layer", "Avoid contact with eyes", "For external use only"],
         ["Device Use"]   = ["Shake well before use", "Instill as directed", "Use with nebulizer machine", "Rinse mouth after use", "To be administered by healthcare professional"],
     };
-
-    private static readonly string[] _menstrualSuggestions =
-        ["3-4/30/ Regular", "moderate flow", "scanty flow", "heavy flow",
-         "irregular cycle", "dysmenorrhea", "amenorrhea", "oligomenorrhea"];
-
-    private static readonly string[] _pamhSuggestions =
-        ["No significant past medical history", "Hypertension", "Diabetes Mellitus",
-         "Hypothyroidism", "Asthma", "Anaemia", "Epilepsy", "Cardiac disease"];
-
-    private static readonly string[] _familySuggestions =
-        ["Not Significant", "Hypertension", "Diabetes Mellitus",
-         "Cancer (specify)", "Twin pregnancy", "Hereditary disorder"];
 
     private static readonly (string id, string label, string sample)[] _langOptions =
     [
@@ -1598,6 +1625,13 @@ else
                     .Contains("Gynec", StringComparison.OrdinalIgnoreCase) == true;
             }
 
+            if (_isGynecologist)
+            {
+                var lookupR = await ObstetricClient.GetHistoryLookupItemsAsync();
+                if (lookupR.Success && lookupR.Data is not null)
+                    _historyLookup = lookupR.Data.ToList();
+            }
+
             if (PrescriptionId != Guid.Empty)
             {
                 var r = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
@@ -1614,9 +1648,19 @@ else
                     _vPulse = _opd.PulseRate?.ToString() ?? string.Empty;
                     _vWeight = _opd.Weight?.ToString("F1") ?? string.Empty;
                     _vSpO2 = _opd.OxygenSaturation?.ToString("F1") ?? string.Empty;
+                    _vTemp = _opd.Temperature?.ToString("F1") ?? string.Empty;
+                    _vRR = _opd.RespiratoryRate?.ToString() ?? string.Empty;
+                    _vSugar = _opd.Sugar?.ToString("F1") ?? string.Empty;
                     await LoadPatientAndHistory(_opd.PatientId);
                 }
             }
+
+            // New consultation only — pre-fill any vital the OPD intake didn't capture
+            // with its normal/typical value so the doctor only has to touch abnormal
+            // readings. Editing an existing prescription never applies defaults, so
+            // its historical values (including intentionally blank ones) stay as-is.
+            if (PrescriptionId == Guid.Empty)
+                ApplyDefaultVitals();
 
             var cfgR = await PrescriptionClient.GetPrescriptionConfigAsync();
             if (cfgR.Success && cfgR.Data is not null)
@@ -1778,6 +1822,15 @@ else
         _items.Add(item);
         RecalcQuantity(_items.Count - 1);
         return true;
+    }
+
+    private void ApplyDefaultVitals()
+    {
+        foreach (var f in _vitalFields)
+        {
+            if (string.IsNullOrWhiteSpace(GetVital(f.Key)))
+                SetVital(f.Key, f.Placeholder);
+        }
     }
 
     private string GetVital(string key) => key switch
@@ -2212,48 +2265,14 @@ else
         }
     }
 
-    private static void AddHistoryItem(List<string> list, string item)
-    {
-        var trimmed = item.Trim();
-        if (!string.IsNullOrEmpty(trimmed) && !list.Contains(trimmed))
-            list.Add(trimmed);
-    }
-
-    private void OnMenstrualKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") AddMenstrualItem();
-    }
-    private void OnPamKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") AddPamItem();
-    }
-    private void OnFamilyKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") AddFamilyItem();
-    }
-
-    private void AddMenstrualItem()
-    {
-        if (!string.IsNullOrWhiteSpace(_menstrualInput))
-        { AddHistoryItem(_menstrualHistory, _menstrualInput); _menstrualInput = string.Empty; }
-    }
-    private void AddPamItem()
-    {
-        if (!string.IsNullOrWhiteSpace(_pamInput))
-        { AddHistoryItem(_pamHistory, _pamInput); _pamInput = string.Empty; }
-    }
-    private void AddFamilyItem()
-    {
-        if (!string.IsNullOrWhiteSpace(_familyInput))
-        { AddHistoryItem(_familyHistory, _familyInput); _familyInput = string.Empty; }
-    }
-
     private UpsertObstetricPrescriptionDataDto? BuildObstetricDto()
     {
         if (!_isGynecologist) return null;
         var hasData = _obsGravida.HasValue || _obsPara.HasValue || _obsLive.HasValue ||
                       _obsAbortion.HasValue || !string.IsNullOrWhiteSpace(_obsInformation) ||
                       _menstrualHistory.Count > 0 || _pamHistory.Count > 0 || _familyHistory.Count > 0 ||
+                      _perAbdomenHistory.Count > 0 || _perVaginumHistory.Count > 0 ||
+                      _surgicalHistory.Count > 0 || _perSpeculumHistory.Count > 0 ||
                       _lmpValue.HasValue || _eddByUsgValue.HasValue;
         if (!hasData) return null;
         return new UpsertObstetricPrescriptionDataDto(
@@ -2263,7 +2282,11 @@ else
             _pamHistory.Count > 0 ? _pamHistory : null,
             _familyHistory.Count > 0 ? _familyHistory : null,
             Lmp: _lmpValue,
-            EddByUsg: _eddByUsgValue);
+            EddByUsg: _eddByUsgValue,
+            PerAbdomen: _perAbdomenHistory.Count > 0 ? _perAbdomenHistory : null,
+            PerVaginum: _perVaginumHistory.Count > 0 ? _perVaginumHistory : null,
+            SurgicalHistory: _surgicalHistory.Count > 0 ? _surgicalHistory : null,
+            PerSpeculum: _perSpeculumHistory.Count > 0 ? _perSpeculumHistory : null);
     }
 
     private void CarryForwardObstetricData(ObstetricPrescriptionDataDto source)
@@ -2276,8 +2299,29 @@ else
         _menstrualHistory = source.MenstrualHistory.ToList();
         _pamHistory = source.PastMedicalHistory.ToList();
         _familyHistory = source.FamilyHistory.ToList();
+        _perAbdomenHistory = source.PerAbdomen.ToList();
+        _perVaginumHistory = source.PerVaginum.ToList();
+        _surgicalHistory = source.SurgicalHistory.ToList();
+        _perSpeculumHistory = source.PerSpeculum.ToList();
         _lmpValue = source.Lmp;
         _eddByUsgValue = source.EddByUsg;
+        _correctedLmpByUsgValue = source.EddByUsg?.AddDays(-280);
+    }
+
+    // The EDD by USG is never entered directly — it's always Corrected LMP + 280 days
+    // (Naegele's rule), same as EDD by LMP. Only the corrected LMP is a real input.
+    private void OnCorrectedLmpByUsgChanged(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var d))
+        {
+            _correctedLmpByUsgValue = d;
+            _eddByUsgValue = d.AddDays(280);
+        }
+        else
+        {
+            _correctedLmpByUsgValue = null;
+            _eddByUsgValue = null;
+        }
     }
 
     // ── Obstetric quick-save (existing prescriptions only) ───────────────────
@@ -2290,6 +2334,7 @@ else
         if (r.Success)
         {
             _eddByUsgValue = r.Data?.EddByUsg ?? _eddByUsgValue;
+            _correctedLmpByUsgValue = _eddByUsgValue?.AddDays(-280);
             Toast.ShowSuccess("LMP saved.");
         }
         else Toast.ShowError(r.Message ?? "Failed to save LMP.");
@@ -2301,8 +2346,8 @@ else
         _savingEddUsg = true;
         var r = await ObstetricClient.SetEddByUsgAsync(PrescriptionId, new SetEddByUsgRequest { EddByUsg = _eddByUsgValue.Value });
         _savingEddUsg = false;
-        if (r.Success) Toast.ShowSuccess("EDD by USG saved.");
-        else Toast.ShowError(r.Message ?? "Failed to save EDD by USG.");
+        if (r.Success) Toast.ShowSuccess("Corrected LMP by USG saved.");
+        else Toast.ShowError(r.Message ?? "Failed to save Corrected LMP by USG.");
     }
 
     private async Task LoadActiveTenureAsync(Guid patientId)

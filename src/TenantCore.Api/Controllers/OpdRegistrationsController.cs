@@ -49,6 +49,7 @@ public class OpdRegistrationsController(ISender sender) : ClinicControllerBase
             GetApplicationId(), dto.PatientId, dto.DoctorUserId,
             dto.DoctorName, dto.Fee, dto.Notes,
             dto.Weight, dto.BloodPressure, dto.PulseRate, dto.OxygenSaturation,
+            dto.Temperature, dto.RespiratoryRate, dto.Sugar,
             GetCurrentUserId()), ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }

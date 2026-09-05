@@ -19,6 +19,9 @@ public class OpdRegistrationDto
     public string? BloodPressure { get; init; }
     public int? PulseRate { get; init; }
     public decimal? OxygenSaturation { get; init; }
+    public decimal? Temperature { get; init; }
+    public int? RespiratoryRate { get; init; }
+    public decimal? Sugar { get; init; }
     public DateTime CreatedAt { get; init; }
 
     // null when no payment record exists yet (rare), Pending = fee not yet collected
@@ -38,7 +41,10 @@ public sealed record CreateOpdRegistrationDto(
     decimal? Weight = null,
     string? BloodPressure = null,
     int? PulseRate = null,
-    decimal? OxygenSaturation = null);
+    decimal? OxygenSaturation = null,
+    decimal? Temperature = null,
+    int? RespiratoryRate = null,
+    decimal? Sugar = null);
 
 public sealed record UpdateOpdRegistrationDto(
     Guid DoctorUserId,

@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TenantCore.Application.Features.HistoryLookupItems.Commands;
+using TenantCore.Application.Features.HistoryLookupItems.Queries;
 using TenantCore.Application.Features.Obstetrics.Commands;
 using TenantCore.Application.Features.Obstetrics.Queries;
 using TenantCore.Shared.Authorization;
@@ -42,4 +44,17 @@ public class ObstetricController(ISender sender) : ClinicControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetEddByUsg(Guid prescriptionId, [FromBody] SetEddByUsgRequest request, CancellationToken ct)
         => Ok(await sender.Send(new SetObstetricEddByUsgCommand(prescriptionId, request, GetApplicationId()), ct));
+
+    [HttpGet("history-lookup")]
+    [Authorize(Policy = AuthPolicies.RequireClinical)]
+    [ProducesResponseType(typeof(IEnumerable<HistoryLookupItemDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetHistoryLookupItems(CancellationToken ct)
+        => Ok(await sender.Send(new GetHistoryLookupItemsQuery(GetApplicationId()), ct));
+
+    [HttpPost("history-lookup")]
+    [Authorize(Policy = AuthPolicies.RequireClinical)]
+    [ProducesResponseType(typeof(HistoryLookupItemDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> AddHistoryLookupItem([FromBody] AddHistoryLookupItemDto dto, CancellationToken ct)
+        => Ok(await sender.Send(new AddHistoryLookupItemCommand(GetApplicationId(), dto.Type, dto.Value), ct));
 }

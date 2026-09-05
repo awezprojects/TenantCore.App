@@ -23,6 +23,10 @@ internal sealed class ObstetricPrescriptionDataConfiguration : IEntityTypeConfig
         builder.Property(o => o.MenstrualHistory);
         builder.Property(o => o.PastMedicalHistory);
         builder.Property(o => o.FamilyHistory);
+        builder.Property(o => o.PerAbdomen);
+        builder.Property(o => o.PerVaginum);
+        builder.Property(o => o.SurgicalHistory);
+        builder.Property(o => o.PerSpeculum);
         builder.Property(o => o.Lmp);
         builder.Property(o => o.EddByLmp);
         builder.Property(o => o.EddByUsg);

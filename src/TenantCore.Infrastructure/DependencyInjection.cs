@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
         services.AddScoped<IClinicSubscriptionRepository, ClinicSubscriptionRepository>();
         services.AddScoped<ISubscriptionAlertSettingRepository, SubscriptionAlertSettingRepository>();
+        services.AddScoped<IHistoryLookupItemRepository, HistoryLookupItemRepository>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();

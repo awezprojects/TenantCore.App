@@ -37,8 +37,7 @@ public sealed class CreatePrescriptionHandler(
         var patient = await patientRepository.GetByIdAsync(opd.PatientId, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), opd.PatientId);
 
-        var todayCount = await prescriptionRepository.CountTodayByApplicationAsync(request.ApplicationId, cancellationToken);
-        var prescriptionNumber = $"RX-{DateTime.UtcNow:yyyyMMdd}-{(todayCount + 1):D4}";
+        var prescriptionNumber = await prescriptionRepository.GetNextPrescriptionNumberAsync(request.ApplicationId, cancellationToken);
 
         var investigationsJson = request.Investigations.Count > 0
             ? System.Text.Json.JsonSerializer.Serialize(request.Investigations)
@@ -95,7 +94,8 @@ public sealed class CreatePrescriptionHandler(
         }
 
         opd.Update(opd.DoctorUserId, opd.DoctorName, opd.Fee, OpdStatus.InProgress, opd.Notes,
-            opd.Weight, opd.BloodPressure, opd.PulseRate, opd.OxygenSaturation);
+            opd.Weight, opd.BloodPressure, opd.PulseRate, opd.OxygenSaturation,
+            opd.Temperature, opd.RespiratoryRate, opd.Sugar);
         opdRepository.Update(opd);
 
         await prescriptionRepository.SaveChangesAsync(cancellationToken);

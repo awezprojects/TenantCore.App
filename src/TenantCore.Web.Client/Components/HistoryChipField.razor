@@ -1,0 +1,117 @@
+@inject IObstetricApiClient ObstetricClient
+@inject IToastService Toast
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<div>
+    <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">@Icon @Label</div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
+        @foreach (var entry in SelectedItems.ToList())
+        {
+            var e = entry;
+            <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:@ChipBg; border-radius:14px; border:1px solid @ChipBorder;">
+                <span style="font-size:12px; font-weight:600; color:@ChipText;">@e</span>
+                <button @onclick="() => SelectedItems.Remove(e)"
+                        style="background:none; border:none; cursor:pointer; color:@ChipText; font-size:11px; padding:0; line-height:1;">✕</button>
+            </div>
+        }
+    </div>
+    <div style="display:flex; gap:6px;">
+        <input value="@_search"
+               @oninput="e => _search = e.Value?.ToString() ?? string.Empty"
+               @onkeydown="OnKeyDown"
+               placeholder="Search or type a new item…"
+               style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
+        <button @onclick="SubmitAsync" disabled="@_saving"
+                style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155; opacity:@(_saving ? "0.6" : "1");">
+            @(_saving ? "Adding…" : "Add")
+        </button>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
+        @foreach (var item in MatchingSuggestions())
+        {
+            var value = item.Value;
+            <button @onclick="() => SelectExisting(value)"
+                    style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @value</button>
+        }
+        @if (_search.Trim().Length is >= 3 and <= 256 && !HasExactMatch())
+        {
+            <button @onclick="SubmitAsync" disabled="@_saving"
+                    style="padding:3px 10px; border-radius:12px; border:1px dashed #7C3AED; background:#fff; font-size:11px; cursor:pointer; color:#7C3AED; font-weight:600;">+ Add "@_search.Trim()"</button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Icon { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public HistoryItemType Type { get; set; }
+    [Parameter, EditorRequired] public List<string> SelectedItems { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<HistoryLookupItemDto> LookupItems { get; set; } = [];
+    [Parameter, EditorRequired] public EventCallback<HistoryLookupItemDto> OnItemCreated { get; set; }
+    [Parameter] public string ChipBg { get; set; } = "#EFF6FF";
+    [Parameter] public string ChipBorder { get; set; } = "#BFDBFE";
+    [Parameter] public string ChipText { get; set; } = "#1D4ED8";
+
+    private string _search = string.Empty;
+    private bool _saving;
+
+    private IEnumerable<HistoryLookupItemDto> MatchingSuggestions() => LookupItems
+        .Where(x => x.Type == Type
+                    && !SelectedItems.Contains(x.Value, StringComparer.OrdinalIgnoreCase)
+                    && (string.IsNullOrWhiteSpace(_search) || x.Value.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)))
+        .Take(5);
+
+    private bool HasExactMatch() => LookupItems.Any(x =>
+        x.Type == Type && string.Equals(x.Value, _search.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private void OnKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") _ = SubmitAsync();
+    }
+
+    private void SelectExisting(string value)
+    {
+        if (!SelectedItems.Contains(value, StringComparer.OrdinalIgnoreCase))
+            SelectedItems.Add(value);
+        _search = string.Empty;
+    }
+
+    private async Task SubmitAsync()
+    {
+        var trimmed = _search.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed)) return;
+
+        var existing = LookupItems.FirstOrDefault(x =>
+            x.Type == Type && string.Equals(x.Value, trimmed, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            SelectExisting(existing.Value);
+            return;
+        }
+
+        // Only new items go through length validation — existing lookup entries were
+        // already validated when they were created.
+        if (trimmed.Length < 3 || trimmed.Length > 256)
+        {
+            Toast.ShowError("Item must be between 3 and 256 characters.");
+            return;
+        }
+
+        _saving = true;
+        var response = await ObstetricClient.AddHistoryLookupItemAsync(new AddHistoryLookupItemDto(Type, trimmed));
+        _saving = false;
+
+        if (response.Success && response.Data is not null)
+        {
+            await OnItemCreated.InvokeAsync(response.Data);
+            SelectExisting(response.Data.Value);
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Failed to add item.");
+        }
+    }
+}

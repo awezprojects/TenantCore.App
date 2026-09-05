@@ -34,8 +34,8 @@ public class CreateOpdRegistrationHandlerTests
             .ReturnsAsync(activeSession);
         _patientRepository.Setup(r => r.GetByIdAsync(patient.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(patient);
-        _opdRepository.Setup(r => r.CountTodayAsync(appId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
+        _opdRepository.Setup(r => r.GetNextRegistrationNumberAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("OPD-20260101-0001");
         _opdRepository.Setup(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         _opdRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
@@ -77,7 +77,7 @@ public class CreateOpdRegistrationHandlerTests
 
         var handler = CreateHandler();
         var command = new CreateOpdRegistrationCommand(
-            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, receivedBy);
+            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, receivedBy);
         await handler.Handle(command, CancellationToken.None);
 
         payment.Should().NotBeNull();
@@ -111,7 +111,7 @@ public class CreateOpdRegistrationHandlerTests
 
         var handler = CreateHandler();
         var command = new CreateOpdRegistrationCommand(
-            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, Guid.NewGuid());
+            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
         await handler.Handle(command, CancellationToken.None);
 
         // Prepaid disabled — handler must not touch the payment at all; it stays Pending.
@@ -128,7 +128,7 @@ public class CreateOpdRegistrationHandlerTests
 
         var handler = CreateHandler();
         var command = new CreateOpdRegistrationCommand(
-            appId, Guid.NewGuid(), Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, Guid.NewGuid());
+            appId, Guid.NewGuid(), Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
 
         var action = () => handler.Handle(command, CancellationToken.None);
 

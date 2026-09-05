@@ -12,9 +12,12 @@ public interface IOpdRegistrationRepository : IClinicRepository<OpdRegistration>
         OpdStatus? statusFilter = null, bool notVisited = false,
         CancellationToken ct = default);
 
-    Task<int> CountTodayAsync(Guid applicationId, CancellationToken ct = default);
+    Task<string> GetNextRegistrationNumberAsync(Guid applicationId, CancellationToken ct = default);
 
     Task<int> CountTodayByDoctorAsync(Guid applicationId, Guid doctorUserId, CancellationToken ct = default);
 
     Task<IEnumerable<OpdRegistration>> GetByIdsAsync(IEnumerable<Guid> ids, Guid applicationId, CancellationToken ct = default);
+
+    Task<bool> ExistsForPatientDoctorOnDateAsync(
+        Guid applicationId, Guid patientId, Guid doctorUserId, DateTime date, CancellationToken ct = default);
 }

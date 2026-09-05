@@ -222,30 +222,16 @@ else
                 var obs = _prescription.ObstetricData;
                 var hasGpla = obs.Gravida.HasValue || obs.Para.HasValue || obs.Live.HasValue || obs.Abortion.HasValue;
                 <div class="rx-section">
-                    <div class="rx-section-title">🤱 OBSTETRIC HISTORY</div>
                     @if (hasGpla)
                     {
                         <div class="rx-gpla">
-                            G@(obs.Gravida?.ToString() ?? "?") &nbsp; P@(obs.Para?.ToString() ?? "?") &nbsp; L@(obs.Live?.ToString() ?? "?") &nbsp; A@(obs.Abortion?.ToString() ?? "?")
+                            <span class="rx-section-title rx-inline-title">OBSTETRIC HISTORY:</span>
+                            G@(obs.Gravida?.ToString() ?? "?") P@(obs.Para?.ToString() ?? "?") L@(obs.Live?.ToString() ?? "?") A@(obs.Abortion?.ToString() ?? "?")
                         </div>
-                        <div class="rx-obs-grid">
-                            @if (obs.Gravida.HasValue)
-                            {
-                                <div class="rx-obs-cell"><div class="rx-obs-label">Gravida</div><div class="rx-obs-val">@obs.Gravida</div></div>
-                            }
-                            @if (obs.Para.HasValue)
-                            {
-                                <div class="rx-obs-cell"><div class="rx-obs-label">Para</div><div class="rx-obs-val">@obs.Para</div></div>
-                            }
-                            @if (obs.Live.HasValue)
-                            {
-                                <div class="rx-obs-cell"><div class="rx-obs-label">Live</div><div class="rx-obs-val">@obs.Live</div></div>
-                            }
-                            @if (obs.Abortion.HasValue)
-                            {
-                                <div class="rx-obs-cell"><div class="rx-obs-label">Abortion</div><div class="rx-obs-val">@obs.Abortion</div></div>
-                            }
-                        </div>
+                    }
+                    else
+                    {
+                        <div class="rx-section-title">🤱 OBSTETRIC HISTORY</div>
                     }
                     @if (!string.IsNullOrEmpty(obs.Information))
                     {
@@ -280,7 +266,9 @@ else
                     }
                 </div>
 
-                @if (obs.MenstrualHistory.Count > 0 || obs.PastMedicalHistory.Count > 0 || obs.FamilyHistory.Count > 0)
+                @if (obs.MenstrualHistory.Count > 0 || obs.PastMedicalHistory.Count > 0 || obs.FamilyHistory.Count > 0
+                     || obs.PerAbdomen.Count > 0 || obs.PerVaginum.Count > 0
+                     || obs.SurgicalHistory.Count > 0 || obs.PerSpeculum.Count > 0)
                 {
                     <div class="rx-section">
                         <div class="rx-section-title">PATIENT HISTORY</div>
@@ -315,6 +303,46 @@ else
                                     }
                                 </div>
                             }
+                            @if (obs.SurgicalHistory.Count > 0)
+                            {
+                                <div>
+                                    <div class="rx-hist-heading">Surgical History</div>
+                                    @foreach (var h in obs.SurgicalHistory)
+                                    {
+                                        <div class="rx-hist-item">• @h</div>
+                                    }
+                                </div>
+                            }
+                            @if (obs.PerAbdomen.Count > 0)
+                            {
+                                <div>
+                                    <div class="rx-hist-heading">Per Abdomen</div>
+                                    @foreach (var h in obs.PerAbdomen)
+                                    {
+                                        <div class="rx-hist-item">• @h</div>
+                                    }
+                                </div>
+                            }
+                            @if (obs.PerVaginum.Count > 0)
+                            {
+                                <div>
+                                    <div class="rx-hist-heading">Per Vaginum</div>
+                                    @foreach (var h in obs.PerVaginum)
+                                    {
+                                        <div class="rx-hist-item">• @h</div>
+                                    }
+                                </div>
+                            }
+                            @if (obs.PerSpeculum.Count > 0)
+                            {
+                                <div>
+                                    <div class="rx-hist-heading">Per Speculum</div>
+                                    @foreach (var h in obs.PerSpeculum)
+                                    {
+                                        <div class="rx-hist-item">• @h</div>
+                                    }
+                                </div>
+                            }
                         </div>
                     </div>
                 }
@@ -324,8 +352,10 @@ else
             @if (!string.IsNullOrEmpty(_prescription.Diagnosis))
             {
                 <div class="rx-section">
-                    <div class="rx-section-title">DIAGNOSIS</div>
-                    <div class="rx-diagnosis">@_prescription.Diagnosis</div>
+                    <div class="rx-diagnosis">
+                        <span class="rx-section-title rx-inline-title">DIAGNOSIS:</span>
+                        @_prescription.Diagnosis
+                    </div>
                 </div>
             }
 
@@ -479,14 +509,9 @@ else
     .rx-vital-unit { font-size:8px; color:#94A3B8; margin-top:2px; }
 
     /* ── Obstetric History ───────────────────────────── */
-    .rx-gpla { font-size:16px; font-weight:800; color:#1565C0; letter-spacing:1px; margin-bottom:8px; }
-    .rx-obs-grid { display:flex; gap:0; border:1px solid #E2E8F0; border-radius:6px;
-                   overflow:hidden; margin-bottom:8px; width:fit-content; }
-    .rx-obs-cell { padding:7px 18px; border-right:1px solid #E2E8F0; text-align:center; }
-    .rx-obs-cell:last-child { border-right:none; }
-    .rx-obs-label { font-size:9px; color:#94A3B8; font-weight:700; text-transform:uppercase;
-                    letter-spacing:0.5px; margin-bottom:3px; }
-    .rx-obs-val { font-size:15px; font-weight:800; color:#0F172A; }
+    .rx-gpla { display:flex; align-items:baseline; gap:8px; font-size:14px; font-weight:800;
+               color:#1565C0; letter-spacing:0.5px; margin-bottom:8px; }
+    .rx-inline-title { margin-bottom:0; white-space:nowrap; }
     .rx-obs-info { font-size:12px; color:#374151; font-style:italic; }
     .rx-hist-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
     .rx-hist-heading { font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;
@@ -494,7 +519,7 @@ else
     .rx-hist-item { font-size:12px; color:#0F172A; margin-bottom:3px; }
 
     /* ── Diagnosis ────────────────────────────────────── */
-    .rx-diagnosis { font-size:14px; font-weight:600; color:#0F172A; }
+    .rx-diagnosis { display:flex; align-items:baseline; gap:8px; font-size:14px; font-weight:600; color:#0F172A; }
 
     /* ── Medicines Table ──────────────────────────────── */
     .rx-table { width:100%; border-collapse:collapse; font-size:12px; }

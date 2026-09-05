@@ -14,4 +14,7 @@ public sealed record CreateOpdRegistrationCommand(
     string? BloodPressure,
     int? PulseRate,
     decimal? OxygenSaturation,
+    decimal? Temperature,
+    int? RespiratoryRate,
+    decimal? Sugar,
     Guid ReceivedByUserId) : IRequest<OpdRegistrationDto>;

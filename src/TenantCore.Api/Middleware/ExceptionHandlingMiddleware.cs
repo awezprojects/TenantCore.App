@@ -1,5 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Shared.Errors;
 using System.Net;
@@ -40,6 +42,8 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             DomainException de      => (HttpStatusCode.BadRequest,          "Request Error", de.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized,    "Unauthorized",  UserMessages.Unauthorized),
             InvalidOperationException ioe => (HttpStatusCode.Conflict,      "Conflict",      ioe.Message),
+            DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } } => (
+                HttpStatusCode.Conflict, "Conflict", UserMessages.Conflict),
             _ => (HttpStatusCode.InternalServerError, "Server Error",       UserMessages.ServerError)
         };
 

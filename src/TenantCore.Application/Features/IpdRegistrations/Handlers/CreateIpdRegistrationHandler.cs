@@ -42,8 +42,7 @@ public sealed class CreateIpdRegistrationHandler(
             bed?.MarkOccupied();
         }
 
-        var todayCount = await ipdRepository.CountTodayAsync(request.ApplicationId, cancellationToken);
-        var admissionNumber = $"IPD-{DateTime.UtcNow:yyyyMMdd}-{(todayCount + 1):D4}";
+        var admissionNumber = await ipdRepository.GetNextAdmissionNumberAsync(request.ApplicationId, cancellationToken);
 
         var registration = IpdRegistration.Create(
             request.ApplicationId, request.PatientId, request.DoctorUserId,

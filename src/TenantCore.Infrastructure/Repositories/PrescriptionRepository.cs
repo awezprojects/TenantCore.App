@@ -58,10 +58,24 @@ public class PrescriptionRepository(ClinicDbContext dbContext)
             .Include(p => p.ObstetricData)
             .FirstOrDefaultAsync(p => p.OpdRegistrationId == opdRegistrationId, ct);
 
-    public async Task<int> CountTodayByApplicationAsync(Guid applicationId, CancellationToken ct = default)
+    public async Task<string> GetNextPrescriptionNumberAsync(Guid applicationId, CancellationToken ct = default)
     {
-        var today = DateTime.Now.Date;
-        return await DbSet.CountAsync(
-            p => p.ApplicationId == applicationId && p.PrescribedDate.Date == today, ct);
+        var today = DateTime.UtcNow.Date;
+        var prefix = $"RX-{today:yyyyMMdd}-";
+
+        var lastNumber = await DbSet
+            .Where(p => p.ApplicationId == applicationId && p.PrescribedDate.Date == today)
+            .OrderByDescending(p => p.PrescriptionNumber)
+            .Select(p => p.PrescriptionNumber)
+            .FirstOrDefaultAsync(ct);
+
+        var nextSequence = 1;
+        if (lastNumber is not null && lastNumber.Length > prefix.Length &&
+            int.TryParse(lastNumber[prefix.Length..], out var lastSequence))
+        {
+            nextSequence = lastSequence + 1;
+        }
+
+        return $"{prefix}{nextSequence:D4}";
     }
 }

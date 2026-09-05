@@ -79,11 +79,25 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
         return (items, total);
     }
 
-    public async Task<int> CountTodayAsync(Guid applicationId, CancellationToken ct = default)
+    public async Task<string> GetNextRegistrationNumberAsync(Guid applicationId, CancellationToken ct = default)
     {
         var today = DateTime.Now.Date;
-        return await DbSet.CountAsync(
-            o => o.ApplicationId == applicationId && o.RegistrationDate.Date == today, ct);
+        var prefix = $"OPD-{today:yyyyMMdd}-";
+
+        var lastNumber = await DbSet
+            .Where(o => o.ApplicationId == applicationId && o.RegistrationDate.Date == today)
+            .OrderByDescending(o => o.RegistrationNumber)
+            .Select(o => o.RegistrationNumber)
+            .FirstOrDefaultAsync(ct);
+
+        var nextSequence = 1;
+        if (lastNumber is not null && lastNumber.Length > prefix.Length &&
+            int.TryParse(lastNumber[prefix.Length..], out var lastSequence))
+        {
+            nextSequence = lastSequence + 1;
+        }
+
+        return $"{prefix}{nextSequence:D4}";
     }
 
     public async Task<int> CountTodayByDoctorAsync(Guid applicationId, Guid doctorUserId, CancellationToken ct = default)
@@ -107,4 +121,13 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
             .Include(o => o.Patient)
             .Where(o => o.ApplicationId == applicationId && ids.Contains(o.Id))
             .ToListAsync(ct);
+
+    public async Task<bool> ExistsForPatientDoctorOnDateAsync(
+        Guid applicationId, Guid patientId, Guid doctorUserId, DateTime date, CancellationToken ct = default)
+        => await DbSet.AnyAsync(o =>
+            o.ApplicationId == applicationId &&
+            o.PatientId == patientId &&
+            o.DoctorUserId == doctorUserId &&
+            o.RegistrationDate.Date == date.Date &&
+            o.Status != OpdStatus.Cancelled, ct);
 }

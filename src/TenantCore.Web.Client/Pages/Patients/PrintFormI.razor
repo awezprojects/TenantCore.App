@@ -1,0 +1,247 @@
+@page "/patients/{PatientId:guid}/formi-print"
+@layout PrintLayout
+@inject IClinicApiClient ClinicClient
+@inject IApplicationApiClient AppClient
+@inject IDoctorProfileApiClient DoctorProfileClient
+@inject ClinicContextService ClinicContext
+@inject AuthStateService AuthState
+@inject IJSRuntime JS
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Dtos.Auth
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<PageTitle>MTP Regulations — Form I — Print</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
+        <div style="font-size:32px;">⏳</div>
+        <div style="font-size:14px;color:#64748B;">Loading...</div>
+    </div>
+}
+else
+{
+    <!-- ── Action Bar + Fill-in Panel (screen only) ─────────────────────── -->
+    <div class="no-print" style="background:#1E3A5F;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                    style="padding:7px 16px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">
+                ✕ Close
+            </button>
+            <div style="color:rgba(255,255,255,0.8);font-size:13px;">
+                <strong style="color:#fff;">MTP Regulations — Form I</strong>
+                @if (!string.IsNullOrEmpty(_patient?.FullName))
+                {
+                    <span> · @_patient.FullName</span>
+                }
+            </div>
+        </div>
+        <button @onclick="PrintPage"
+                style="padding:9px 22px;border-radius:8px;border:none;background:#fff;color:#1E3A5F;cursor:pointer;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;">
+            🖨️ Print
+        </button>
+    </div>
+
+    <div class="no-print" style="max-width:820px;margin:16px auto;background:#fff;border-radius:8px;padding:16px 20px;box-shadow:0 1px 6px rgba(0,0,0,0.08);">
+        <div style="font-size:12px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+            Fill in before printing
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Doctor's Qualification</label>
+                <input @bind="_qualification" placeholder="e.g. M.B.B.S M.S.OBGY"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Mobile No.</label>
+                <input @bind="_mobile"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div style="grid-column:1/-1;">
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Doctor's Address (Nursing Home / Clinic name &amp; address)</label>
+                <textarea @bind="_doctorAddress" rows="2"
+                          style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+            <div style="grid-column:1/-1;">
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Patient's Resident Address</label>
+                <textarea @bind="_patientAddress" rows="2"
+                          style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Place</label>
+                <input @bind="_place" placeholder="e.g. Aurangabad"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">Date</label>
+                <input type="date" @bind="_date"
+                       style="width:100%;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:13px;box-sizing:border-box;" />
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Form Sheet ────────────────────────────────────────── -->
+    <div class="fi-bg">
+        <div class="fi-sheet">
+            <div class="fi-title">Form I</div>
+            <div class="fi-subtitle">As per Clause 3 of Medical Termination of Pregnancy Regulations, 2003</div>
+
+            <div class="fi-body">
+                I Dr <span class="fi-bold">@(_doctorName.ToUpperInvariant())</span>@(string.IsNullOrWhiteSpace(_qualification) ? "" : $" {_qualification}"), address -
+            </div>
+            <div class="fi-body fi-bold" style="margin-top:6px;">@_doctorAddress</div>
+
+            <div class="fi-body" style="margin-top:16px;">
+                hereby certify that *I/We am/are of opinion, formed in good faith, that it is necessary to terminate the
+            </div>
+
+            <div class="fi-body" style="margin-top:14px;">
+                Pregnancy of <span class="fi-bold">@(_patient?.FullName?.ToUpperInvariant())</span>
+            </div>
+
+            <div class="fi-body" style="margin-top:14px;">
+                Resident of <span class="fi-bold">@_patientAddress@(string.IsNullOrWhiteSpace(_mobile) ? "" : $" , Mobile No. {_mobile}")</span>
+            </div>
+
+            <div class="fi-body" style="margin-top:14px;">
+                for the reasons given below**.
+            </div>
+
+            <div class="fi-body" style="margin-top:10px;">
+                *I,We hereby give intimation that *I/We terminated the pregnancy of the woman referred to above
+                who bears the Serial Number <span class="fi-line-short"></span> in the Admission Register of the hospital /
+                approved place. The pregnancy was terminated at <span class="fi-line-short"></span> and this report is certified within 3
+                hours of such termination.
+            </div>
+
+            <div class="fi-footer-row">
+                <div>
+                    <div class="fi-body">Place : <span class="fi-bold">@_place</span></div>
+                    <div class="fi-body" style="margin-top:14px;">Date : <span class="fi-bold">@_date.ToString("dd/MM/yyyy")</span></div>
+                </div>
+                <div class="fi-sign-label">Signature (S) of the<br />Registered Medical Practitioners(S)</div>
+            </div>
+
+            <div class="fi-rule"></div>
+
+            <div class="fi-body">*Strike out whichever is not applicable</div>
+            <div class="fi-body">**of the reasons specified items (i) to (v) write the one which is appropriate:-</div>
+
+            <div class="fi-body" style="margin-top:8px;">(i) in order to save the life of the pregnant woman</div>
+            <div class="fi-body">(ii) in order to prevent grave injury to the physical and mental health of the pregnant woman</div>
+            <div class="fi-body">(iii) in view of the substantial risk that if the child was born, it would suffer from such physical or
+                mental abnormalities as to be seriously handicapped</div>
+            <div class="fi-body">(iv) as the pregnancy is alleged by pregnant woman to have been caused by rape</div>
+            <div class="fi-body">(v) as the pregnancy has occured as a result of failure of any contraceptive device or methods used
+                by married woman or her husband for the purpose of limiting the number of children.</div>
+            <div class="fi-body fi-bold" style="margin-top:6px;">Note : Account may be taken of the pregnant womans actual or reasonably foreseeable environment
+                in determining whether the continuance of her pregnancy would involve a grave injury to her
+                physical or mental health</div>
+
+            <div class="fi-footer-row" style="margin-top:26px;">
+                <div>
+                    <div class="fi-body">Place : <span class="fi-bold">@_place</span></div>
+                    <div class="fi-body" style="margin-top:14px;">Date : <span class="fi-bold">@_date.ToString("dd/MM/yyyy")</span></div>
+                </div>
+                <div class="fi-sign-label">Signature (S) of the<br />Registered Medical Practitioners(S)</div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .fi-bg { background:#F0F4F8; min-height:calc(100vh - 44px); padding:28px 16px; }
+    .fi-sheet { max-width:820px; margin:0 auto; background:#fff; border-radius:4px;
+                box-shadow:0 2px 16px rgba(0,0,0,0.1); font-family:'Times New Roman',serif; color:#111;
+                padding:26px 44px 32px; }
+
+    .fi-title { text-align:center; font-size:15px; font-weight:700; margin-bottom:4px; }
+    .fi-subtitle { text-align:center; font-size:13px; margin-bottom:2px; }
+    .fi-body { font-size:13.5px; line-height:1.8; color:#1E293B; }
+    .fi-bold { font-weight:700; }
+
+    .fi-line-short { display:inline-block; border-bottom:1px solid #1E293B; width:110px; }
+
+    .fi-footer-row { display:flex; justify-content:space-between; align-items:flex-start; margin-top:22px; }
+    .fi-sign-label { font-size:13.5px; text-align:center; }
+
+    .fi-rule { border-top:1px dashed #64748B; margin:20px 0 14px; }
+
+    @@media print {
+        .no-print { display:none !important; }
+        .fi-bg { background:#fff !important; padding:0 !important; min-height:unset; }
+        .fi-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; }
+        body { background:#fff !important; margin:0 !important; padding:0 !important; }
+    }
+</style>
+
+@code {
+    [Parameter] public Guid PatientId { get; set; }
+
+    private PatientDto? _patient;
+    private ApplicationResponseDto? _clinic;
+    private bool _loading = true;
+
+    private string _doctorName = string.Empty;
+    private string _qualification = string.Empty;
+    private string _doctorAddress = string.Empty;
+    private string _mobile = string.Empty;
+    private string _patientAddress = string.Empty;
+    private string _place = string.Empty;
+    private DateOnly _date = DateOnly.FromDateTime(DateTime.Today);
+
+    // OnAfterRenderAsync is the only safe place in Blazor WASM to call JS interop
+    // (localStorage) and then fire authenticated API calls — see PrintUsgChart.razor
+    // for the same reasoning: PrintLayout has no code-behind to initialize context.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await AuthState.InitializeAsync();
+            await ClinicContext.InitializeAsync();
+            _doctorName = AuthState.CurrentUser?.FullName ?? string.Empty;
+
+            await Task.WhenAll(LoadPatient(), LoadClinic(), LoadDoctorProfile());
+
+            _mobile = _patient?.PhoneNumber ?? string.Empty;
+            _patientAddress = _patient?.Address ?? string.Empty;
+
+            if (_clinic is not null)
+            {
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(_clinic.ApplicationName)) parts.Add(_clinic.ApplicationName);
+                if (!string.IsNullOrWhiteSpace(_clinic.Address)) parts.Add(_clinic.Address);
+                _doctorAddress = string.Join(", ", parts);
+            }
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPatient()
+    {
+        var r = await ClinicClient.GetPatientByIdAsync(PatientId);
+        if (r.Success && r.Data is not null) _patient = r.Data;
+    }
+
+    private async Task LoadClinic()
+    {
+        var appId = ClinicContext.SelectedApplicationId;
+        if (appId == Guid.Empty) return;
+        var r = await AppClient.GetApplicationByIdAsync(appId);
+        if (r.Success && r.Data is not null) _clinic = r.Data;
+    }
+
+    private async Task LoadDoctorProfile()
+    {
+        var r = await DoctorProfileClient.GetMyProfileAsync();
+        if (r.Success && r.Data is not null) _qualification = r.Data.QualificationDetails ?? string.Empty;
+    }
+
+    private async Task PrintPage() => await JS.InvokeVoidAsync("window.print");
+}

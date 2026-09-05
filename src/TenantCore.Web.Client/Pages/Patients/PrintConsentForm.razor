@@ -1,0 +1,208 @@
+@page "/patients/{PatientId:guid}/consent-print"
+@layout PrintLayout
+@inject IClinicApiClient ClinicClient
+@inject IDoctorProfileApiClient DoctorProfileClient
+@inject IPrescriptionApiClient PrescriptionClient
+@inject ClinicContextService ClinicContext
+@inject AuthStateService AuthState
+@inject IJSRuntime JS
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Services
+
+<PageTitle>PCPNDT Consent Form — Print</PageTitle>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
+        <div style="font-size:32px;">⏳</div>
+        <div style="font-size:14px;color:#64748B;">Loading...</div>
+    </div>
+}
+else
+{
+    var t = GetText();
+    var today = DateTime.Now.ToString("dd/MM/yyyy");
+
+    <!-- ── Print Action Bar (screen only) ─────────────────────── -->
+    <div class="no-print" style="background:#1E3A5F;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;z-index:100;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                    style="padding:7px 16px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">
+                ✕ Close
+            </button>
+            <div style="color:rgba(255,255,255,0.8);font-size:13px;">
+                <strong style="color:#fff;">PCPNDT Consent Form</strong>
+                @if (!string.IsNullOrEmpty(_patientName))
+                {
+                    <span> · @_patientName</span>
+                }
+            </div>
+        </div>
+        <button @onclick="PrintPage"
+                style="padding:9px 22px;border-radius:8px;border:none;background:#fff;color:#1E3A5F;cursor:pointer;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;">
+            🖨️ Print
+        </button>
+    </div>
+
+    <!-- ── Form Sheet ────────────────────────────────────────── -->
+    <div class="cf-bg">
+        <div class="cf-sheet">
+            @for (var copy = 0; copy < 2; copy++)
+            {
+                <div class="cf-block">
+                    <div class="cf-title cf-title-mother">@t.MotherTitle</div>
+                    <div class="cf-body">@t.MotherBody</div>
+                    <div class="cf-checks">
+                        <div class="cf-check-item"><span class="cf-checkbox"></span> @t.Boy</div>
+                        <div class="cf-check-item"><span class="cf-checkbox"></span> @t.Girl</div>
+                    </div>
+                    <div class="cf-footer-row">
+                        <div class="cf-date">@t.DateLabel : @today</div>
+                        <div class="cf-sign-label">@t.MotherSignLabel</div>
+                    </div>
+                </div>
+
+                <div class="cf-block">
+                    <div class="cf-title cf-title-doctor">@t.DoctorTitle</div>
+                    <div class="cf-body">
+                        @t.DoctorBodyIntro<br />
+                        @t.DoctorBody
+                    </div>
+                    <div class="cf-doctor-sign">
+                        <div class="cf-doctor-sign-name">@t.DoctorPrefix @_doctorName</div>
+                        <div class="cf-doctor-sign-reg">@t.RegLabel @_registrationNumber</div>
+                    </div>
+                </div>
+
+                @if (copy == 0)
+                {
+                    <div class="cf-copy-divider"></div>
+                }
+            }
+        </div>
+    </div>
+}
+
+<style>
+    .cf-bg { background:#F0F4F8; min-height:calc(100vh - 44px); padding:28px 16px; }
+    .cf-sheet { max-width:820px; margin:0 auto; background:#fff; border-radius:4px;
+                box-shadow:0 2px 16px rgba(0,0,0,0.1); font-family:'Segoe UI',sans-serif; color:#111; padding:8px 36px 24px; }
+
+    .cf-block { padding:18px 0; }
+    .cf-title { text-align:center; font-size:14px; font-weight:800; text-decoration:underline;
+                margin-bottom:12px; }
+    .cf-title-mother { color:#7C2D12; }
+    .cf-title-doctor { color:#1D4ED8; }
+    .cf-body { font-size:13px; line-height:1.7; color:#1E293B; }
+    .cf-bold { font-weight:700; }
+    .cf-checks { display:flex; gap:36px; margin:14px 0; align-items:center; }
+    .cf-check-item { display:flex; align-items:center; gap:6px; font-size:13px; }
+    .cf-checkbox { width:18px; height:18px; border:1.5px solid #334155; display:inline-block; }
+    .cf-footer-row { display:flex; justify-content:space-between; align-items:flex-end; margin-top:10px; }
+    .cf-date { font-size:12.5px; }
+    .cf-sign-label { font-size:12.5px; }
+    .cf-doctor-sign { text-align:right; margin-top:16px; }
+    .cf-doctor-sign-name { font-size:13px; font-weight:700; color:#0F172A; }
+    .cf-doctor-sign-reg { font-size:12px; color:#334155; margin-top:2px; }
+
+    .cf-copy-divider { border-top:1.5px dashed #94A3B8; margin:10px 0; }
+
+    @@media print {
+        .no-print { display:none !important; }
+        .cf-bg { background:#fff !important; padding:0 !important; min-height:unset; }
+        .cf-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; }
+        body { background:#fff !important; margin:0 !important; padding:0 !important; }
+    }
+</style>
+
+@code {
+    [Parameter] public Guid PatientId { get; set; }
+
+    private string _patientName = string.Empty;
+    private string _doctorName = string.Empty;
+    private string _registrationNumber = string.Empty;
+    private PrescriptionLanguage _language = PrescriptionLanguage.English;
+    private bool _loading = true;
+
+    // OnAfterRenderAsync is the only safe place in Blazor WASM to call JS interop
+    // (localStorage) and then fire authenticated API calls — see PrintUsgChart.razor
+    // for the same reasoning: PrintLayout has no code-behind to initialize context.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await AuthState.InitializeAsync();
+            await ClinicContext.InitializeAsync();
+            _doctorName = AuthState.CurrentUser?.FullName ?? string.Empty;
+
+            await Task.WhenAll(LoadPatient(), LoadDoctorProfile(), LoadLanguage());
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPatient()
+    {
+        var r = await ClinicClient.GetPatientByIdAsync(PatientId);
+        if (r.Success && r.Data is not null) _patientName = r.Data.FullName;
+    }
+
+    private async Task LoadDoctorProfile()
+    {
+        var r = await DoctorProfileClient.GetMyProfileAsync();
+        if (r.Success && r.Data is not null) _registrationNumber = r.Data.RegistrationNumber;
+    }
+
+    private async Task LoadLanguage()
+    {
+        var r = await PrescriptionClient.GetPrescriptionConfigAsync();
+        if (r.Success && r.Data is not null) _language = r.Data.DefaultLanguage;
+    }
+
+    private async Task PrintPage() => await JS.InvokeVoidAsync("window.print");
+
+    private sealed record Text(
+        string MotherTitle, string MotherBody, string Boy, string Girl,
+        string DateLabel, string MotherSignLabel,
+        string DoctorTitle, string DoctorBodyIntro, string DoctorBody,
+        string DoctorPrefix, string RegLabel);
+
+    private Text GetText() => _language switch
+    {
+        PrescriptionLanguage.Hindi => new Text(
+            MotherTitle: "गर्भवती माता / गर्भवती स्त्री का शपथ पत्र",
+            MotherBody: $"मैं श्रीमती {_patientName} शपथपूर्वक घोषित करती हूँ कि, सोनोग्राफी / इमेज स्कैनिंग करते समय मुझे अपने गर्भ का लिंग जानने की इच्छा नहीं है, इसके लिए मैं सहमति देती हूँ।",
+            Boy: "लड़का", Girl: "लड़की",
+            DateLabel: "दिनांक", MotherSignLabel: "गर्भवती स्त्री के हस्ताक्षर / अंगूठा",
+            DoctorTitle: "डॉक्टर / सोनोग्राफी-इमेज स्कैनिंग करने वाले व्यक्ति का शपथ पत्र",
+            DoctorBodyIntro: $"मैं डॉक्टर {_doctorName} शपथपूर्वक घोषित करता हूँ कि,",
+            DoctorBody: $"श्रीमती {_patientName} की सोनोग्राफी / इमेज स्कैनिंग करते समय मैंने गर्भ के लिंग का निदान नहीं किया है। साथ ही गर्भवती माता या किसी अन्य व्यक्ति को किसी भी प्रकार से नहीं बताया है।",
+            DoctorPrefix: "डॉ.", RegLabel: "रजी. नं."),
+
+        PrescriptionLanguage.Marathi => new Text(
+            MotherTitle: "गरोदर मातेचे / गर्भवती स्त्रीचे शपथपत्र",
+            MotherBody: $"मी सौ. {_patientName} असे शपथपूर्वक जाहीर करते की, सोनोग्राफी / इमेज स्कॅनिंग करताना मला माझ्या गर्भाचे लिंग जाणून घ्यायचे नाही, यासाठी मी संमती देत आहे.",
+            Boy: "मुलगा", Girl: "मुलगी",
+            DateLabel: "दिनांक", MotherSignLabel: "गर्भवती स्त्री ची सही / अंगठा",
+            DoctorTitle: "डॉक्टरांचे / सोनोग्राफी-इमेज स्कॅनिंग करणाऱ्या व्यक्तीचे शपथपत्र",
+            DoctorBodyIntro: $"मी डॉक्टर {_doctorName} असे शपथपूर्वक जाहीर करतो की,",
+            DoctorBody: $"सौ. {_patientName} यांची सोनोग्राफी / इमेज स्कॅनिंग करताना मी गर्भलिंग निदान केलेले नाही. तसेच गर्भवती मातेला अथवा इतर व्यक्तीला कुठल्याही पद्धतीने सांगितले नाही.",
+            DoctorPrefix: "डॉ.", RegLabel: "रजी. नं."),
+
+        _ => new Text(
+            MotherTitle: "Affidavit of the Pregnant Mother",
+            MotherBody: $"I, Mrs. {_patientName}, hereby solemnly declare that I do not wish to know the sex of my fetus during the sonography / image scanning procedure, and I hereby give my consent for the same.",
+            Boy: "Boy", Girl: "Girl",
+            DateLabel: "Date", MotherSignLabel: "Signature / Thumb Impression of the Pregnant Woman",
+            DoctorTitle: "Affidavit of the Doctor / Person Conducting the Sonography / Image Scanning",
+            DoctorBodyIntro: $"I, Dr. {_doctorName}, hereby solemnly declare that,",
+            DoctorBody: $"while conducting the sonography / image scanning of Mrs. {_patientName}, I have not determined the sex of the fetus. Nor have I disclosed the same to the pregnant mother or any other person in any manner.",
+            DoctorPrefix: "Dr.", RegLabel: "Reg. No."),
+    };
+}

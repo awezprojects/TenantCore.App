@@ -19,6 +19,9 @@ public class OpdRegistration : AuditableEntity
     public string? BloodPressure { get; private set; }
     public int? PulseRate { get; private set; }
     public decimal? OxygenSaturation { get; private set; }
+    public decimal? Temperature { get; private set; }
+    public int? RespiratoryRate { get; private set; }
+    public decimal? Sugar { get; private set; }
 
     public Patient Patient { get; private set; } = null!;
 
@@ -35,7 +38,10 @@ public class OpdRegistration : AuditableEntity
         decimal? weight = null,
         string? bloodPressure = null,
         int? pulseRate = null,
-        decimal? oxygenSaturation = null) => new()
+        decimal? oxygenSaturation = null,
+        decimal? temperature = null,
+        int? respiratoryRate = null,
+        decimal? sugar = null) => new()
     {
         Id = Guid.NewGuid(),
         ApplicationId = applicationId,
@@ -51,11 +57,15 @@ public class OpdRegistration : AuditableEntity
         BloodPressure = bloodPressure,
         PulseRate = pulseRate,
         OxygenSaturation = oxygenSaturation,
+        Temperature = temperature,
+        RespiratoryRate = respiratoryRate,
+        Sugar = sugar,
         CreatedAt = DateTime.UtcNow
     };
 
     public void Update(Guid doctorUserId, string doctorName, decimal fee, OpdStatus status, string? notes,
-        decimal? weight = null, string? bloodPressure = null, int? pulseRate = null, decimal? oxygenSaturation = null)
+        decimal? weight = null, string? bloodPressure = null, int? pulseRate = null, decimal? oxygenSaturation = null,
+        decimal? temperature = null, int? respiratoryRate = null, decimal? sugar = null)
     {
         if (Status is OpdStatus.Cancelled or OpdStatus.Completed)
             throw new DomainValidationException("Cannot update a completed or cancelled OPD registration.");
@@ -69,6 +79,9 @@ public class OpdRegistration : AuditableEntity
         BloodPressure = bloodPressure;
         PulseRate = pulseRate;
         OxygenSaturation = oxygenSaturation;
+        Temperature = temperature;
+        RespiratoryRate = respiratoryRate;
+        Sugar = sugar;
         SetUpdatedAt();
     }
 }

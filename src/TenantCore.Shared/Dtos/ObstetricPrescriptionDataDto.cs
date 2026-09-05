@@ -12,6 +12,10 @@ public class ObstetricPrescriptionDataDto
     public IReadOnlyList<string> MenstrualHistory { get; init; } = [];
     public IReadOnlyList<string> PastMedicalHistory { get; init; } = [];
     public IReadOnlyList<string> FamilyHistory { get; init; } = [];
+    public IReadOnlyList<string> PerAbdomen { get; init; } = [];
+    public IReadOnlyList<string> PerVaginum { get; init; } = [];
+    public IReadOnlyList<string> SurgicalHistory { get; init; } = [];
+    public IReadOnlyList<string> PerSpeculum { get; init; } = [];
     public DateOnly? Lmp { get; init; }
     public DateOnly? EddByLmp { get; init; }
     public DateOnly? EddByUsg { get; init; }
@@ -27,4 +31,8 @@ public sealed record UpsertObstetricPrescriptionDataDto(
     IReadOnlyList<string>? PastMedicalHistory,
     IReadOnlyList<string>? FamilyHistory,
     DateOnly? Lmp = null,
-    DateOnly? EddByUsg = null);
+    DateOnly? EddByUsg = null,
+    IReadOnlyList<string>? PerAbdomen = null,
+    IReadOnlyList<string>? PerVaginum = null,
+    IReadOnlyList<string>? SurgicalHistory = null,
+    IReadOnlyList<string>? PerSpeculum = null);
