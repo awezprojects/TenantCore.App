@@ -6,7 +6,10 @@
 @using TenantCore.Web.Client.Services
 
 <div>
-    <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">@Icon @Label</div>
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">@Icon @Label</div>
+    }
     <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
         @foreach (var entry in SelectedItems.ToList())
         {
@@ -18,17 +21,12 @@
             </div>
         }
     </div>
-    <div style="display:flex; gap:6px;">
-        <input value="@_search"
-               @oninput="e => _search = e.Value?.ToString() ?? string.Empty"
-               @onkeydown="OnKeyDown"
-               placeholder="Search or type a new item…"
-               style="flex:1; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none;" />
-        <button @onclick="SubmitAsync" disabled="@_saving"
-                style="padding:8px 16px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155; opacity:@(_saving ? "0.6" : "1");">
-            @(_saving ? "Adding…" : "Add")
-        </button>
-    </div>
+    <input value="@_search"
+           @oninput="e => _search = e.Value?.ToString() ?? string.Empty"
+           @onkeydown="OnKeyDown"
+           placeholder="Search or type a new item, then press Enter…"
+           disabled="@_saving"
+           style="width:100%; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; box-sizing:border-box; opacity:@(_saving ? "0.6" : "1");" />
     <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
         @foreach (var item in MatchingSuggestions())
         {

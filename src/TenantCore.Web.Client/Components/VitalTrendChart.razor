@@ -1,0 +1,104 @@
+@* Small, dependency-free inline-SVG line chart for plotting one or more vital-sign
+   series (e.g. Systolic + Diastolic for BP) across a patient's visit history. *@
+
+<div style="background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <div style="font-weight:700; font-size:13px; color:#0F172A;">@Icon @Title</div>
+        <div style="display:flex; gap:10px;">
+            @foreach (var s in Series)
+            {
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="width:9px; height:9px; border-radius:50%; background:@s.ColorHex; display:inline-block;"></span>
+                    <span style="font-size:10px; color:#64748B; font-weight:600;">@s.Name</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (!HasEnoughData)
+    {
+        <div style="padding:28px 0; text-align:center; color:#94A3B8; font-size:12px;">Not enough data yet — needs at least 2 visits.</div>
+    }
+    else
+    {
+        <svg viewBox="0 0 @ViewBoxWidth @ViewBoxHeight" style="width:100%; height:140px; overflow:visible;">
+            <!-- gridlines -->
+            <line x1="@PadLeft" y1="@PadTop" x2="@PadLeft" y2="@(ViewBoxHeight - PadBottom)" stroke="#E2E8F0" stroke-width="1" />
+            <line x1="@PadLeft" y1="@(ViewBoxHeight - PadBottom)" x2="@(ViewBoxWidth - PadRight)" y2="@(ViewBoxHeight - PadBottom)" stroke="#E2E8F0" stroke-width="1" />
+
+            <!-- min/max labels -->
+            <text x="4" y="@(PadTop + 4)" font-size="9" fill="#94A3B8">@MaxValue.ToString("0.#")</text>
+            <text x="4" y="@(ViewBoxHeight - PadBottom + 2)" font-size="9" fill="#94A3B8">@MinValue.ToString("0.#")</text>
+
+            @foreach (var s in Series)
+            {
+                var pts = BuildPoints(s.Points);
+                if (pts.Count > 0)
+                {
+                    <polyline points="@string.Join(" ", pts.Select(p => $"{p.X:0.##},{p.Y:0.##}"))"
+                              fill="none" stroke="@s.ColorHex" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                    @foreach (var p in pts)
+                    {
+                        <circle cx="@p.X" cy="@p.Y" r="3" fill="@s.ColorHex" />
+                    }
+                }
+            }
+
+            <!-- first/last date labels -->
+            <text x="@PadLeft" y="@(ViewBoxHeight - 2)" font-size="9" fill="#94A3B8">@FirstDate</text>
+            <text x="@(ViewBoxWidth - PadRight)" y="@(ViewBoxHeight - 2)" font-size="9" fill="#94A3B8" text-anchor="end">@LastDate</text>
+        </svg>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = string.Empty;
+    [Parameter] public string Unit { get; set; } = string.Empty;
+    [Parameter] public List<ChartSeries> Series { get; set; } = [];
+
+    public record ChartSeries(string Name, string ColorHex, List<(DateTime Date, double Value)> Points);
+    private record Pt(double X, double Y);
+
+    private const double ViewBoxWidth = 320;
+    private const double ViewBoxHeight = 140;
+    private const double PadLeft = 28;
+    private const double PadRight = 8;
+    private const double PadTop = 10;
+    private const double PadBottom = 18;
+
+    private bool HasEnoughData => Series.Any(s => s.Points.Count >= 2);
+
+    private IEnumerable<(DateTime Date, double Value)> AllPoints => Series.SelectMany(s => s.Points);
+
+    private double MinValue => AllPoints.Any() ? AllPoints.Min(p => p.Value) : 0;
+    private double MaxValue => AllPoints.Any() ? AllPoints.Max(p => p.Value) : 1;
+
+    private DateTime MinDate => AllPoints.Any() ? AllPoints.Min(p => p.Date) : DateTime.Today;
+    private DateTime MaxDate => AllPoints.Any() ? AllPoints.Max(p => p.Date) : DateTime.Today;
+
+    private string FirstDate => MinDate.ToString("dd MMM");
+    private string LastDate => MaxDate.ToString("dd MMM");
+
+    private List<Pt> BuildPoints(List<(DateTime Date, double Value)> points)
+    {
+        if (points.Count == 0) return [];
+
+        var xSpanTicks = Math.Max(1, (MaxDate - MinDate).Ticks);
+        var ySpan = Math.Max(0.0001, MaxValue - MinValue);
+        var plotWidth = ViewBoxWidth - PadLeft - PadRight;
+        var plotHeight = ViewBoxHeight - PadTop - PadBottom;
+
+        return points
+            .OrderBy(p => p.Date)
+            .Select(p =>
+            {
+                var xRatio = (p.Date - MinDate).Ticks / (double)xSpanTicks;
+                var yRatio = (p.Value - MinValue) / ySpan;
+                var x = PadLeft + xRatio * plotWidth;
+                var y = PadTop + (1 - yRatio) * plotHeight;
+                return new Pt(x, y);
+            })
+            .ToList();
+    }
+}

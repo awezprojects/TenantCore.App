@@ -388,3 +388,4 @@ Named HttpClient: `"AuthApi"`. Base URL: `AuthApi:BaseUrl` in appsettings.
 - Throw exceptions for errors; never return error DTOs from handlers
 - Do not change the middleware pipeline order (see ADR-005)
 - **Every feature must ship with unit tests** — all handlers, validators, and translators must have tests covering happy path, not-found errors, cross-tenant isolation, and all validator boundary/edge cases (see ADR-009)
+- **Every delete/remove/clear action must confirm first** — use the shared `ConfirmDialog` component (`TenantCore.Web.Client/Components/ConfirmDialog.razor`); never wire a destructive action straight to a button's `@onclick` (see ADR-007, "Destructive Action Confirmation")

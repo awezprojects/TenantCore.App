@@ -83,6 +83,16 @@ public class ObstetricPrescriptionData : BaseEntity
         SetUpdatedAt();
     }
 
+    // Undoes an accidentally-entered LMP on this prescription. Deliberately scoped to this
+    // record only — it does not touch any PregnancyTenure the LMP may have created/updated;
+    // correcting that is what the existing "Close Tenure" flow is for.
+    public void ClearLmp()
+    {
+        Lmp = null;
+        EddByLmp = null;
+        SetUpdatedAt();
+    }
+
     private static string? SerializeList(IReadOnlyList<string>? list)
     {
         if (list is null || list.Count == 0) return null;

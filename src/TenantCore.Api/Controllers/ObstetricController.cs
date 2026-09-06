@@ -37,6 +37,13 @@ public class ObstetricController(ISender sender) : ClinicControllerBase
     public async Task<IActionResult> SetLmp(Guid prescriptionId, [FromBody] SetLmpRequest request, CancellationToken ct)
         => Ok(await sender.Send(new SetObstetricLmpCommand(prescriptionId, request, GetApplicationId()), ct));
 
+    [HttpDelete("prescriptions/{prescriptionId:guid}/lmp")]
+    [Authorize(Policy = AuthPolicies.RequireClinical)]
+    [ProducesResponseType(typeof(ObstetricDatesDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ClearLmp(Guid prescriptionId, CancellationToken ct)
+        => Ok(await sender.Send(new ClearObstetricLmpCommand(prescriptionId, GetApplicationId()), ct));
+
     [HttpPut("prescriptions/{prescriptionId:guid}/edd-by-usg")]
     [Authorize(Policy = AuthPolicies.RequireClinical)]
     [ProducesResponseType(typeof(ObstetricDatesDto), StatusCodes.Status200OK)]

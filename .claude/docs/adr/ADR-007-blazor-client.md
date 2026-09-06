@@ -487,6 +487,46 @@ All modals use the **custom fixed-position modal pattern** — no MudBlazor dial
 }
 ```
 
+#### Destructive Action Confirmation (Critical — Every Delete Needs This)
+
+**Every delete/remove/clear action in the application must show a confirmation dialog before executing — no exceptions, no "quick" deletes wired straight to a button's `@onclick`.** This applies to list-page deletes (patients, prescriptions, medicines, lookup items, etc.) and to in-form deletes (e.g. removing a prescribed medicine, clearing an entered LMP).
+
+Use the shared `ConfirmDialog` component (`Components/ConfirmDialog.razor`) rather than hand-rolling a new modal:
+
+```razor
+@using TenantCore.Web.Client.Components
+
+<button @onclick="() => _confirmDeleteId = item.Id">🗑 Delete</button>
+
+<ConfirmDialog Visible="@(_confirmDeleteId.HasValue)"
+               Title="Delete Medicine"
+               ConfirmText="Delete"
+               BusyText="Deleting..."
+               IsBusy="_deleting"
+               OnConfirm="ExecuteDeleteAsync"
+               OnCancel="() => _confirmDeleteId = null">
+    Are you sure you want to delete <strong>@_confirmDeleteName</strong>? This cannot be undone.
+</ConfirmDialog>
+```
+
+```csharp
+private Guid? _confirmDeleteId;
+private bool _deleting;
+
+private async Task ExecuteDeleteAsync()
+{
+    if (_confirmDeleteId is not { } id) return;
+    _deleting = true;
+    // ... call the delete API / mutate local state ...
+    _deleting = false;
+    _confirmDeleteId = null;
+}
+```
+
+`ConfirmDialog` reproduces the established visual convention (overlay `rgba(0,0,0,0.45)`, centered 380px card, `#EF4444` header/confirm button for dangerous actions, `z-index:900/901`) so every confirmation in the app looks and behaves the same. Pass `IsDangerous="false"` only for non-destructive confirmations (rare); default is `true`.
+
+If a page already has a hand-rolled confirm modal from before this rule existed, leave it as-is unless you are already touching that delete flow — don't do a drive-by rewrite. But **any new delete action, and any delete action you are otherwise modifying, must use `ConfirmDialog`.**
+
 ### Theme decision rule
 
 > **All pages** use the custom CSS theme (`opd-*`, `form-*`, `cc-*` classes) and native HTML elements.  
@@ -599,3 +639,4 @@ return all
 - Do NOT call `.ToString(...)` directly on UTC-stored datetimes — always use `DateTimeHelper.ToLocalString()`
 - Do NOT use `DateTime.UtcNow.Date` to record "today" on the client — use `DateTime.Today`
 - Do NOT filter UTC-timestamp columns with raw `yyyy-MM-dd` local dates without the `utcOffset` conversion
+- Do NOT wire a delete/remove/clear action directly to a button without a confirmation step — use the shared `ConfirmDialog` component (see "Destructive Action Confirmation" above)

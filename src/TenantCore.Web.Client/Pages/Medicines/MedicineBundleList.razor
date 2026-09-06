@@ -1,0 +1,643 @@
+@page "/medicine-bundles"
+@layout AuthorizedLayout
+@inject IMedicineBundleApiClient BundleClient
+@inject IMedicineApiClient MedicineClient
+@inject AuthStateService AuthState
+@inject IToastService Toast
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Components
+@using TenantCore.Web.Client.Services
+
+<PageTitle>Medicine Bundles - TenantCore</PageTitle>
+
+@if (_view == "list")
+{
+    <div style="display:flex; flex-direction:column; gap:20px;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+                <div style="font-size:18px; font-weight:800; color:#1E293B;">📦 Medicine Bundles</div>
+                <div style="font-size:13px; color:#64748B; margin-top:2px;">
+                    Reusable medicine sets for common treatment plans — add every drug once, then insert the whole set into a prescription in one click.
+                </div>
+            </div>
+            <button class="opd-btn-primary" @onclick="StartCreate">+ Create Bundle</button>
+        </div>
+
+        @if (_loading)
+        {
+            <div style="padding:40px; text-align:center; color:#94A3B8;">Loading bundles...</div>
+        }
+        else if (_bundles.Count == 0)
+        {
+            <div class="opd-table-card" style="padding:40px; text-align:center; color:#94A3B8; font-size:13px;">
+                No medicine bundles yet. Create one for a treatment plan you prescribe often (e.g. "1st Trimester Care").
+            </div>
+        }
+        else
+        {
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">
+                @foreach (var b in _bundles)
+                {
+                    var bundle = b;
+                    <div style="background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,0.08); overflow:hidden;">
+                        <div style="padding:14px 18px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                            <div>
+                                <div style="font-weight:700; font-size:14px; color:#0F172A;">@bundle.Name</div>
+                                <div style="font-size:11px; color:#94A3B8; margin-top:2px;">by @bundle.CreatedByName</div>
+                            </div>
+                            <span style="background:#EFF6FF; color:#2563EB; font-weight:700; font-size:11px; padding:3px 10px; border-radius:14px; white-space:nowrap;">
+                                @bundle.DurationDays days
+                            </span>
+                        </div>
+                        <div style="padding:14px 18px;">
+                            <div style="font-size:11px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:8px;">
+                                @bundle.Items.Count medicine@(bundle.Items.Count != 1 ? "s" : "")
+                            </div>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                @foreach (var item in bundle.Items)
+                                {
+                                    <span style="font-size:11px; font-weight:600; color:#334155; background:#F8FAFC; border:1px solid #E2E8F0; padding:3px 9px; border-radius:12px;">
+                                        @FormIcon(item.MedicineForm) @item.MedicineName
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                        <div style="padding:10px 18px; border-top:1px solid #F1F5F9; display:flex; justify-content:flex-end; gap:8px;">
+                            <button @onclick="() => StartEdit(bundle)"
+                                    style="padding:6px 14px; border-radius:7px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">
+                                ✏️ Edit
+                            </button>
+                            <button @onclick="() => _confirmDeleteBundle = bundle"
+                                    style="padding:6px 14px; border-radius:7px; border:1.5px solid #FECACA; background:#FEF2F2; cursor:pointer; font-size:12px; font-weight:600; color:#B91C1C;">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <ConfirmDialog Visible="@(_confirmDeleteBundle is not null)"
+                   Title="Delete Bundle"
+                   ConfirmText="Delete"
+                   BusyText="Deleting..."
+                   IsBusy="_deleting"
+                   OnConfirm="ConfirmDeleteAsync"
+                   OnCancel="() => _confirmDeleteBundle = null">
+        Are you sure you want to delete <strong>@_confirmDeleteBundle?.Name</strong>? This cannot be undone.
+    </ConfirmDialog>
+}
+else
+{
+    <!-- ── Bundle Editor ─────────────────────────────────────────────────── -->
+    <div style="display:flex; flex-direction:column; gap:20px; padding-bottom:32px;">
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <button @onclick='() => _view = "list"' style="background:none; border:none; color:#64748B; cursor:pointer; font-size:14px; padding:4px 8px; border-radius:6px;">
+                    ← Back
+                </button>
+                <div style="font-size:20px; font-weight:800; color:#0F172A;">
+                    @(_editingId.HasValue ? "Edit Bundle" : "Create Bundle")
+                </div>
+            </div>
+            <button style="padding:9px 20px; border-radius:8px; border:none; background:#059669; color:#fff; cursor:pointer; font-size:13px; font-weight:700; opacity:@(_saving ? "0.65" : "1");"
+                    @onclick="SaveBundleAsync" disabled="@_saving">
+                @(_saving ? "Saving..." : "✓ Save Bundle")
+            </button>
+        </div>
+
+        <div style="background:#fff; border-radius:14px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,0.08); display:grid; grid-template-columns:2fr 1fr; gap:16px;">
+            <div>
+                <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase;">Bundle Name</div>
+                <input value="@_name" @oninput="e => _name = e.Value?.ToString() ?? string.Empty"
+                       placeholder="e.g. 1st Trimester Care"
+                       style="width:100%; padding:10px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:14px; font-weight:600; outline:none; box-sizing:border-box;" />
+            </div>
+            <div>
+                <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase;">Typical Duration</div>
+                <div style="position:relative;">
+                    <input type="number" min="1" value="@_durationDays" @oninput="e => int.TryParse(e.Value?.ToString(), out _durationDays)"
+                           style="width:100%; padding:10px 38px 10px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:14px; font-weight:700; outline:none; box-sizing:border-box;" />
+                    <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px; color:#94A3B8; font-weight:600; pointer-events:none;">days</span>
+                </div>
+            </div>
+            <div style="grid-column:1/-1;">
+                <div style="font-size:11px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase;">Notes (optional)</div>
+                <textarea value="@_notes" @oninput="e => _notes = e.Value?.ToString()" rows="2"
+                          placeholder="When to use this bundle, special precautions, etc."
+                          style="width:100%; padding:10px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
+            </div>
+        </div>
+
+        <div style="background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+            <div style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #E2E8F0;">
+                <div style="font-weight:700; font-size:14px; color:#0F172A;">℞ Medicines in this Bundle</div>
+                <span style="background:#EFF6FF; color:#2563EB; font-weight:700; font-size:11px; padding:3px 10px; border-radius:14px;">
+                    @_items.Count drug@(_items.Count != 1 ? "s" : "")
+                </span>
+            </div>
+            <div style="padding:16px 20px 18px;">
+
+                @if (_draftItem is null)
+                {
+                    <div style="margin-bottom:16px;">
+                        <div style="font-size:12px; font-weight:600; color:#94A3B8; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.3px;">Add Medicine</div>
+                        <div style="position:relative;">
+                            <input class="form-input" type="text" placeholder="Search drug name…"
+                                   value="@_medSearchText" @oninput="OnMedSearchInput" autocomplete="off" style="font-size:13px;" />
+                            @if (_medSearchOpen && _medSearchResults.Count > 0)
+                            {
+                                <div @onclick="() => { _medSearchOpen = false; _medSearchResults = []; }" style="position:fixed;inset:0;z-index:198;" />
+                                <div style="position:absolute;top:100%;left:0;right:0;z-index:199;background:#fff;border-radius:8px;border:1px solid #E2E8F0;box-shadow:0 8px 24px rgba(0,0,0,0.12);overflow:hidden;margin-top:2px;">
+                                    @foreach (var med in _medSearchResults)
+                                    {
+                                        var m = med;
+                                        <div @onclick="() => SelectMedicine(m)" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:#fff;">
+                                            <div style="font-weight:600;font-size:13px;">@m.Name</div>
+                                            <div style="font-size:11px;color:#64748B;">
+                                                @(m.DosageFormName ?? m.Form ?? "—")
+                                                @if (!string.IsNullOrEmpty(m.Dosage)) { <text> · @m.Dosage</text> }
+                                                @if (!string.IsNullOrEmpty(m.GenericName)) { <text> · @m.GenericName</text> }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (_draftItem is not null)
+                {
+                    var item = _draftItem;
+                    <div style="border-radius:12px; border:2px solid #2563EB; margin-bottom:16px; overflow:hidden; background:#fff;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:#EFF6FF; border-bottom:1px solid #BFDBFE;">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <span style="font-size:10px; font-weight:800; color:#2563EB; text-transform:uppercase;">@(_editingItemIndex.HasValue ? "Editing" : "Adding")</span>
+                                <span style="font-weight:700; font-size:14px; color:#0F172A;">@FormIcon(item.MedicineForm) @item.MedicineName</span>
+                                @if (!string.IsNullOrEmpty(item.Strength))
+                                {
+                                    <span style="font-size:12px; font-weight:600; color:#64748B;">@item.Strength</span>
+                                }
+                            </div>
+                            <button @onclick="CancelItemEdit" style="padding:6px 8px; border-radius:6px; border:none; background:transparent; cursor:pointer; font-size:16px; color:#94A3B8;">✕</button>
+                        </div>
+                        <div style="padding:12px 14px; display:grid; grid-template-columns:1.4fr 1fr 0.8fr; gap:12px; align-items:end; border-bottom:1px solid #E2E8F0;">
+                            <div>
+                                <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase;">Dose per intake</div>
+                                <div style="display:flex; gap:6px;">
+                                    <input type="number" min="0" step="0.5" @bind="item.DoseAmountStr" @bind:after="() => OnDoseAmountChanged(item)"
+                                           style="width:64px; padding:9px 8px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; text-align:center;" />
+                                    <select @bind="item.DosageUnit" style="flex:1; min-width:0; padding:9px 8px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; background:#fff;">
+                                        @foreach (var u in _doseUnits)
+                                        {
+                                            <option value="@u">@u</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase;">Duration (Days)</div>
+                                <input type="number" min="1" @bind="item.DurationDays" @bind:after="() => RecalcQuantity(item)"
+                                       style="width:100%; padding:9px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box;" />
+                            </div>
+                            <div>
+                                <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase;">Quantity</div>
+                                <input type="number" min="0" step="0.5" @bind="item.Quantity"
+                                       style="width:100%; padding:9px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; text-align:center;" />
+                            </div>
+                        </div>
+                        <div style="padding:12px 14px; border-bottom:1px solid #E2E8F0;">
+                            <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:8px; text-transform:uppercase;">How Often (Frequency)</div>
+                            <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:6px;">
+                                @foreach (var fp in _freqPresets)
+                                {
+                                    var preset = fp;
+                                    var sel = item.Frequency == preset.Code;
+                                    <button @onclick="() => SelectFrequency(item, preset.Code)"
+                                            style="padding:9px 4px; border-radius:9px; border:1.5px solid @(sel ? "#2563EB" : "#E2E8F0"); background:@(sel ? "#EFF6FF" : "#fff"); color:@(sel ? "#2563EB" : "#334155"); cursor:pointer; text-align:center;">
+                                        <div style="font-size:11px; font-weight:700; line-height:1.3;">@preset.Line1<br />@preset.Line2</div>
+                                        <div style="font-size:9px; color:@(sel ? "#2563EB" : "#94A3B8"); margin-top:3px; font-weight:600;">@preset.Pattern</div>
+                                    </button>
+                                }
+                            </div>
+                            <div style="font-size:12px; color:#334155; margin-top:10px;">
+                                🕐 Timing: <strong>@BuildTimingLabel(GetActiveSlots(item))</strong>
+                                <span style="color:#94A3B8; font-family:'Courier New',monospace; margin-left:6px;">(@BuildSlotPattern(item))</span>
+                            </div>
+                        </div>
+                        <div style="padding:12px 14px; border-bottom:1px solid #E2E8F0;">
+                            <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:6px; text-transform:uppercase;">Instructions (optional)</div>
+                            <input value="@item.Instructions" @oninput="e => item.Instructions = e.Value?.ToString()"
+                                   placeholder="e.g. After meals"
+                                   style="width:100%; padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; box-sizing:border-box;" />
+                        </div>
+                        <div style="display:flex; justify-content:flex-end; gap:10px; padding:12px 14px; background:#F8FAFC;">
+                            <button @onclick="CancelItemEdit" style="padding:8px 18px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">Cancel</button>
+                            <button @onclick="CommitItemEdit" style="padding:8px 18px; border-radius:8px; border:none; background:#059669; color:#fff; cursor:pointer; font-size:12px; font-weight:700;">
+                                @(_editingItemIndex.HasValue ? "✓ Update Medicine" : "✓ Add Medicine")
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                @if (_items.Count == 0 && _draftItem is null)
+                {
+                    <div style="text-align:center; padding:24px; color:#94A3B8; font-size:13px;">No medicines added yet. Search above to add.</div>
+                }
+                else if (_items.Count > 0)
+                {
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                            <thead>
+                                <tr style="background:#F8FAFC; border-bottom:2px solid #E2E8F0;">
+                                    <th style="padding:8px 10px; text-align:left; color:#64748B; font-size:10px; text-transform:uppercase;">Medicine</th>
+                                    <th style="padding:8px 10px; text-align:left; color:#64748B; font-size:10px; text-transform:uppercase;">Dose</th>
+                                    <th style="padding:8px 10px; text-align:left; color:#64748B; font-size:10px; text-transform:uppercase;">Duration</th>
+                                    <th style="padding:8px 10px; text-align:left; color:#64748B; font-size:10px; text-transform:uppercase;">Qty</th>
+                                    <th style="padding:8px 10px; text-align:left; color:#64748B; font-size:10px; text-transform:uppercase;">Instructions</th>
+                                    <th style="padding:8px 10px; text-align:left; color:#64748B; font-size:10px; text-transform:uppercase;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < _items.Count; i++)
+                                {
+                                    var idx = i;
+                                    var item = _items[idx];
+                                    <tr style="border-bottom:1px solid #F1F5F9; background:@(_editingItemIndex == idx ? "#EFF6FF" : "#fff");">
+                                        <td style="padding:10px;">@FormIcon(item.MedicineForm) <strong>@item.MedicineName</strong> @item.Strength</td>
+                                        <td style="padding:10px; font-family:'Courier New',monospace; font-weight:700;">@BuildSlotPattern(item)</td>
+                                        <td style="padding:10px; white-space:nowrap;">@item.DurationDays days</td>
+                                        <td style="padding:10px; white-space:nowrap;">@item.Quantity.ToString("0.##") @item.DosageUnit</td>
+                                        <td style="padding:10px; color:#334155; font-style:italic;">@(item.Instructions ?? "—")</td>
+                                        <td style="padding:10px; white-space:nowrap;">
+                                            <button @onclick="() => StartEditItem(idx)"
+                                                    style="width:30px; height:30px; border-radius:7px; border:1.5px solid #BFDBFE; background:#EFF6FF; cursor:pointer; font-size:14px; margin-right:6px;">✏️</button>
+                                            <button @onclick="() => _confirmDeleteItemIdx = idx"
+                                                    style="width:30px; height:30px; border-radius:7px; border:1.5px solid #FECACA; background:#FEF2F2; cursor:pointer; font-size:14px;">🗑️</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <ConfirmDialog Visible="@(_confirmDeleteItemIdx.HasValue)"
+                   Title="Remove Medicine"
+                   ConfirmText="Remove"
+                   OnConfirm="ConfirmDeleteItem"
+                   OnCancel="() => _confirmDeleteItemIdx = null">
+        Are you sure you want to remove this medicine from the bundle?
+    </ConfirmDialog>
+}
+
+@code {
+    private string _view = "list";
+    private bool _loading = true;
+    private bool _saving;
+    private bool _deleting;
+    private List<MedicineBundleDto> _bundles = [];
+    private MedicineBundleDto? _confirmDeleteBundle;
+
+    private Guid? _editingId;
+    private string _name = string.Empty;
+    private int _durationDays = 30;
+    private string? _notes;
+    private List<BundleItemRow> _items = [];
+    private BundleItemRow? _draftItem;
+    private int? _editingItemIndex;
+    private int? _confirmDeleteItemIdx;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var r = await BundleClient.GetAllAsync();
+        if (r.Success && r.Data is not null) _bundles = r.Data.ToList();
+        _loading = false;
+    }
+
+    private void StartCreate()
+    {
+        _editingId = null;
+        _name = string.Empty;
+        _durationDays = 30;
+        _notes = null;
+        _items = [];
+        _draftItem = null;
+        _editingItemIndex = null;
+        _view = "editor";
+    }
+
+    private void StartEdit(MedicineBundleDto bundle)
+    {
+        _editingId = bundle.Id;
+        _name = bundle.Name;
+        _durationDays = bundle.DurationDays;
+        _notes = bundle.Notes;
+        _items = bundle.Items.Select(i => new BundleItemRow
+        {
+            MedicineId = i.MedicineId,
+            MedicineName = i.MedicineName,
+            GenericName = i.GenericName,
+            MedicineForm = i.MedicineForm,
+            Strength = i.Strength ?? string.Empty,
+            DosageUnit = i.DosageUnit,
+            DosageMorningStr = i.DosageMorning?.ToString(),
+            DosageAfternoonStr = i.DosageAfternoon?.ToString(),
+            DosageEveningStr = i.DosageEvening?.ToString(),
+            DosageNightStr = i.DosageNight?.ToString(),
+            DurationDays = i.DurationDays,
+            Quantity = i.Quantity,
+            Frequency = i.Frequency ?? "OD",
+            Instructions = i.Instructions,
+        }).ToList();
+        foreach (var it in _items)
+            it.DoseAmountStr = it.DosageMorningStr ?? it.DosageAfternoonStr ?? it.DosageEveningStr ?? it.DosageNightStr ?? "1";
+        _draftItem = null;
+        _editingItemIndex = null;
+        _view = "editor";
+    }
+
+    private async Task SaveBundleAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) { Toast.ShowError("Bundle name is required."); return; }
+        if (_durationDays <= 0) { Toast.ShowError("Duration must be at least 1 day."); return; }
+        if (_items.Count == 0) { Toast.ShowError("Add at least one medicine to the bundle."); return; }
+        if (_draftItem is not null) { Toast.ShowWarning("Finish adding/updating the current medicine before saving."); return; }
+
+        var user = AuthState.CurrentUser;
+        if (user is null) { Toast.ShowError("Not authenticated."); return; }
+
+        var items = _items.Select(i => new CreateMedicineBundleItemDto(
+            i.MedicineId, i.MedicineName, i.GenericName, i.MedicineForm, i.Strength, i.DosageUnit,
+            ParseDose(i.DosageMorningStr), ParseDose(i.DosageAfternoonStr), ParseDose(i.DosageEveningStr), ParseDose(i.DosageNightStr),
+            i.DurationDays, i.Frequency, i.Timing, i.Instructions, 0)).ToList();
+
+        _saving = true;
+        if (_editingId.HasValue)
+        {
+            var dto = new UpdateMedicineBundleDto(_name, _durationDays, _notes, items);
+            var r = await BundleClient.UpdateAsync(_editingId.Value, dto);
+            if (r.Success) { Toast.ShowSuccess("Bundle updated."); _view = "list"; await LoadAsync(); }
+            else Toast.ShowError(r.Message ?? "Failed to update bundle.");
+        }
+        else
+        {
+            var dto = new CreateMedicineBundleDto(user.UserId, user.FullName, _name, _durationDays, _notes, items);
+            var r = await BundleClient.CreateAsync(dto);
+            if (r.Success) { Toast.ShowSuccess("Bundle created."); _view = "list"; await LoadAsync(); }
+            else Toast.ShowError(r.Message ?? "Failed to create bundle.");
+        }
+        _saving = false;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_confirmDeleteBundle is null) return;
+        _deleting = true;
+        var r = await BundleClient.DeleteAsync(_confirmDeleteBundle.Id);
+        _deleting = false;
+        if (r.Success) { Toast.ShowSuccess("Bundle deleted."); _confirmDeleteBundle = null; await LoadAsync(); }
+        else Toast.ShowError(r.Message ?? "Failed to delete bundle.");
+    }
+
+    private static decimal? ParseDose(string? s) => decimal.TryParse(s, out var v) ? v : null;
+
+    // ── Medicine search ──────────────────────────────────────────────────
+    private string _medSearchText = string.Empty;
+    private List<MedicineDto> _medSearchResults = [];
+    private bool _medSearchOpen;
+    private CancellationTokenSource? _medSearchDebounce;
+
+    private async Task OnMedSearchInput(ChangeEventArgs e)
+    {
+        _medSearchText = e.Value?.ToString() ?? string.Empty;
+        if (_medSearchText.Length < 1) { _medSearchResults = []; _medSearchOpen = false; return; }
+        _medSearchDebounce?.Cancel();
+        _medSearchDebounce = new CancellationTokenSource();
+        var token = _medSearchDebounce.Token;
+        try
+        {
+            await Task.Delay(250, token);
+            var r = await MedicineClient.SearchMedicinesByNameAsync(_medSearchText, 5);
+            _medSearchResults = r.Success ? (r.Data ?? []).Take(5).ToList() : [];
+            _medSearchOpen = _medSearchResults.Count > 0;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void SelectMedicine(MedicineDto medicine)
+    {
+        var formType = MapFormType(medicine.DosageFormName ?? medicine.Form ?? string.Empty);
+        var item = new BundleItemRow
+        {
+            MedicineId = medicine.Id,
+            MedicineName = medicine.Name,
+            GenericName = medicine.GenericName,
+            MedicineForm = formType,
+            Strength = medicine.Dosage ?? string.Empty,
+            DosageUnit = GetDefaultUnit(formType),
+            DurationDays = _durationDays > 0 ? _durationDays : 30,
+            Frequency = "OD",
+            DoseAmountStr = "1",
+            DosageMorningStr = "1",
+        };
+        RecalcQuantity(item);
+        _draftItem = item;
+        _editingItemIndex = null;
+
+        _medSearchText = string.Empty;
+        _medSearchResults = [];
+        _medSearchOpen = false;
+    }
+
+    private void StartEditItem(int idx)
+    {
+        var src = _items[idx];
+        _draftItem = new BundleItemRow
+        {
+            MedicineId = src.MedicineId,
+            MedicineName = src.MedicineName,
+            GenericName = src.GenericName,
+            MedicineForm = src.MedicineForm,
+            Strength = src.Strength,
+            DosageUnit = src.DosageUnit,
+            DoseAmountStr = src.DoseAmountStr,
+            DosageMorningStr = src.DosageMorningStr,
+            DosageAfternoonStr = src.DosageAfternoonStr,
+            DosageEveningStr = src.DosageEveningStr,
+            DosageNightStr = src.DosageNightStr,
+            DurationDays = src.DurationDays,
+            Quantity = src.Quantity,
+            Frequency = src.Frequency,
+            Instructions = src.Instructions,
+        };
+        _editingItemIndex = idx;
+    }
+
+    private void CommitItemEdit()
+    {
+        if (_draftItem is null) return;
+        RecalcQuantity(_draftItem);
+        if (_editingItemIndex is { } idx && idx < _items.Count)
+            _items[idx] = _draftItem;
+        else
+            _items.Add(_draftItem);
+        _draftItem = null;
+        _editingItemIndex = null;
+    }
+
+    private void CancelItemEdit()
+    {
+        _draftItem = null;
+        _editingItemIndex = null;
+    }
+
+    private void ConfirmDeleteItem()
+    {
+        if (_confirmDeleteItemIdx is not { } idx) return;
+        _items.RemoveAt(idx);
+        if (_editingItemIndex == idx) CancelItemEdit();
+        else if (_editingItemIndex.HasValue && idx < _editingItemIndex.Value) _editingItemIndex--;
+        _confirmDeleteItemIdx = null;
+    }
+
+    // ── Dose/frequency helpers (mirrors PrescriptionForm.razor's medicine editor) ──
+    private static readonly string[] _doseUnits = ["tablet", "capsule", "ml", "drops", "sachet", "application", "puff", "dose", "unit"];
+
+    private record FreqPreset(string Code, string Line1, string Line2, string Pattern);
+    private static readonly FreqPreset[] _freqPresets =
+    [
+        new("OD", "Once", "Daily", "1-0-0"),
+        new("BD", "Twice", "Daily", "1-0-1"),
+        new("TDS", "Three Times", "Daily", "1-1-1"),
+        new("QID", "Four Times", "Daily", "1-1-1-1"),
+        new("HS", "At", "Bedtime", "0-0-1"),
+        new("SOS", "As", "Needed", "When required"),
+    ];
+
+    private void SelectFrequency(BundleItemRow item, string code)
+    {
+        item.Frequency = code;
+        var dose = string.IsNullOrWhiteSpace(item.DoseAmountStr) ? "1" : item.DoseAmountStr;
+        switch (code)
+        {
+            case "OD": item.DosageMorningStr = dose; item.DosageAfternoonStr = null; item.DosageEveningStr = null; item.DosageNightStr = null; break;
+            case "BD": item.DosageMorningStr = dose; item.DosageAfternoonStr = null; item.DosageEveningStr = null; item.DosageNightStr = dose; break;
+            case "TDS": item.DosageMorningStr = dose; item.DosageAfternoonStr = dose; item.DosageEveningStr = null; item.DosageNightStr = dose; break;
+            case "QID": item.DosageMorningStr = dose; item.DosageAfternoonStr = dose; item.DosageEveningStr = dose; item.DosageNightStr = dose; break;
+            case "HS": item.DosageMorningStr = null; item.DosageAfternoonStr = null; item.DosageEveningStr = null; item.DosageNightStr = dose; break;
+            case "SOS": item.DosageMorningStr = null; item.DosageAfternoonStr = null; item.DosageEveningStr = null; item.DosageNightStr = null; break;
+        }
+        RecalcQuantity(item);
+    }
+
+    private void OnDoseAmountChanged(BundleItemRow item)
+    {
+        var dose = string.IsNullOrWhiteSpace(item.DoseAmountStr) ? "1" : item.DoseAmountStr;
+        if (item.DosageMorningStr is not null) item.DosageMorningStr = dose;
+        if (item.DosageAfternoonStr is not null) item.DosageAfternoonStr = dose;
+        if (item.DosageEveningStr is not null) item.DosageEveningStr = dose;
+        if (item.DosageNightStr is not null) item.DosageNightStr = dose;
+        RecalcQuantity(item);
+    }
+
+    private static List<string> GetActiveSlots(BundleItemRow item)
+    {
+        var list = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.DosageMorningStr)) list.Add("Morning");
+        if (!string.IsNullOrWhiteSpace(item.DosageAfternoonStr)) list.Add("Afternoon");
+        if (!string.IsNullOrWhiteSpace(item.DosageEveningStr)) list.Add("Evening");
+        if (!string.IsNullOrWhiteSpace(item.DosageNightStr)) list.Add("Night");
+        return list;
+    }
+
+    private static string BuildTimingLabel(List<string> slots)
+        => slots.Count == 0 ? "As needed" : string.Join(" & ", slots);
+
+    private static string BuildSlotPattern(BundleItemRow item)
+    {
+        if (item.Frequency == "SOS" && GetActiveSlots(item).Count == 0) return "SOS";
+        string Slot(string? s) => decimal.TryParse(s, out var v) && v > 0 ? v.ToString("0.##") : "0";
+        if (decimal.TryParse(item.DosageEveningStr, out var e) && e > 0)
+            return $"{Slot(item.DosageMorningStr)}-{Slot(item.DosageAfternoonStr)}-{Slot(item.DosageEveningStr)}-{Slot(item.DosageNightStr)}";
+        return $"{Slot(item.DosageMorningStr)}-{Slot(item.DosageAfternoonStr)}-{Slot(item.DosageNightStr)}";
+    }
+
+    private static void RecalcQuantity(BundleItemRow item)
+    {
+        var m = decimal.TryParse(item.DosageMorningStr, out var mv) ? mv : 0;
+        var a = decimal.TryParse(item.DosageAfternoonStr, out var av) ? av : 0;
+        var e = decimal.TryParse(item.DosageEveningStr, out var ev) ? ev : 0;
+        var n = decimal.TryParse(item.DosageNightStr, out var nv) ? nv : 0;
+        item.Quantity = (m + a + e + n) * item.DurationDays;
+    }
+
+    private static MedicineFormType MapFormType(string formName)
+    {
+        var f = formName.ToLowerInvariant();
+        if (f.Contains("cap")) return MedicineFormType.Capsule;
+        if (f.Contains("syr") || f.Contains("liquid") || f.Contains("suspension")) return MedicineFormType.Syrup;
+        if (f.Contains("drop")) return MedicineFormType.Drops;
+        if (f.Contains("inj") || f.Contains("vial") || f.Contains("amp")) return MedicineFormType.Injection;
+        if (f.Contains("cream") || f.Contains("ointment") || f.Contains("gel") || f.Contains("lotion") || f.Contains("tube")) return MedicineFormType.Tube;
+        if (f.Contains("powder") || f.Contains("sachet")) return MedicineFormType.Powder;
+        if (f.Contains("tab")) return MedicineFormType.Tab;
+        return MedicineFormType.Other;
+    }
+
+    private static string GetDefaultUnit(MedicineFormType form) => form switch
+    {
+        MedicineFormType.Tab => "tablet",
+        MedicineFormType.Capsule => "capsule",
+        MedicineFormType.Syrup => "ml",
+        MedicineFormType.Drops => "drops",
+        MedicineFormType.Injection => "dose",
+        MedicineFormType.Tube => "application",
+        MedicineFormType.Powder => "sachet",
+        _ => "unit"
+    };
+
+    private static string FormIcon(MedicineFormType form) => form switch
+    {
+        MedicineFormType.Tab => "💊",
+        MedicineFormType.Capsule => "💊",
+        MedicineFormType.Syrup => "🧴",
+        MedicineFormType.Injection => "💉",
+        MedicineFormType.Drops => "💧",
+        MedicineFormType.Tube => "🧴",
+        MedicineFormType.Powder => "🥄",
+        _ => "💊"
+    };
+
+    private class BundleItemRow
+    {
+        public Guid MedicineId { get; set; }
+        public string MedicineName { get; set; } = string.Empty;
+        public string? GenericName { get; set; }
+        public MedicineFormType MedicineForm { get; set; } = MedicineFormType.Tab;
+        public string Strength { get; set; } = string.Empty;
+        public string DosageUnit { get; set; } = "tablet";
+        public string DoseAmountStr { get; set; } = "1";
+        public string? DosageMorningStr { get; set; }
+        public string? DosageAfternoonStr { get; set; }
+        public string? DosageEveningStr { get; set; }
+        public string? DosageNightStr { get; set; }
+        public int DurationDays { get; set; } = 30;
+        public decimal Quantity { get; set; }
+        public string Frequency { get; set; } = "OD";
+        public string? Timing { get; set; }
+        public string? Instructions { get; set; }
+    }
+}

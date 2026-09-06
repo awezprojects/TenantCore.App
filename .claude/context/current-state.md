@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-09-04 (updated after clinic-subscription-gating execution — added SubscriptionPlan/ClinicSubscription/SubscriptionAlertSetting DbSets + repos. Email sending and the reminder background job are deferred to a separate Azure Function; SubscriptionAlertSetting ships as configuration-only with no consumer in this repo yet)
+**Last verified:** 2026-09-07 (drift auto-corrected during logging-service planning session — snapshot was stale at 33 DbSets; actual DbContext has 39. Added since last snapshot, in-progress/uncommitted: MedicineBundle/MedicineBundleItem (medicine bundles feature), HistoryLookupItem (diagnosis/investigation history chips), State/City/ClinicLocation (clinic profile geography))
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -50,8 +50,14 @@
 | SubscriptionPlans | SubscriptionPlan | No (global catalogue) |
 | ClinicSubscriptions | ClinicSubscription | Yes |
 | SubscriptionAlertSettings | SubscriptionAlertSetting | No (global config) |
+| MedicineBundles | MedicineBundle | Yes |
+| MedicineBundleItems | MedicineBundleItem | Yes |
+| HistoryLookupItems | HistoryLookupItem | Yes |
+| States | State | No (lookup) |
+| Cities | City | No (lookup) |
+| ClinicLocations | ClinicLocation | Yes |
 
-**Total DbSets: 33**
+**Total DbSets: 39**
 
 ---
 
@@ -93,6 +99,11 @@
 | ISubscriptionPlanRepository | SubscriptionPlanRepository |
 | IClinicSubscriptionRepository | ClinicSubscriptionRepository |
 | ISubscriptionAlertSettingRepository | SubscriptionAlertSettingRepository |
+| IMedicineBundleRepository | MedicineBundleRepository |
+| IHistoryLookupItemRepository | HistoryLookupItemRepository |
+| IStateRepository | StateRepository |
+| ICityRepository | CityRepository |
+| IClinicLocationRepository | ClinicLocationRepository |
 
 ### Services (Scoped)
 

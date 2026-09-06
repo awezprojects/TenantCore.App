@@ -8,5 +8,7 @@ public enum HistoryItemType
     PerAbdomen = 4,
     PerVaginum = 5,
     SurgicalHistory = 6,
-    PerSpeculum = 7
+    PerSpeculum = 7,
+    Diagnosis = 8,
+    Investigation = 9
 }

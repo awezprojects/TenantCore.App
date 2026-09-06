@@ -1,0 +1,259 @@
+@page "/patients/{PatientId:guid}/health-summary"
+@layout PrintLayout
+@inject IPrescriptionApiClient PrescriptionClient
+@inject IClinicApiClient ClinicClient
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject IJSRuntime JS
+@using TenantCore.Shared.Dtos
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Components
+@using TenantCore.Web.Client.Helpers
+@using TenantCore.Web.Client.Services
+
+<PageTitle>Patient Health Summary</PageTitle>
+
+<div style="background:#F1F5F9; min-height:100vh; padding-bottom:40px;">
+
+    @if (_loading)
+    {
+        <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
+            <div style="font-size:32px;">⏳</div>
+            <div style="font-size:14px;color:#64748B;">Loading health summary...</div>
+        </div>
+    }
+    else if (_patient is null)
+    {
+        <div style="display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:12px;">
+            <div style="font-size:40px;">❌</div>
+            <div style="font-size:15px;color:#64748B;">Patient not found.</div>
+            <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                    style="padding:10px 20px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">
+                ✕ Close
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- Action bar -->
+        <div style="background:#1E3A5F; padding:10px 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100;">
+            <button @onclick='async () => await JS.InvokeVoidAsync("window.close")'
+                    style="padding:7px 16px;border-radius:8px;border:none;background:#EF4444;color:#fff;cursor:pointer;font-size:12px;font-weight:700;">
+                ✕ Close
+            </button>
+            <div style="color:rgba(255,255,255,0.85); font-size:13px; font-weight:600;">Patient Health Summary</div>
+        </div>
+
+        <div style="max-width:1100px; margin:0 auto; padding:24px 24px 0; display:flex; flex-direction:column; gap:20px;">
+
+            <!-- Patient banner -->
+            <div style="border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); background:linear-gradient(135deg,#1E3A5F,#1565C0); padding:18px 22px; display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; gap:14px; align-items:center;">
+                    <div style="width:50px; height:50px; border-radius:12px; background:rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:18px; flex-shrink:0;">
+                        @PatientInitials
+                    </div>
+                    <div>
+                        <div style="color:#fff; font-weight:800; font-size:17px;">@_patient.FullName</div>
+                        <div style="color:rgba(255,255,255,0.7); font-size:12px; margin-top:2px;">@PatientSubtitle</div>
+                    </div>
+                </div>
+                <div style="text-align:right; color:rgba(255,255,255,0.75); font-size:12px;">
+                    @_history.Count visit@(_history.Count != 1 ? "s" : "") on record
+                </div>
+            </div>
+
+            <!-- Vitals Trend Charts -->
+            <div>
+                <div style="font-weight:700; font-size:15px; color:#0F172A; margin-bottom:12px;">📈 Vitals Trend — First Visit to Latest</div>
+                <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px;">
+                    <VitalTrendChart Title="Blood Pressure" Icon="❤️" Unit="mmHg" Series="_bpSeries" />
+                    <VitalTrendChart Title="Pulse" Icon="💓" Unit="/min" Series="_pulseSeries" />
+                    <VitalTrendChart Title="Temperature" Icon="🌡️" Unit="°F" Series="_tempSeries" />
+                    <VitalTrendChart Title="Weight" Icon="⚖️" Unit="kg" Series="_weightSeries" />
+                    <VitalTrendChart Title="SpO₂" Icon="🫁" Unit="%" Series="_spo2Series" />
+                    <VitalTrendChart Title="Respiratory Rate" Icon="🫧" Unit="/min" Series="_rrSeries" />
+                    <VitalTrendChart Title="Blood Sugar" Icon="🩸" Unit="mg/dL" Series="_sugarSeries" />
+                </div>
+            </div>
+
+            <!-- Full Visit History -->
+            <div style="border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); background:#fff; margin-bottom:24px;">
+                <div style="padding:14px 20px; font-weight:700; font-size:14px; color:#0F172A; border-bottom:1px solid #E2E8F0;">
+                    📋 Full Visit History
+                </div>
+                @if (_history.Count == 0)
+                {
+                    <div style="padding:30px; text-align:center; color:#94A3B8; font-size:13px;">No visits recorded.</div>
+                }
+                else
+                {
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                            <thead>
+                                <tr style="background:#F8FAFC; border-bottom:2px solid #E2E8F0;">
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;">Date</th>
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;">Rx ID</th>
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;">Diagnosis</th>
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;">BP</th>
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;">Sugar</th>
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;">Weight</th>
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;">Drugs</th>
+                                    <th style="padding:10px 16px; text-align:left; color:#64748B; font-size:11px; text-transform:uppercase;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var hx in _historyPageItems)
+                                {
+                                    <tr style="border-bottom:1px solid #F1F5F9;">
+                                        <td style="padding:10px 16px; font-weight:600;">@hx.PrescribedDate.ToString("dd MMM yyyy")</td>
+                                        <td style="padding:10px 16px;">
+                                            <span style="font-size:11px; color:#2563EB; font-weight:700; background:#EFF6FF; padding:2px 8px; border-radius:5px;">@hx.PrescriptionNumber</span>
+                                        </td>
+                                        <td style="padding:10px 16px; color:#334155;">@(hx.Diagnosis?.Length > 40 ? hx.Diagnosis[..40] + "…" : (hx.Diagnosis ?? "—"))</td>
+                                        <td style="padding:10px 16px; font-weight:600; color:#EF4444;">@(hx.VitalBP ?? "—")</td>
+                                        <td style="padding:10px 16px; font-weight:600; color:#7C3AED;">@(hx.VitalSugar?.ToString("F0") ?? "—")</td>
+                                        <td style="padding:10px 16px;">@(hx.VitalWeight?.ToString("F1") ?? "—") kg</td>
+                                        <td style="padding:10px 16px;">
+                                            <span style="background:#EFF6FF; color:#2563EB; font-weight:700; font-size:11px; padding:2px 8px; border-radius:10px;">@hx.Items.Count</span>
+                                        </td>
+                                        <td style="padding:10px 16px;">
+                                            <a href="/prescriptions/@hx.Id/print" target="_blank"
+                                               style="padding:5px 14px; border-radius:7px; border:1.5px solid #2563EB; color:#2563EB; font-size:11px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                                                🖨 Print
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (_history.Count > _tablePageSize)
+                    {
+                        <div style="padding:10px 20px; display:flex; align-items:center; justify-content:space-between; border-top:1px solid #F1F5F9;">
+                            <button @onclick="() => _tablePage = Math.Max(1, _tablePage - 1)" disabled="@(_tablePage <= 1)"
+                                    style="padding:5px 12px; border-radius:6px; border:1.5px solid #E2E8F0; background:#fff; font-size:12px; font-weight:600; color:#334155; cursor:pointer; opacity:@(_tablePage <= 1 ? "0.5" : "1");">
+                                ‹ Prev
+                            </button>
+                            <span style="font-size:12px; color:#94A3B8;">Page @_tablePage of @TableTotalPages</span>
+                            <button @onclick="() => _tablePage = Math.Min(TableTotalPages, _tablePage + 1)" disabled="@(_tablePage >= TableTotalPages)"
+                                    style="padding:5px 12px; border-radius:6px; border:1.5px solid #E2E8F0; background:#fff; font-size:12px; font-weight:600; color:#334155; cursor:pointer; opacity:@(_tablePage >= TableTotalPages ? "0.5" : "1");">
+                                Next ›
+                            </button>
+                        </div>
+                    }
+                }
+            </div>
+
+            <!-- AI-generated health insights are planned as a follow-up feature. -->
+
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid PatientId { get; set; }
+
+    private bool _loading = true;
+    private PatientDto? _patient;
+    private List<PrescriptionDto> _history = [];
+
+    private const int _tablePageSize = 10;
+    private int _tablePage = 1;
+    private int TableTotalPages => Math.Max(1, (int)Math.Ceiling(_history.Count / (double)_tablePageSize));
+    private IEnumerable<PrescriptionDto> _historyPageItems =>
+        _history.OrderByDescending(h => h.PrescribedDate).Skip((_tablePage - 1) * _tablePageSize).Take(_tablePageSize);
+
+    private List<VitalTrendChart.ChartSeries> _bpSeries = [];
+    private List<VitalTrendChart.ChartSeries> _pulseSeries = [];
+    private List<VitalTrendChart.ChartSeries> _tempSeries = [];
+    private List<VitalTrendChart.ChartSeries> _weightSeries = [];
+    private List<VitalTrendChart.ChartSeries> _spo2Series = [];
+    private List<VitalTrendChart.ChartSeries> _rrSeries = [];
+    private List<VitalTrendChart.ChartSeries> _sugarSeries = [];
+
+    private string PatientInitials => string.Join("", _patient!.FullName.Split(' ').Take(2).Select(n => n.Length > 0 ? n[0].ToString() : ""));
+    private string PatientSubtitle
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (_patient?.DateOfBirth is not null)
+                parts.Add($"{DateTime.Today.Year - _patient.DateOfBirth.Value.Year}y");
+            if (_patient is not null)
+                parts.Add(_patient.Gender.ToString());
+            return string.Join(" · ", parts);
+        }
+    }
+
+    // OnAfterRenderAsync is the only safe place in Blazor WASM to call JS interop
+    // (localStorage) before firing authenticated API calls on a freshly opened tab.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await AuthState.InitializeAsync();
+            await ClinicContext.InitializeAsync();
+            await LoadData();
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        var pR = await ClinicClient.GetPatientByIdAsync(PatientId);
+        if (!pR.Success || pR.Data is null) return;
+        _patient = pR.Data;
+
+        var histR = await PrescriptionClient.GetPrescriptionsAsync(patientId: PatientId, page: 1, pageSize: 200);
+        if (histR.Success && histR.Data is not null)
+            _history = histR.Data.Items.ToList();
+
+        BuildTrendSeries();
+    }
+
+    private void BuildTrendSeries()
+    {
+        var ordered = _history.OrderBy(h => h.PrescribedDate).ToList();
+
+        var systolic = new List<(DateTime, double)>();
+        var diastolic = new List<(DateTime, double)>();
+        foreach (var h in ordered)
+        {
+            if (VitalsHelper.TryParseBp(h.VitalBP, out var sys, out var dia))
+            {
+                systolic.Add((h.PrescribedDate, sys));
+                diastolic.Add((h.PrescribedDate, dia));
+            }
+        }
+        _bpSeries =
+        [
+            new("Systolic", "#EF4444", systolic),
+            new("Diastolic", "#F59E0B", diastolic)
+        ];
+
+        _pulseSeries = [new("Pulse", "#DB2777", Points(ordered, h => h.VitalPulse))];
+        _tempSeries = [new("Temp", "#EA580C", Points(ordered, h => h.VitalTemp))];
+        _weightSeries = [new("Weight", "#2563EB", Points(ordered, h => h.VitalWeight))];
+        _spo2Series = [new("SpO₂", "#0891B2", Points(ordered, h => h.VitalSpO2))];
+        _rrSeries = [new("RR", "#7C3AED", Points(ordered, h => h.VitalRR))];
+        _sugarSeries = [new("Sugar", "#7C3AED", Points(ordered, h => h.VitalSugar))];
+    }
+
+    private static List<(DateTime Date, double Value)> Points<T>(List<PrescriptionDto> history, Func<PrescriptionDto, T?> selector) where T : struct
+    {
+        var result = new List<(DateTime, double)>();
+        foreach (var h in history)
+        {
+            var v = selector(h);
+            if (v is not null)
+                result.Add((h.PrescribedDate, Convert.ToDouble(v)));
+        }
+        return result;
+    }
+}

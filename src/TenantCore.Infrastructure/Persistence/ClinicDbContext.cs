@@ -15,6 +15,8 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<Prescription> Prescriptions => Set<Prescription>();
     public DbSet<PrescriptionItem> PrescriptionItems => Set<PrescriptionItem>();
     public DbSet<PrescriptionReport> PrescriptionReports => Set<PrescriptionReport>();
+    public DbSet<MedicineBundle> MedicineBundles => Set<MedicineBundle>();
+    public DbSet<MedicineBundleItem> MedicineBundleItems => Set<MedicineBundleItem>();
     public DbSet<ObstetricPrescriptionData> ObstetricPrescriptionData => Set<ObstetricPrescriptionData>();
     public DbSet<DosageRemark> DosageRemarks => Set<DosageRemark>();
     public DbSet<PrescriptionConfig> PrescriptionConfigs => Set<PrescriptionConfig>();

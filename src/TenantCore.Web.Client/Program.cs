@@ -69,6 +69,12 @@ builder.Services.AddHttpClient<IPrescriptionApiClient, PrescriptionApiClient>(cl
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
+// Register Medicine Bundle API Client
+builder.Services.AddHttpClient<IMedicineBundleApiClient, MedicineBundleApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
 // Register Obstetric API Client
 builder.Services.AddHttpClient<IObstetricApiClient, ObstetricApiClient>(client =>
 {

@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IMedicineDosageFormRepository, MedicineDosageFormRepository>();
         services.AddScoped<IMedicineRepository, MedicineRepository>();
         services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
+        services.AddScoped<IMedicineBundleRepository, MedicineBundleRepository>();
         services.AddScoped<IObstetricPrescriptionDataRepository, ObstetricPrescriptionDataRepository>();
         services.AddScoped<IDosageRemarkRepository, DosageRemarkRepository>();
         services.AddScoped<IPrescriptionConfigRepository, PrescriptionConfigRepository>();

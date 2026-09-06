@@ -1,0 +1,53 @@
+@* Reusable confirmation dialog for destructive actions. Every delete/remove action in the
+   app must confirm through this component (or an equivalent modal using the same visual
+   style) before executing — see ADR-007, "Destructive Action Confirmation". *@
+
+@if (Visible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="HandleCancel"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:380px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;overflow:hidden;"
+         @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:800;color:@(IsDangerous ? "#EF4444" : "#0F172A");">@Title</div>
+        </div>
+        <div style="padding:20px 24px;font-size:14px;color:#1E293B;line-height:1.5;">
+            @ChildContent
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                           padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer;"
+                    @onclick="HandleCancel" disabled="@IsBusy">@CancelText</button>
+            <button style="background:@(IsDangerous ? "#EF4444" : "#2563EB");color:#fff;border:none;border-radius:8px;
+                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;
+                           opacity:@(IsBusy ? "0.65" : "1");"
+                    @onclick="HandleConfirm" disabled="@IsBusy">
+                @(IsBusy ? BusyText : ConfirmText)
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string ConfirmText { get; set; } = "Delete";
+    [Parameter] public string BusyText { get; set; } = "Deleting...";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
+    [Parameter] public bool IsDangerous { get; set; } = true;
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private async Task HandleConfirm()
+    {
+        if (!IsBusy) await OnConfirm.InvokeAsync();
+    }
+
+    private async Task HandleCancel()
+    {
+        if (!IsBusy) await OnCancel.InvokeAsync();
+    }
+}

@@ -63,6 +63,17 @@ public class ObstetricApiClient(HttpClient httpClient, AuthStateService authStat
         catch (Exception ex) { return Fail<ObstetricDatesDto>(ex.Message); }
     }
 
+    public async Task<ApiResponse<ObstetricDatesDto>> ClearLmpAsync(Guid prescriptionId)
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.DeleteAsync($"api/obstetric/prescriptions/{prescriptionId}/lmp");
+            return await Ok<ObstetricDatesDto>(response);
+        }
+        catch (Exception ex) { return Fail<ObstetricDatesDto>(ex.Message); }
+    }
+
     public async Task<ApiResponse<ObstetricDatesDto>> SetEddByUsgAsync(Guid prescriptionId, SetEddByUsgRequest request)
     {
         try
