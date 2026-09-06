@@ -147,4 +147,11 @@ builder.Services.AddHttpClient<ISubscriptionApiClient, SubscriptionApiClient>(cl
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 builder.Services.AddScoped<SubscriptionContextService>();
 
+// Register Logging API Client — no ClinicAuthorizationHandler: the endpoint is
+// anonymous-allowed so pre-login frontend crashes are still captured.
+builder.Services.AddHttpClient<ILoggingApiClient, LoggingApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+});
+
 await builder.Build().RunAsync();

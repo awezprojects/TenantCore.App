@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-09-07 (drift auto-corrected during logging-service planning session — snapshot was stale at 33 DbSets; actual DbContext has 39. Added since last snapshot, in-progress/uncommitted: MedicineBundle/MedicineBundleItem (medicine bundles feature), HistoryLookupItem (diagnosis/investigation history chips), State/City/ClinicLocation (clinic profile geography))
+**Last verified:** 2026-09-07 (centralized-logging-service executed — no DbSet change, Azure Table Storage is a separate store from ClinicDbContext; added IErrorLogger service registration)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -116,6 +116,7 @@
 | IAuthApplicationService | AuthApplicationService |
 | IAuthClinicService | AuthClinicService |
 | IApplicationAccessValidator | ApplicationAccessValidator |
+| IErrorLogger | ErrorLoggingService (writes to Azure Table Storage via the independent `TenantCore.Logging` project — `ApiErrorLogs`/`FrontendErrorLogs`, not `ClinicDbContext`) |
 
 ---
 

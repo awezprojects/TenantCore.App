@@ -2,7 +2,9 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using TenantCore.Application.Services;
 using TenantCore.Domain.Exceptions;
+using TenantCore.Shared.Enums;
 using TenantCore.Shared.Errors;
 using System.Net;
 
@@ -10,7 +12,9 @@ namespace TenantCore.Api.Middleware;
 
 public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
 {
-    public async Task InvokeAsync(HttpContext context)
+    // IErrorLogger is Scoped — it must be resolved per-request via this method parameter,
+    // not the constructor (which runs once, from the root provider, at app startup).
+    public async Task InvokeAsync(HttpContext context, IErrorLogger errorLogger)
     {
         try
         {
@@ -18,15 +22,27 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
         }
         catch (Exception ex)
         {
-            await HandleExceptionAsync(context, ex);
+            await HandleExceptionAsync(context, ex, errorLogger);
         }
     }
 
-    private async Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private async Task HandleExceptionAsync(HttpContext context, Exception exception, IErrorLogger errorLogger)
     {
         var correlationId = context.TraceIdentifier;
 
         logger.LogError(exception, "Unhandled exception. CorrelationId: {CorrelationId}", correlationId);
+
+        var applicationId = context.Items.TryGetValue(ClinicContextMiddleware.ContextKey, out var item) && item is Guid id && id != Guid.Empty
+            ? id
+            : (Guid?)null;
+
+        await errorLogger.LogExceptionAsync(
+            LogCategory.Api,
+            "Api.Middleware",
+            exception,
+            applicationId: applicationId,
+            userId: context.User.FindFirst("nameid")?.Value ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+            additionalContext: $"CorrelationId={correlationId}; RequestPath={context.Request.Path}");
 
         // Detail is the user-facing message shown in the UI.
         // Technical context (exception type, stack trace) stays in the log above.

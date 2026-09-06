@@ -37,11 +37,17 @@ public class CloseCounterSessionHandlerTests
         var appId = Guid.NewGuid();
         var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
 
+        // Closing a session requires the cash to have already been handed over and accepted.
+        var handover = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Clinic Admin", 0m, null);
+        handover.Accept();
+
         _sessionRepo.Setup(r => r.GetByIdAsync(session.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(session);
         _sessionRepo.Setup(r => r.Update(session));
         _sessionRepo.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
+        _handoverRepo.Setup(r => r.GetBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([handover]);
 
         var handler = new CloseCounterSessionHandler(_sessionRepo.Object, _paymentRepo.Object, _particularRepo.Object, _expenseRepo.Object, _handoverRepo.Object);
         var result = await handler.Handle(new CloseCounterSessionCommand(session.Id, appId), CancellationToken.None);

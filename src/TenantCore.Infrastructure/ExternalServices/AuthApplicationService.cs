@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using TenantCore.Application.Services;
 using TenantCore.Shared.Dtos.Auth;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Infrastructure.ExternalServices;
 
@@ -15,6 +16,7 @@ namespace TenantCore.Infrastructure.ExternalServices;
 public sealed class AuthApplicationService(
     IHttpClientFactory httpClientFactory,
     IHttpContextAccessor httpContextAccessor,
+    IErrorLogger errorLogger,
     ILogger<AuthApplicationService> logger)
     : IAuthApplicationService
 {
@@ -28,6 +30,17 @@ public sealed class AuthApplicationService(
         {
             client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", token);
         }
+
+        // Forward the same correlation id CorrelationIdMiddleware assigned to this request
+        // (TraceIdentifier) so a failed Auth API call can be cross-referenced with TenantCore.Auth's
+        // own logs for the same request — this is what the new AuthApplicationService error
+        // logging below relies on to be useful.
+        var correlationId = httpContextAccessor.HttpContext?.TraceIdentifier;
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Correlation-Id", correlationId);
+        }
+
         return client;
     }
 
@@ -217,7 +230,9 @@ public sealed class AuthApplicationService(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
-            throw new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            var error = new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            await LogAuthCallFailureAsync(error, response.StatusCode, cancellationToken);
+            throw error;
         }
 
         try
@@ -233,6 +248,7 @@ public sealed class AuthApplicationService(
         catch (JsonException ex)
         {
             logger.LogError(ex, "Failed to deserialize Auth API response: {Body}", body);
+            await LogAuthCallFailureAsync(ex, response.StatusCode, cancellationToken);
             throw new InvalidOperationException("Failed to parse response from Auth API.", ex);
         }
     }
@@ -243,7 +259,9 @@ public sealed class AuthApplicationService(
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
-            throw new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            var error = new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            await LogAuthCallFailureAsync(error, response.StatusCode, cancellationToken);
+            throw error;
         }
     }
 
@@ -256,18 +274,35 @@ public sealed class AuthApplicationService(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
-            throw new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            var error = new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            await LogAuthCallFailureAsync(error, response.StatusCode, cancellationToken);
+            throw error;
         }
 
         try
         {
             var wrapper = JsonSerializer.Deserialize<ApiResponse<object>>(body, JsonOptions);
             if (wrapper is not null && !wrapper.Success)
-                throw new InvalidOperationException(wrapper.Message ?? "Operation failed.");
+            {
+                var error = new InvalidOperationException(wrapper.Message ?? "Operation failed.");
+                await LogAuthCallFailureAsync(error, response.StatusCode, cancellationToken);
+                throw error;
+            }
         }
         catch (JsonException)
         {
             // Body was not JSON — HTTP was 200 so treat as success
         }
     }
+
+    // Captures failures of App's own outbound calls to the Auth service — never touches
+    // the Auth repo itself, only the call site here. Best-effort: never lets a logging
+    // failure mask the original Auth API error being reported to the caller.
+    private Task LogAuthCallFailureAsync(Exception exception, System.Net.HttpStatusCode statusCode, CancellationToken cancellationToken) =>
+        errorLogger.LogExceptionAsync(
+            LogCategory.Api,
+            "Infrastructure.AuthApplicationService",
+            exception,
+            additionalContext: $"AuthApiStatusCode={(int)statusCode}",
+            ct: cancellationToken);
 }

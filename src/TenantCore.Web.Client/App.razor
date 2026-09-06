@@ -1,10 +1,13 @@
 @inject TenantCore.Web.Client.Services.AuthStateService AuthState
+@using TenantCore.Web.Client.Components
 
 <CascadingAuthenticationState>
     <Router AppAssembly="typeof(Program).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="routeData" DefaultLayout="typeof(AuthLayout)" />
-            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            <AppErrorBoundary>
+                <RouteView RouteData="routeData" DefaultLayout="typeof(AuthLayout)" />
+                <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            </AppErrorBoundary>
         </Found>
         <NotFound>
             <LayoutView Layout="typeof(AuthLayout)">

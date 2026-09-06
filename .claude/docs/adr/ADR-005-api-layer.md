@@ -231,6 +231,32 @@ The secret must match the one used by TenantCore.Auth to sign tokens.
 
 ---
 
+## Configuration Layering — `appsettings.json` vs `appsettings.Local.json`
+
+`Program.cs` loads configuration in this order (later sources override earlier ones for the same key):
+
+```csharp
+// 1. appsettings.json                 — checked in, safe defaults / empty placeholders only
+// 2. appsettings.{Environment}.json   — checked in (e.g. appsettings.Development.json)
+// 3. appsettings.Local.json           — gitignored, loaded explicitly, LAST — wins
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+```
+
+**Rule — whenever a new configuration section or key is added (a new connection string, a new external service's base URL, any secret):**
+
+1. Add the key to `appsettings.json` with an **empty string or clearly-fake placeholder value** — this file is checked into source control and must never contain a real secret or working connection string.
+2. Add the **same key** to `appsettings.Local.json` with the **actual real value** for local development/testing. This file is gitignored — real secrets live here, never in `appsettings.json` or `appsettings.Development.json`.
+3. If the key needs an environment-specific but still non-secret default (e.g. a different `AuthApi:BaseUrl` for Development vs. Production), add it to `appsettings.{Environment}.json` instead of `appsettings.Local.json` — reserve `appsettings.Local.json` for values that are genuinely per-developer or secret.
+
+**Why this matters:** Visual Studio (and `dotnet run`) load `appsettings.Local.json` last regardless of environment, so it is the effective source of truth for local runs whenever a key is defined there. A key that only exists in `appsettings.json` with an empty value will silently stay empty locally until someone adds the real value to `appsettings.Local.json` — this is the expected, intentional behavior, not a bug to route around by putting real values into `appsettings.json`.
+
+**What NOT to do:**
+- Do NOT put a real connection string, API key, or secret directly into `appsettings.json` or `appsettings.Development.json` — both are checked in
+- Do NOT add a new config section to only one of the two files — `appsettings.json` documents the shape (with placeholders) for every environment; `appsettings.Local.json` supplies the real local value
+- Do NOT rely on `appsettings.Development.json` for secrets — it is also checked in
+
+---
+
 ## Health Check
 
 ```

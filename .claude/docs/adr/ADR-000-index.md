@@ -61,6 +61,10 @@ TenantCore.Web.Client
 | [ADR-009](ADR-009-unit-testing.md) | Unit Testing | xUnit, Moq, FluentAssertions, test organization |
 | [ADR-010](ADR-010-security.md) | Security & Code Quality | Security analysis, architectural violations, quality review |
 
+## Configuration & Local Secrets
+
+Adding a new config key (connection string, API base URL, secret)? See [ADR-005's Configuration Layering section](ADR-005-api-layer.md#configuration-layering--appsettingsjson-vs-appsettingslocaljson) — placeholder value in checked-in `appsettings.json`, the real value in gitignored `appsettings.Local.json` (loaded last, wins).
+
 ## Key Technology Decisions
 
 | Concern | Decision | Package |

@@ -221,6 +221,8 @@ Implements `IEmailService`. Configuration in `appsettings.json`.
 
 Implements `IPdfConversionService`. Converts HTML prescription reports to PDF.
 
+> **Adding a new config key for any Infrastructure service?** Follow the `appsettings.json` / `appsettings.Local.json` layering rule in [ADR-005's Configuration Layering section](ADR-005-api-layer.md#configuration-layering--appsettingsjson-vs-appsettingslocaljson) — placeholder/empty value in `appsettings.json`, the real value in gitignored `appsettings.Local.json`. Every Infrastructure config key listed below (`BlobStorage:*`, `AppLogging:*`, `AuthApi:BaseUrl`, etc.) follows this rule.
+
 ### HTTP Clients for TenantCore.Auth
 
 `AuthApplicationService` and `AuthClinicService` implement `IAuthApplicationService` and `IAuthClinicService`. They use the named `HttpClient` called `"AuthApi"`:

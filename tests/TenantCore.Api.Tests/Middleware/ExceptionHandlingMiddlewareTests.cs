@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Moq;
 using TenantCore.Api.Middleware;
+using TenantCore.Application.Services;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Shared.Errors;
 
@@ -14,6 +15,7 @@ namespace TenantCore.Api.Tests.Middleware;
 public class ExceptionHandlingMiddlewareTests
 {
     private readonly Mock<ILogger<ExceptionHandlingMiddleware>> _logger = new();
+    private readonly Mock<IErrorLogger> _errorLogger = new();
 
     private async Task<JsonDocument> InvokeAndReadResponseAsync(Exception exception)
     {
@@ -25,7 +27,7 @@ public class ExceptionHandlingMiddlewareTests
             _ => throw exception,
             _logger.Object);
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(context, _errorLogger.Object);
 
         context.Response.Body.Seek(0, SeekOrigin.Begin);
         return await JsonDocument.ParseAsync(context.Response.Body);
@@ -146,7 +148,7 @@ public class ExceptionHandlingMiddlewareTests
             _ => throw new Exception("error"),
             _logger.Object);
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(context, _errorLogger.Object);
 
         // WriteAsJsonAsync normalises the content type; we verify it is JSON.
         context.Response.ContentType.Should().StartWith("application/json");
@@ -166,7 +168,7 @@ public class ExceptionHandlingMiddlewareTests
             },
             _logger.Object);
 
-        await middleware.InvokeAsync(context);
+        await middleware.InvokeAsync(context, _errorLogger.Object);
 
         nextCalled.Should().BeTrue();
         context.Response.Body.Length.Should().Be(0);

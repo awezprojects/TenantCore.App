@@ -8,6 +8,7 @@ using TenantCore.Infrastructure.ExternalServices;
 using TenantCore.Infrastructure.Persistence;
 using TenantCore.Infrastructure.Repositories;
 using TenantCore.Infrastructure.Services;
+using TenantCore.Logging;
 
 namespace TenantCore.Infrastructure;
 
@@ -63,6 +64,9 @@ public static class DependencyInjection
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IPdfConversionService, PdfConversionService>();
+
+        services.AddAppLogging(configuration);
+        services.AddScoped<IErrorLogger, ErrorLoggingService>();
 
         services.AddScoped<IAuthApplicationService, AuthApplicationService>();
         services.AddScoped<IAuthClinicService, AuthClinicService>();
