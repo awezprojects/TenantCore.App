@@ -8,7 +8,7 @@ internal sealed class ClinicFeeConfigConfiguration : IEntityTypeConfiguration<Cl
 {
     public void Configure(EntityTypeBuilder<ClinicFeeConfig> builder)
     {
-        builder.ToTable("ClinicFeeConfigs", "clinic");
+        builder.ToTable("ClinicFeeConfigs", "clinic", t => t.HasCheckConstraint("CK_ClinicFeeConfigs_OpdFee_NonNegative", "[OpdFee] >= 0"));
         builder.HasKey(c => c.Id);
         builder.Property(c => c.Id).ValueGeneratedNever();
 

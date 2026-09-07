@@ -669,7 +669,7 @@ else
                                         <div style="font-size:10px; font-weight:700; color:#94A3B8; text-transform:uppercase; letter-spacing:0.5px;">How Often (Frequency)</div>
                                         <div style="font-size:10px; color:#94A3B8; font-style:italic;">e.g. once a day, twice a day…</div>
                                     </div>
-                                    <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:6px;">
+                                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(84px, 1fr)); gap:6px;">
                                         @foreach (var fp in _freqPresets)
                                         {
                                             var preset = fp;
@@ -1088,14 +1088,14 @@ else
     <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
          @onclick="() => _showSettings = false"></div>
     <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-                background:#fff;border-radius:14px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;
+                background:#fff;border-radius:14px;width:@(_settingsTab == 2 ? "640px" : "480px");max-width:96vw;max-height:90vh;overflow-y:auto;
                 box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;" @onclick:stopPropagation="true">
         <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
             <div style="font-size:16px;font-weight:800;color:#1E293B;">⚙️ Prescription Settings</div>
         </div>
         <!-- Tabs -->
         <div style="display:flex;gap:0;border-bottom:1px solid #E2E8F0;padding:0 24px;">
-            @foreach (var (idx, label) in new[] { (0, "🌐 Language"), (1, "🖨️ Print Settings") })
+            @foreach (var (idx, label) in new[] { (0, "🌐 Language"), (1, "🖨️ Print Settings"), (2, "🎨 Print Template") })
             {
                 var ti = idx;
                 <button @onclick="() => _settingsTab = ti"
@@ -1124,7 +1124,7 @@ else
                     }
                 </div>
             }
-            else
+            else if (_settingsTab == 1)
             {
                 <div style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:4px;">Print Margins</div>
                 <div style="font-size:12px;color:#94A3B8;margin-bottom:12px;">
@@ -1169,15 +1169,36 @@ else
                     </div>
                 }
             }
+            else
+            {
+                <div style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:4px;">Print Template</div>
+                <div style="font-size:12px;color:#94A3B8;margin-bottom:14px;">
+                    Choose how <strong>your</strong> prescriptions look when printed. This is a personal preference —
+                    only your own prescriptions change; applied immediately.
+                </div>
+                <PrescriptionTemplateGallery Current="_selectedTemplate" Saving="_savingTemplate"
+                                             PendingSelection="_pendingTemplate" OnSelect="SelectTemplateAsync" />
+            }
         </div>
-        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
-            <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
-                           padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;"
-                    @onclick="() => _showSettings = false">Cancel</button>
-            <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
-                           padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;"
-                    @onclick="SaveSettingsAsync">Save</button>
-        </div>
+        @if (_settingsTab != 2)
+        {
+            <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+                <button style="background:transparent;color:#64748B;border:1.5px solid #E2E8F0;border-radius:8px;
+                               padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;"
+                        @onclick="() => _showSettings = false">Cancel</button>
+                <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                               padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;"
+                        @onclick="SaveSettingsAsync">Save</button>
+            </div>
+        }
+        else
+        {
+            <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;">
+                <button style="background:#1565C0;color:#fff;border:none;border-radius:8px;
+                               padding:9px 20px;font-weight:700;font-size:13px;cursor:pointer;"
+                        @onclick="() => _showSettings = false">Close</button>
+            </div>
+        }
     </div>
 }
 
@@ -1248,9 +1269,7 @@ else
             else if (_bundles.Count == 0)
             {
                 <div style="padding:30px;text-align:center;color:#94A3B8;font-size:13px;">
-                    No medicine bundles yet.
-                    <a href="/medicine-bundles" target="_blank" style="color:#2563EB;font-weight:600;">Create one</a>
-                    to reuse common treatment sets here.
+                    No medicine bundles yet. Create one below to reuse common treatment sets here.
                 </div>
             }
             else
@@ -1295,6 +1314,12 @@ else
                     }
                 </div>
             }
+        </div>
+        <div style="padding:12px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;">
+            <a href="/medicine-bundles" target="_blank"
+               style="font-size:12px;font-weight:700;color:#7C3AED;text-decoration:none;padding:8px 16px;border:1.5px solid #DDD6FE;border-radius:8px;background:#F5F3FF;display:inline-flex;align-items:center;gap:6px;">
+                + Create New Package
+            </a>
         </div>
     </div>
 }
@@ -1541,6 +1566,9 @@ else
     private OpdRegistrationDto? _opd;
     private PatientDto? _patient;
     private DoctorProfileDto? _doctorProfile;
+    private PrescriptionTemplate _selectedTemplate = PrescriptionTemplate.Classic;
+    private bool _savingTemplate;
+    private PrescriptionTemplate? _pendingTemplate;
     private bool _isGynecologist;
     private List<PrescriptionDto> _history = [];
     private Guid _historyPatientId;
@@ -1658,6 +1686,7 @@ else
     private static readonly FreqPreset[] _freqPresets =
     [
         new("OD",  "Once",        "Daily",   "1-0-0"),
+        new("AN",  "Afternoon",   "Only",    "0-1-0"),
         new("BD",  "Twice",       "Daily",   "1-0-1"),
         new("TDS", "Three Times", "Daily",   "1-1-1"),
         new("QID", "Four Times",  "Daily",   "1-1-1-1"),
@@ -1712,6 +1741,26 @@ else
         await PrescriptionClient.UpdatePrescriptionConfigAsync(dto);
         _showSettings = false;
     }
+
+    private async Task SelectTemplateAsync(PrescriptionTemplate template)
+    {
+        _savingTemplate = true;
+        _pendingTemplate = template;
+        var r = await DoctorProfileClient.SetMyPrescriptionTemplateAsync(new SetPrescriptionTemplateDto(template));
+        _savingTemplate = false;
+        _pendingTemplate = null;
+
+        if (r.Success)
+        {
+            _selectedTemplate = template;
+            Toast.ShowSuccess($"Your prescriptions will now print using the \"{template}\" template.");
+        }
+        else
+        {
+            Toast.ShowError(r.Message ?? "Failed to save your print template.");
+        }
+    }
+
     private string PatientName => _patient is not null ? _patient.FullName : (_opd?.PatientName ?? "Patient");
     private string PatientInitials => string.Join("", PatientName.Split(' ').Take(2).Select(n => n.Length > 0 ? n[0].ToString() : ""));
     private string PatientSubtitle
@@ -1769,6 +1818,7 @@ else
                 _doctorProfile = drR.Data;
                 _isGynecologist = _doctorProfile.SpecialityName?
                     .Contains("Gynec", StringComparison.OrdinalIgnoreCase) == true;
+                _selectedTemplate = _doctorProfile.PreferredPrescriptionTemplate;
             }
 
             // Loaded for every doctor (not just gynecologists) — Diagnosis chips use this
@@ -2051,6 +2101,10 @@ else
         {
             case "OD":
                 item.DosageMorningStr = dose; item.DosageAfternoonStr = null;
+                item.DosageEveningStr = null; item.DosageNightStr = null;
+                break;
+            case "AN":
+                item.DosageMorningStr = null; item.DosageAfternoonStr = dose;
                 item.DosageEveningStr = null; item.DosageNightStr = null;
                 break;
             case "BD":

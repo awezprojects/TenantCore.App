@@ -21,6 +21,10 @@ public sealed class CreateMedicineBundleCommandValidator : AbstractValidator<Cre
             item.RuleFor(i => i.MedicineName).NotEmpty().MaximumLength(300);
             item.RuleFor(i => i.DosageUnit).NotEmpty().MaximumLength(20);
             item.RuleFor(i => i.DurationDays).GreaterThan(0);
+            item.RuleFor(i => i.DosageMorning).GreaterThanOrEqualTo(0).When(i => i.DosageMorning.HasValue);
+            item.RuleFor(i => i.DosageAfternoon).GreaterThanOrEqualTo(0).When(i => i.DosageAfternoon.HasValue);
+            item.RuleFor(i => i.DosageEvening).GreaterThanOrEqualTo(0).When(i => i.DosageEvening.HasValue);
+            item.RuleFor(i => i.DosageNight).GreaterThanOrEqualTo(0).When(i => i.DosageNight.HasValue);
         });
     }
 }

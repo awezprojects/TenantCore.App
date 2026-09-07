@@ -1,4 +1,5 @@
 using TenantCore.Domain.Common;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Domain.Entities;
 
@@ -9,6 +10,7 @@ public class DoctorProfile : BaseEntity
     public bool IsRegistrationVerified { get; private set; }
     public Guid? SpecialityId { get; private set; }
     public string? QualificationDetails { get; private set; }
+    public PrescriptionTemplate PreferredPrescriptionTemplate { get; private set; } = PrescriptionTemplate.Classic;
 
     // Navigation — loaded explicitly; may be null when not included
     public DoctorSpeciality? Speciality { get; private set; }
@@ -47,6 +49,12 @@ public class DoctorProfile : BaseEntity
     public void MarkVerified()
     {
         IsRegistrationVerified = true;
+        SetUpdatedAt();
+    }
+
+    public void SetPreferredPrescriptionTemplate(PrescriptionTemplate template)
+    {
+        PreferredPrescriptionTemplate = template;
         SetUpdatedAt();
     }
 }

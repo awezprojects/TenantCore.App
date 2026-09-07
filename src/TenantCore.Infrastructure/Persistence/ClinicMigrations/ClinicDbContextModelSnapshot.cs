@@ -92,7 +92,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasIndex("CounterSessionId");
 
-                    b.ToTable("AmountHandovers", "clinic");
+                    b.ToTable("AmountHandovers", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_AmountHandovers_Amount_NonNegative", "[Amount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.Bed", b =>
@@ -239,7 +242,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("ApplicationId")
                         .IsUnique();
 
-                    b.ToTable("ClinicFeeConfigs", "clinic");
+                    b.ToTable("ClinicFeeConfigs", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicFeeConfigs_OpdFee_NonNegative", "[OpdFee] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicLocation", b =>
@@ -364,7 +370,12 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasIndex("ApplicationId", "Status", "EndDate");
 
-                    b.ToTable("ClinicSubscriptions", "clinic");
+                    b.ToTable("ClinicSubscriptions", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicSubscriptions_DurationDays_Positive", "[DurationDays] > 0");
+
+                            t.HasCheckConstraint("CK_ClinicSubscriptions_PricePaid_NonNegative", "[PricePaid] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicUsgTemplate", b =>
@@ -502,7 +513,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("DoctorProfileId", "ApplicationId")
                         .IsUnique();
 
-                    b.ToTable("DoctorFeeConfigs", "clinic");
+                    b.ToTable("DoctorFeeConfigs", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_DoctorFeeConfigs_VisitFee_NonNegative", "[VisitFee] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.DoctorProfile", b =>
@@ -516,6 +530,11 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.Property<bool>("IsRegistrationVerified")
                         .HasColumnType("bit");
+
+                    b.Property<int>("PreferredPrescriptionTemplate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("QualificationDetails")
                         .HasMaxLength(500)
@@ -1028,7 +1047,12 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasIndex("ExpenseCategoryId");
 
-                    b.ToTable("ExpenseRecords", "clinic");
+                    b.ToTable("ExpenseRecords", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExpenseRecords_Amount_NonNegative", "[Amount] >= 0");
+
+                            t.HasCheckConstraint("CK_ExpenseRecords_PaidAmount_NonNegative", "[PaidAmount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.HistoryLookupItem", b =>
@@ -1152,7 +1176,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("ApplicationId", "AdmissionNumber")
                         .IsUnique();
 
-                    b.ToTable("IpdRegistrations", "clinic");
+                    b.ToTable("IpdRegistrations", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_IpdRegistrations_InitialFee_NonNegative", "[InitialFee] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.Medicine", b =>
@@ -1769,7 +1796,12 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("PrescriptionId")
                         .IsUnique();
 
-                    b.ToTable("ObstetricPrescriptionData", "clinic");
+                    b.ToTable("ObstetricPrescriptionData", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_ObstetricPrescriptionData_Counts_NonNegative", "(Gravida IS NULL OR Gravida >= 0) AND (Para IS NULL OR Para >= 0) AND (Live IS NULL OR Live >= 0) AND (Abortion IS NULL OR Abortion >= 0)");
+
+                            t.HasCheckConstraint("CK_ObstetricPrescriptionData_Lmp_Range", "[Lmp] IS NULL OR ([Lmp] <= CAST(GETUTCDATE() AS date) AND [Lmp] >= DATEADD(MONTH, -10, CAST(GETUTCDATE() AS date)))");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.OpdParticular", b =>
@@ -1836,7 +1868,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasIndex("ParticularId");
 
-                    b.ToTable("OpdParticulars", "clinic");
+                    b.ToTable("OpdParticulars", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_OpdParticulars_Amount_NonNegative", "[Amount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.OpdPayment", b =>
@@ -1925,7 +1960,22 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("OpdRegistrationId")
                         .IsUnique();
 
-                    b.ToTable("OpdPayments", "clinic");
+                    b.ToTable("OpdPayments", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_OpdPayments_CollectedAmount_NonNegative", "[CollectedAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_OpdPayments_Discount_NonNegative", "[Discount] >= 0");
+
+                            t.HasCheckConstraint("CK_OpdPayments_FinalAmount_NonNegative", "[FinalAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_OpdPayments_ParticularsTotal_NonNegative", "[ParticularsTotal] >= 0");
+
+                            t.HasCheckConstraint("CK_OpdPayments_RefundDue_NonNegative", "[RefundDue] >= 0");
+
+                            t.HasCheckConstraint("CK_OpdPayments_TotalAmount_NonNegative", "[TotalAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_OpdPayments_VisitFee_NonNegative", "[VisitFee] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.OpdRegistration", b =>
@@ -2066,7 +2116,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasIndex("ApplicationId");
 
-                    b.ToTable("Particulars", "clinic");
+                    b.ToTable("Particulars", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_Particulars_DefaultAmount_NonNegative", "[DefaultAmount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.Patient", b =>
@@ -2228,7 +2281,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasIndex("ApplicationId", "PatientId", "Status");
 
-                    b.ToTable("PregnancyTenures");
+                    b.ToTable("PregnancyTenures", t =>
+                        {
+                            t.HasCheckConstraint("CK_PregnancyTenures_Lmp_Range", "[Lmp] <= CAST(GETUTCDATE() AS date) AND [Lmp] >= DATEADD(MONTH, -10, CAST(GETUTCDATE() AS date))");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.Prescription", b =>
@@ -2577,7 +2633,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("WardId", "RoomNumber")
                         .IsUnique();
 
-                    b.ToTable("Rooms", "clinic");
+                    b.ToTable("Rooms", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_Rooms_PricePerDay_NonNegative", "[PricePerDay] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.State", b =>
@@ -2681,7 +2740,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0001-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription is set to expire on {ExpiryDate}. Renew now to avoid any interruption to your clinic's access.",
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 598, DateTimeKind.Utc).AddTicks(9296),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8284),
                             DaysBeforeExpiry = 10,
                             DisplayOrder = 1,
                             Headline = "Time to renew soon",
@@ -2693,7 +2752,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0002-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Only a few days left. Renew before {ExpiryDate} to keep your clinic running without interruption.",
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 598, DateTimeKind.Utc).AddTicks(9303),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8288),
                             DaysBeforeExpiry = 5,
                             DisplayOrder = 2,
                             Headline = "Your subscription expires soon",
@@ -2705,7 +2764,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0003-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription expires on {ExpiryDate}. Renew today to avoid losing access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 598, DateTimeKind.Utc).AddTicks(9307),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8291),
                             DaysBeforeExpiry = 2,
                             DisplayOrder = 3,
                             Headline = "Final reminder — act now",
@@ -2717,7 +2776,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0004-0000-0000-000000000000"),
                             AlertType = 2,
                             BodyMessage = "Your subscription expired on {ExpiryDate}. Choose a plan to restore access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 598, DateTimeKind.Utc).AddTicks(9322),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8304),
                             DaysBeforeExpiry = 0,
                             DisplayOrder = 4,
                             Headline = "Subscription expired",
@@ -2807,7 +2866,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0001-0000-0000-000000000000"),
                             Code = 1,
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 600, DateTimeKind.Utc).AddTicks(5715),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1177),
                             Currency = "INR",
                             Description = "Try every feature free for 14 days.",
                             DisplayOrder = 1,
@@ -2822,7 +2881,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0002-0000-0000-000000000000"),
                             Code = 2,
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 600, DateTimeKind.Utc).AddTicks(5728),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1208),
                             Currency = "INR",
                             Description = "Billed every 30 days. Cancel anytime.",
                             DisplayOrder = 2,
@@ -2837,7 +2896,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0003-0000-0000-000000000000"),
                             Code = 3,
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 600, DateTimeKind.Utc).AddTicks(5755),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1231),
                             Currency = "INR",
                             Description = "Our most popular plan — save versus monthly billing.",
                             DisplayOrder = 3,
@@ -2852,7 +2911,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0004-0000-0000-000000000000"),
                             Code = 4,
-                            CreatedAt = new DateTime(2026, 9, 6, 18, 32, 5, 600, DateTimeKind.Utc).AddTicks(5760),
+                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1236),
                             Currency = "INR",
                             Description = "The best value — a full year of every feature.",
                             DisplayOrder = 4,

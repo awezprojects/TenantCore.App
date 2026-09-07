@@ -8,7 +8,7 @@ internal sealed class RoomConfiguration : IEntityTypeConfiguration<Room>
 {
     public void Configure(EntityTypeBuilder<Room> builder)
     {
-        builder.ToTable("Rooms", "clinic");
+        builder.ToTable("Rooms", "clinic", t => t.HasCheckConstraint("CK_Rooms_PricePerDay_NonNegative", "[PricePerDay] >= 0"));
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Id).ValueGeneratedNever();
 

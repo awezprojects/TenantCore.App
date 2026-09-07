@@ -11,6 +11,9 @@ internal sealed class PregnancyTenureConfiguration : IEntityTypeConfiguration<Pr
     {
         builder.HasKey(t => t.Id);
 
+        builder.ToTable(t => t.HasCheckConstraint("CK_PregnancyTenures_Lmp_Range",
+            "[Lmp] <= CAST(GETUTCDATE() AS date) AND [Lmp] >= DATEADD(MONTH, -10, CAST(GETUTCDATE() AS date))"));
+
         builder.Property(t => t.PatientId).IsRequired();
         builder.Property(t => t.ApplicationId).IsRequired();
         builder.Property(t => t.Lmp).IsRequired();

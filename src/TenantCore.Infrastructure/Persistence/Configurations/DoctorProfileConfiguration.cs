@@ -12,6 +12,7 @@ internal sealed class DoctorProfileConfiguration : IEntityTypeConfiguration<Doct
         builder.HasIndex(dp => dp.UserId).IsUnique();
         builder.Property(dp => dp.RegistrationNumber).IsRequired().HasMaxLength(100);
         builder.Property(dp => dp.QualificationDetails).HasMaxLength(500);
+        builder.Property(dp => dp.PreferredPrescriptionTemplate).IsRequired().HasDefaultValue(TenantCore.Shared.Enums.PrescriptionTemplate.Classic);
         builder.Property(dp => dp.RowVersion).IsRowVersion();
 
         // Legacy free-text specialty column kept for backward compatibility

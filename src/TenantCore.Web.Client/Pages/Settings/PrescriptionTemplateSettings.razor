@@ -1,0 +1,66 @@
+@page "/settings/prescription-template"
+@layout AuthorizedLayout
+@inject IDoctorProfileApiClient DoctorProfileClient
+@inject IToastService Toast
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+@using TenantCore.Web.Client.Components
+
+<PageTitle>Print Template - TenantCore</PageTitle>
+
+<div class="opd-header" style="margin-bottom:8px;">
+    <div>
+        <div class="opd-header-title">🖨️ Print Template</div>
+        <div style="font-size:12px;color:#94A3B8;margin-top:2px;">
+            Choose how <strong>your</strong> prescriptions look when printed. This is a personal preference —
+            it only changes what prints for you, other doctors in this clinic keep their own choice.
+        </div>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:40px 0;">
+        <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+    </div>
+}
+else
+{
+    <div style="max-width:1100px; margin-top:16px;">
+        <PrescriptionTemplateGallery Current="_current" Saving="_saving" PendingSelection="_pendingSelection" OnSelect="SelectAsync" />
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private PrescriptionTemplate _current = PrescriptionTemplate.Classic;
+    private PrescriptionTemplate? _pendingSelection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await DoctorProfileClient.GetMyProfileAsync();
+        if (r.Success && r.Data is not null) _current = r.Data.PreferredPrescriptionTemplate;
+        _loading = false;
+    }
+
+    private async Task SelectAsync(PrescriptionTemplate template)
+    {
+        _saving = true;
+        _pendingSelection = template;
+        var r = await DoctorProfileClient.SetMyPrescriptionTemplateAsync(new SetPrescriptionTemplateDto(template));
+        _saving = false;
+        _pendingSelection = null;
+
+        if (r.Success)
+        {
+            _current = template;
+            Toast.ShowSuccess($"Your prescriptions will now print using the \"{template}\" template.");
+        }
+        else
+        {
+            Toast.ShowError(r.Message ?? "Failed to save your print template. Make sure your doctor profile is complete.");
+        }
+    }
+}

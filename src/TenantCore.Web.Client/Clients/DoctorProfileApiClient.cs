@@ -54,4 +54,32 @@ public class DoctorProfileApiClient(HttpClient httpClient, AuthStateService auth
             return new ApiResponse<DoctorProfileDto> { Success = false, Message = ex.Message };
         }
     }
+
+    public async Task<ApiResponse<DoctorProfileDto>> GetByUserIdAsync(Guid userId)
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.GetAsync($"api/doctor-profile/by-user/{userId}");
+            return await Read<DoctorProfileDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponse<DoctorProfileDto> { Success = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<ApiResponse<DoctorProfileDto>> SetMyPrescriptionTemplateAsync(SetPrescriptionTemplateDto dto)
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.PutAsJsonAsync("api/doctor-profile/template", dto, JsonOptions);
+            return await Read<DoctorProfileDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return new ApiResponse<DoctorProfileDto> { Success = false, Message = ex.Message };
+        }
+    }
 }

@@ -8,7 +8,7 @@ internal sealed class OpdParticularConfiguration : IEntityTypeConfiguration<OpdP
 {
     public void Configure(EntityTypeBuilder<OpdParticular> builder)
     {
-        builder.ToTable("OpdParticulars", "clinic");
+        builder.ToTable("OpdParticulars", "clinic", t => t.HasCheckConstraint("CK_OpdParticulars_Amount_NonNegative", "[Amount] >= 0"));
         builder.HasKey(o => o.Id);
         builder.Property(o => o.Id).ValueGeneratedNever();
 

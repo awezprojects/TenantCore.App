@@ -8,7 +8,13 @@ internal sealed class ObstetricPrescriptionDataConfiguration : IEntityTypeConfig
 {
     public void Configure(EntityTypeBuilder<ObstetricPrescriptionData> builder)
     {
-        builder.ToTable("ObstetricPrescriptionData", "clinic");
+        builder.ToTable("ObstetricPrescriptionData", "clinic", t =>
+        {
+            t.HasCheckConstraint("CK_ObstetricPrescriptionData_Lmp_Range",
+                "[Lmp] IS NULL OR ([Lmp] <= CAST(GETUTCDATE() AS date) AND [Lmp] >= DATEADD(MONTH, -10, CAST(GETUTCDATE() AS date)))");
+            t.HasCheckConstraint("CK_ObstetricPrescriptionData_Counts_NonNegative",
+                "(Gravida IS NULL OR Gravida >= 0) AND (Para IS NULL OR Para >= 0) AND (Live IS NULL OR Live >= 0) AND (Abortion IS NULL OR Abortion >= 0)");
+        });
         builder.HasKey(o => o.Id);
         builder.Property(o => o.Id).ValueGeneratedNever();
 

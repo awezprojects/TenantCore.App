@@ -8,7 +8,7 @@ internal sealed class AmountHandoverConfiguration : IEntityTypeConfiguration<Amo
 {
     public void Configure(EntityTypeBuilder<AmountHandover> builder)
     {
-        builder.ToTable("AmountHandovers", "clinic");
+        builder.ToTable("AmountHandovers", "clinic", t => t.HasCheckConstraint("CK_AmountHandovers_Amount_NonNegative", "[Amount] >= 0"));
         builder.HasKey(a => a.Id);
         builder.Property(a => a.Id).ValueGeneratedNever();
 

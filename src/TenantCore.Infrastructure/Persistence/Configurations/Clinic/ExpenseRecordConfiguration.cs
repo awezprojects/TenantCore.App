@@ -8,7 +8,11 @@ internal sealed class ExpenseRecordConfiguration : IEntityTypeConfiguration<Expe
 {
     public void Configure(EntityTypeBuilder<ExpenseRecord> builder)
     {
-        builder.ToTable("ExpenseRecords", "clinic");
+        builder.ToTable("ExpenseRecords", "clinic", t =>
+        {
+            t.HasCheckConstraint("CK_ExpenseRecords_Amount_NonNegative", "[Amount] >= 0");
+            t.HasCheckConstraint("CK_ExpenseRecords_PaidAmount_NonNegative", "[PaidAmount] >= 0");
+        });
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).ValueGeneratedNever();
 

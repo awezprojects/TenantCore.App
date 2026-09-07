@@ -214,7 +214,7 @@ else
                         </div>
                         <div style="padding:12px 14px; border-bottom:1px solid #E2E8F0;">
                             <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:8px; text-transform:uppercase;">How Often (Frequency)</div>
-                            <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:6px;">
+                            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(84px, 1fr)); gap:6px;">
                                 @foreach (var fp in _freqPresets)
                                 {
                                     var preset = fp;
@@ -520,6 +520,7 @@ else
     private static readonly FreqPreset[] _freqPresets =
     [
         new("OD", "Once", "Daily", "1-0-0"),
+        new("AN", "Afternoon", "Only", "0-1-0"),
         new("BD", "Twice", "Daily", "1-0-1"),
         new("TDS", "Three Times", "Daily", "1-1-1"),
         new("QID", "Four Times", "Daily", "1-1-1-1"),
@@ -534,6 +535,7 @@ else
         switch (code)
         {
             case "OD": item.DosageMorningStr = dose; item.DosageAfternoonStr = null; item.DosageEveningStr = null; item.DosageNightStr = null; break;
+            case "AN": item.DosageMorningStr = null; item.DosageAfternoonStr = dose; item.DosageEveningStr = null; item.DosageNightStr = null; break;
             case "BD": item.DosageMorningStr = dose; item.DosageAfternoonStr = null; item.DosageEveningStr = null; item.DosageNightStr = dose; break;
             case "TDS": item.DosageMorningStr = dose; item.DosageAfternoonStr = dose; item.DosageEveningStr = null; item.DosageNightStr = dose; break;
             case "QID": item.DosageMorningStr = dose; item.DosageAfternoonStr = dose; item.DosageEveningStr = dose; item.DosageNightStr = dose; break;

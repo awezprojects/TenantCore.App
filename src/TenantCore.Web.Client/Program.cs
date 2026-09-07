@@ -33,11 +33,16 @@ builder.Services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
     client.BaseAddress = new Uri(authApiBaseUrl);
 });
 
-// Register Doctor Profile API Client (doctor-level, no clinic context header)
+// Register Doctor Profile API Client. DoctorProfile itself isn't tenant-scoped (no
+// ApplicationId column — a doctor's profile is the same across every clinic they work at),
+// but its write actions are still gated by RequireClinical, which checks the caller's role
+// *for the clinic identified by X-Application-Id* (ClinicRoleAuthorizationHandler has no
+// fallback when that header is absent — it denies with 403). So this client still needs
+// ClinicAuthorizationHandler to attach the header, purely for that authorization check.
 builder.Services.AddHttpClient<IDoctorProfileApiClient, DoctorProfileApiClient>(client =>
 {
     client.BaseAddress = new Uri(tenantApiBaseUrl);
-});
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
 // Register Doctor Specialities API Client
 builder.Services.AddHttpClient<IDoctorSpecialitiesApiClient, DoctorSpecialitiesApiClient>(client =>

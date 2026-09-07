@@ -8,7 +8,7 @@ internal sealed class ParticularConfiguration : IEntityTypeConfiguration<Particu
 {
     public void Configure(EntityTypeBuilder<Particular> builder)
     {
-        builder.ToTable("Particulars", "clinic");
+        builder.ToTable("Particulars", "clinic", t => t.HasCheckConstraint("CK_Particulars_DefaultAmount_NonNegative", "[DefaultAmount] >= 0"));
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).ValueGeneratedNever();
 

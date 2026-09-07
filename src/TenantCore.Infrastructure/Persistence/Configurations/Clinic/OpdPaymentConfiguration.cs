@@ -9,7 +9,16 @@ internal sealed class OpdPaymentConfiguration : IEntityTypeConfiguration<OpdPaym
 {
     public void Configure(EntityTypeBuilder<OpdPayment> builder)
     {
-        builder.ToTable("OpdPayments", "clinic");
+        builder.ToTable("OpdPayments", "clinic", t =>
+        {
+            t.HasCheckConstraint("CK_OpdPayments_VisitFee_NonNegative", "[VisitFee] >= 0");
+            t.HasCheckConstraint("CK_OpdPayments_ParticularsTotal_NonNegative", "[ParticularsTotal] >= 0");
+            t.HasCheckConstraint("CK_OpdPayments_TotalAmount_NonNegative", "[TotalAmount] >= 0");
+            t.HasCheckConstraint("CK_OpdPayments_Discount_NonNegative", "[Discount] >= 0");
+            t.HasCheckConstraint("CK_OpdPayments_FinalAmount_NonNegative", "[FinalAmount] >= 0");
+            t.HasCheckConstraint("CK_OpdPayments_CollectedAmount_NonNegative", "[CollectedAmount] >= 0");
+            t.HasCheckConstraint("CK_OpdPayments_RefundDue_NonNegative", "[RefundDue] >= 0");
+        });
         builder.HasKey(o => o.Id);
         builder.Property(o => o.Id).ValueGeneratedNever();
 

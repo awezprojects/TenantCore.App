@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Shared.Dtos;
 
@@ -11,9 +12,12 @@ public class DoctorProfileDto
     public Guid? SpecialityId { get; init; }
     public string? SpecialityName { get; init; }
     public string? QualificationDetails { get; init; }
+    public PrescriptionTemplate PreferredPrescriptionTemplate { get; init; } = PrescriptionTemplate.Classic;
     public DateTime CreatedAt { get; init; }
     public DateTime? UpdatedAt { get; init; }
 }
+
+public sealed record SetPrescriptionTemplateDto(PrescriptionTemplate Template);
 
 public class UpsertDoctorProfileDto
 {

@@ -14,6 +14,7 @@ public static class DoctorProfileTranslator
         SpecialityId           = entity.SpecialityId,
         SpecialityName         = entity.Speciality?.Name,
         QualificationDetails   = entity.QualificationDetails,
+        PreferredPrescriptionTemplate = entity.PreferredPrescriptionTemplate,
         CreatedAt              = entity.CreatedAt,
         UpdatedAt              = entity.UpdatedAt,
     };
@@ -28,6 +29,7 @@ public static class DoctorProfileTranslator
         SpecialityId           = entity.SpecialityId,
         SpecialityName         = speciality.Name,
         QualificationDetails   = entity.QualificationDetails,
+        PreferredPrescriptionTemplate = entity.PreferredPrescriptionTemplate,
         CreatedAt              = entity.CreatedAt,
         UpdatedAt              = entity.UpdatedAt,
     };

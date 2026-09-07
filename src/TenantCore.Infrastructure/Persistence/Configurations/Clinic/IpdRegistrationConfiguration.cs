@@ -8,7 +8,7 @@ internal sealed class IpdRegistrationConfiguration : IEntityTypeConfiguration<Ip
 {
     public void Configure(EntityTypeBuilder<IpdRegistration> builder)
     {
-        builder.ToTable("IpdRegistrations", "clinic");
+        builder.ToTable("IpdRegistrations", "clinic", t => t.HasCheckConstraint("CK_IpdRegistrations_InitialFee_NonNegative", "[InitialFee] >= 0"));
         builder.HasKey(i => i.Id);
         builder.Property(i => i.Id).ValueGeneratedNever();
 

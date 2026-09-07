@@ -76,4 +76,31 @@ public class SetObstetricLmpCommandValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(x => x.ErrorMessage.Contains("LMP date cannot be in the future"));
     }
+
+    [Fact]
+    public void Validate_WhenLmpIsExactlyTenMonthsAgo_ReturnsValidResult()
+    {
+        var command = new SetObstetricLmpCommand(
+            Guid.NewGuid(),
+            new SetLmpRequest { Lmp = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-10) },
+            Guid.NewGuid());
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_WhenLmpIsMoreThanTenMonthsAgo_ReturnsValidationError()
+    {
+        var command = new SetObstetricLmpCommand(
+            Guid.NewGuid(),
+            new SetLmpRequest { Lmp = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-10).AddDays(-1) },
+            Guid.NewGuid());
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.ErrorMessage.Contains("more than 10 months in the past"));
+    }
 }

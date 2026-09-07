@@ -8,7 +8,11 @@ internal sealed class ClinicSubscriptionConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<ClinicSubscription> builder)
     {
-        builder.ToTable("ClinicSubscriptions", "clinic");
+        builder.ToTable("ClinicSubscriptions", "clinic", t =>
+        {
+            t.HasCheckConstraint("CK_ClinicSubscriptions_PricePaid_NonNegative", "[PricePaid] >= 0");
+            t.HasCheckConstraint("CK_ClinicSubscriptions_DurationDays_Positive", "[DurationDays] > 0");
+        });
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).ValueGeneratedNever();
 
