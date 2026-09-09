@@ -16,6 +16,7 @@ internal sealed class ClinicFeatureFlagsConfiguration : IEntityTypeConfiguration
         builder.HasIndex(f => f.ApplicationId).IsUnique();
 
         builder.Property(f => f.PrepaidOpdEnabled).IsRequired();
+        builder.Property(f => f.BillingEnabled).IsRequired();
 
         builder.Property(f => f.CreatedAt).IsRequired();
         builder.Property(f => f.RowVersion).IsRowVersion();

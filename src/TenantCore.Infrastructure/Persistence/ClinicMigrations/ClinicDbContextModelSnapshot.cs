@@ -192,6 +192,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<Guid>("ApplicationId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("BillingEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -2740,7 +2743,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0001-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription is set to expire on {ExpiryDate}. Renew now to avoid any interruption to your clinic's access.",
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8284),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 902, DateTimeKind.Utc).AddTicks(7761),
                             DaysBeforeExpiry = 10,
                             DisplayOrder = 1,
                             Headline = "Time to renew soon",
@@ -2752,7 +2755,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0002-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Only a few days left. Renew before {ExpiryDate} to keep your clinic running without interruption.",
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8288),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 902, DateTimeKind.Utc).AddTicks(7766),
                             DaysBeforeExpiry = 5,
                             DisplayOrder = 2,
                             Headline = "Your subscription expires soon",
@@ -2764,7 +2767,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0003-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription expires on {ExpiryDate}. Renew today to avoid losing access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8291),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 902, DateTimeKind.Utc).AddTicks(7770),
                             DaysBeforeExpiry = 2,
                             DisplayOrder = 3,
                             Headline = "Final reminder — act now",
@@ -2776,7 +2779,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0004-0000-0000-000000000000"),
                             AlertType = 2,
                             BodyMessage = "Your subscription expired on {ExpiryDate}. Choose a plan to restore access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 213, DateTimeKind.Utc).AddTicks(8304),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 902, DateTimeKind.Utc).AddTicks(7781),
                             DaysBeforeExpiry = 0,
                             DisplayOrder = 4,
                             Headline = "Subscription expired",
@@ -2866,7 +2869,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0001-0000-0000-000000000000"),
                             Code = 1,
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1177),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 903, DateTimeKind.Utc).AddTicks(7873),
                             Currency = "INR",
                             Description = "Try every feature free for 14 days.",
                             DisplayOrder = 1,
@@ -2881,7 +2884,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0002-0000-0000-000000000000"),
                             Code = 2,
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1208),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 903, DateTimeKind.Utc).AddTicks(7885),
                             Currency = "INR",
                             Description = "Billed every 30 days. Cancel anytime.",
                             DisplayOrder = 2,
@@ -2896,7 +2899,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0003-0000-0000-000000000000"),
                             Code = 3,
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1231),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 903, DateTimeKind.Utc).AddTicks(7904),
                             Currency = "INR",
                             Description = "Our most popular plan — save versus monthly billing.",
                             DisplayOrder = 3,
@@ -2911,7 +2914,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0004-0000-0000-000000000000"),
                             Code = 4,
-                            CreatedAt = new DateTime(2026, 9, 7, 14, 15, 39, 215, DateTimeKind.Utc).AddTicks(1236),
+                            CreatedAt = new DateTime(2026, 9, 9, 5, 11, 26, 903, DateTimeKind.Utc).AddTicks(7908),
                             Currency = "INR",
                             Description = "The best value — a full year of every feature.",
                             DisplayOrder = 4,
@@ -2969,6 +2972,289 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("ClinicUsgTemplateId");
 
                     b.ToTable("UsgTemplateRows", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.VitalPresetLookupItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("VitalField")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VitalField");
+
+                    b.HasIndex("ApplicationId", "VitalField", "Value")
+                        .IsUnique()
+                        .HasFilter("[ApplicationId] IS NOT NULL");
+
+                    b.ToTable("VitalPresetLookupItems", "clinic");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a1b2c301-0001-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "110/70",
+                            VitalField = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c301-0002-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "120/80",
+                            VitalField = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c301-0003-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "130/85",
+                            VitalField = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c301-0004-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "140/90",
+                            VitalField = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c301-0005-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "150/95",
+                            VitalField = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c302-0001-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "60",
+                            VitalField = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c302-0002-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "72",
+                            VitalField = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c302-0003-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "80",
+                            VitalField = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c302-0004-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "90",
+                            VitalField = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c302-0005-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "100",
+                            VitalField = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c303-0001-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "97.5",
+                            VitalField = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c303-0002-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "98.4",
+                            VitalField = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c303-0003-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "98.6",
+                            VitalField = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c303-0004-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "99.5",
+                            VitalField = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c303-0005-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "100.4",
+                            VitalField = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c304-0001-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "50",
+                            VitalField = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c304-0002-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "60",
+                            VitalField = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c304-0003-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "70",
+                            VitalField = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c304-0004-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "80",
+                            VitalField = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c304-0005-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "90",
+                            VitalField = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c305-0001-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "94",
+                            VitalField = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c305-0002-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "96",
+                            VitalField = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c305-0003-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "97",
+                            VitalField = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c305-0004-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "98",
+                            VitalField = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c305-0005-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "99",
+                            VitalField = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c306-0001-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "12",
+                            VitalField = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c306-0002-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "14",
+                            VitalField = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c306-0003-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "16",
+                            VitalField = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c306-0004-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "18",
+                            VitalField = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c306-0005-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "20",
+                            VitalField = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c307-0001-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "80",
+                            VitalField = 7
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c307-0002-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "90",
+                            VitalField = 7
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c307-0003-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "100",
+                            VitalField = 7
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c307-0004-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "110",
+                            VitalField = 7
+                        },
+                        new
+                        {
+                            Id = new Guid("a1b2c307-0005-0000-0000-000000000000"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Value = "126",
+                            VitalField = 7
+                        });
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.Ward", b =>

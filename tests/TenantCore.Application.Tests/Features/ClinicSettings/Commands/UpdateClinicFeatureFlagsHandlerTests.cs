@@ -22,11 +22,30 @@ public class UpdateClinicFeatureFlagsHandlerTests
             .ReturnsAsync(1);
 
         var handler = new UpdateClinicFeatureFlagsHandler(_repository.Object);
-        var result = await handler.Handle(new UpdateClinicFeatureFlagsCommand(appId, false), CancellationToken.None);
+        var result = await handler.Handle(new UpdateClinicFeatureFlagsCommand(appId, false, true), CancellationToken.None);
 
         result.PrepaidOpdEnabled.Should().BeFalse();
         _repository.Verify(r => r.Update(flags), Times.Once);
         _repository.Verify(r => r.AddAsync(It.IsAny<ClinicFeatureFlags>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_ExistingFlags_UpdatesBillingEnabled()
+    {
+        var appId = Guid.NewGuid();
+        var flags = ClinicFeatureFlags.Create(appId, true, true);
+        _repository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(flags);
+        _repository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = new UpdateClinicFeatureFlagsHandler(_repository.Object);
+        var result = await handler.Handle(new UpdateClinicFeatureFlagsCommand(appId, true, false), CancellationToken.None);
+
+        result.BillingEnabled.Should().BeFalse();
+        flags.BillingEnabled.Should().BeFalse();
+        _repository.Verify(r => r.Update(flags), Times.Once);
         _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -42,10 +61,11 @@ public class UpdateClinicFeatureFlagsHandlerTests
             .ReturnsAsync(1);
 
         var handler = new UpdateClinicFeatureFlagsHandler(_repository.Object);
-        var result = await handler.Handle(new UpdateClinicFeatureFlagsCommand(appId, false), CancellationToken.None);
+        var result = await handler.Handle(new UpdateClinicFeatureFlagsCommand(appId, false, false), CancellationToken.None);
 
         result.PrepaidOpdEnabled.Should().BeFalse();
+        result.BillingEnabled.Should().BeFalse();
         result.ApplicationId.Should().Be(appId);
-        _repository.Verify(r => r.AddAsync(It.Is<ClinicFeatureFlags>(f => f.ApplicationId == appId && !f.PrepaidOpdEnabled), It.IsAny<CancellationToken>()), Times.Once);
+        _repository.Verify(r => r.AddAsync(It.Is<ClinicFeatureFlags>(f => f.ApplicationId == appId && !f.PrepaidOpdEnabled && !f.BillingEnabled), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

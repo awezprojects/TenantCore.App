@@ -147,11 +147,11 @@ public class ClinicSettingsControllerTests
     [Fact]
     public async Task UpdateFeatureFlags_ReturnsOk_WithUpdatedDto()
     {
-        var dto = new ClinicFeatureFlagsDto { PrepaidOpdEnabled = false };
+        var dto = new ClinicFeatureFlagsDto { PrepaidOpdEnabled = false, BillingEnabled = false };
         _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(dto);
 
-        var result = await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false), CancellationToken.None);
+        var result = await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false, false), CancellationToken.None);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         ok.Value.Should().BeSameAs(dto);
@@ -163,10 +163,23 @@ public class ClinicSettingsControllerTests
         _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(new ClinicFeatureFlagsDto());
 
-        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false), CancellationToken.None);
+        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false, true), CancellationToken.None);
 
         _sender.Verify(s => s.Send(
-            It.Is<UpdateClinicFeatureFlagsCommand>(c => c.ApplicationId == _applicationId && c.PrepaidOpdEnabled == false),
+            It.Is<UpdateClinicFeatureFlagsCommand>(c => c.ApplicationId == _applicationId && c.PrepaidOpdEnabled == false && c.BillingEnabled == true),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateFeatureFlags_SendsCommandWithBillingDisabled()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new ClinicFeatureFlagsDto());
+
+        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(true, false), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<UpdateClinicFeatureFlagsCommand>(c => c.ApplicationId == _applicationId && c.PrepaidOpdEnabled == true && c.BillingEnabled == false),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

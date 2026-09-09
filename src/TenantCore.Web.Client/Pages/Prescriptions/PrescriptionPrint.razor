@@ -319,60 +319,67 @@ else
                 @if (_prescription.ObstetricData is not null)
                 {
                     var obs = _prescription.ObstetricData;
-                    @if (obs.MenstrualHistory.Count > 0 || obs.PastMedicalHistory.Count > 0 || obs.FamilyHistory.Count > 0
-                         || obs.PerAbdomen.Count > 0 || obs.PerVaginum.Count > 0
-                         || obs.SurgicalHistory.Count > 0 || obs.PerSpeculum.Count > 0)
+                    var menstrual = PrintableValues(obs.MenstrualHistory);
+                    var pamh = PrintableValues(obs.PastMedicalHistory);
+                    var family = PrintableValues(obs.FamilyHistory);
+                    var surgical = PrintableValues(obs.SurgicalHistory);
+                    var perAbdomen = PrintableValues(obs.PerAbdomen);
+                    var perVaginum = PrintableValues(obs.PerVaginum);
+                    var perSpeculum = PrintableValues(obs.PerSpeculum);
+                    @if (menstrual.Count > 0 || pamh.Count > 0 || family.Count > 0
+                         || perAbdomen.Count > 0 || perVaginum.Count > 0
+                         || surgical.Count > 0 || perSpeculum.Count > 0)
                     {
                         <div class="rx-section rx-sec-history">
                             <div class="rx-section-title">PATIENT HISTORY</div>
                             <div class="rx-hist-grid">
-                                @if (obs.MenstrualHistory.Count > 0)
+                                @if (menstrual.Count > 0)
                                 {
                                     <div>
                                         <div class="rx-hist-heading">Menstrual History</div>
-                                        <div class="rx-hist-item">@string.Join(" • ", obs.MenstrualHistory)</div>
+                                        <div class="rx-hist-item">@string.Join(" • ", menstrual)</div>
                                     </div>
                                 }
-                                @if (obs.PastMedicalHistory.Count > 0)
+                                @if (pamh.Count > 0)
                                 {
                                     <div>
                                         <div class="rx-hist-heading">Past Medical History</div>
-                                        <div class="rx-hist-item">@string.Join(" • ", obs.PastMedicalHistory)</div>
+                                        <div class="rx-hist-item">@string.Join(" • ", pamh)</div>
                                     </div>
                                 }
-                                @if (obs.FamilyHistory.Count > 0)
+                                @if (family.Count > 0)
                                 {
                                     <div>
                                         <div class="rx-hist-heading">Family History</div>
-                                        <div class="rx-hist-item">@string.Join(" • ", obs.FamilyHistory)</div>
+                                        <div class="rx-hist-item">@string.Join(" • ", family)</div>
                                     </div>
                                 }
-                                @if (obs.SurgicalHistory.Count > 0)
+                                @if (surgical.Count > 0)
                                 {
                                     <div>
                                         <div class="rx-hist-heading">Surgical History</div>
-                                        <div class="rx-hist-item">@string.Join(" • ", obs.SurgicalHistory)</div>
+                                        <div class="rx-hist-item">@string.Join(" • ", surgical)</div>
                                     </div>
                                 }
-                                @if (obs.PerAbdomen.Count > 0)
+                                @if (perAbdomen.Count > 0)
                                 {
                                     <div>
                                         <div class="rx-hist-heading">Per Abdomen</div>
-                                        <div class="rx-hist-item">@string.Join(" • ", obs.PerAbdomen)</div>
+                                        <div class="rx-hist-item">@string.Join(" • ", perAbdomen)</div>
                                     </div>
                                 }
-                                @if (obs.PerVaginum.Count > 0)
+                                @if (perVaginum.Count > 0)
                                 {
                                     <div>
                                         <div class="rx-hist-heading">Per Vaginum</div>
-                                        <div class="rx-hist-item">@string.Join(" • ", obs.PerVaginum)</div>
+                                        <div class="rx-hist-item">@string.Join(" • ", perVaginum)</div>
                                     </div>
                                 }
-                                @if (obs.PerSpeculum.Count > 0)
+                                @if (perSpeculum.Count > 0)
                                 {
                                     <div>
                                         <div class="rx-hist-heading">Per Speculum</div>
-                                        <div class="rx-hist-item">@string.Join(" • ", obs.PerSpeculum)</div>
+                                        <div class="rx-hist-item">@string.Join(" • ", perSpeculum)</div>
                                     </div>
                                 }
                             </div>
@@ -586,7 +593,8 @@ else
     .rx-obs-info { font-size:12px; color:#374151; font-style:italic; }
     .rx-hist-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px 14px; }
     .rx-hist-heading { font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;
-                       letter-spacing:0.5px; margin-bottom:3px; }
+                       letter-spacing:0.5px; margin-bottom:3px; text-decoration:underline;
+                       text-underline-offset:2px; }
     .rx-hist-item { font-size:11px; color:#0F172A; line-height:1.4; }
 
     /* ── Diagnosis ────────────────────────────────────── */
@@ -761,6 +769,9 @@ else
 
 @code {
     [Parameter] public Guid PrescriptionId { get; set; }
+
+    private static List<string> PrintableValues(IReadOnlyList<HistoryItemSelectionDto> items) =>
+        items.Where(x => x.PrintOnPrescription).Select(x => x.Value).ToList();
 
     private bool _loading = true;
     private PrescriptionDto? _prescription;

@@ -1,22 +1,39 @@
 @inject IObstetricApiClient ObstetricClient
 @inject IToastService Toast
+@inject IJSRuntime JS
 @using TenantCore.Shared.Dtos
 @using TenantCore.Shared.Enums
 @using TenantCore.Web.Client.Clients
 @using TenantCore.Web.Client.Services
 
 <div>
-    @if (!string.IsNullOrEmpty(Label))
+    @if (!string.IsNullOrEmpty(Label) || (ShowPrintToggle && SelectedItems.Count > 0))
     {
-        <div style="font-weight:700; font-size:13px; color:#0F172A; margin-bottom:8px;">@Icon @Label</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+            @if (!string.IsNullOrEmpty(Label))
+            {
+                <div style="font-weight:700; font-size:13px; color:#0F172A;">@Icon @Label</div>
+            }
+            @if (ShowPrintToggle && SelectedItems.Count > 0)
+            {
+                <label style="display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:#64748B; cursor:pointer; white-space:nowrap;"
+                       title="Print this section on the prescription">
+                    <input type="checkbox" @ref="_selectAllRef"
+                           checked="@(_triState == TriStateCheckboxValue.Checked)"
+                           @onchange="ToggleAllPrintAsync" />
+                    Print this
+                </label>
+            }
+        </div>
     }
     <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; min-height:20px;">
-        @foreach (var entry in SelectedItems.ToList())
+        @for (var i = 0; i < SelectedItems.Count; i++)
         {
-            var e = entry;
+            var idx = i;
+            var e = SelectedItems[idx];
             <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:@ChipBg; border-radius:14px; border:1px solid @ChipBorder;">
                 <span style="font-size:12px; font-weight:600; color:@ChipText;">@e</span>
-                <button @onclick="() => SelectedItems.Remove(e)"
+                <button @onclick="() => RemoveAtAsync(idx)"
                         style="background:none; border:none; cursor:pointer; color:@ChipText; font-size:11px; padding:0; line-height:1;">✕</button>
             </div>
         }
@@ -31,7 +48,7 @@
         @foreach (var item in MatchingSuggestions())
         {
             var value = item.Value;
-            <button @onclick="() => SelectExisting(value)"
+            <button @onclick="() => SelectExistingAsync(value)"
                     style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @value</button>
         }
         @if (_search.Trim().Length is >= 3 and <= 256 && !HasExactMatch())
@@ -53,8 +70,22 @@
     [Parameter] public string ChipBorder { get; set; } = "#BFDBFE";
     [Parameter] public string ChipText { get; set; } = "#1D4ED8";
 
+    // Opt-in print-on-prescription mode. When enabled, PrintFlags must stay index-aligned
+    // with SelectedItems — this component owns keeping the two lists in lockstep for every
+    // add/remove path, so call sites never need their own synchronization code.
+    [Parameter] public bool ShowPrintToggle { get; set; } = false;
+    [Parameter] public List<bool>? PrintFlags { get; set; }
+
+    // Fired whenever PrintFlags changes (add, remove, or the "Print this" toggle) — lets a
+    // parent hosting several of these fields (e.g. a master "Print all" over multiple cards)
+    // know to re-render, since mutating a shared List<bool> reference alone doesn't trigger
+    // a re-render of a different component.
+    [Parameter] public EventCallback PrintStateChanged { get; set; }
+
     private string _search = string.Empty;
     private bool _saving;
+    private ElementReference _selectAllRef;
+    private TriStateCheckboxValue _triState => PrintFlags is null ? TriStateCheckboxValue.Unchecked : TriStateCheckboxState.Compute(PrintFlags);
 
     private IEnumerable<HistoryLookupItemDto> MatchingSuggestions() => LookupItems
         .Where(x => x.Type == Type
@@ -70,11 +101,42 @@
         if (e.Key == "Enter") _ = SubmitAsync();
     }
 
-    private void SelectExisting(string value)
+    private async Task SelectExistingAsync(string value)
     {
+        var added = false;
         if (!SelectedItems.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
             SelectedItems.Add(value);
+            PrintFlags?.Add(true);
+            added = true;
+        }
         _search = string.Empty;
+        if (added && PrintFlags is not null) await PrintStateChanged.InvokeAsync();
+    }
+
+    private async Task RemoveAtAsync(int index)
+    {
+        SelectedItems.RemoveAt(index);
+        var hadPrintFlags = PrintFlags is not null && index < PrintFlags.Count;
+        if (hadPrintFlags) PrintFlags!.RemoveAt(index);
+        if (hadPrintFlags) await PrintStateChanged.InvokeAsync();
+    }
+
+    private async Task ToggleAllPrintAsync(ChangeEventArgs e)
+    {
+        if (PrintFlags is null) return;
+        var newValue = e.Value is bool b && b;
+        for (var i = 0; i < PrintFlags.Count; i++) PrintFlags[i] = newValue;
+        await PrintStateChanged.InvokeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (ShowPrintToggle && PrintFlags is not null && SelectedItems.Count > 0)
+        {
+            try { await JS.InvokeVoidAsync("setIndeterminate", _selectAllRef, _triState == TriStateCheckboxValue.Indeterminate); }
+            catch { /* element may not be rendered yet — next render will retry */ }
+        }
     }
 
     private async Task SubmitAsync()
@@ -86,7 +148,7 @@
             x.Type == Type && string.Equals(x.Value, trimmed, StringComparison.OrdinalIgnoreCase));
         if (existing is not null)
         {
-            SelectExisting(existing.Value);
+            await SelectExistingAsync(existing.Value);
             return;
         }
 
@@ -105,7 +167,7 @@
         if (response.Success && response.Data is not null)
         {
             await OnItemCreated.InvokeAsync(response.Data);
-            SelectExisting(response.Data.Value);
+            await SelectExistingAsync(response.Data.Value);
         }
         else
         {

@@ -3,6 +3,7 @@
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject SubscriptionContextService SubscriptionContext
+@inject FeatureFlagsContextService FeatureFlagsContext
 @implements IDisposable
 
 <ToastContainer />
@@ -269,6 +270,7 @@ else if (_isAuthenticated)
         if (NeedsSubscriptionGate)
         {
             await SubscriptionContext.RefreshAsync();
+            await FeatureFlagsContext.RefreshAsync();
         }
     }
 
@@ -368,6 +370,7 @@ else if (_isAuthenticated)
     private async Task SwitchClinic()
     {
         SubscriptionContext.Clear();
+        FeatureFlagsContext.Clear();
         await ClinicContext.ClearClinicAsync();
         NavigationManager.NavigateTo("/select-clinic");
     }
@@ -382,6 +385,7 @@ else if (_isAuthenticated)
     {
         _userMenuOpen = false;
         SubscriptionContext.Clear();
+        FeatureFlagsContext.Clear();
         await ClinicContext.ClearClinicAsync();
         await AuthState.ClearAuthStateAsync();
         NavigationManager.NavigateTo("/auth/login", forceLoad: true);

@@ -28,9 +28,16 @@ public sealed class CreateOpdRegistrationHandler(
     {
         logger.LogInformation("Creating OPD registration for patient {PatientId}", request.PatientId);
 
-        var activeSession = await counterSessionRepository.GetActiveSessionAsync(request.ApplicationId, cancellationToken);
-        if (activeSession is null)
-            throw new InvalidOperationException("No active counter session. Please open a counter session before booking OPD appointments.");
+        var flags = await featureFlagsRepository.GetByApplicationAsync(request.ApplicationId, cancellationToken);
+        var billingEnabled = flags?.BillingEnabled ?? true;
+
+        CounterSession? activeSession = null;
+        if (billingEnabled)
+        {
+            activeSession = await counterSessionRepository.GetActiveSessionAsync(request.ApplicationId, cancellationToken);
+            if (activeSession is null)
+                throw new InvalidOperationException("No active counter session. Please open a counter session before booking OPD appointments.");
+        }
 
         var patient = await patientRepository.GetByIdAsync(request.PatientId, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), request.PatientId);
@@ -59,19 +66,21 @@ public sealed class CreateOpdRegistrationHandler(
         await opdRepository.AddAsync(registration, cancellationToken);
         await opdRepository.SaveChangesAsync(cancellationToken);
 
-        var doctorProfile = await doctorProfileRepository.GetByUserIdAsync(request.DoctorUserId, cancellationToken);
-        var doctorProfileId = doctorProfile?.Id ?? Guid.Empty;
-        await sender.Send(new EnsureOpdPaymentCommand(registration.Id, doctorProfileId, request.ApplicationId), cancellationToken);
-
-        var flags = await featureFlagsRepository.GetByApplicationAsync(request.ApplicationId, cancellationToken);
-        if (flags?.PrepaidOpdEnabled ?? true)
+        if (billingEnabled)
         {
-            var payment = await paymentRepository.GetByOpdRegistrationIdAsync(registration.Id, request.ApplicationId, cancellationToken);
-            if (payment is not null && payment.PaymentStatus == PaymentStatus.Pending)
+            var doctorProfile = await doctorProfileRepository.GetByUserIdAsync(request.DoctorUserId, cancellationToken);
+            var doctorProfileId = doctorProfile?.Id ?? Guid.Empty;
+            await sender.Send(new EnsureOpdPaymentCommand(registration.Id, doctorProfileId, request.ApplicationId), cancellationToken);
+
+            if (flags?.PrepaidOpdEnabled ?? true)
             {
-                payment.AcceptVisitFee(request.ReceivedByUserId, activeSession.Id);
-                paymentRepository.Update(payment);
-                await paymentRepository.SaveChangesAsync(cancellationToken);
+                var payment = await paymentRepository.GetByOpdRegistrationIdAsync(registration.Id, request.ApplicationId, cancellationToken);
+                if (payment is not null && payment.PaymentStatus == PaymentStatus.Pending)
+                {
+                    payment.AcceptVisitFee(request.ReceivedByUserId, activeSession!.Id);
+                    paymentRepository.Update(payment);
+                    await paymentRepository.SaveChangesAsync(cancellationToken);
+                }
             }
         }
 

@@ -7,8 +7,10 @@
 @inject IOpdPaymentApiClient OpdPaymentClient
 @inject IDoctorFeeConfigApiClient DoctorFeeConfigClient
 @inject ICounterSessionApiClient CounterSessionClient
+@inject IVitalPresetApiClient VitalPresetClient
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
+@inject FeatureFlagsContextService FeatureFlagsContext
 @inject IToastService Toast
 @inject NavigationManager Navigation
 @using TenantCore.Shared.Enums
@@ -205,7 +207,7 @@
                                         @(string.IsNullOrWhiteSpace(reg.Notes) ? "—" : reg.Notes)
                                     </td>
                                 }
-                                <td style="font-weight:700;color:#059669;">₹@reg.Fee.ToString("N0")</td>
+                                <td style="font-weight:700;color:#059669;">@(FeatureFlagsContext.IsBillingEnabled ? $"₹{reg.Fee:N0}" : "—")</td>
                                 <td>
                                     @if (notVisited)
                                     {
@@ -232,26 +234,29 @@
                                         }
                                         else
                                         {
-                                            <button class="opd-btn rx" @onclick="() => OpenParticularsPopup(reg)">Items</button>
-                                            @if (reg.Status == OpdStatus.Completed)
+                                            @if (FeatureFlagsContext.IsBillingEnabled)
                                             {
-                                                @if (reg.PaymentStatus == PaymentStatus.Received)
+                                                <button class="opd-btn rx" @onclick="() => OpenParticularsPopup(reg)">Items</button>
+                                                @if (reg.Status == OpdStatus.Completed)
                                                 {
-                                                    <span class="opd-badge done" style="font-size:11px;padding:3px 8px;">Paid ✓</span>
-                                                }
-                                                else
-                                                {
-                                                    @if (reg.HasDiscount)
+                                                    @if (reg.PaymentStatus == PaymentStatus.Received)
                                                     {
-                                                        <button class="opd-btn done-btn" @onclick="() => CollectFeeAsync(reg)" disabled="@_updating">
-                                                            Collect Full ₹@((reg.FinalAmount ?? reg.Fee).ToString("N0"))
-                                                        </button>
+                                                        <span class="opd-badge done" style="font-size:11px;padding:3px 8px;">Paid ✓</span>
                                                     }
                                                     else
                                                     {
-                                                        <button class="opd-btn done-btn" @onclick="() => CollectFeeAsync(reg)" disabled="@_updating">
-                                                            Collect ₹@reg.Fee.ToString("N0")
-                                                        </button>
+                                                        @if (reg.HasDiscount)
+                                                        {
+                                                            <button class="opd-btn done-btn" @onclick="() => CollectFeeAsync(reg)" disabled="@_updating">
+                                                                Collect Full ₹@((reg.FinalAmount ?? reg.Fee).ToString("N0"))
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button class="opd-btn done-btn" @onclick="() => CollectFeeAsync(reg)" disabled="@_updating">
+                                                                Collect ₹@reg.Fee.ToString("N0")
+                                                            </button>
+                                                        }
                                                     }
                                                 }
                                             }
@@ -259,7 +264,7 @@
                                             {
                                                 <button class="opd-btn cancelled" @onclick="() => CancelAsync(reg)" disabled="@_updating">Cancel</button>
                                             }
-                                            @if (reg.Status == OpdStatus.Cancelled && NeedsRefund(reg))
+                                            @if (FeatureFlagsContext.IsBillingEnabled && reg.Status == OpdStatus.Cancelled && NeedsRefund(reg))
                                             {
                                                 <button class="opd-btn done-btn" @onclick="() => OpenDiscountDialog(reg)">Refund</button>
                                             }
@@ -361,10 +366,13 @@
                     <div class="opd-modal-field-label">Appointment</div>
                     <div class="opd-modal-field-value">@_selected.RegistrationDate.ToString("hh:mm tt")</div>
                 </div>
-                <div class="opd-modal-field">
-                    <div class="opd-modal-field-label">Fee</div>
-                    <div class="opd-modal-field-value">₹@_selected.Fee.ToString("N0")</div>
-                </div>
+                @if (FeatureFlagsContext.IsBillingEnabled)
+                {
+                    <div class="opd-modal-field">
+                        <div class="opd-modal-field-label">Fee</div>
+                        <div class="opd-modal-field-value">₹@_selected.Fee.ToString("N0")</div>
+                    </div>
+                }
                 @if (_selected.Weight.HasValue || !string.IsNullOrWhiteSpace(_selected.BloodPressure) || _selected.PulseRate.HasValue
                      || _selected.OxygenSaturation.HasValue || _selected.Temperature.HasValue || _selected.RespiratoryRate.HasValue || _selected.Sugar.HasValue)
                 {
@@ -467,37 +475,47 @@
                 </select>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label class="form-label">Fee (₹)</label>
-                    <input class="form-input" type="number" min="0" @bind="_fee" />
-                </div>
+                @if (FeatureFlagsContext.IsBillingEnabled)
+                {
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Fee (₹)</label>
+                        <input class="form-input" type="number" min="0" @bind="_fee" />
+                    </div>
+                }
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">Weight (kg)</label>
                     <input class="form-input" type="number" min="0" step="0.1" @bind="_weight" />
+                    @VitalQuickPick("weight")
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">BP (e.g. 120/80)</label>
                     <input class="form-input" type="text" @bind="_bloodPressure" />
+                    @VitalQuickPick("bp")
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">Pulse (bpm)</label>
                     <input class="form-input" type="number" min="0" @bind="_pulseRate" />
+                    @VitalQuickPick("pulse")
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">O2 Sat. (%)</label>
                     <input class="form-input" type="number" min="0" max="100" step="0.1" @bind="_oxygenSaturation" />
+                    @VitalQuickPick("spo2")
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">Temp (°F)</label>
                     <input class="form-input" type="number" min="0" step="0.1" @bind="_temperature" />
+                    @VitalQuickPick("temp")
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">RR (/min)</label>
                     <input class="form-input" type="number" min="0" @bind="_respiratoryRate" />
+                    @VitalQuickPick("rr")
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">Sugar (F)</label>
                     <input class="form-input" type="number" min="0" step="0.1" @bind="_sugar" />
+                    @VitalQuickPick("sugar")
                 </div>
             </div>
             <div class="form-group" style="margin-bottom:0;">
@@ -624,6 +642,52 @@
     private int?     _respiratoryRate;
     private decimal? _sugar;
 
+    // Vitals quick-pick presets (weight/bp/pulse/spo2/temp/rr/sugar) — system defaults plus
+    // this clinic's own additions, managed on the "Vitals Lookup" reception page.
+    private Dictionary<string, List<string>> _vitalPresets = new()
+    {
+        ["weight"] = [], ["bp"] = [], ["pulse"] = [], ["spo2"] = [], ["temp"] = [], ["rr"] = [], ["sugar"] = []
+    };
+
+    private async Task LoadVitalPresetsAsync()
+    {
+        var r = await VitalPresetClient.GetAllAsync();
+        if (!r.Success || r.Data is null) return;
+        var byField = r.Data.ToLookup(x => x.VitalField);
+        _vitalPresets["bp"] = byField[VitalFieldType.Bp].Select(x => x.Value).ToList();
+        _vitalPresets["pulse"] = byField[VitalFieldType.Pulse].Select(x => x.Value).ToList();
+        _vitalPresets["temp"] = byField[VitalFieldType.Temp].Select(x => x.Value).ToList();
+        _vitalPresets["weight"] = byField[VitalFieldType.Weight].Select(x => x.Value).ToList();
+        _vitalPresets["spo2"] = byField[VitalFieldType.SpO2].Select(x => x.Value).ToList();
+        _vitalPresets["rr"] = byField[VitalFieldType.Rr].Select(x => x.Value).ToList();
+        _vitalPresets["sugar"] = byField[VitalFieldType.Sugar].Select(x => x.Value).ToList();
+    }
+
+    private void SetOpdVital(string key, string? value)
+    {
+        switch (key)
+        {
+            case "weight": _weight = decimal.TryParse(value, out var w) ? w : null; break;
+            case "bp": _bloodPressure = string.IsNullOrWhiteSpace(value) ? null : value; break;
+            case "pulse": _pulseRate = int.TryParse(value, out var p) ? p : null; break;
+            case "spo2": _oxygenSaturation = decimal.TryParse(value, out var o) ? o : null; break;
+            case "temp": _temperature = decimal.TryParse(value, out var t) ? t : null; break;
+            case "rr": _respiratoryRate = int.TryParse(value, out var r) ? r : null; break;
+            case "sugar": _sugar = decimal.TryParse(value, out var s) ? s : null; break;
+        }
+    }
+
+    private RenderFragment VitalQuickPick(string key) =>
+        @<select value="" class="vital-quickpick" @onchange="e => SetOpdVital(key, e.Value?.ToString())"
+                title="Quick-pick a common value, or type your own above"
+                style="width:100%; margin-top:6px; font-size:11px; padding:5px 6px; border:1.5px solid #DBEAFE; border-radius:6px; background:#EFF6FF; color:#2563EB; font-weight:600; outline:none;">
+            <option value="">Quick pick…</option>
+            @foreach (var p in _vitalPresets[key])
+            {
+                <option value="@p">@p</option>
+            }
+        </select>;
+
     // ── Computed ──────────────────────────────────────────────────────────────
     private int TotalPages => _result is null || _pageSize == 0
         ? 1
@@ -666,10 +730,13 @@
         _clinicAppId = appId != Guid.Empty ? appId : null;
 
         BuildPresets();
-        await Task.WhenAll(LoadPageAsync(), LoadCountsAsync());
+        await Task.WhenAll(LoadPageAsync(), LoadCountsAsync(), LoadVitalPresetsAsync());
         if (!_isDoctor)
         {
-            await Task.WhenAll(LoadDoctorsAsync(), LoadActiveSessionAsync());
+            if (FeatureFlagsContext.IsBillingEnabled)
+                await Task.WhenAll(LoadDoctorsAsync(), LoadActiveSessionAsync());
+            else
+                await LoadDoctorsAsync();
         }
         if (Navigation.Uri.EndsWith("/opd/new", StringComparison.OrdinalIgnoreCase) && !_isDoctor)
             OpenNewDialog();
@@ -963,11 +1030,11 @@
         _selectedPatientId = Guid.Empty; _selectedDoctorId = null;
         _fee = 0; _notes = null;
 
-        // Pre-fill vitals with normal/typical values — reception only needs to touch
-        // whatever reading is actually abnormal for this patient, same convention as
-        // the doctor's prescription vitals defaults.
-        _weight = 70; _bloodPressure = "120/80"; _pulseRate = 72; _oxygenSaturation = 98;
-        _temperature = 98.6m; _respiratoryRate = 16; _sugar = 95;
+        // Only Pulse and O2 Sat pre-fill with a typical value — Weight, BP, Temp, RR and
+        // Sugar vary too much patient-to-patient to default, and reception must actually
+        // measure and enter them rather than risk submitting a stale placeholder unchanged.
+        _weight = null; _bloodPressure = null; _pulseRate = 72; _oxygenSaturation = 98;
+        _temperature = null; _respiratoryRate = null; _sugar = null;
 
         _newDialogVisible = true;
     }

@@ -45,7 +45,7 @@ public class ClinicSettingsController(ISender sender) : ClinicControllerBase
     [ProducesResponseType(typeof(ClinicFeatureFlagsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UpdateFeatureFlags([FromBody] UpdateClinicFeatureFlagsDto dto, CancellationToken ct)
-        => Ok(await sender.Send(new UpdateClinicFeatureFlagsCommand(GetApplicationId(), dto.PrepaidOpdEnabled), ct));
+        => Ok(await sender.Send(new UpdateClinicFeatureFlagsCommand(GetApplicationId(), dto.PrepaidOpdEnabled, dto.BillingEnabled), ct));
 
     [HttpGet("states")]
     [ProducesResponseType(typeof(IEnumerable<StateDto>), StatusCodes.Status200OK)]

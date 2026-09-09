@@ -93,9 +93,31 @@ public class ObstetricPrescriptionData : BaseEntity
         SetUpdatedAt();
     }
 
-    private static string? SerializeList(IReadOnlyList<string>? list)
+    private static string? SerializeList(IReadOnlyList<HistoryItemSelectionDto>? list)
     {
         if (list is null || list.Count == 0) return null;
         return System.Text.Json.JsonSerializer.Serialize(list);
+    }
+
+    // Backward-compatible with prescriptions saved before the print-on-prescription flag
+    // existed, when this column held a plain JSON string array (e.g. ["scanty flow"]).
+    // Anything read back in that legacy shape defaults to PrintOnPrescription = true —
+    // it keeps printing exactly as it always did.
+    public static IReadOnlyList<HistoryItemSelectionDto> DeserializeSelections(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+
+        try
+        {
+            var selections = System.Text.Json.JsonSerializer.Deserialize<List<HistoryItemSelectionDto>>(json);
+            if (selections is not null) return selections;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Fall through to legacy plain-string-array format below.
+        }
+
+        var legacy = System.Text.Json.JsonSerializer.Deserialize<List<string>>(json);
+        return legacy is null ? [] : legacy.Select(v => new HistoryItemSelectionDto(v, true)).ToList();
     }
 }

@@ -56,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<IClinicSubscriptionRepository, ClinicSubscriptionRepository>();
         services.AddScoped<ISubscriptionAlertSettingRepository, SubscriptionAlertSettingRepository>();
         services.AddScoped<IHistoryLookupItemRepository, HistoryLookupItemRepository>();
+        services.AddScoped<IVitalPresetLookupItemRepository, VitalPresetLookupItemRepository>();
         services.AddScoped<IStateRepository, StateRepository>();
         services.AddScoped<ICityRepository, CityRepository>();
         services.AddScoped<IClinicLocationRepository, ClinicLocationRepository>();

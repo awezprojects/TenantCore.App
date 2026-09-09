@@ -1,6 +1,7 @@
 @inject AuthStateService AuthState
 @inject NavigationManager NavigationManager
 @inject ClinicContextService ClinicContext
+@inject FeatureFlagsContextService FeatureFlagsContext
 @using TenantCore.Web.Client.Services
 @implements IDisposable
 
@@ -23,12 +24,15 @@
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
         <NavItem Href="/admin/doctor-fee-configs"  Icon="💵" Label="Fee Configs"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/admin/particulars"         Icon="📦" Label="Particulars"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/admin/expense-categories"  Icon="📂" Label="Expense Cats"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/finance-dashboard"         Icon="📊" Label="Finance"         DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/counter-session"           Icon="🏧" Label="Counter"         DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/expense-records"           Icon="💸" Label="Expenses"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/amount-handovers"          Icon="🤝" Label="Handovers"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        @if (FeatureFlagsContext.IsBillingEnabled)
+        {
+            <NavItem Href="/admin/particulars"         Icon="📦" Label="Particulars"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/admin/expense-categories"  Icon="📂" Label="Expense Cats"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/finance-dashboard"         Icon="📊" Label="Finance"         DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/counter-session"           Icon="🏧" Label="Counter"         DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/expense-records"           Icon="💸" Label="Expenses"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/amount-handovers"          Icon="🤝" Label="Handovers"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        }
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
         <NavItem Href="/admin/usg-template"        Icon="🔬" Label="USG Template"   DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
@@ -51,10 +55,13 @@
         <NavItem Href="/medicines"            Icon="💊" Label="Medicines"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/medicine-bundles"     Icon="📦" Label="Medicine Bundles" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
-        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+        @if (FeatureFlagsContext.IsBillingEnabled)
+        {
+            <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
-        <NavItem Href="/finance-dashboard"       Icon="📊" Label="My Finance"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/amount-handovers"        Icon="🤝" Label="Handovers"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/finance-dashboard"       Icon="📊" Label="My Finance"     DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/amount-handovers"        Icon="🤝" Label="Handovers"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        }
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
@@ -73,11 +80,20 @@
         <NavItem Href="/opd"                  Icon="🩺" Label="OPD Queue"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/ipd"      Icon="🛏" Label="IPD & Beds"    DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
+        @if (FeatureFlagsContext.IsBillingEnabled)
+        {
+            <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+
+            <NavItem Href="/counter-session"  Icon="🏧" Label="Counter"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/expense-records"  Icon="💸" Label="Expenses"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+            <NavItem Href="/amount-handovers" Icon="🤝" Label="Handovers"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        }
+
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
-        <NavItem Href="/counter-session"  Icon="🏧" Label="Counter"        DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/expense-records"  Icon="💸" Label="Expenses"       DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
-        <NavItem Href="/amount-handovers" Icon="🤝" Label="Handovers"      DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
+
+        <NavItem Href="/reception/vitals-lookup" Icon="📊" Label="Vitals Lookup" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
@@ -94,6 +110,7 @@
     {
         NavigationManager.LocationChanged += OnLocationChanged;
         ClinicContext.OnClinicChanged += OnClinicContextChanged;
+        FeatureFlagsContext.OnFeatureFlagsChanged += OnClinicContextChanged;
         UpdatePath(NavigationManager.Uri);
     }
 
@@ -117,5 +134,6 @@
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
         ClinicContext.OnClinicChanged -= OnClinicContextChanged;
+        FeatureFlagsContext.OnFeatureFlagsChanged -= OnClinicContextChanged;
     }
 }

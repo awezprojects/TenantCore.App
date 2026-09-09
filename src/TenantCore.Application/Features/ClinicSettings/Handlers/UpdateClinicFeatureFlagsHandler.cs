@@ -17,12 +17,12 @@ public sealed class UpdateClinicFeatureFlagsHandler(IClinicFeatureFlagsRepositor
 
         if (flags is null)
         {
-            flags = ClinicFeatureFlags.Create(request.ApplicationId, request.PrepaidOpdEnabled);
+            flags = ClinicFeatureFlags.Create(request.ApplicationId, request.PrepaidOpdEnabled, request.BillingEnabled);
             await repository.AddAsync(flags, cancellationToken);
         }
         else
         {
-            flags.Update(request.PrepaidOpdEnabled);
+            flags.Update(request.PrepaidOpdEnabled, request.BillingEnabled);
             repository.Update(flags);
         }
 

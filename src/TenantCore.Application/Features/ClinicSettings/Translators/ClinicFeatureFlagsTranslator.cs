@@ -10,6 +10,7 @@ public static class ClinicFeatureFlagsTranslator
         Id = entity.Id,
         ApplicationId = entity.ApplicationId,
         PrepaidOpdEnabled = entity.PrepaidOpdEnabled,
+        BillingEnabled = entity.BillingEnabled,
         UpdatedAt = entity.UpdatedAt
     };
 }

@@ -2,6 +2,7 @@
 @layout AuthorizedLayout
 @inject IClinicApiClient ClinicClient
 @inject IToastService Toast
+@inject TenantCore.Web.Client.Services.FeatureFlagsContextService FeatureFlagsContext
 @using TenantCore.Shared.Dtos
 
 <PageTitle>Feature Flags - Settings</PageTitle>
@@ -31,10 +32,33 @@ else
             </div>
             <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;cursor:pointer;">
                 <input type="checkbox" checked="@_prepaidOpdEnabled" @onchange="TogglePrepaidOpdAsync"
-                       disabled="@_saving" style="opacity:0;width:0;height:0;" />
+                       disabled="@(_saving || !_billingEnabled)" style="opacity:0;width:0;height:0;" />
                 <span style="position:absolute;inset:0;background:@(_prepaidOpdEnabled ? "#1565C0" : "#CBD5E1");
                              border-radius:24px;transition:background 0.15s;"></span>
                 <span style="position:absolute;top:3px;left:@(_prepaidOpdEnabled ? "23px" : "3px");
+                             width:18px;height:18px;background:#fff;border-radius:50%;transition:left 0.15s;
+                             box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
+            </label>
+        </div>
+    </div>
+
+    <div style="background:#fff;border-radius:14px;border:1px solid #E2E8F0;padding:22px;max-width:520px;margin-top:16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+            <div>
+                <div style="font-size:14px;font-weight:800;color:#1E293B;">Billing</div>
+                <div style="font-size:12px;color:#64748B;margin-top:4px;line-height:1.5;">
+                    When disabled, payment collection, particulars, finance reports, counter sessions, expenses and
+                    handovers are turned off across the entire application — nothing billing-related is reachable
+                    from the API or the UI. OPD and IPD registration keep working with no billing involved. Use this
+                    if your hospital doesn't want billing data in the cloud application.
+                </div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;cursor:pointer;">
+                <input type="checkbox" checked="@_billingEnabled" @onchange="ToggleBillingAsync"
+                       disabled="@_saving" style="opacity:0;width:0;height:0;" />
+                <span style="position:absolute;inset:0;background:@(_billingEnabled ? "#1565C0" : "#CBD5E1");
+                             border-radius:24px;transition:background 0.15s;"></span>
+                <span style="position:absolute;top:3px;left:@(_billingEnabled ? "23px" : "3px");
                              width:18px;height:18px;background:#fff;border-radius:50%;transition:left 0.15s;
                              box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>
             </label>
@@ -46,25 +70,43 @@ else
     private bool _loading = true;
     private bool _saving;
     private bool _prepaidOpdEnabled = true;
+    private bool _billingEnabled = true;
 
     protected override async Task OnInitializedAsync()
     {
         var r = await ClinicClient.GetFeatureFlagsAsync();
         if (r.Success && r.Data is not null)
+        {
             _prepaidOpdEnabled = r.Data.PrepaidOpdEnabled;
+            _billingEnabled = r.Data.BillingEnabled;
+        }
         else if (!r.Success)
+        {
             Toast.ShowError(r.Message ?? "Failed to load feature flags.");
+        }
         _loading = false;
     }
 
     private async Task TogglePrepaidOpdAsync(ChangeEventArgs e)
     {
         var newValue = e.Value is bool b && b;
+        await SaveAsync(newValue, _billingEnabled, () => _prepaidOpdEnabled = newValue);
+    }
+
+    private async Task ToggleBillingAsync(ChangeEventArgs e)
+    {
+        var newValue = e.Value is bool b && b;
+        await SaveAsync(_prepaidOpdEnabled, newValue, () => _billingEnabled = newValue);
+    }
+
+    private async Task SaveAsync(bool prepaidOpdEnabled, bool billingEnabled, Action applyLocally)
+    {
         _saving = true;
-        var r = await ClinicClient.UpdateFeatureFlagsAsync(new UpdateClinicFeatureFlagsDto(newValue));
+        var r = await ClinicClient.UpdateFeatureFlagsAsync(new UpdateClinicFeatureFlagsDto(prepaidOpdEnabled, billingEnabled));
         if (r.Success)
         {
-            _prepaidOpdEnabled = newValue;
+            applyLocally();
+            await FeatureFlagsContext.RefreshAsync();
             Toast.ShowSuccess("Feature flag updated.");
         }
         else

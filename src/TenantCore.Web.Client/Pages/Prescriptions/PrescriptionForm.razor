@@ -6,6 +6,7 @@
 @inject IClinicApiClient ClinicClient
 @inject IDoctorProfileApiClient DoctorProfileClient
 @inject IObstetricApiClient ObstetricClient
+@inject IVitalPresetApiClient VitalPresetClient
 @inject IPregnancyTenureApiClient PregnancyTenureClient
 @inject IMedicineBundleApiClient BundleClient
 @inject IToastService Toast
@@ -167,14 +168,39 @@ else
             }
         </style>
 
-        <!-- ── Obstetric Details (Gynecology only) ───────────────────────────── -->
+        <!-- ── Medical History (every doctor, regardless of speciality) ───────── -->
+        <div style="border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); background:#fff;">
+            <div style="padding:14px 20px; border-bottom:1px solid #E2E8F0;">
+                <div style="font-weight:700; font-size:14px; color:#0F172A;">📋 Medical History</div>
+            </div>
+            <div style="padding:10px 22px 0; font-size:11px; color:#64748B;">
+                💡 Check <strong>Print all</strong> on a card to include it on the printed prescription — uncheck to keep it in the record without printing it.
+            </div>
+            <div class="obs-merged-grid" style="padding:18px 22px;">
+                <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
+                    <HistoryChipField Icon="📋" Label="Past Medical History (PAMH)" Type="HistoryItemType.PastMedicalHistory"
+                                       SelectedItems="_pamHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                       ShowPrintToggle="true" PrintFlags="_pamHistoryPrint"
+                                       ChipBg="#FFFBEB" ChipBorder="#FDE68A" ChipText="#92400E" />
+                </div>
+
+                <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
+                    <HistoryChipField Icon="👨‍👩‍👧" Label="Family History" Type="HistoryItemType.FamilyHistory"
+                                       SelectedItems="_familyHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                       ShowPrintToggle="true" PrintFlags="_familyHistoryPrint"
+                                       ChipBg="#F0FDF4" ChipBorder="#BBF7D0" ChipText="#166534" />
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Gynecological History (Gynecology only) ─────────────────────────── -->
         @if (_isGynecologist)
         {
             <div style="border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); background:#fff;">
                 <div style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #E2E8F0;">
-                    <div style="font-weight:700; font-size:14px; color:#0F172A;">🤱 Obstetric Details</div>
+                    <div style="font-weight:700; font-size:14px; color:#0F172A;">🤱 Gynecological History</div>
                     <div style="display:flex; gap:4px; background:#F1F5F9; border-radius:8px; padding:3px;">
-                        @foreach (var (tid, tlabel) in new[] { ("obstetric-info", "Obstetric Info & Dates"), ("pathistory", "History & Examination"), ("printforms", "Print Forms") })
+                        @foreach (var (tid, tlabel) in new[] { ("obstetric-info", "Obstetric Info & Dates"), ("pathistory", "Findings & Examination"), ("printforms", "Print Forms") })
                         {
                             var tabId = tid; var tabLabel = tlabel;
                             <button @onclick="() => _obsTab = tabId"
@@ -377,47 +403,52 @@ else
                 }
                 else if (_obsTab == "pathistory")
                 {
+                    <div style="padding:16px 22px 0; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                        <div style="font-size:11px; color:#64748B;">
+                            💡 Check <strong>Print all</strong> on a card to include it on the printed prescription — uncheck to keep it in the record without printing it.
+                        </div>
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#334155; cursor:pointer; white-space:nowrap;"
+                               title="Print all 5 sections below on the prescription">
+                            <input type="checkbox" @ref="_obstetricPrintAllRef"
+                                   checked="@(ObstetricPrintAllState == TriStateCheckboxValue.Checked)"
+                                   @onchange="ToggleObstetricPrintAllAsync" />
+                            Print all
+                        </label>
+                    </div>
                     <div class="obs-merged-grid" style="padding:18px 22px;">
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🩸" Label="Menstrual History" Type="HistoryItemType.MenstrualHistory"
                                                SelectedItems="_menstrualHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                               ShowPrintToggle="true" PrintFlags="_menstrualHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
                                                ChipBg="#FFF1F2" ChipBorder="#FECDD3" ChipText="#BE123C" />
-                        </div>
-
-                        <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
-                            <HistoryChipField Icon="📋" Label="Past Medical History (PAMH)" Type="HistoryItemType.PastMedicalHistory"
-                                               SelectedItems="_pamHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                               ChipBg="#FFFBEB" ChipBorder="#FDE68A" ChipText="#92400E" />
-                        </div>
-
-                        <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
-                            <HistoryChipField Icon="👨‍👩‍👧" Label="Family History" Type="HistoryItemType.FamilyHistory"
-                                               SelectedItems="_familyHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                               ChipBg="#F0FDF4" ChipBorder="#BBF7D0" ChipText="#166534" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🔪" Label="Surgical History" Type="HistoryItemType.SurgicalHistory"
                                                SelectedItems="_surgicalHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                               ShowPrintToggle="true" PrintFlags="_surgicalHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
                                                ChipBg="#FEF3C7" ChipBorder="#FDE68A" ChipText="#92400E" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🤰" Label="Per Abdomen" Type="HistoryItemType.PerAbdomen"
                                                SelectedItems="_perAbdomenHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                               ShowPrintToggle="true" PrintFlags="_perAbdomenHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
                                                ChipBg="#EFF6FF" ChipBorder="#BFDBFE" ChipText="#1D4ED8" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🩷" Label="Per Vaginum" Type="HistoryItemType.PerVaginum"
                                                SelectedItems="_perVaginumHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                               ShowPrintToggle="true" PrintFlags="_perVaginumHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
                                                ChipBg="#FDF2F8" ChipBorder="#FBCFE8" ChipText="#BE185D" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🔬" Label="Per Speculum" Type="HistoryItemType.PerSpeculum"
                                                SelectedItems="_perSpeculumHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                               ShowPrintToggle="true" PrintFlags="_perSpeculumHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
                                                ChipBg="#F5F3FF" ChipBorder="#DDD6FE" ChipText="#5B21B6" />
                         </div>
 
@@ -1647,6 +1678,46 @@ else
     private List<string> _surgicalHistory = [];
     private List<string> _perSpeculumHistory = [];
 
+    // Index-aligned with the lists above — whether each selected item prints on the PDF.
+    private List<bool> _menstrualHistoryPrint = [];
+    private List<bool> _pamHistoryPrint = [];
+    private List<bool> _familyHistoryPrint = [];
+    private List<bool> _perAbdomenHistoryPrint = [];
+    private List<bool> _perVaginumHistoryPrint = [];
+    private List<bool> _surgicalHistoryPrint = [];
+    private List<bool> _perSpeculumHistoryPrint = [];
+
+    // Master "Print all" checkbox above the 5 gynecology-only sections — aggregates their
+    // print flags into one tri-state control (checked/unchecked/indeterminate) and, when
+    // clicked, sets every flag in all 5 sections to the same value in one go.
+    private ElementReference _obstetricPrintAllRef;
+    private IEnumerable<bool> ObstetricPrintFlags => _menstrualHistoryPrint
+        .Concat(_surgicalHistoryPrint).Concat(_perAbdomenHistoryPrint)
+        .Concat(_perVaginumHistoryPrint).Concat(_perSpeculumHistoryPrint);
+    private TriStateCheckboxValue ObstetricPrintAllState => TriStateCheckboxState.Compute(ObstetricPrintFlags.ToList());
+
+    private async Task ToggleObstetricPrintAllAsync(ChangeEventArgs e)
+    {
+        var newValue = e.Value is bool b && b;
+        foreach (var list in new[] { _menstrualHistoryPrint, _surgicalHistoryPrint, _perAbdomenHistoryPrint, _perVaginumHistoryPrint, _perSpeculumHistoryPrint })
+            for (var i = 0; i < list.Count; i++) list[i] = newValue;
+        await Task.CompletedTask;
+    }
+
+    // Called by each of the 5 obstetric HistoryChipField instances whenever their own print
+    // flags change — mutating their shared List<bool> updates the data this component reads,
+    // but Blazor doesn't know to re-render this component from a child's event on its own.
+    private void RefreshObstetricPrintAll() => StateHasChanged();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isGynecologist && _obsTab == "pathistory")
+        {
+            try { await JS.InvokeVoidAsync("setIndeterminate", _obstetricPrintAllRef, ObstetricPrintAllState == TriStateCheckboxValue.Indeterminate); }
+            catch { /* element may not be rendered yet — next render will retry */ }
+        }
+    }
+
     // Global (system default) + this clinic's own custom additions — fetched once per
     // page load and filtered client-side by each HistoryChipField, per the workspace's
     // cost-conscious data fetching rule.
@@ -1669,18 +1740,31 @@ else
         ("sugar", "Sugar (F)",  "95",     "🩸"),
     ];
 
-    // 5 common values per vital for one-tap entry — the text box above stays free-form
-    // so a doctor can always type an out-of-range reading manually.
-    private static readonly Dictionary<string, string[]> _vitalPresets = new()
+    // Maps the vital keys above to the shared VitalFieldType lookup enum.
+    private static readonly Dictionary<string, VitalFieldType> _vitalFieldMap = new()
     {
-        ["bp"]     = ["110/70", "120/80", "130/85", "140/90", "150/95"],
-        ["pulse"]  = ["60", "72", "80", "90", "100"],
-        ["temp"]   = ["97.5", "98.4", "98.6", "99.5", "100.4"],
-        ["weight"] = ["50", "60", "70", "80", "90"],
-        ["spo2"]   = ["94", "96", "97", "98", "99"],
-        ["rr"]     = ["12", "14", "16", "18", "20"],
-        ["sugar"]  = ["80", "90", "100", "110", "126"],
+        ["bp"] = VitalFieldType.Bp,
+        ["pulse"] = VitalFieldType.Pulse,
+        ["temp"] = VitalFieldType.Temp,
+        ["weight"] = VitalFieldType.Weight,
+        ["spo2"] = VitalFieldType.SpO2,
+        ["rr"] = VitalFieldType.Rr,
+        ["sugar"] = VitalFieldType.Sugar,
     };
+
+    // Quick-pick values per vital for one-tap entry — the text box above stays free-form
+    // so a doctor can always type an out-of-range reading manually. Loaded from the shared
+    // Vitals Lookup (system defaults + this clinic's own additions) — see LoadVitalPresetsAsync.
+    private Dictionary<string, List<string>> _vitalPresets = _vitalFieldMap.Keys.ToDictionary(k => k, _ => new List<string>());
+
+    private async Task LoadVitalPresetsAsync()
+    {
+        var r = await VitalPresetClient.GetAllAsync();
+        if (!r.Success || r.Data is null) return;
+        var byField = r.Data.ToLookup(x => x.VitalField);
+        foreach (var (key, field) in _vitalFieldMap)
+            _vitalPresets[key] = byField[field].Select(x => x.Value).ToList();
+    }
 
     private record FreqPreset(string Code, string Line1, string Line2, string Pattern);
     private static readonly FreqPreset[] _freqPresets =
@@ -1827,6 +1911,8 @@ else
             if (lookupR.Success && lookupR.Data is not null)
                 _historyLookup = lookupR.Data.ToList();
 
+            await LoadVitalPresetsAsync();
+
             if (PrescriptionId != Guid.Empty)
             {
                 var r = await PrescriptionClient.GetPrescriptionByIdAsync(PrescriptionId);
@@ -1925,7 +2011,7 @@ else
             UpdateTimingSummary(item);
         }
 
-        if (_isGynecologist && dto.ObstetricData is not null)
+        if (dto.ObstetricData is not null)
             CarryForwardObstetricData(dto.ObstetricData);
 
         var opdR = await ClinicClient.GetOpdRegistrationByIdAsync(dto.OpdRegistrationId);
@@ -1946,9 +2032,10 @@ else
         _historyPage = 1;
         await LoadHistoryPageAsync();
 
-        // Carry forward obstetric data for new prescriptions (gynecologist only) — the
-        // server already sorts visits newest-first, so the most recent page covers this.
-        if (_isGynecologist && PrescriptionId == Guid.Empty)
+        // Carry forward obstetric data for new prescriptions (every doctor — Past Medical
+        // History/Family History apply regardless of speciality) — the server already sorts
+        // visits newest-first, so the most recent page covers this.
+        if (PrescriptionId == Guid.Empty)
         {
             var lastWithObs = _history.FirstOrDefault(p => p.ObstetricData is not null);
             if (lastWithObs?.ObstetricData is not null)
@@ -2454,12 +2541,16 @@ else
         }
     }
 
-    private async Task SaveAsync()
+    private async Task SaveAsync() => await SaveAsync(silent: false);
+
+    // Returns whether the save actually succeeded, so SubmitAsync can refuse to submit
+    // stale/unsaved data instead of finalizing whatever was last persisted.
+    private async Task<bool> SaveAsync(bool silent)
     {
         if (_draftItem is not null)
         {
             Toast.ShowWarning($"Finish {(_editingIndex.HasValue ? "updating" : "adding")} the medicine before saving.");
-            return;
+            return false;
         }
 
         _saving = true;
@@ -2469,7 +2560,7 @@ else
             if (PrescriptionId == Guid.Empty)
             {
                 var user = AuthState.CurrentUser;
-                if (user is null) { Toast.ShowError("Not authenticated."); return; }
+                if (user is null) { Toast.ShowError("Not authenticated."); return false; }
                 var dto = new CreatePrescriptionDto(
                     OpdRegistrationId, user.UserId, user.FullName,
                     _followup, DiagnosisText, _investigations,
@@ -2481,10 +2572,12 @@ else
                 {
                     _prescription = r.Data;
                     PrescriptionId = r.Data.Id;
-                    Toast.ShowSuccess("Prescription saved.");
+                    if (!silent) Toast.ShowSuccess("Prescription saved.");
                     Navigation.NavigateTo($"/prescriptions/{PrescriptionId}");
+                    return true;
                 }
-                else Toast.ShowError(r.Message ?? "Failed to save.");
+                Toast.ShowError(r.Message ?? "Failed to save.");
+                return false;
             }
             else
             {
@@ -2494,8 +2587,14 @@ else
                     ParseDecimal(_vWeight), ParseDecimal(_vSpO2), ParseInt(_vRR), ParseDecimal(_vSugar),
                     items, BuildObstetricDto());
                 var r = await PrescriptionClient.UpdatePrescriptionAsync(PrescriptionId, dto);
-                if (r.Success) { _prescription = r.Data; Toast.ShowSuccess("Prescription updated."); }
-                else Toast.ShowError(r.Message ?? "Failed to update.");
+                if (r.Success)
+                {
+                    _prescription = r.Data;
+                    if (!silent) Toast.ShowSuccess("Prescription updated.");
+                    return true;
+                }
+                Toast.ShowError(r.Message ?? "Failed to update.");
+                return false;
             }
         }
         finally { _saving = false; }
@@ -2503,8 +2602,12 @@ else
 
     private async Task SubmitAsync()
     {
-        if (PrescriptionId == Guid.Empty) await SaveAsync();
-        if (PrescriptionId == Guid.Empty) return;
+        // Always persist the current form first — previously this only saved brand-new
+        // prescriptions before submitting, so editing an existing prescription (items,
+        // obstetric history, print flags, etc.) and clicking "Save & Finalise" directly
+        // submitted the last-saved version and silently dropped whatever was just edited.
+        var saved = await SaveAsync(silent: true);
+        if (!saved) return;
 
         _saving = true;
         var r = await PrescriptionClient.SubmitPrescriptionAsync(PrescriptionId);
@@ -2593,9 +2696,20 @@ else
         }
     }
 
+    // Zips a section's selected values with its parallel print flags into the DTO shape,
+    // or null when nothing is selected (matches the "omit empty section" behavior below).
+    private static IReadOnlyList<HistoryItemSelectionDto>? ToSelections(List<string> values, List<bool> prints) =>
+        values.Count == 0 ? null : values.Select((v, i) => new HistoryItemSelectionDto(v, i < prints.Count && prints[i])).ToList();
+
+    private static (List<string> Values, List<bool> Prints) FromSelections(IReadOnlyList<HistoryItemSelectionDto> source) =>
+        (source.Select(s => s.Value).ToList(), source.Select(s => s.PrintOnPrescription).ToList());
+
     private UpsertObstetricPrescriptionDataDto? BuildObstetricDto()
     {
-        if (!_isGynecologist) return null;
+        // Runs for every doctor, not just gynecologists — Past Medical History and Family
+        // History are generic fields available regardless of speciality. The 5 obstetric-only
+        // lists simply stay empty for a General Physician since those inputs never render for
+        // them, so hasData/the DTO naturally only ever carries what that doctor could enter.
         var hasData = _obsGravida.HasValue || _obsPara.HasValue || _obsLive.HasValue ||
                       _obsAbortion.HasValue || !string.IsNullOrWhiteSpace(_obsInformation) ||
                       _menstrualHistory.Count > 0 || _pamHistory.Count > 0 || _familyHistory.Count > 0 ||
@@ -2606,15 +2720,15 @@ else
         return new UpsertObstetricPrescriptionDataDto(
             _obsGravida, _obsPara, _obsLive, _obsAbortion,
             NullIfEmpty(_obsInformation),
-            _menstrualHistory.Count > 0 ? _menstrualHistory : null,
-            _pamHistory.Count > 0 ? _pamHistory : null,
-            _familyHistory.Count > 0 ? _familyHistory : null,
+            ToSelections(_menstrualHistory, _menstrualHistoryPrint),
+            ToSelections(_pamHistory, _pamHistoryPrint),
+            ToSelections(_familyHistory, _familyHistoryPrint),
             Lmp: _lmpValue,
             EddByUsg: _eddByUsgValue,
-            PerAbdomen: _perAbdomenHistory.Count > 0 ? _perAbdomenHistory : null,
-            PerVaginum: _perVaginumHistory.Count > 0 ? _perVaginumHistory : null,
-            SurgicalHistory: _surgicalHistory.Count > 0 ? _surgicalHistory : null,
-            PerSpeculum: _perSpeculumHistory.Count > 0 ? _perSpeculumHistory : null);
+            PerAbdomen: ToSelections(_perAbdomenHistory, _perAbdomenHistoryPrint),
+            PerVaginum: ToSelections(_perVaginumHistory, _perVaginumHistoryPrint),
+            SurgicalHistory: ToSelections(_surgicalHistory, _surgicalHistoryPrint),
+            PerSpeculum: ToSelections(_perSpeculumHistory, _perSpeculumHistoryPrint));
     }
 
     private void CarryForwardObstetricData(ObstetricPrescriptionDataDto source)
@@ -2624,13 +2738,13 @@ else
         _obsLive = source.Live;
         _obsAbortion = source.Abortion;
         _obsInformation = source.Information ?? string.Empty;
-        _menstrualHistory = source.MenstrualHistory.ToList();
-        _pamHistory = source.PastMedicalHistory.ToList();
-        _familyHistory = source.FamilyHistory.ToList();
-        _perAbdomenHistory = source.PerAbdomen.ToList();
-        _perVaginumHistory = source.PerVaginum.ToList();
-        _surgicalHistory = source.SurgicalHistory.ToList();
-        _perSpeculumHistory = source.PerSpeculum.ToList();
+        (_menstrualHistory, _menstrualHistoryPrint) = FromSelections(source.MenstrualHistory);
+        (_pamHistory, _pamHistoryPrint) = FromSelections(source.PastMedicalHistory);
+        (_familyHistory, _familyHistoryPrint) = FromSelections(source.FamilyHistory);
+        (_perAbdomenHistory, _perAbdomenHistoryPrint) = FromSelections(source.PerAbdomen);
+        (_perVaginumHistory, _perVaginumHistoryPrint) = FromSelections(source.PerVaginum);
+        (_surgicalHistory, _surgicalHistoryPrint) = FromSelections(source.SurgicalHistory);
+        (_perSpeculumHistory, _perSpeculumHistoryPrint) = FromSelections(source.PerSpeculum);
         _lmpValue = source.Lmp;
         _eddByUsgValue = source.EddByUsg;
         _correctedLmpByUsgValue = source.EddByUsg?.AddDays(-280);

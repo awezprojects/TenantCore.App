@@ -44,6 +44,7 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<State> States => Set<State>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<ClinicLocation> ClinicLocations => Set<ClinicLocation>();
+    public DbSet<VitalPresetLookupItem> VitalPresetLookupItems => Set<VitalPresetLookupItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

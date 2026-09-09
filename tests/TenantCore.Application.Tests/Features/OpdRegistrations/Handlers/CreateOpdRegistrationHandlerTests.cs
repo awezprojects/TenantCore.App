@@ -123,6 +123,8 @@ public class CreateOpdRegistrationHandlerTests
     public async Task Handle_NoActiveCounterSession_ThrowsInvalidOperationException()
     {
         var appId = Guid.NewGuid();
+        _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeatureFlags.Create(appId, true, true));
         _counterSessionRepository.Setup(r => r.GetActiveSessionAsync(appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((CounterSession?)null);
 
@@ -133,5 +135,67 @@ public class CreateOpdRegistrationHandlerTests
         var action = () => handler.Handle(command, CancellationToken.None);
 
         await action.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Handle_BillingDisabled_DoesNotRequireActiveCounterSession()
+    {
+        var appId = Guid.NewGuid();
+        var patient = CreatePatient(appId);
+        _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeatureFlags.Create(appId, true, false));
+        _patientRepository.Setup(r => r.GetByIdAsync(patient.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(patient);
+        _opdRepository.Setup(r => r.GetNextRegistrationNumberAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("OPD-20260101-0001");
+        _opdRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        OpdRegistration? added = null;
+        _opdRepository.Setup(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()))
+            .Callback<OpdRegistration, CancellationToken>((r, _) => added = r)
+            .Returns(Task.CompletedTask);
+        _opdRepository.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(added));
+
+        var handler = CreateHandler();
+        var command = new CreateOpdRegistrationCommand(
+            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
+
+        var action = () => handler.Handle(command, CancellationToken.None);
+
+        await action.Should().NotThrowAsync();
+        _counterSessionRepository.Verify(r => r.GetActiveSessionAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_BillingDisabled_DoesNotCreateOpdPayment()
+    {
+        var appId = Guid.NewGuid();
+        var patient = CreatePatient(appId);
+        _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeatureFlags.Create(appId, true, false));
+        _patientRepository.Setup(r => r.GetByIdAsync(patient.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(patient);
+        _opdRepository.Setup(r => r.GetNextRegistrationNumberAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync("OPD-20260101-0001");
+        _opdRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        OpdRegistration? added = null;
+        _opdRepository.Setup(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()))
+            .Callback<OpdRegistration, CancellationToken>((r, _) => added = r)
+            .Returns(Task.CompletedTask);
+        _opdRepository.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(added));
+
+        var handler = CreateHandler();
+        var command = new CreateOpdRegistrationCommand(
+            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
+
+        await handler.Handle(command, CancellationToken.None);
+
+        _sender.Verify(s => s.Send(It.IsAny<IRequest<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
+        _paymentRepository.Verify(r => r.GetByOpdRegistrationIdAsync(It.IsAny<Guid>(), appId, It.IsAny<CancellationToken>()), Times.Never);
     }
 }

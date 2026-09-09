@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-09-07 (centralized-logging-service executed — no DbSet change, Azure Table Storage is a separate store from ClinicDbContext; added IErrorLogger service registration)
+**Last verified:** 2026-09-09 (vitals-presets-lookup executed — added VitalPresetLookupItems DbSet + IVitalPresetLookupItemRepository)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -56,8 +56,9 @@
 | States | State | No (lookup) |
 | Cities | City | No (lookup) |
 | ClinicLocations | ClinicLocation | Yes |
+| VitalPresetLookupItems | VitalPresetLookupItem | Yes (with global system defaults) |
 
-**Total DbSets: 39**
+**Total DbSets: 40**
 
 ---
 
@@ -104,6 +105,7 @@
 | IStateRepository | StateRepository |
 | ICityRepository | CityRepository |
 | IClinicLocationRepository | ClinicLocationRepository |
+| IVitalPresetLookupItemRepository | VitalPresetLookupItemRepository |
 
 ### Services (Scoped)
 

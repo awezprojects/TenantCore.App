@@ -5,4 +5,5 @@ namespace TenantCore.Application.Features.ClinicSettings.Commands;
 
 public sealed record UpdateClinicFeatureFlagsCommand(
     Guid ApplicationId,
-    bool PrepaidOpdEnabled) : IRequest<ClinicFeatureFlagsDto>;
+    bool PrepaidOpdEnabled,
+    bool BillingEnabled) : IRequest<ClinicFeatureFlagsDto>;

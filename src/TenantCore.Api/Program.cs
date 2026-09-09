@@ -119,6 +119,7 @@ try
     app.UseAuthentication();
     app.UseMiddleware<ClinicContextMiddleware>();  // validates X-Application-Id header
     app.UseMiddleware<SubscriptionGuardMiddleware>();  // blocks clinic-scoped requests when the clinic has no active subscription
+    app.UseMiddleware<BillingFeatureGuardMiddleware>();  // blocks billing routes when the clinic has disabled billing
     app.UseAuthorization();
     app.MapControllers();
     app.MapHealthChecks("/health");

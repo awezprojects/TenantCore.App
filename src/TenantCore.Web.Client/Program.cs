@@ -109,6 +109,11 @@ builder.Services.AddHttpClient<IParticularApiClient, ParticularApiClient>(client
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 
+builder.Services.AddHttpClient<IVitalPresetApiClient, VitalPresetApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
 builder.Services.AddHttpClient<IOpdParticularApiClient, OpdParticularApiClient>(client =>
 {
     client.BaseAddress = new Uri(tenantApiBaseUrl);
@@ -151,6 +156,7 @@ builder.Services.AddHttpClient<ISubscriptionApiClient, SubscriptionApiClient>(cl
     client.BaseAddress = new Uri(tenantApiBaseUrl);
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 builder.Services.AddScoped<SubscriptionContextService>();
+builder.Services.AddScoped<FeatureFlagsContextService>();
 
 // Register Logging API Client — no ClinicAuthorizationHandler: the endpoint is
 // anonymous-allowed so pre-login frontend crashes are still captured.

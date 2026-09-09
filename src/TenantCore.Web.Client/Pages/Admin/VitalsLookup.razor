@@ -1,0 +1,199 @@
+@page "/reception/vitals-lookup"
+@layout AuthorizedLayout
+@inject IVitalPresetApiClient VitalPresetClient
+@inject IToastService Toast
+@using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Clients
+
+<PageTitle>Vitals Lookup - TenantCore</PageTitle>
+
+<div class="opd-header">
+    <div>
+        <div class="opd-header-title">Vitals Quick-Pick Lookup</div>
+        <div style="font-size:12px;color:#64748B;margin-top:2px;">
+            These values power the quick-pick dropdown for vitals on OPD registration and prescriptions.
+            System defaults apply to every clinic; add your own values below to supplement them for this clinic only.
+        </div>
+    </div>
+    <button class="opd-btn-primary" @onclick="OpenCreateDialog">+ Add Preset</button>
+</div>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:40px 0;">
+        <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
+    </div>
+}
+else
+{
+    <div class="opd-table-card">
+        <table class="opd-table">
+            <thead>
+                <tr>
+                    <th>Vital</th>
+                    <th>Value</th>
+                    <th>Source</th>
+                    <th style="white-space:nowrap;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!_items.Any())
+                {
+                    <tr><td colspan="4" class="opd-empty">No vitals presets found.</td></tr>
+                }
+                @foreach (var item in _items)
+                {
+                    <tr>
+                        <td><strong>@FieldLabel(item.VitalField)</strong></td>
+                        <td>@item.Value</td>
+                        <td>
+                            @if (item.IsGlobal)
+                            {
+                                <span style="background:#EFF6FF;color:#1D4ED8;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">System default</span>
+                            }
+                            else
+                            {
+                                <span style="background:#F0FDF4;color:#166534;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;">This clinic</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="opd-actions">
+                                @if (!item.IsGlobal)
+                                {
+                                    <button class="opd-btn delete-btn" @onclick="() => _confirmDelete = item">Delete</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (_dialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;" @onclick="CloseDialog"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;padding:28px 30px;width:440px;max-width:95vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;">
+        <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:20px;">Add Preset</div>
+
+        <div class="form-group">
+            <label class="form-label">Vital *</label>
+            <select class="form-input" @bind="_newVitalField">
+                @foreach (var f in Enum.GetValues<VitalFieldType>())
+                {
+                    <option value="@f">@FieldLabel(f)</option>
+                }
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Value *</label>
+            <input class="form-input" type="text" @bind="_newValue" placeholder="@ValuePlaceholder(_newVitalField)" />
+        </div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;">
+            <button @onclick="CloseDialog"
+                    style="padding:9px 20px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;
+                           font-size:13px;font-weight:600;color:#64748B;cursor:pointer;">
+                Cancel
+            </button>
+            <button @onclick="SaveAsync" disabled="@_saving"
+                    style="padding:9px 22px;border-radius:8px;border:none;background:#1565C0;color:#fff;
+                           font-size:13px;font-weight:700;cursor:pointer;opacity:@(_saving ? "0.7" : "1");">
+                @(_saving ? "Saving..." : "Save")
+            </button>
+        </div>
+    </div>
+}
+
+<ConfirmDialog Visible="@(_confirmDelete is not null)"
+               Title="Delete Preset"
+               ConfirmText="Delete"
+               BusyText="Deleting..."
+               IsBusy="_deleting"
+               OnConfirm="ConfirmDeleteAsync"
+               OnCancel="() => _confirmDelete = null">
+    Are you sure you want to delete <strong>@_confirmDelete?.Value</strong> from @FieldLabel(_confirmDelete?.VitalField ?? VitalFieldType.Bp)? This cannot be undone.
+</ConfirmDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _dialogVisible;
+    private bool _saving;
+    private bool _deleting;
+    private List<VitalPresetLookupItemDto> _items = [];
+    private VitalPresetLookupItemDto? _confirmDelete;
+
+    private VitalFieldType _newVitalField = VitalFieldType.Bp;
+    private string _newValue = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var response = await VitalPresetClient.GetAllAsync();
+        if (response.Success && response.Data is not null)
+            _items = response.Data.ToList();
+        else if (!response.Success)
+            Toast.ShowError(response.Message ?? "Failed to load vitals presets.");
+        _loading = false;
+    }
+
+    private void OpenCreateDialog()
+    {
+        _newVitalField = VitalFieldType.Bp;
+        _newValue = string.Empty;
+        _dialogVisible = true;
+    }
+
+    private void CloseDialog() => _dialogVisible = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newValue)) { Toast.ShowWarning("Value is required."); return; }
+        _saving = true;
+        var response = await VitalPresetClient.AddAsync(new AddVitalPresetLookupItemDto(_newVitalField, _newValue.Trim()));
+        if (response.Success) { Toast.ShowSuccess("Preset added."); CloseDialog(); await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed to add preset.");
+        _saving = false;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_confirmDelete is null) return;
+        _deleting = true;
+        var response = await VitalPresetClient.DeleteAsync(_confirmDelete.Id);
+        _deleting = false;
+        if (response.Success) { Toast.ShowSuccess("Preset deleted."); _confirmDelete = null; await LoadAsync(); }
+        else Toast.ShowError(response.Message ?? "Failed to delete preset.");
+    }
+
+    private static string FieldLabel(VitalFieldType field) => field switch
+    {
+        VitalFieldType.Bp => "BP (mmHg)",
+        VitalFieldType.Pulse => "Pulse",
+        VitalFieldType.Temp => "Temp °F",
+        VitalFieldType.Weight => "Weight kg",
+        VitalFieldType.SpO2 => "SpO₂ %",
+        VitalFieldType.Rr => "RR /min",
+        VitalFieldType.Sugar => "Sugar (F)",
+        _ => field.ToString()
+    };
+
+    private static string ValuePlaceholder(VitalFieldType field) => field switch
+    {
+        VitalFieldType.Bp => "e.g. 120/80",
+        VitalFieldType.Pulse => "e.g. 72",
+        VitalFieldType.Temp => "e.g. 98.6",
+        VitalFieldType.Weight => "e.g. 70",
+        VitalFieldType.SpO2 => "e.g. 98",
+        VitalFieldType.Rr => "e.g. 16",
+        VitalFieldType.Sugar => "e.g. 95",
+        _ => string.Empty
+    };
+}

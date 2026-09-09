@@ -11,7 +11,7 @@ public class UpdateClinicFeatureFlagsCommandValidatorTests
     [Fact]
     public void Validate_ValidCommand_PassesValidation()
     {
-        var command = new UpdateClinicFeatureFlagsCommand(Guid.NewGuid(), true);
+        var command = new UpdateClinicFeatureFlagsCommand(Guid.NewGuid(), true, true);
 
         _validator.Validate(command).IsValid.Should().BeTrue();
     }
@@ -19,7 +19,7 @@ public class UpdateClinicFeatureFlagsCommandValidatorTests
     [Fact]
     public void Validate_EmptyApplicationId_FailsWithError()
     {
-        var command = new UpdateClinicFeatureFlagsCommand(Guid.Empty, true);
+        var command = new UpdateClinicFeatureFlagsCommand(Guid.Empty, true, true);
 
         var result = _validator.Validate(command);
 

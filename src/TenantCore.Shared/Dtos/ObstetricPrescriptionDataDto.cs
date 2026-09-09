@@ -9,13 +9,13 @@ public class ObstetricPrescriptionDataDto
     public int? Live { get; init; }
     public int? Abortion { get; init; }
     public string? Information { get; init; }
-    public IReadOnlyList<string> MenstrualHistory { get; init; } = [];
-    public IReadOnlyList<string> PastMedicalHistory { get; init; } = [];
-    public IReadOnlyList<string> FamilyHistory { get; init; } = [];
-    public IReadOnlyList<string> PerAbdomen { get; init; } = [];
-    public IReadOnlyList<string> PerVaginum { get; init; } = [];
-    public IReadOnlyList<string> SurgicalHistory { get; init; } = [];
-    public IReadOnlyList<string> PerSpeculum { get; init; } = [];
+    public IReadOnlyList<HistoryItemSelectionDto> MenstrualHistory { get; init; } = [];
+    public IReadOnlyList<HistoryItemSelectionDto> PastMedicalHistory { get; init; } = [];
+    public IReadOnlyList<HistoryItemSelectionDto> FamilyHistory { get; init; } = [];
+    public IReadOnlyList<HistoryItemSelectionDto> PerAbdomen { get; init; } = [];
+    public IReadOnlyList<HistoryItemSelectionDto> PerVaginum { get; init; } = [];
+    public IReadOnlyList<HistoryItemSelectionDto> SurgicalHistory { get; init; } = [];
+    public IReadOnlyList<HistoryItemSelectionDto> PerSpeculum { get; init; } = [];
     public DateOnly? Lmp { get; init; }
     public DateOnly? EddByLmp { get; init; }
     public DateOnly? EddByUsg { get; init; }
@@ -27,12 +27,12 @@ public sealed record UpsertObstetricPrescriptionDataDto(
     int? Live,
     int? Abortion,
     string? Information,
-    IReadOnlyList<string>? MenstrualHistory,
-    IReadOnlyList<string>? PastMedicalHistory,
-    IReadOnlyList<string>? FamilyHistory,
+    IReadOnlyList<HistoryItemSelectionDto>? MenstrualHistory,
+    IReadOnlyList<HistoryItemSelectionDto>? PastMedicalHistory,
+    IReadOnlyList<HistoryItemSelectionDto>? FamilyHistory,
     DateOnly? Lmp = null,
     DateOnly? EddByUsg = null,
-    IReadOnlyList<string>? PerAbdomen = null,
-    IReadOnlyList<string>? PerVaginum = null,
-    IReadOnlyList<string>? SurgicalHistory = null,
-    IReadOnlyList<string>? PerSpeculum = null);
+    IReadOnlyList<HistoryItemSelectionDto>? PerAbdomen = null,
+    IReadOnlyList<HistoryItemSelectionDto>? PerVaginum = null,
+    IReadOnlyList<HistoryItemSelectionDto>? SurgicalHistory = null,
+    IReadOnlyList<HistoryItemSelectionDto>? PerSpeculum = null);
