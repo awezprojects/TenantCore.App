@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-09-13 (medicine-search-caching executed — no new DbSets/repositories; IMedicineRepository, IMedicineTypeRepository, IMedicineDosageFormRepository now resolve to caching decorators, see Infrastructure DI Registrations note below)
+**Last verified:** 2026-09-13 (action-audit-logging executed — no new DbSets/repositories; adds IActionLogger/ICurrentUserContext services, see Infrastructure DI Registrations note below)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -121,6 +121,8 @@
 | IAuthClinicService | AuthClinicService |
 | IApplicationAccessValidator | ApplicationAccessValidator |
 | IErrorLogger | ErrorLoggingService (writes to Azure Table Storage via the independent `TenantCore.Logging` project — `ApiErrorLogs`/`FrontendErrorLogs`, not `ClinicDbContext`) |
+| IActionLogger | ActionLoggingService (business-action audit trail — Started/Completed/Failed rows in the `ActionLogs` Azure Table via `TenantCore.Logging`; fired by `ActionLoggingBehavior` MediatR pipeline behavior for commands implementing `IBusinessAction`; see `plan/action-audit-logging/PLAN.md`) |
+| ICurrentUserContext | CurrentUserContext (resolves the authenticated user id from `IHttpContextAccessor` for `ActionLoggingBehavior` — Application layer never references `HttpContext` directly) |
 
 ---
 

@@ -14,4 +14,5 @@ public sealed class AppLoggingOptions
     public string ConnectionString { get; set; } = string.Empty;
     public string ApiErrorTable { get; set; } = "ApiErrorLogs";
     public string FrontendErrorTable { get; set; } = "FrontendErrorLogs";
+    public string ActionLogTable { get; set; } = "ActionLogs";
 }

@@ -84,6 +84,8 @@ public static class DependencyInjection
 
         services.AddAppLogging(configuration);
         services.AddScoped<IErrorLogger, ErrorLoggingService>();
+        services.AddScoped<IActionLogger, ActionLoggingService>();
+        services.AddScoped<ICurrentUserContext, CurrentUserContext>();
 
         services.AddScoped<IAuthApplicationService, AuthApplicationService>();
         services.AddScoped<IAuthClinicService, AuthClinicService>();

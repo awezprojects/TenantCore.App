@@ -19,4 +19,16 @@ public sealed class LogEntry
     public string? AdditionalContext { get; init; }
     public required string Environment { get; init; }
     public DateTime TimestampUtc { get; init; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Action-log only: ties a "Started" row to its matching "Completed"/"Failed" row.
+    /// Null for error-log entries (Api/Frontend categories).
+    /// </summary>
+    public string? CorrelationId { get; init; }
+
+    /// <summary>Action-log only: "Started" / "Completed" / "Failed". Null for error-log entries.</summary>
+    public string? Status { get; init; }
+
+    /// <summary>Action-log only: elapsed time, set on Completed/Failed rows. Null for Started rows and error-log entries.</summary>
+    public long? DurationMs { get; init; }
 }

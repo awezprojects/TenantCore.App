@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Application.Features.OpdRegistrations.Commands;
@@ -17,4 +18,7 @@ public sealed record CreateOpdRegistrationCommand(
     decimal? Temperature,
     int? RespiratoryRate,
     decimal? Sugar,
-    Guid ReceivedByUserId) : IRequest<OpdRegistrationDto>;
+    Guid ReceivedByUserId) : IRequest<OpdRegistrationDto>, IBusinessAction
+{
+    public string ActionName => "OPD Registration";
+}

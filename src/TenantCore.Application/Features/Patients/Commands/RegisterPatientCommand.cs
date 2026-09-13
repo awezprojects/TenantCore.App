@@ -1,4 +1,5 @@
 using MediatR;
+using TenantCore.Application.Common;
 using TenantCore.Shared.Dtos;
 using TenantCore.Shared.Enums;
 
@@ -20,4 +21,7 @@ public sealed record RegisterPatientCommand(
     string? EmergencyContactPhone = null,
     string? KnownAllergies = null,
     string? MedicalHistory = null,
-    bool ShowFullAadhaar = false) : IRequest<PatientDto>;
+    bool ShowFullAadhaar = false) : IRequest<PatientDto>, IBusinessAction
+{
+    public string ActionName => "Patient Registration";
+}

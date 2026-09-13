@@ -55,7 +55,10 @@ public sealed class AzureTableLogWriter : IAppLogWriter
             { nameof(LogEntry.RequestPath), entry.RequestPath },
             { nameof(LogEntry.AdditionalContext), entry.AdditionalContext },
             { nameof(LogEntry.Environment), entry.Environment },
-            { nameof(LogEntry.TimestampUtc), entry.TimestampUtc }
+            { nameof(LogEntry.TimestampUtc), entry.TimestampUtc },
+            { nameof(LogEntry.CorrelationId), entry.CorrelationId },
+            { nameof(LogEntry.Status), entry.Status },
+            { nameof(LogEntry.DurationMs), entry.DurationMs }
         };
 
         await tableClient.AddEntityAsync(tableEntity, ct);
