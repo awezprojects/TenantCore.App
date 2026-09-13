@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-09-09 (vitals-presets-lookup executed — added VitalPresetLookupItems DbSet + IVitalPresetLookupItemRepository)
+**Last verified:** 2026-09-13 (medicine-search-caching executed — no new DbSets/repositories; IMedicineRepository, IMedicineTypeRepository, IMedicineDosageFormRepository now resolve to caching decorators, see Infrastructure DI Registrations note below)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -74,9 +74,11 @@
 | IOpdRegistrationRepository | OpdRegistrationRepository |
 | IIpdRegistrationRepository | IpdRegistrationRepository |
 | IClinicFeeConfigRepository | ClinicFeeConfigRepository |
-| IMedicineTypeRepository | MedicineTypeRepository |
-| IMedicineDosageFormRepository | MedicineDosageFormRepository |
-| IMedicineRepository | MedicineRepository |
+| IMedicineTypeRepository | CachedMedicineTypeRepository (wraps MedicineTypeRepository — served from `RefreshableCache<MedicineType>`, kept warm by `MedicineCacheWarmupService`; also reloads inline immediately after a write; see `plan/medicine-search-caching/PLAN.md`) |
+| IMedicineDosageFormRepository | CachedMedicineDosageFormRepository (wraps MedicineDosageFormRepository — same pattern) |
+| IMedicineRepository | CachedMedicineRepository (wraps MedicineRepository — caches only system-wide `ApplicationId == null` medicines via `RefreshableCache<Medicine>`, kept warm by `MedicineCacheWarmupService`; clinic-owned medicines always queried live) |
+
+**Background services:** `MedicineCacheWarmupService` (`TenantCore.Infrastructure.Caching`) — hosted service, refreshes the three medicine-related caches on startup and every 30 minutes.
 | IPrescriptionRepository | PrescriptionRepository |
 | IObstetricPrescriptionDataRepository | ObstetricPrescriptionDataRepository |
 | IDosageRemarkRepository | DosageRemarkRepository |

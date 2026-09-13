@@ -3,7 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TenantCore.Application.Common;
 using TenantCore.Application.Services;
+using TenantCore.Domain.Entities;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Infrastructure.Caching;
 using TenantCore.Infrastructure.ExternalServices;
 using TenantCore.Infrastructure.Persistence;
 using TenantCore.Infrastructure.Repositories;
@@ -28,9 +30,23 @@ public static class DependencyInjection
         services.AddScoped<IOpdRegistrationRepository, OpdRegistrationRepository>();
         services.AddScoped<IIpdRegistrationRepository, IpdRegistrationRepository>();
         services.AddScoped<IClinicFeeConfigRepository, ClinicFeeConfigRepository>();
-        services.AddScoped<IMedicineTypeRepository, MedicineTypeRepository>();
-        services.AddScoped<IMedicineDosageFormRepository, MedicineDosageFormRepository>();
-        services.AddScoped<IMedicineRepository, MedicineRepository>();
+
+        // Medicines, medicine types and dosage forms are served through caching decorators backed
+        // by RefreshableCache<T> snapshots that a background hosted service keeps warm (initial
+        // fetch on startup, then every 30 minutes) — no live request ever populates or rebuilds
+        // them. See plan/medicine-search-caching/PLAN.md.
+        services.AddSingleton<RefreshableCache<Medicine>>();
+        services.AddSingleton<RefreshableCache<MedicineType>>();
+        services.AddSingleton<RefreshableCache<MedicineDosageForm>>();
+        services.AddHostedService<MedicineCacheWarmupService>();
+
+        services.AddScoped<MedicineTypeRepository>();
+        services.AddScoped<IMedicineTypeRepository, CachedMedicineTypeRepository>();
+        services.AddScoped<MedicineDosageFormRepository>();
+        services.AddScoped<IMedicineDosageFormRepository, CachedMedicineDosageFormRepository>();
+        services.AddScoped<MedicineRepository>();
+        services.AddScoped<IMedicineRepository, CachedMedicineRepository>();
+
         services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
         services.AddScoped<IMedicineBundleRepository, MedicineBundleRepository>();
         services.AddScoped<IObstetricPrescriptionDataRepository, ObstetricPrescriptionDataRepository>();
