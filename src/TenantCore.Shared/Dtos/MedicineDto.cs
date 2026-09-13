@@ -23,6 +23,8 @@ public class MedicineDto
     public string? MedicineTypeName { get; init; }
     public Guid? DosageFormId { get; init; }
     public string? DosageFormName { get; init; }
+    /// <summary>Null = system-wide medicine (read-only). Set = added by the requesting clinic (editable).</summary>
+    public Guid? ApplicationId { get; init; }
     public DateTime CreatedAt { get; init; }
 }
 

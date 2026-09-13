@@ -1,8 +1,10 @@
 using FluentAssertions;
 using MediatR;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using TenantCore.Api.Controllers;
+using TenantCore.Api.Middleware;
 using TenantCore.Application.Features.Medicines.Commands;
 using TenantCore.Application.Features.Medicines.Queries;
 using TenantCore.Shared.Common;
@@ -14,10 +16,15 @@ public class MedicinesControllerTests
 {
     private readonly Mock<ISender> _sender = new();
     private readonly MedicinesController _controller;
+    private readonly Guid _applicationId = Guid.NewGuid();
 
     public MedicinesControllerTests()
     {
         _controller = new MedicinesController(_sender.Object);
+
+        var httpContext = new DefaultHttpContext();
+        httpContext.Items[ClinicContextMiddleware.ContextKey] = _applicationId;
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
     // ?? GET /api/medicines ??????????????????????????????????????????????????

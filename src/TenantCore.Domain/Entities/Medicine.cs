@@ -23,6 +23,9 @@ public class Medicine : TenantCore.Domain.Common.AuditableEntity
     public bool IsDosageFormMapped { get; private set; }
     public DateTime? DosageFormMappedAt { get; private set; }
 
+    /// <summary>Null = system-wide medicine, shared read-only across all clinics. Set = added by this clinic, editable only by it.</summary>
+    public Guid? ApplicationId { get; private set; }
+
     public MedicineType? MedicineType { get; private set; }
     public MedicineDosageForm? DosageForm { get; private set; }
 
@@ -44,7 +47,8 @@ public class Medicine : TenantCore.Domain.Common.AuditableEntity
         string? sideEffects,
         string? contraindications,
         string? storage,
-        Guid? medicineTypeId) => new()
+        Guid? medicineTypeId,
+        Guid? applicationId) => new()
     {
         Id = Guid.NewGuid(),
         Name = name,
@@ -65,6 +69,7 @@ public class Medicine : TenantCore.Domain.Common.AuditableEntity
         IsActive = true,
         MedicineTypeId = medicineTypeId,
         IsDosageFormMapped = false,
+        ApplicationId = applicationId,
         CreatedAt = DateTime.UtcNow
     };
 

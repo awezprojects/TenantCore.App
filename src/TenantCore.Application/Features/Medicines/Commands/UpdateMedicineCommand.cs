@@ -21,4 +21,5 @@ public sealed record UpdateMedicineCommand(
     string? Contraindications,
     string? Storage,
     bool IsActive,
-    Guid? MedicineTypeId) : IRequest<MedicineDto>;
+    Guid? MedicineTypeId,
+    Guid ApplicationId) : IRequest<MedicineDto>;

@@ -17,10 +17,13 @@ public class MedicineRepository(ClinicDbContext dbContext)
         Guid? medicineTypeId,
         Guid? dosageFormId,
         bool? isGeneric,
+        Guid applicationId,
         bool includeInactive = false,
         CancellationToken ct = default)
     {
         var query = DbSet.Include(m => m.MedicineType).Include(m => m.DosageForm).AsQueryable();
+
+        query = query.Where(m => m.ApplicationId == null || m.ApplicationId == applicationId);
 
         if (!includeInactive)
             query = query.Where(m => m.IsActive);
@@ -29,7 +32,8 @@ public class MedicineRepository(ClinicDbContext dbContext)
             query = query.Where(m =>
                 m.Name.Contains(search) ||
                 (m.GenericName != null && m.GenericName.Contains(search)) ||
-                (m.BrandName != null && m.BrandName.Contains(search)));
+                (m.BrandName != null && m.BrandName.Contains(search)) ||
+                (m.Manufacturer != null && m.Manufacturer.Contains(search)));
 
         if (!string.IsNullOrWhiteSpace(brandName))
             query = query.Where(m => m.BrandName != null && m.BrandName.Contains(brandName));
@@ -69,27 +73,35 @@ public class MedicineRepository(ClinicDbContext dbContext)
             .Take(batchSize)
             .ToListAsync(ct);
 
-    public async Task<IEnumerable<Medicine>> GetByNamePrefixAsync(string name, int limit = 5, CancellationToken ct = default)
+    public async Task<IEnumerable<Medicine>> GetByNamePrefixAsync(string name, Guid applicationId, int limit = 5, CancellationToken ct = default)
         => await DbSet
             .Include(m => m.DosageForm)
-            .Where(m => m.IsActive && m.Name.StartsWith(name))
+            .Where(m => m.IsActive && m.Name.StartsWith(name) && (m.ApplicationId == null || m.ApplicationId == applicationId))
             .OrderBy(m => m.Name)
             .Take(limit)
             .ToListAsync(ct);
 
     public async Task<IEnumerable<Medicine>> FindSimilarAsync(
         string name,
-        string? genericName,
         string? brandName,
+        string? dosage,
+        Guid applicationId,
         Guid? excludeId = null,
         CancellationToken ct = default)
     {
-        var nameLower = name.ToLower();
+        var nameLower = name.Trim().ToLower();
+        var brandLower = brandName?.Trim().ToLower();
+        var dosageLower = dosage?.Trim().ToLower();
 
+        // A duplicate is the *same* medicine: identical name, brand and strength/power.
+        // Differing brand or dosage (e.g. a different brand at 500mg) is a distinct, valid medicine.
         var query = DbSet.Where(m =>
-            m.Name.ToLower().Contains(nameLower) ||
-            (genericName != null && m.GenericName != null && m.GenericName.ToLower().Contains(genericName.ToLower())) ||
-            (brandName != null && m.BrandName != null && m.BrandName.ToLower().Contains(brandName.ToLower())));
+            (m.ApplicationId == null || m.ApplicationId == applicationId) &&
+            m.Name.ToLower() == nameLower &&
+            ((brandLower == null && m.BrandName == null) ||
+                (brandLower != null && m.BrandName != null && m.BrandName.ToLower() == brandLower)) &&
+            ((dosageLower == null && m.Dosage == null) ||
+                (dosageLower != null && m.Dosage != null && m.Dosage.ToLower() == dosageLower)));
 
         if (excludeId.HasValue)
             query = query.Where(m => m.Id != excludeId.Value);

@@ -44,6 +44,9 @@ internal sealed class MedicineConfiguration : IEntityTypeConfiguration<Medicine>
 
         builder.HasIndex(m => m.IsDosageFormMapped);
 
+        builder.Property(m => m.ApplicationId);
+        builder.HasIndex(m => m.ApplicationId);
+
         builder.HasOne(m => m.DosageForm)
             .WithMany()
             .HasForeignKey(m => m.DosageFormId)

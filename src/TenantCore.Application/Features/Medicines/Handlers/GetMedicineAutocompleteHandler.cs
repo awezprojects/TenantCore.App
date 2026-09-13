@@ -13,7 +13,7 @@ public sealed class GetMedicineAutocompleteHandler(IMedicineRepository repositor
         GetMedicineAutocompleteQuery request, CancellationToken cancellationToken)
     {
         var limit = Math.Min(request.Limit, 50);
-        var items = await repository.GetByNamePrefixAsync(request.Name, limit, cancellationToken);
+        var items = await repository.GetByNamePrefixAsync(request.Name, request.ApplicationId, limit, cancellationToken);
         return MedicineTranslator.ToDtoList(items);
     }
 }

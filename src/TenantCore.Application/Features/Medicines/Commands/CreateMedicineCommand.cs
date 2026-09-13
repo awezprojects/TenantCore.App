@@ -19,4 +19,5 @@ public sealed record CreateMedicineCommand(
     string? SideEffects,
     string? Contraindications,
     string? Storage,
-    Guid? MedicineTypeId) : IRequest<MedicineDto>;
+    Guid? MedicineTypeId,
+    Guid ApplicationId) : IRequest<MedicineDto>;

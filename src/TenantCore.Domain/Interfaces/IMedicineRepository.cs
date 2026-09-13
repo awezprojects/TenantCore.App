@@ -13,6 +13,7 @@ public interface IMedicineRepository : IRepository<Medicine>
         Guid? medicineTypeId,
         Guid? dosageFormId,
         bool? isGeneric,
+        Guid applicationId,
         bool includeInactive = false,
         CancellationToken ct = default);
 
@@ -20,12 +21,13 @@ public interface IMedicineRepository : IRepository<Medicine>
 
     Task<IEnumerable<Medicine>> FindSimilarAsync(
         string name,
-        string? genericName,
         string? brandName,
+        string? dosage,
+        Guid applicationId,
         Guid? excludeId = null,
         CancellationToken ct = default);
 
     Task<IEnumerable<Medicine>> GetUnmappedAsync(int batchSize, CancellationToken ct = default);
 
-    Task<IEnumerable<Medicine>> GetByNamePrefixAsync(string name, int limit = 5, CancellationToken ct = default);
+    Task<IEnumerable<Medicine>> GetByNamePrefixAsync(string name, Guid applicationId, int limit = 5, CancellationToken ct = default);
 }

@@ -12,4 +12,5 @@ public sealed record GetMedicinesQuery(
     string? GenericName,
     Guid? MedicineTypeId,
     Guid? DosageFormId,
-    bool? IsGeneric) : IRequest<PagedResult<MedicineDto>>;
+    bool? IsGeneric,
+    Guid ApplicationId) : IRequest<PagedResult<MedicineDto>>;

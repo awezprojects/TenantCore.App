@@ -13,7 +13,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/medicines")]
 [Produces("application/json")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
-public class MedicinesController(ISender sender) : ControllerBase
+public class MedicinesController(ISender sender) : ClinicControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<MedicineDto>), StatusCodes.Status200OK)]
@@ -28,13 +28,13 @@ public class MedicinesController(ISender sender) : ControllerBase
         [FromQuery] bool? isGeneric = null,
         CancellationToken ct = default)
         => Ok(await sender.Send(
-            new GetMedicinesQuery(page, pageSize, search, brandName, genericName, medicineTypeId, dosageFormId, isGeneric), ct));
+            new GetMedicinesQuery(page, pageSize, search, brandName, genericName, medicineTypeId, dosageFormId, isGeneric, GetApplicationId()), ct));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(MedicineDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
-        => Ok(await sender.Send(new GetMedicineByIdQuery(id), ct));
+        => Ok(await sender.Send(new GetMedicineByIdQuery(id, GetApplicationId()), ct));
 
     [HttpPost]
     [Authorize(Policy = AuthPolicies.RequireClinical)]
@@ -47,7 +47,7 @@ public class MedicinesController(ISender sender) : ControllerBase
             dto.Name, dto.GenericName, dto.BrandName, dto.Description,
             dto.Composition, dto.Composition2, dto.Dosage, dto.Form,
             dto.Manufacturer, dto.IsGeneric, dto.PackSize, dto.Uses,
-            dto.SideEffects, dto.Contraindications, dto.Storage, dto.MedicineTypeId), ct);
+            dto.SideEffects, dto.Contraindications, dto.Storage, dto.MedicineTypeId, GetApplicationId()), ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -57,7 +57,7 @@ public class MedicinesController(ISender sender) : ControllerBase
         [FromQuery] string name,
         [FromQuery] int limit = 5,
         CancellationToken ct = default)
-        => Ok(await sender.Send(new GetMedicineAutocompleteQuery(name, limit), ct));
+        => Ok(await sender.Send(new GetMedicineAutocompleteQuery(name, GetApplicationId(), limit), ct));
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = AuthPolicies.RequireClinical)]
@@ -69,5 +69,5 @@ public class MedicinesController(ISender sender) : ControllerBase
             id, dto.Name, dto.GenericName, dto.BrandName, dto.Description,
             dto.Composition, dto.Composition2, dto.Dosage, dto.Form,
             dto.Manufacturer, dto.IsGeneric, dto.PackSize, dto.Uses,
-            dto.SideEffects, dto.Contraindications, dto.Storage, dto.IsActive, dto.MedicineTypeId), ct));
+            dto.SideEffects, dto.Contraindications, dto.Storage, dto.IsActive, dto.MedicineTypeId, GetApplicationId()), ct));
 }

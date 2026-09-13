@@ -18,7 +18,7 @@ public sealed class CreateMedicineHandler(
         logger.LogInformation("Creating medicine {Name}", request.Name);
 
         var similar = await repository.FindSimilarAsync(
-            request.Name, request.GenericName, request.BrandName, excludeId: null, cancellationToken);
+            request.Name, request.BrandName, request.Dosage, request.ApplicationId, excludeId: null, cancellationToken);
 
         var conflicts = similar.ToList();
         if (conflicts.Count > 0)
@@ -32,7 +32,8 @@ public sealed class CreateMedicineHandler(
             request.Name, request.GenericName, request.BrandName, request.Description,
             request.Composition, request.Composition2, request.Dosage, request.Form,
             request.Manufacturer, request.IsGeneric, request.PackSize, request.Uses,
-            request.SideEffects, request.Contraindications, request.Storage, request.MedicineTypeId);
+            request.SideEffects, request.Contraindications, request.Storage, request.MedicineTypeId,
+            request.ApplicationId);
 
         await repository.AddAsync(medicine, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);

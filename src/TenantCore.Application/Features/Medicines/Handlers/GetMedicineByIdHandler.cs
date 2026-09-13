@@ -16,6 +16,9 @@ public sealed class GetMedicineByIdHandler(IMedicineRepository repository)
         var medicine = await repository.GetByIdWithTypeAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Medicine), request.Id);
 
+        if (medicine.ApplicationId is not null && medicine.ApplicationId != request.ApplicationId)
+            throw new NotFoundException(nameof(Medicine), request.Id);
+
         return MedicineTranslator.ToDto(medicine);
     }
 }

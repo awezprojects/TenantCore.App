@@ -1,5 +1,6 @@
 @page "/medicines"
 @layout AuthorizedLayout
+@implements IDisposable
 @inject IMedicineApiClient MedicineClient
 @inject IToastService Toast
 @inject AuthStateService AuthState
@@ -28,17 +29,13 @@
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
         <div style="flex:2;min-width:180px;position:relative;">
             <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:13px;">🔍</span>
-            <input type="text" @bind="_search" @onkeyup="OnSearchKeyUp"
-                   placeholder="Search by name…"
+            <input type="text" @bind="_search" @bind:event="oninput" @bind:after="OnFilterChangedDebounced"
+                   placeholder="Search by name, brand, manufacturer…"
                    style="width:100%;padding:8px 10px 8px 30px;border:1.5px solid #E2E8F0;
                           border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" />
         </div>
-        <input type="text" @bind="_brandNameFilter" @onkeyup="OnSearchKeyUp"
+        <input type="text" @bind="_brandNameFilter" @bind:event="oninput" @bind:after="OnFilterChangedDebounced"
                placeholder="Brand Name"
-               style="flex:1;min-width:130px;padding:8px 10px;border:1.5px solid #E2E8F0;
-                      border-radius:8px;font-size:12px;outline:none;" />
-        <input type="text" @bind="_genericNameFilter" @onkeyup="OnSearchKeyUp"
-               placeholder="Generic Name"
                style="flex:1;min-width:130px;padding:8px 10px;border:1.5px solid #E2E8F0;
                       border-radius:8px;font-size:12px;outline:none;" />
         <select @onchange="OnMedTypeFilterChanged"
@@ -48,23 +45,6 @@
             @foreach (var type in _medicineTypes)
             {<option value="@type.Id" selected="@(_medicineTypeFilter == type.Id)">@type.Name</option>}
         </select>
-        <div style="display:flex;gap:6px;">
-            <button @onclick="() => ToggleIsGeneric(true)"
-                    style="padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;
-                           border:1.5px solid @(_isGenericFilter == true ? "#1565C0" : "#E2E8F0");
-                           background:@(_isGenericFilter == true ? "#EFF6FF" : "#fff");
-                           color:@(_isGenericFilter == true ? "#1565C0" : "#64748B");">Generic</button>
-            <button @onclick="() => ToggleIsGeneric(false)"
-                    style="padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;
-                           border:1.5px solid @(_isGenericFilter == false ? "#D97706" : "#E2E8F0");
-                           background:@(_isGenericFilter == false ? "#FFFBEB" : "#fff");
-                           color:@(_isGenericFilter == false ? "#D97706" : "#64748B");">Branded</button>
-        </div>
-        <button @onclick="ClearFilters"
-                style="padding:7px 14px;border:1.5px solid #E2E8F0;border-radius:7px;
-                       background:#fff;color:#64748B;font-size:12px;font-weight:600;cursor:pointer;">
-            ✕ Clear
-        </button>
     </div>
 </div>
 
@@ -86,12 +66,12 @@ else if (_result is not null)
                         <tr style="background:#F8FAFC;border-bottom:2px solid #E2E8F0;">
                             @{ var thStyle = "padding:11px 14px;text-align:left;font-weight:700;color:#64748B;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;"; }
                             <th style="@thStyle">Name</th>
-                            <th style="@thStyle">Generic Name</th>
                             <th style="@thStyle">Brand Name</th>
+                            <th style="@thStyle">Composition</th>
+                            <th style="@thStyle">Manufacturer</th>
                             <th style="@thStyle">Type</th>
                             <th style="@thStyle">Form</th>
                             <th style="@thStyle">Dosage</th>
-                            <th style="@thStyle">Kind</th>
                             <th style="@thStyle">Status</th>
                             @if (_canManage)
                             {<th style="@thStyle;white-space:nowrap;">Actions</th>}
@@ -103,18 +83,12 @@ else if (_result is not null)
                             var med = m;
                             <tr style="border-bottom:1px solid #F1F5F9;">
                                 <td style="padding:12px 14px;font-weight:600;color:#0F172A;">@med.Name</td>
-                                <td style="padding:12px 14px;color:#334155;">@(med.GenericName ?? "—")</td>
                                 <td style="padding:12px 14px;color:#334155;">@(med.BrandName ?? "—")</td>
+                                <td style="padding:12px 14px;color:#64748B;font-size:12px;">@GetComposition(med)</td>
+                                <td style="padding:12px 14px;color:#64748B;font-size:12px;">@(med.Manufacturer ?? "—")</td>
                                 <td style="padding:12px 14px;color:#64748B;font-size:12px;">@(med.MedicineTypeName ?? "—")</td>
                                 <td style="padding:12px 14px;color:#64748B;font-size:12px;">@(med.Form ?? "—")</td>
                                 <td style="padding:12px 14px;color:#64748B;font-size:12px;">@(med.Dosage ?? "—")</td>
-                                <td style="padding:12px 14px;">
-                                    <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:14px;
-                                                 background:@(med.IsGeneric ? "#EFF6FF" : "#FFFBEB");
-                                                 color:@(med.IsGeneric ? "#1565C0" : "#D97706");">
-                                        @(med.IsGeneric ? "Generic" : "Branded")
-                                    </span>
-                                </td>
                                 <td style="padding:12px 14px;">
                                     <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:14px;
                                                  background:@(med.IsActive ? "#ECFDF5" : "#FEF2F2");
@@ -125,7 +99,14 @@ else if (_result is not null)
                                 @if (_canManage)
                                 {
                                     <td style="padding:12px 14px;">
-                                        <button class="opd-btn edit-btn" @onclick="() => OpenEditDialog(med)">Edit</button>
+                                        @if (med.ApplicationId.HasValue)
+                                        {
+                                            <button class="opd-btn edit-btn" @onclick="() => OpenEditDialog(med)">Edit</button>
+                                        }
+                                        else
+                                        {
+                                            <span style="font-size:11px;color:#94A3B8;">System</span>
+                                        }
                                     </td>
                                 }
                             </tr>
@@ -287,9 +268,7 @@ else if (_result is not null)
 
     private string? _search;
     private string? _brandNameFilter;
-    private string? _genericNameFilter;
     private Guid? _medicineTypeFilter;
-    private bool? _isGenericFilter;
 
     private int _page = 1;
     private const int PageSize = 20;
@@ -323,7 +302,7 @@ else if (_result is not null)
     {
         _loading = true;
         var response = await MedicineClient.GetMedicinesAsync(
-            _page, PageSize, _search, _brandNameFilter, _genericNameFilter, _medicineTypeFilter, _isGenericFilter);
+            _page, PageSize, _search, _brandNameFilter, null, _medicineTypeFilter);
         if (response.Success)
             _result = response.Data;
         else
@@ -331,36 +310,56 @@ else if (_result is not null)
         _loading = false;
     }
 
-    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
-
-    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    private static string GetComposition(MedicineDto med)
     {
-        if (e.Key == "Enter") { _page = 1; await LoadAsync(); }
+        var parts = new[] { med.Composition, med.Composition2 }
+            .Where(c => !string.IsNullOrWhiteSpace(c));
+        var combined = string.Join(" + ", parts);
+        return string.IsNullOrEmpty(combined) ? "—" : combined;
     }
 
-    private async Task OnFilterChanged() { _page = 1; await LoadAsync(); }
+    private async Task OnPageChanged(int page) { _page = page; await LoadAsync(); }
+
+    private CancellationTokenSource? _filterDebounceCts;
+    private const int FilterDebounceMs = 300;
+
+    private void OnFilterChangedDebounced()
+    {
+        _filterDebounceCts?.Cancel();
+        _filterDebounceCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _filterDebounceCts = cts;
+        _ = DebouncedLoadAsync(cts.Token);
+    }
+
+    private async Task DebouncedLoadAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(FilterDebounceMs, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested)
+            return;
+
+        _page = 1;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _filterDebounceCts?.Cancel();
+        _filterDebounceCts?.Dispose();
+    }
 
     private async Task OnMedTypeFilterChanged(ChangeEventArgs e)
     {
         _medicineTypeFilter = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
-        _page = 1;
-        await LoadAsync();
-    }
-
-    private async Task ToggleIsGeneric(bool value)
-    {
-        _isGenericFilter = _isGenericFilter == value ? null : value;
-        _page = 1;
-        await LoadAsync();
-    }
-
-    private async Task ClearFilters()
-    {
-        _search = null;
-        _brandNameFilter = null;
-        _genericNameFilter = null;
-        _medicineTypeFilter = null;
-        _isGenericFilter = null;
         _page = 1;
         await LoadAsync();
     }

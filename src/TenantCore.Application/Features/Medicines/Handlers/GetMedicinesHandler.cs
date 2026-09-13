@@ -16,7 +16,7 @@ public sealed class GetMedicinesHandler(IMedicineRepository repository)
         var (items, total) = await repository.GetPagedAsync(
             request.Page, pageSize, request.Search,
             request.BrandName, request.GenericName, request.MedicineTypeId,
-            request.DosageFormId, request.IsGeneric, includeInactive: false, cancellationToken);
+            request.DosageFormId, request.IsGeneric, request.ApplicationId, includeInactive: false, cancellationToken);
 
         return new PagedResult<MedicineDto>
         {

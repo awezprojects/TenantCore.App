@@ -21,8 +21,11 @@ public sealed class UpdateMedicineHandler(
         var medicine = await repository.GetByIdWithTypeAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Medicine), request.Id);
 
+        if (medicine.ApplicationId is null || medicine.ApplicationId != request.ApplicationId)
+            throw new UnauthorizedAccessException("Only medicines added by your own clinic can be edited.");
+
         var similar = await repository.FindSimilarAsync(
-            request.Name, request.GenericName, request.BrandName, excludeId: request.Id, cancellationToken);
+            request.Name, request.BrandName, request.Dosage, request.ApplicationId, excludeId: request.Id, cancellationToken);
 
         var conflicts = similar.ToList();
         if (conflicts.Count > 0)
