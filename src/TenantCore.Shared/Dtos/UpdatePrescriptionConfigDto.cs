@@ -8,4 +8,5 @@ public sealed record UpdatePrescriptionConfigDto(
     int PrintMarginRight = 0,
     int PrintMarginBottom = 0,
     int PrintMarginLeft = 0,
-    bool HideClinicHeader = false);
+    bool HideClinicHeader = false,
+    EmailTemplateTheme EmailTheme = EmailTemplateTheme.AzureClassic);

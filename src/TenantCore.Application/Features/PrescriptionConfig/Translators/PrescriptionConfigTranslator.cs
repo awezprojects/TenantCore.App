@@ -13,6 +13,7 @@ public static class PrescriptionConfigTranslator
         PrintMarginRight = config.PrintMarginRight,
         PrintMarginBottom = config.PrintMarginBottom,
         PrintMarginLeft = config.PrintMarginLeft,
-        HideClinicHeader = config.HideClinicHeader
+        HideClinicHeader = config.HideClinicHeader,
+        EmailTheme = config.EmailTheme
     };
 }

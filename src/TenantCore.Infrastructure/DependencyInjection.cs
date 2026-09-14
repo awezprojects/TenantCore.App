@@ -81,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IPdfConversionService, PdfConversionService>();
+        services.AddScoped<IPrescriptionPdfGenerator, PrescriptionPdfGenerator>();
 
         services.AddAppLogging(configuration);
         services.AddScoped<IErrorLogger, ErrorLoggingService>();

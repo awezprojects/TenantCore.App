@@ -92,6 +92,44 @@ else
                 </div>
             }
         </div>
+
+        <!-- Email Template card -->
+        <div style="flex:1 1 100%;min-width:280px;background:#fff;border-radius:14px;border:1px solid #E2E8F0;padding:24px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                <span style="font-size:20px;">&#9993;</span>
+                <div style="font-size:15px;font-weight:800;color:#1E293B;">Email Template</div>
+            </div>
+            <p style="font-size:12px;color:#64748B;margin:0 0 16px;">
+                Theme used for the prescription email sent to the patient after a doctor submits a prescription.
+                The email includes the appointment details and the prescription PDF attachment.
+            </p>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;">
+                @foreach (var theme in Themes)
+                {
+                    <button type="button"
+                            @onclick="() => _emailTheme = theme.Theme"
+                            style="text-align:left;cursor:pointer;padding:0;background:#fff;border-radius:10px;overflow:hidden;
+                                   border:2px solid @(_emailTheme == theme.Theme ? "#1565C0" : "#E2E8F0");
+                                   box-shadow:@(_emailTheme == theme.Theme ? "0 0 0 3px rgba(21,101,192,0.12)" : "none");">
+                        <div style="height:42px;background:@theme.Header;display:flex;align-items:center;padding:0 10px;">
+                            <span style="color:#fff;font-size:10px;font-weight:700;letter-spacing:1px;">YOUR CLINIC</span>
+                        </div>
+                        <div style="padding:10px;">
+                            <div style="font-size:12.5px;font-weight:700;color:#1E293B;">@theme.Name</div>
+                            <div style="display:flex;gap:4px;margin-top:8px;">
+                                <span style="width:16px;height:16px;border-radius:4px;background:@theme.Header;"></span>
+                                <span style="width:16px;height:16px;border-radius:4px;background:@theme.Accent;"></span>
+                                <span style="width:16px;height:16px;border-radius:4px;background:@theme.Body;border:1px solid #E2E8F0;"></span>
+                            </div>
+                            <div style="margin-top:8px;font-size:11px;color:@(_emailTheme == theme.Theme ? "#1565C0" : "#94A3B8");">
+                                @(_emailTheme == theme.Theme ? "Selected" : "Select")
+                            </div>
+                        </div>
+                    </button>
+                }
+            </div>
+        </div>
     </div>
 
     <div style="margin-top:24px;">
@@ -119,6 +157,17 @@ else
     private int _marginBottom;
     private int _marginLeft;
     private bool _hideHeader;
+    private EmailTemplateTheme _emailTheme = EmailTemplateTheme.AzureClassic;
+
+    /// <summary>Preview swatches for the selectable prescription email themes.</summary>
+    private static readonly (EmailTemplateTheme Theme, string Name, string Header, string Accent, string Body)[] Themes =
+    [
+        (EmailTemplateTheme.AzureClassic,    "Azure Classic",   "#1565C0", "#1E88E5", "#F5F8FC"),
+        (EmailTemplateTheme.EmeraldCare,     "Emerald Care",    "#0F766E", "#14B8A6", "#F0FDFA"),
+        (EmailTemplateTheme.SunsetRose,      "Sunset Rose",     "#E11D48", "#FB7185", "#FFF1F2"),
+        (EmailTemplateTheme.MidnightIndigo,  "Midnight Indigo", "#312E81", "#6366F1", "#EEF2FF"),
+        (EmailTemplateTheme.MinimalSlate,    "Minimal Slate",   "#334155", "#64748B", "#F8FAFC"),
+    ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -141,6 +190,7 @@ else
             _marginBottom = d.PrintMarginBottom;
             _marginLeft   = d.PrintMarginLeft;
             _hideHeader   = d.HideClinicHeader;
+            _emailTheme   = d.EmailTheme;
         }
         _loading = false;
     }
@@ -149,7 +199,7 @@ else
     {
         _saving = true;
         var dto = new UpdatePrescriptionConfigDto(
-            _language, _marginTop, _marginRight, _marginBottom, _marginLeft, _hideHeader);
+            _language, _marginTop, _marginRight, _marginBottom, _marginLeft, _hideHeader, _emailTheme);
         var r = await PrescriptionClient.UpdatePrescriptionConfigAsync(dto);
         if (r.Success) Toast.ShowSuccess("Settings saved.");
         else Toast.ShowError(r.Message ?? "Failed to save.");

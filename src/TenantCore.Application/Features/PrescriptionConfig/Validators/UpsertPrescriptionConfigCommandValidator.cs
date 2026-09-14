@@ -9,5 +9,6 @@ public sealed class UpsertPrescriptionConfigCommandValidator : AbstractValidator
     {
         RuleFor(x => x.ApplicationId).NotEmpty();
         RuleFor(x => x.DefaultLanguage).IsInEnum();
+        RuleFor(x => x.EmailTheme).IsInEnum();
     }
 }

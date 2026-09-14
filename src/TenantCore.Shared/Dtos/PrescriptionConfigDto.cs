@@ -11,4 +11,7 @@ public class PrescriptionConfigDto
     public int PrintMarginBottom { get; init; }
     public int PrintMarginLeft { get; init; }
     public bool HideClinicHeader { get; init; }
+
+    /// <summary>Selected visual theme for the patient prescription email.</summary>
+    public EmailTemplateTheme EmailTheme { get; init; } = EmailTemplateTheme.AzureClassic;
 }

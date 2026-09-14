@@ -1,0 +1,279 @@
+# TenantCore.App — Cline Memory & Working Rules
+
+> **Auto-loaded context for Cline.** Read at the start of every session before planning or writing any code in this repo.
+> This file **mirrors and references — never duplicates or replaces** — the canonical sources below.
+> **Do NOT modify `.claude/` (commands, context, settings) or `CLAUDE.md`** — those are Claude's workspace. This file is Cline's own memory.
+> On any conflict, the ADRs (`docs/adr/`) and `CLAUDE.md` win.
+> Last updated: 2026-09-14
+
+---
+
+## 0. Canonical sources (read these; they win on any conflict)
+
+| Source | Use it for |
+|---|---|
+| `CLAUDE.md` | Claude's instruction file — coding patterns + absolute constraints (read-only reference) |
+| `docs/adr/ADR-000-index.md` | Orientation — stack, project map, dependency direction |
+| `docs/adr/ADR-001-solution-structure.md` | Solution layout, dependency rules |
+| `docs/adr/ADR-002-domain-layer.md` | Entities, `IRepository<T>`, domain exceptions |
+| `docs/adr/ADR-003-application-layer.md` | CQRS, MediatR, features, pipeline behaviors |
+| `docs/adr/ADR-004-infrastructure-layer.md` | EF Core, `ClinicRepository<T>`, external services |
+| `docs/adr/ADR-005-api-layer.md` | Controllers, middleware order, authorization, config layering |
+| `docs/adr/ADR-006-shared-layer.md` | DTOs, constants, enums |
+| `docs/adr/ADR-007-blazor-client.md` | Blazor pages/components, UI theme, date handling, destructive-action confirmation |
+| `docs/adr/ADR-008-multi-tenancy.md` | Tenant isolation (`X-Application-Id`) |
+| `docs/adr/ADR-009-unit-testing.md` | Test standards |
+| `docs/adr/ADR-010-security.md` | Security + code quality checklist, safe-fix rules |
+| `plan/REGISTRY.md` | Feature registry + domain coverage map — **check before planning anything new** |
+| `.claude/context/current-state.md` | DbSet + DI registration snapshot (read-only; auto-maintained by Claude) |
+| `.claude/commands/*.md` | Claude's plan/execute/security command definitions — **canonical workflow; read-only** |
+
+> **Path note:** `CLAUDE.md` and ADR-000 reference ADRs as `.claude/docs/adr/...`; the ADRs actually live in **`docs/adr/`**. Always use `docs/adr/`.
+
+---
+
+## 1. Architecture (ADR-000 / ADR-001)
+
+Clean Architecture + CQRS via MediatR. Multi-tenant clinic management system.
+
+```
+TenantCore.Api ──► TenantCore.Application ──► TenantCore.Domain
+TenantCore.Api ──► TenantCore.Infrastructure ──► TenantCore.Domain
+TenantCore.Web.Client ──► TenantCore.Shared
+All layers ──► TenantCore.Shared (DTOs / constants only)
+```
+
+**Rule:** inner layers NEVER reference outer layers. Domain references nothing.
+
+| Project | Responsibility |
+|---|---|
+| `TenantCore.Api` | Entry / composition root — thin controllers, middleware, JWT, DI wiring, Swagger, Serilog |
+| `TenantCore.Application` | CQRS — commands, queries, handlers, validators, translators, pipeline behaviors, service interfaces |
+| `TenantCore.Domain` | Entities (`BaseEntity` / `AuditableEntity`), repository interfaces, domain exceptions — zero deps |
+| `TenantCore.Infrastructure` | EF Core `ClinicDbContext`, `ClinicRepository<T>` + repositories, Fluent configs, external services, Auth HTTP client |
+| `TenantCore.Shared` | DTOs, `AuthorizationConstants`, enums, `Result<T>` / `PagedResult<T>` — zero deps |
+| `TenantCore.Web.Client` | Blazor WASM — typed HTTP clients, pages, components (HTTP-only, no server refs) |
+| `TenantCore.Web` | Blazor server host |
+| `TenantCore.Logging` | Centralized logging to Azure Table Storage (`ApiErrorLogs`, `FrontendErrorLogs`, `ActionLogs`) |
+| `Requirements` | Requirements documents |
+
+**Test projects:** `tests/TenantCore.Api.Tests`, `TenantCore.Application.Tests`, `TenantCore.Domain.Tests`, `TenantCore.Infrastructure.Tests`, `TenantCore.Web.Client.Tests`.
+**Tools:** `tools/MedicineNormalizer`.
+
+---
+
+## 2. Coding patterns (quick reference)
+
+### Controller — `src/TenantCore.Api/Controllers/`
+Thin. Clinic-scoped controllers inherit `ClinicControllerBase`. Only `ISender` injected. Zero business logic.
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+[Produces("application/json")]
+public class PatientsController(ISender sender) : ClinicControllerBase(sender)
+{
+    [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<PatientSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(CancellationToken ct)
+        => Ok(await sender.Send(new GetPatientsQuery(GetApplicationId()), ct));
+
+    [HttpPost]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    public async Task<IActionResult> Create([FromBody] CreatePatientRequest request, CancellationToken ct)
+    {
+        var id = await sender.Send(new CreatePatientCommand(request, GetApplicationId()), ct);
+        return CreatedAtAction(nameof(GetById), new { id }, id);
+    }
+}
+```
+- Use `GetApplicationId()` from the base class — never read the `X-Application-Id` header directly.
+- Always pass `ApplicationId` into commands and queries.
+
+### Command / Query — `Features/{Area}/Commands|Queries/`
+`sealed record` implementing `IRequest<T>` (delete/void → `IRequest`).
+
+```csharp
+public sealed record CreatePatientCommand(CreatePatientRequest Request, Guid ApplicationId) : IRequest<Guid>;
+public sealed record DeletePatientCommand(Guid Id, Guid ApplicationId) : IRequest;
+public sealed record GetPatientsQuery(Guid ApplicationId) : IRequest<IEnumerable<PatientSummaryDto>>;
+```
+
+### Handler — `Features/{Area}/Handlers/`
+`sealed class`, primary constructor, one handler per command/query file.
+
+```csharp
+public sealed class CreatePatientHandler(IPatientRepository repository, ILogger<CreatePatientHandler> logger)
+    : IRequestHandler<CreatePatientCommand, Guid>
+{ /* map via translator, AddAsync, SaveChangesAsync, return Id */ }
+```
+- Throw `EntityNotFoundException` on not-found — never return null or error DTOs.
+- Generate IDs in the translator, not in the handler.
+
+### Validator — `Features/{Area}/Validators/`
+`AbstractValidator<T>` (FluentValidation), auto-registered by assembly scan. Every string: `NotEmpty()` + `MaximumLength(N)`. Validate `Guid.Empty` for IDs; `Enum.IsDefined` before enum use.
+
+### Translator — `Features/{Area}/Translators/`
+`static class` with `static` methods (`ToEntity`, `ToDto`, `ToSummaryDto`). **Never AutoMapper.**
+
+### Repository interface — `src/TenantCore.Domain/Interfaces/`
+Extends `IRepository<T>` (generic base: `GetByIdAsync`, `GetAllAsync`, `AddAsync`, `Update`, `Delete`, `ExistsAsync`, `SaveChangesAsync`). Add only extra queries; always accept `Guid applicationId`.
+
+### Repository implementation — `src/TenantCore.Infrastructure/Repositories/`
+Inherit `ClinicRepository<T>`; always filter by `applicationId`; `AsNoTracking()` on reads.
+
+### EF config — `src/TenantCore.Infrastructure/Persistence/Configurations/`
+`IEntityTypeConfiguration<T>`, Fluent API only (no Data Annotations on entities), configure `RowVersion` as row version.
+
+### DTOs — `src/TenantCore.Shared/Dtos/`
+`record` with `init` setters. Detail `XDto`, list `XSummaryDto`, input `CreateXRequest` / `UpdateXRequest`. No methods, no validation attributes, no business logic.
+
+### DI + migrations
+- Application DI: `AddApplication()` · Infrastructure DI: `AddInfrastructure()`. Handlers/validators auto-scan. New repository → register `Scoped` in Infrastructure DI.
+- Migrations:
+```bash
+dotnet ef migrations add <Name> --project src/TenantCore.Infrastructure --startup-project src/TenantCore.Api --output-dir Persistence/ClinicMigrations
+dotnet ef database update --project src/TenantCore.Infrastructure --startup-project src/TenantCore.Api
+```
+
+---
+
+## 3. Hard rules (never violate — from CLAUDE.md)
+
+- Controllers inherit `ClinicControllerBase` and only call `sender.Send(...)` — no service injection.
+- Commands and queries are `sealed record`; handlers are `sealed class`.
+- Translators are `static class` with `static` methods — never AutoMapper.
+- No business logic in controllers, repositories, or middleware.
+- No EF Core in Application or Domain layers.
+- No Data Annotations on Domain entities — use Fluent API configurations.
+- Always include `ApplicationId` on tenant-scoped commands/queries.
+- Always filter by `applicationId` in tenant-scoped repository queries.
+- Throw exceptions for errors; never return error DTOs from handlers.
+- Do not change the middleware pipeline order (ADR-005).
+- Every feature must ship with unit tests (ADR-009).
+- Every delete/remove/clear action must confirm first via the shared `ConfirmDialog` component (ADR-007).
+
+### Error handling
+Throw domain exceptions — `ExceptionHandlingMiddleware` converts to ProblemDetails.
+
+| Exception | HTTP status |
+|---|---|
+| `ValidationException` (FluentValidation via pipeline) | 400 |
+| `EntityNotFoundException` | 404 |
+| `InvalidOperationException` | 409 |
+| `UnauthorizedAccessException` | 401 |
+
+Never return error responses manually from handlers or controllers.
+
+### Authorization
+`[Authorize(Policy = AuthPolicies.RequireAuthenticated | RequireClinicAdmin | RequireReception | RequireClinical)]`.
+Constants live in `TenantCore.Shared/Authorization/AuthorizationConstants.cs` — never use raw string literals.
+
+---
+
+## 4. Multi-tenancy (ADR-008) — critical
+
+```
+X-Application-Id header
+  → ClinicContextMiddleware (validates against the JWT "app_ids" claim; 403 if absent/not owned)
+  → HttpContext.Items["ApplicationId"]
+  → ClinicControllerBase.GetApplicationId()
+  → command/query ApplicationId field
+  → repository WHERE ApplicationId = @applicationId
+```
+- Never read the `X-Application-Id` header in a controller.
+- Never accept `ApplicationId` from `[FromBody]` — only from `GetApplicationId()`.
+- Every tenant-scoped entity has `public Guid ApplicationId { get; set; }`.
+- Test: "can two different clinics have different values/records for this?" → yes ⇒ tenant-scoped.
+- Global reference/lookup data (e.g. `MedicineDosageForm`, `DoctorSpeciality`) is **not** tenant-scoped.
+
+---
+
+## 5. Testing (ADR-009) — mandatory for every feature
+
+Stack: xUnit 2.4.2, Moq, FluentAssertions, `Microsoft.NET.Test.Sdk`. Test folders mirror `Features/{Area}/...`.
+Naming: `MethodName_Scenario_ExpectedResult` (e.g. `Handle_PatientNotFound_ThrowsEntityNotFoundException`).
+
+Per-feature required coverage:
+- **Handlers** — happy path (`AddAsync` + `SaveChangesAsync` called, correct data captured), `ApplicationId` set on entity, all fields mapped, `EntityNotFoundException` on not-found, cross-tenant entity treated as not-found, empty list returns empty (not exception).
+- **Validators** — fully valid passes; each required field fails on null/empty (`[Theory]` + `[InlineData]`); `MaximumLength` boundary (over fails, at passes); empty `ApplicationId` fails.
+- **Translators** — `ToEntity` maps all properties + generates non-empty `Id` + sets `ApplicationId`; `ToDto` / `ToSummaryDto` map all fields.
+
+Do **NOT** test EF Core internals, DTO setters, or `Program.cs` wiring.
+
+```bash
+dotnet test
+dotnet test tests/TenantCore.Application.Tests/
+```
+
+---
+
+## 6. Security & code quality (ADR-010)
+
+**Checklist:** every controller/action has explicit `[Authorize(...)]` or `[AllowAnonymous]` (with a comment); destructive ops ≥ `RequireClinicAdmin`; string inputs `NotEmpty()` + `MaximumLength()`; route IDs typed `Guid`; enums checked with `Enum.IsDefined`; `pageSize` capped (≤100); no `ExecuteSqlRaw` with user input; `AsNoTracking()` on read queries; no `IQueryable<T>` returned from repositories; no secrets/passwords in logs; errors flow through middleware; CorrelationId forwarded on AuthApi calls.
+
+**Code smells (S1–S12) & architectural violations (V1–V7) to detect:** wrong dependency direction (Application→Infrastructure, Domain→anything), controller not inheriting `ClinicControllerBase`, feature files outside `Features/`, non-`record` commands/queries, repository exposing `DbContext`, duplicate repository methods, generic `catch (Exception)`, handler returning null instead of throwing.
+
+**Safe-fix rules (ADR-010 §11):** read the file first; find all callers before changing a signature; preserve observable behavior; one logical fix per edit; do not refactor surrounding code.
+**Never change without explicit user instruction:** migration files, `RowVersion` concurrency config, middleware pipeline order, JWT validation parameters, `GetApplicationId()` implementation.
+
+**Blazor client specifics (ADR-007):** no MudBlazor (removed — use native HTML with `opd-*`, `form-*`, `cc-*` classes); use `DateTimeHelper.ToLocalString()` for UTC-stored dates; `DateTime.Today` for "today" on the client; send `utcOffset` for UTC date-range filters; confirm before destructive actions; print pages open via `window.open` and use a red "✕ Close" button.
+
+---
+
+## 7. Workflow — 3 phases (mirrors `.claude/commands`, read-only)
+
+Claude's canonical command definitions live in `.claude/commands/`. I mirror their discipline; I never modify them.
+
+**Phase 1 — Plan** (mirrors `plan-app-feature.md`)
+1. Read `.claude/context/current-state.md` and `plan/REGISTRY.md`; verify the DbSet count matches the actual `ClinicDbContext.cs`.
+2. Read `CLAUDE.md` + `docs/adr/ADR-000-index.md`, then only the ADRs relevant to the layers touched.
+3. Present a **pre-plan brief** — domain area, layers affected, tenant-scoped?, EF migration?, files to create/modify, key decisions/open questions — and **wait for explicit approval**.
+4. On approval, write `plan/<feature-name>/PLAN.md` (Overview, entity property table, Files to Create, Files to Modify, API Endpoints, Validation Rules, Business Rules, Multi-Tenancy Checklist, EF migration, Implementation Order, Test Files to Create).
+
+**Phase 2 — Execute** (mirrors `execute-app-feature.md`)
+Implement in PLAN.md order: Shared DTOs → Domain entity → repo interface → EF config → repo impl → `ClinicDbContext` (+DbSet) → Infrastructure DI (register) → Application commands/queries → validators → translator → handlers → API controller → unit tests → **migration reminder (print the command; do NOT auto-run)**.
+Then: verify the multi-tenancy checklist; run `dotnet test tests/TenantCore.Application.Tests/` and confirm green; update `.claude/context/current-state.md` and `plan/REGISTRY.md`; print a completion table; suggest the security phase next.
+
+**Phase 3 — Security** (mirrors `security-app-feature.md`)
+Scan the implementation against ADR-010; report findings by severity with file/line + proposed fix; **ask which to fix** (`fix all` / `fix critical` / `fix security` / `fix quality` / `fix [IDs]` / `skip`); apply approved fixes per §11 safe-fix rules; write `plan/<feature>/SECURITY.md`.
+
+---
+
+## 8. Configuration layering (ADR-005)
+
+`Program.cs` load order — later wins: `appsettings.json` → `appsettings.{Environment}.json` → **`appsettings.Local.json`** (last, gitignored).
+- `appsettings.json` / `appsettings.Development.json`: **placeholders only** — checked in, never real secrets or working connection strings.
+- `appsettings.Local.json`: the **real local values**.
+
+New config key ⇒ add it to **both** files (placeholder + real value).
+
+---
+
+## 9. New-feature file layout (`Foo`)
+
+```
+src/TenantCore.Shared/Dtos/                                  FooDto.cs, CreateFooRequest.cs, UpdateFooRequest.cs
+src/TenantCore.Domain/Entities/                              Foo.cs
+src/TenantCore.Domain/Interfaces/                            IFooRepository.cs
+src/TenantCore.Infrastructure/Persistence/Configurations/    FooConfiguration.cs
+src/TenantCore.Infrastructure/Repositories/                  FooRepository.cs
+src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs        (modify: +DbSet<Foo>)
+src/TenantCore.Infrastructure/DependencyInjection.cs               (modify: register IFooRepository)
+src/TenantCore.Application/Features/Foos/{Commands,Queries,Handlers,Validators,Translators}/
+src/TenantCore.Api/Controllers/                              FoosController.cs
+tests/TenantCore.Application.Tests/Features/Foos/{Commands,Queries,Validators,Translators}/
+```
+Namespaces/types follow: commands `CreateFooCommand` (`sealed record`), handlers `CreateFooHandler` (`sealed class`), validators `CreateFooCommandValidator` (`AbstractValidator<T>`), translators `FooTranslator` (`static`).
+
+---
+
+## 10. Session-start checklist
+
+1. Read this file (`.clinerules`).
+2. Read `.claude/context/current-state.md` + `plan/REGISTRY.md` (read-only).
+3. Read `CLAUDE.md` + `docs/adr/ADR-000-index.md`, then only the relevant ADRs.
+4. Confirm scope with the user before writing code for a new feature (Plan → approve → Execute).
+5. Verify multi-tenancy, add tests, and run `dotnet test` before declaring done.
+6. Never modify `.claude/`, `CLAUDE.md`, the ADRs, `plan/REGISTRY.md`, or migration files.
+

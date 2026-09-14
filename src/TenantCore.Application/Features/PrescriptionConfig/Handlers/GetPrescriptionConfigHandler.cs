@@ -19,7 +19,8 @@ public sealed class GetPrescriptionConfigHandler(IPrescriptionConfigRepository r
             return new PrescriptionConfigDto
             {
                 ApplicationId = request.ApplicationId,
-                DefaultLanguage = PrescriptionLanguage.English
+                DefaultLanguage = PrescriptionLanguage.English,
+                EmailTheme = EmailTemplateTheme.AzureClassic
             };
 
         return PrescriptionConfigTranslator.ToDto(config);

@@ -21,7 +21,7 @@ public sealed class UpsertPrescriptionConfigHandler(IPrescriptionConfigRepositor
                 request.ApplicationId, request.DefaultLanguage,
                 request.PrintMarginTop, request.PrintMarginRight,
                 request.PrintMarginBottom, request.PrintMarginLeft,
-                request.HideClinicHeader);
+                request.HideClinicHeader, request.EmailTheme);
             await repository.AddAsync(config, cancellationToken);
         }
         else
@@ -30,7 +30,7 @@ public sealed class UpsertPrescriptionConfigHandler(IPrescriptionConfigRepositor
                 request.DefaultLanguage,
                 request.PrintMarginTop, request.PrintMarginRight,
                 request.PrintMarginBottom, request.PrintMarginLeft,
-                request.HideClinicHeader);
+                request.HideClinicHeader, request.EmailTheme);
             repository.Update(config);
         }
 

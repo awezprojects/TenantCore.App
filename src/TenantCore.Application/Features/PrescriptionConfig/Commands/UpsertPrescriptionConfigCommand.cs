@@ -11,4 +11,5 @@ public sealed record UpsertPrescriptionConfigCommand(
     int PrintMarginRight,
     int PrintMarginBottom,
     int PrintMarginLeft,
-    bool HideClinicHeader) : IRequest<PrescriptionConfigDto>;
+    bool HideClinicHeader,
+    EmailTemplateTheme EmailTheme = EmailTemplateTheme.AzureClassic) : IRequest<PrescriptionConfigDto>;

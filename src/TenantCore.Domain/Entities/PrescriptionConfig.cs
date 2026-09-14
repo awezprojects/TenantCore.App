@@ -14,6 +14,9 @@ public class PrescriptionConfig : BaseEntity
     public int PrintMarginLeft { get; private set; }
     public bool HideClinicHeader { get; private set; }
 
+    /// <summary>Selected visual theme for the patient prescription email.</summary>
+    public EmailTemplateTheme EmailTheme { get; private set; }
+
     private PrescriptionConfig() { }
 
     public static PrescriptionConfig Create(
@@ -21,7 +24,8 @@ public class PrescriptionConfig : BaseEntity
         PrescriptionLanguage defaultLanguage,
         int printMarginTop = 0, int printMarginRight = 0,
         int printMarginBottom = 0, int printMarginLeft = 0,
-        bool hideClinicHeader = false) => new()
+        bool hideClinicHeader = false,
+        EmailTemplateTheme emailTheme = EmailTemplateTheme.AzureClassic) => new()
     {
         Id = Guid.NewGuid(),
         ApplicationId = applicationId,
@@ -31,6 +35,7 @@ public class PrescriptionConfig : BaseEntity
         PrintMarginBottom = printMarginBottom,
         PrintMarginLeft = printMarginLeft,
         HideClinicHeader = hideClinicHeader,
+        EmailTheme = emailTheme,
         CreatedAt = DateTime.UtcNow
     };
 
@@ -38,7 +43,8 @@ public class PrescriptionConfig : BaseEntity
         PrescriptionLanguage defaultLanguage,
         int printMarginTop, int printMarginRight,
         int printMarginBottom, int printMarginLeft,
-        bool hideClinicHeader)
+        bool hideClinicHeader,
+        EmailTemplateTheme emailTheme = EmailTemplateTheme.AzureClassic)
     {
         DefaultLanguage = defaultLanguage;
         PrintMarginTop = printMarginTop;
@@ -46,6 +52,7 @@ public class PrescriptionConfig : BaseEntity
         PrintMarginBottom = printMarginBottom;
         PrintMarginLeft = printMarginLeft;
         HideClinicHeader = hideClinicHeader;
+        EmailTheme = emailTheme;
         SetUpdatedAt();
     }
 }

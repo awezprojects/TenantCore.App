@@ -27,5 +27,5 @@ public class PrescriptionConfigController(ISender sender) : ClinicControllerBase
             GetApplicationId(), dto.DefaultLanguage,
             dto.PrintMarginTop, dto.PrintMarginRight,
             dto.PrintMarginBottom, dto.PrintMarginLeft,
-            dto.HideClinicHeader), ct));
+            dto.HideClinicHeader, dto.EmailTheme), ct));
 }
