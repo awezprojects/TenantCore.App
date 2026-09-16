@@ -126,6 +126,61 @@ public class UpdatePatientHandlerTests
         _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_WhenPhoneNumberBelongsToAnotherPatient_ThrowsInvalidOperationException()
+    {
+        var patient = CreatePatient();
+        var otherPatient = Patient.Create(
+            patient.ApplicationId, "Other", "Patient", new DateOnly(1990, 1, 1), Gender.Male,
+            "9876543210", null, null, null, null);
+        var command = new UpdatePatientCommand(
+            patient.Id, patient.ApplicationId, "Updated", "Patient",
+            new DateOnly(1991, 8, 14), Gender.Other, otherPatient.PhoneNumber,
+            "updated@example.com", "999988887777", null, "Updated Address");
+
+        _repository.Setup(r => r.GetByIdAsync(command.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(patient);
+        _accessValidator.Setup(v => v.CanAccess(patient.ApplicationId))
+            .Returns(true);
+        _repository.Setup(r => r.GetByPhoneAsync(command.ApplicationId, command.PhoneNumber, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(otherPatient);
+
+        var handler = new UpdatePatientHandler(_repository.Object, _accessValidator.Object);
+
+        Func<Task> action = () => handler.Handle(command, CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>();
+        _repository.Verify(r => r.Update(It.IsAny<Patient>()), Times.Never);
+        _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_WhenPhoneNumberUnchangedForSamePatient_UpdatesSuccessfully()
+    {
+        var patient = CreatePatient();
+        var command = new UpdatePatientCommand(
+            patient.Id, patient.ApplicationId, "Updated", "Patient",
+            new DateOnly(1991, 8, 14), Gender.Other, patient.PhoneNumber,
+            "updated@example.com", "999988887777", null, "Updated Address");
+
+        _repository.Setup(r => r.GetByIdAsync(command.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(patient);
+        _accessValidator.Setup(v => v.CanAccess(patient.ApplicationId))
+            .Returns(true);
+        _repository.Setup(r => r.GetByPhoneAsync(command.ApplicationId, command.PhoneNumber, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(patient);
+        _repository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = new UpdatePatientHandler(_repository.Object, _accessValidator.Object);
+
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        result.Should().NotBeNull();
+        _repository.Verify(r => r.Update(patient), Times.Once);
+        _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static Patient CreatePatient()
         => Patient.Create(
             Guid.NewGuid(),

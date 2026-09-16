@@ -18,6 +18,10 @@ public sealed class RegisterPatientHandler(
         logger.LogInformation("Registering patient {FirstName} {LastName} for application {ApplicationId}",
             request.FirstName, request.LastName, request.ApplicationId);
 
+        var duplicate = await repository.GetByPhoneAsync(request.ApplicationId, request.PhoneNumber, cancellationToken);
+        if (duplicate is not null)
+            throw new InvalidOperationException($"A patient with phone number '{request.PhoneNumber}' already exists.");
+
         var patient = Patient.Create(
             request.ApplicationId, request.FirstName, request.LastName,
             request.DateOfBirth, request.Gender, request.PhoneNumber,

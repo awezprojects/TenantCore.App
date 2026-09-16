@@ -1,32 +1,40 @@
 # TenantCore.App — Cline Memory & Working Rules
 
-> **Auto-loaded context for Cline.** Read at the start of every session before planning or writing any code in this repo.
-> This file **mirrors and references — never duplicates or replaces** — the canonical sources below.
-> **Do NOT modify `.claude/` (commands, context, settings) or `CLAUDE.md`** — those are Claude's workspace. This file is Cline's own memory.
-> On any conflict, the ADRs (`docs/adr/`) and `CLAUDE.md` win.
-> Last updated: 2026-09-14
+> **Auto-loaded context for Cline. This file IS the distilled repo knowledge base and is self-contained.**
+> Architecture, patterns, validation, testing, tenant isolation, security, UI theme, current state and the
+> list of features already built are all below. **Do NOT re-read `CLAUDE.md` or the ADRs to get oriented —
+> that is exactly what this file replaces.** Open one specific ADR / `CLAUDE.md` section only for a
+> genuinely undocumented edge case (see §0).
+> On any factual conflict, the ADRs (`docs/adr/`) and `CLAUDE.md` win.
+> **Read-only (never edit):** `CLAUDE.md`, the ADRs, `plan/REGISTRY.md`, migration files, `.claude/settings*.json`.
+> Last updated: 2026-09-15
 
 ---
 
-## 0. Canonical sources (read these; they win on any conflict)
+## 0. Reference sources — expand ONLY on demand (never read to "get oriented")
 
-| Source | Use it for |
-|---|---|
-| `CLAUDE.md` | Claude's instruction file — coding patterns + absolute constraints (read-only reference) |
-| `docs/adr/ADR-000-index.md` | Orientation — stack, project map, dependency direction |
-| `docs/adr/ADR-001-solution-structure.md` | Solution layout, dependency rules |
-| `docs/adr/ADR-002-domain-layer.md` | Entities, `IRepository<T>`, domain exceptions |
-| `docs/adr/ADR-003-application-layer.md` | CQRS, MediatR, features, pipeline behaviors |
-| `docs/adr/ADR-004-infrastructure-layer.md` | EF Core, `ClinicRepository<T>`, external services |
-| `docs/adr/ADR-005-api-layer.md` | Controllers, middleware order, authorization, config layering |
-| `docs/adr/ADR-006-shared-layer.md` | DTOs, constants, enums |
-| `docs/adr/ADR-007-blazor-client.md` | Blazor pages/components, UI theme, date handling, destructive-action confirmation |
-| `docs/adr/ADR-008-multi-tenancy.md` | Tenant isolation (`X-Application-Id`) |
-| `docs/adr/ADR-009-unit-testing.md` | Test standards |
-| `docs/adr/ADR-010-security.md` | Security + code quality checklist, safe-fix rules |
-| `plan/REGISTRY.md` | Feature registry + domain coverage map — **check before planning anything new** |
-| `.claude/context/current-state.md` | DbSet + DI registration snapshot (read-only; auto-maintained by Claude) |
-| `.claude/commands/*.md` | Claude's plan/execute/security command definitions — **canonical workflow; read-only** |
+Everything needed for a normal plan → execute → security cycle is in this file. The sources below are the
+**long-form originals**; open one (targeted, by section) only when you hit something this file does not cover.
+Do not read them wholesale, and do not read them at session start.
+
+| Open this… | …only when you need | Covered here by |
+|---|---|---|
+| `CLAUDE.md` | the exact wording of a rule you are about to change | §2–§3 |
+| `docs/adr/ADR-000-index.md` | package versions / stack table | §1 |
+| `docs/adr/ADR-001-solution-structure.md` | adding or moving a **project** | rare |
+| `docs/adr/ADR-002-domain-layer.md` | `BaseEntity`/`AuditableEntity` field lists, the full repo-interface list | rare |
+| `docs/adr/ADR-003-application-layer.md` | pipeline-behavior registration details | §2, §3 |
+| `docs/adr/ADR-004-infrastructure-layer.md` | `ClinicRepository<T>` internals, external-service wiring | rare |
+| `docs/adr/ADR-005-api-layer.md` | **exact middleware pipeline order** | §3 |
+| `docs/adr/ADR-006-shared-layer.md` | `Result<T>` / `PagedResult<T>` / enum conventions | rare |
+| `docs/adr/ADR-007-blazor-client.md` | the **full** CSS class list / hex palette | §7 |
+| `docs/adr/ADR-008-multi-tenancy.md` | JWT claim internals, per-tenant role mapping | §4 |
+| `docs/adr/ADR-009-unit-testing.md` | a test-file template to copy verbatim | §5 |
+| `docs/adr/ADR-010-security.md` | the **S1–S12 / V1–V7 catalogue** when scoring a finding | §6 |
+| `plan/REGISTRY.md` | checking a new feature against **everything already built** | §12 |
+| `.claude/context/current-state.md` | the **full 40-row DbSet table + DI list** | §11 |
+| `.claude/commands/*.md` | the canonical plan/execute/security workflow text | read-only |
+| `src/TenantCore.Api/Program.cs` | middleware order **as actually built** | §3 |
 
 > **Path note:** `CLAUDE.md` and ADR-000 reference ADRs as `.claude/docs/adr/...`; the ADRs actually live in **`docs/adr/`**. Always use `docs/adr/`.
 
@@ -95,8 +103,10 @@ public class PatientsController(ISender sender) : ClinicControllerBase(sender)
 
 ```csharp
 public sealed record CreatePatientCommand(CreatePatientRequest Request, Guid ApplicationId) : IRequest<Guid>;
-public sealed record DeletePatientCommand(Guid Id, Guid ApplicationId) : IRequest;
+public sealed record UpdatePatientCommand(Guid Id, UpdatePatientRequest Request, Guid ApplicationId) : IRequest<PatientDto>;
+public sealed record DeletePatientCommand(Guid Id, Guid ApplicationId) : IRequest;   // void → IRequest (no type param)
 public sealed record GetPatientsQuery(Guid ApplicationId) : IRequest<IEnumerable<PatientSummaryDto>>;
+public sealed record GetPatientByIdQuery(Guid Id, Guid ApplicationId) : IRequest<PatientDto>;
 ```
 
 ### Handler — `Features/{Area}/Handlers/`
@@ -123,10 +133,15 @@ Extends `IRepository<T>` (generic base: `GetByIdAsync`, `GetAllAsync`, `AddAsync
 Inherit `ClinicRepository<T>`; always filter by `applicationId`; `AsNoTracking()` on reads.
 
 ### EF config — `src/TenantCore.Infrastructure/Persistence/Configurations/`
-`IEntityTypeConfiguration<T>`, Fluent API only (no Data Annotations on entities), configure `RowVersion` as row version.
+`internal sealed class XConfiguration : IEntityTypeConfiguration<X>` — Fluent API only (no Data Annotations on entities).
+Convention: `builder.HasKey(x => x.Id)` → `builder.Property(x => x.Name).IsRequired().HasMaxLength(N)` per string → `builder.Property(x => x.RowVersion).IsRowVersion();`
 
 ### DTOs — `src/TenantCore.Shared/Dtos/`
-`record` with `init` setters. Detail `XDto`, list `XSummaryDto`, input `CreateXRequest` / `UpdateXRequest`. No methods, no validation attributes, no business logic.
+`record` with `init` setters. Detail `XDto`, list `XSummaryDto` (lean — Id, display name, status only), input `CreateXRequest` / `UpdateXRequest`. No methods, no validation attributes, no business logic.
+```csharp
+public record PatientDto { public Guid Id { get; init; } public string FirstName { get; init; } = string.Empty; }
+public record CreatePatientRequest { public string FirstName { get; init; } = string.Empty; public Gender Gender { get; init; } }
+```
 
 ### DI + migrations
 - Application DI: `AddApplication()` · Infrastructure DI: `AddInfrastructure()`. Handlers/validators auto-scan. New repository → register `Scoped` in Infrastructure DI.
@@ -168,6 +183,17 @@ Never return error responses manually from handlers or controllers.
 ### Authorization
 `[Authorize(Policy = AuthPolicies.RequireAuthenticated | RequireClinicAdmin | RequireReception | RequireClinical)]`.
 Constants live in `TenantCore.Shared/Authorization/AuthorizationConstants.cs` — never use raw string literals.
+Every controller action carries an explicit `[Authorize(...)]` or `[AllowAnonymous]` (with a justifying comment).
+
+### Middleware pipeline order — `src/TenantCore.Api/Program.cs` (current @ 2026-09-15 — NEVER reorder)
+`CorrelationIdMiddleware` → `ExceptionHandlingMiddleware` → `UseSerilogRequestLogging` →
+(`UseSwagger` + `UseSwaggerUI` in Development) → `UseBlazorFrameworkFiles` → `UseStaticFiles` (index.html no-cache)
+→ `UseCors("AllowAll")` → `UseAuthentication` → `ClinicContextMiddleware` → `SubscriptionGuardMiddleware` →
+`BillingFeatureGuardMiddleware` → `UseAuthorization` → `MapControllers` → `MapHealthChecks("/health")` → `MapFallbackToFile("index.html")`.
+
+Why the order matters: `ClinicContextMiddleware` must run **after** `UseAuthentication` (it reads the JWT `app_ids`
+claim); the subscription (402) and billing (403) guards must run **after** `ClinicContextMiddleware` and **before**
+`UseAuthorization`. Adding a middleware means inserting it — never moving the existing ones. Full rationale: ADR-005.
 
 ---
 
@@ -185,7 +211,9 @@ X-Application-Id header
 - Never accept `ApplicationId` from `[FromBody]` — only from `GetApplicationId()`.
 - Every tenant-scoped entity has `public Guid ApplicationId { get; set; }`.
 - Test: "can two different clinics have different values/records for this?" → yes ⇒ tenant-scoped.
-- Global reference/lookup data (e.g. `MedicineDosageForm`, `DoctorSpeciality`) is **not** tenant-scoped.
+- Global reference/lookup data (e.g. `MedicineDosageForm`, `DoctorSpeciality`, `State`, `City`, `SubscriptionPlan`, `SubscriptionAlertSetting`) is **not** tenant-scoped.
+- The stash key is `ClinicContextMiddleware.ContextKey` → `HttpContext.Items["ApplicationId"]`. Controller tests set `httpContext.Items[ClinicContextMiddleware.ContextKey]` directly (see `tests/TenantCore.Api.Tests`).
+- Two cross-cutting guards sit on the pipeline (§3): no active subscription ⇒ **402** on clinic-scoped routes; billing disabled ⇒ **403** on billing route prefixes.
 
 ---
 
@@ -217,17 +245,33 @@ dotnet test tests/TenantCore.Application.Tests/
 **Safe-fix rules (ADR-010 §11):** read the file first; find all callers before changing a signature; preserve observable behavior; one logical fix per edit; do not refactor surrounding code.
 **Never change without explicit user instruction:** migration files, `RowVersion` concurrency config, middleware pipeline order, JWT validation parameters, `GetApplicationId()` implementation.
 
-**Blazor client specifics (ADR-007):** no MudBlazor (removed — use native HTML with `opd-*`, `form-*`, `cc-*` classes); use `DateTimeHelper.ToLocalString()` for UTC-stored dates; `DateTime.Today` for "today" on the client; send `utcOffset` for UTC date-range filters; confirm before destructive actions; print pages open via `window.open` and use a red "✕ Close" button.
+**Blazor client specifics:** see §7 (no MudBlazor; `opd-*` theme; UTC dates via `DateTimeHelper.ToLocalString()`; `DateTime.Today` for "today"; `utcOffset` on UTC date-range filters; `ConfirmDialog` before destructive actions; print pages via `window.open` + red "✕ Close").
 
 ---
 
-## 7. Workflow — 3 phases (mirrors `.claude/commands`, read-only)
+## 7. Blazor client essentials (ADR-007) — condensed
+
+Read before writing any page/component. Full class list + hex palette live in ADR-007 §"UI Theme System".
+
+- **No MudBlazor** (fully removed). Native HTML only, styled by `src/TenantCore.Web.Client/wwwroot/css/app.css`.
+- **Two themes — using the wrong one is a bug.** OPD/management pages ⇒ `opd-*` classes. Legacy/other pages ⇒ `form-*` / `cc-*`.
+- **OPD page shell (required):** `div.opd-page` › `div.opd-header` (`.opd-title` + `.opd-subtitle` + `button.opd-btn-primary`) › optional `div.opd-filter-bar` (`.opd-search-input`) › optional `div.opd-stats` (`div.opd-stat-card` + modifier `done` / `waiting`, each with `.opd-stat-label` / `.opd-stat-icon` / `.opd-stat-value`) › `div.opd-table-card` › `table.opd-table`; empty rows use `<td colspan="N" class="opd-empty">`.
+- **Buttons:** `opd-btn` (outline) · `opd-btn-primary` (filled) · `opd-btn start` (green accent — **space, not dash**) · `opd-tab` (tab strip).
+- **Status badges:** never return `RenderFragment` from a switch (causes phantom error messages). Use an inline `<span style="...">` or a `private static MarkupString StatusBadge(...)` helper. Palette: success `#DCFCE7`/`#166534` · pending `#FEF3C7`/`#92400E` · error `#FEE2E2`/`#991B1B` · neutral `#F1F5F9`/`#475569`; money out `#DC2626`, money in `#16A34A`.
+- **Modals:** custom fixed-position pattern — overlay `position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900` + panel `z-index:901` with `@onclick:stopPropagation="true"`. No MudBlazor dialogs.
+- **Dates:** UTC is stored/sent. Display with `DateTimeHelper.ToLocalString()`. "Today" on the client = `DateTime.Today`. Date-range filters that must be UTC-correct send `utcOffset`.
+- **Destructive actions:** always route through the shared `ConfirmDialog` (`Web.Client/Components/ConfirmDialog.razor`) — never bind a delete straight to `@onclick`.
+- **Print pages:** open via `window.open`; render a red "✕ Close" button in the print view.
+
+---
+
+## 8. Workflow — 3 phases (mirrors `.claude/commands`, read-only)
 
 Claude's canonical command definitions live in `.claude/commands/`. I mirror their discipline; I never modify them.
 
 **Phase 1 — Plan** (mirrors `plan-app-feature.md`)
-1. Read `.claude/context/current-state.md` and `plan/REGISTRY.md`; verify the DbSet count matches the actual `ClinicDbContext.cs`.
-2. Read `CLAUDE.md` + `docs/adr/ADR-000-index.md`, then only the ADRs relevant to the layers touched.
+1. Read `.claude/context/current-state.md` and `plan/REGISTRY.md` — the only two files this phase needs (they are auto-maintained and drift, so this file cannot cache them). Quickly verify the DbSet count matches `ClinicDbContext.cs`.
+2. **Do NOT re-read `CLAUDE.md` or the ADRs.** Everything needed is already in this file (§1–§7). Open one ADR **section** only for an undocumented edge case (see §0).
 3. Present a **pre-plan brief** — domain area, layers affected, tenant-scoped?, EF migration?, files to create/modify, key decisions/open questions — and **wait for explicit approval**.
 4. On approval, write `plan/<feature-name>/PLAN.md` (Overview, entity property table, Files to Create, Files to Modify, API Endpoints, Validation Rules, Business Rules, Multi-Tenancy Checklist, EF migration, Implementation Order, Test Files to Create).
 
@@ -240,7 +284,7 @@ Scan the implementation against ADR-010; report findings by severity with file/l
 
 ---
 
-## 8. Configuration layering (ADR-005)
+## 9. Configuration layering (ADR-005)
 
 `Program.cs` load order — later wins: `appsettings.json` → `appsettings.{Environment}.json` → **`appsettings.Local.json`** (last, gitignored).
 - `appsettings.json` / `appsettings.Development.json`: **placeholders only** — checked in, never real secrets or working connection strings.
@@ -250,7 +294,7 @@ New config key ⇒ add it to **both** files (placeholder + real value).
 
 ---
 
-## 9. New-feature file layout (`Foo`)
+## 10. New-feature file layout (`Foo`)
 
 ```
 src/TenantCore.Shared/Dtos/                                  FooDto.cs, CreateFooRequest.cs, UpdateFooRequest.cs
@@ -268,12 +312,30 @@ Namespaces/types follow: commands `CreateFooCommand` (`sealed record`), handlers
 
 ---
 
-## 10. Session-start checklist
+## 11. Current state (summary — verify against `.claude/context/current-state.md` before touching a DbSet/DI)
 
-1. Read this file (`.clinerules`).
-2. Read `.claude/context/current-state.md` + `plan/REGISTRY.md` (read-only).
-3. Read `CLAUDE.md` + `docs/adr/ADR-000-index.md`, then only the relevant ADRs.
+- **`ClinicDbContext` has 40 DbSets.** Non-tenant-scoped (global lookups / catalogue): `MedicineDosageForms`, `DoctorSpecialities`, `SubscriptionPlans`, `SubscriptionAlertSettings`, `States`, `Cities`. Everything else is tenant-scoped.
+- **`VitalPresetLookupItems` is dual-natured:** `ApplicationId == null` = global system default (read-only, visible to every clinic); set = that clinic's own row.
+- **Three medicine repositories are cached decorators:** `IMedicineRepository` → `CachedMedicineRepository`, `IMedicineTypeRepository` → `CachedMedicineTypeRepository`, `IMedicineDosageFormRepository` → `CachedMedicineDosageFormRepository`, backed by `RefreshableCache<T>` and kept warm by `MedicineCacheWarmupService` (startup + every 30 min). Clinic-owned medicines are always queried live.
+- **Logging is a separate store, not `ClinicDbContext`:** `IErrorLogger` (`ApiErrorLogs` / `FrontendErrorLogs`) and `IActionLogger` (`ActionLogs`) write to **Azure Table Storage via the `TenantCore.Logging` project**. `ActionLoggingBehavior` fires automatically for commands marked `IBusinessAction`.
+- **Full 40-row DbSet table + every DI registration:** `.claude/context/current-state.md` — read it before adding/removing a DbSet or a DI registration.
+
+---
+
+## 12. Feature registry summary (check `plan/REGISTRY.md` before planning anything new)
+
+**Already built — do not duplicate:** Patients · OPD & IPD registrations · Medicines (+ type / dosage-form / search caching) · Prescriptions (+ items, PDF, obstetric data, USG templates, history print-control) · Doctor profiles, specialities & fees · Wards / Rooms / Beds · Clinic fee config · Particulars & OPD payments (prepaid + refund) · Expense categories & records · Counter sessions · Amount handovers · Finance reports · Clinic feature flags (PrepaidOpd / Billing) · Subscription plans + gating · Centralized logging + action/audit logging · Vitals-preset lookup · History lookup items · States / Cities · Clinic locations · Pregnancy tenure + LMP tenure view.
+
+`plan/REGISTRY.md` also holds the **Executed Features** log (dates, new entities/DbSets, file counts) and the current **Planned (not yet executed)** list — read it to check overlap or to record a new execution.
+
+---
+
+## 13. Session-start checklist
+
+1. This file (`.clinerules`) is auto-loaded — it *is* your context. **Do not re-read `CLAUDE.md` / the ADRs.**
+2. Read only `.claude/context/current-state.md` + `plan/REGISTRY.md` (they drift; both are auto-maintained — only the two designated update steps in the execute workflow may edit them).
+3. Open a single ADR / `CLAUDE.md` section only for an undocumented edge case (see §0).
 4. Confirm scope with the user before writing code for a new feature (Plan → approve → Execute).
 5. Verify multi-tenancy, add tests, and run `dotnet test` before declaring done.
-6. Never modify `.claude/`, `CLAUDE.md`, the ADRs, `plan/REGISTRY.md`, or migration files.
+6. Never modify `CLAUDE.md`, the ADRs, migrations, `RowVersion` config, the middleware order, JWT validation params, `GetApplicationId()`, or `.claude/settings*.json` without explicit user instruction.
 

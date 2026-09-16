@@ -120,12 +120,89 @@ public class RegisterPatientCommandValidatorTests
         _validator.Validate(command).IsValid.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("123")]
+    [InlineData("+91 98123-45699")]
+    [InlineData("98123456789")]
+    [InlineData("abcdefghij")]
+    public void Validate_WhenPhoneNumberIsNotTenDigits_ReturnsError(string phoneNumber)
+    {
+        var command = CreateCommand(phoneNumber: phoneNumber);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "PhoneNumber");
+    }
+
+    [Fact]
+    public void Validate_WhenPhoneNumberIsExactlyTenDigits_ReturnsValid()
+    {
+        var command = CreateCommand(phoneNumber: "9812345670");
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_WhenEmergencyContactPhoneIsNotTenDigits_ReturnsError()
+    {
+        var command = CreateCommand(emergencyContactPhone: "abcXYZ!!");
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "EmergencyContactPhone");
+    }
+
+    [Fact]
+    public void Validate_WhenEmergencyContactPhoneIsNull_ReturnsValid()
+    {
+        var command = CreateCommand(emergencyContactPhone: null);
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("<script>alert('XSS')</script>")]
+    [InlineData("John123")]
+    [InlineData("John<b>")]
+    public void Validate_WhenFirstNameContainsInvalidCharacters_ReturnsError(string firstName)
+    {
+        var command = CreateCommand(firstName: firstName);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "FirstName");
+    }
+
+    [Fact]
+    public void Validate_WhenAddressContainsHtmlTags_ReturnsError()
+    {
+        var command = CreateCommand(address: "<img src=x onerror=alert(document.cookie)>");
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "Address");
+    }
+
+    [Fact]
+    public void Validate_WhenAddressIsPlainText_ReturnsValid()
+    {
+        var command = CreateCommand(address: "221B Baker Street, London");
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
+    }
+
     private static RegisterPatientCommand CreateCommand(
         string firstName = "Jane",
         string lastName = "Doe",
-        string phoneNumber = "+1234567890",
+        string phoneNumber = "9812345670",
         string? email = "jane@example.com",
         string? aadhaarNumber = "123456789012",
+        string? emergencyContactPhone = null,
+        string? address = "123 Main St",
         DateOnly? dateOfBirth = null)
         => new(
             Guid.NewGuid(),
@@ -137,5 +214,6 @@ public class RegisterPatientCommandValidatorTests
             email,
             aadhaarNumber,
             null,
-            "123 Main St");
+            address,
+            EmergencyContactPhone: emergencyContactPhone);
 }

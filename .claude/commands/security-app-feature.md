@@ -4,10 +4,9 @@ You are performing a security and code quality review of a feature implemented i
 
 ## Step 1 — Load the feature context
 
-Read these files in order:
-
-1. `.claude/docs/adr/ADR-010-security.md` — the complete security and quality checklist for this repo
-2. `CLAUDE.md` — architectural patterns and absolute constraints
+1. `.clinerules` — **already auto-loaded**: §6 is the security/quality checklist plus the S1–S12 / V1–V7 list, §3 has the hard rules (including the frozen middleware order)
+2. `docs/adr/ADR-010-security.md` — the full long-form catalogue. Open it when you need exact wording to score a specific finding, or the §11 safe-fix rules verbatim. (ADRs live in `docs/adr/`, **not** `.claude/docs/adr/`.)
+3. `CLAUDE.md` — no need to read routinely; it duplicates `.clinerules` §2–§3
 
 Then check whether a plan exists:
 
@@ -214,7 +213,7 @@ Write or overwrite `plan/$ARGUMENTS/SECURITY.md` using this template:
 **Date:** <today's date>
 **Repo:** TenantCore.App
 **Plan:** plan/$ARGUMENTS/PLAN.md  (or "no plan — code-only scan")
-**ADR reference:** .claude/docs/adr/ADR-010-security.md
+**ADR reference:** docs/adr/ADR-010-security.md  (condensed checklist: `.clinerules` §6)
 
 ## Overall Risk Level
 

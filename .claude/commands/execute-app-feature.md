@@ -2,24 +2,26 @@ You are implementing a planned feature for **TenantCore.App**. $ARGUMENTS is the
 
 ---
 
-## Step 1 — Load the plan and context
+## Step 1 — Load the plan and context (do NOT re-read the ADRs)
 
-Read these files — nothing else until a specific file must be modified:
+Read only this:
 
 1. `plan/$ARGUMENTS/PLAN.md` — the approved implementation blueprint
-2. `CLAUDE.md` — patterns, rules, absolute constraints
+2. `.clinerules` — **already auto-loaded** and self-contained (patterns, rules, validation, testing, tenancy, UI theme, middleware order)
 
-Then read only the ADRs that are relevant to the layers this plan touches (check the "Layers Affected" table in PLAN.md):
+`.clinerules` is sufficient for every layer below. Open a single ADR **section** only for an undocumented edge case:
 
-| Layer in plan | ADR to read |
-|--------------|-------------|
-| Domain | `.claude/docs/adr/ADR-002-domain-layer.md` |
-| Application | `.claude/docs/adr/ADR-003-application-layer.md` |
-| Infrastructure | `.claude/docs/adr/ADR-004-infrastructure-layer.md` |
-| API | `.claude/docs/adr/ADR-005-api-layer.md` |
-| Shared | `.claude/docs/adr/ADR-006-shared-layer.md` |
-| Blazor Client | `.claude/docs/adr/ADR-007-blazor-client.md` |
-| Multi-tenancy | `.claude/docs/adr/ADR-008-multi-tenancy.md` |
+| Layer in plan | Rules already in `.clinerules` | Open an ADR only for |
+|--------------|-------------------------------|----------------------|
+| Domain | §2 (entities, `IRepository<T>`) | `BaseEntity`/`AuditableEntity` field lists → ADR-002 |
+| Application | §2 (CQRS, handlers, validators, translators) | behavior registration → ADR-003 |
+| Infrastructure | §2 (EF config, `ClinicRepository<T>`) | repository internals → ADR-004 |
+| API | §3 (controllers, authorization, middleware order) | pipeline rationale → ADR-005 |
+| Shared | §2 (DTO record shapes) | `Result<T>` / `PagedResult<T>` → ADR-006 |
+| Blazor Client | §7 (UI theme essentials) | the full CSS class list → ADR-007 |
+| Multi-tenancy | §4 | JWT claim internals → ADR-008 |
+
+> Path note: the ADRs live in `docs/adr/`, **not** `.claude/docs/adr/`.
 
 ---
 
@@ -139,7 +141,7 @@ Standard order for TenantCore.App features:
 
 ## Step 5 — Write Unit Tests
 
-Read `.claude/docs/adr/ADR-009-unit-testing.md` now. Tests are **not optional** — a feature is not complete without them.
+Read `.clinerules` §5 now — the test stack, the `MethodName_Scenario_ExpectedResult` naming rule, and the per-feature coverage matrix are all there. Tests are **not optional** — a feature is not complete without them. (Open `docs/adr/ADR-009-unit-testing.md` only if you want a full test-file template to copy verbatim.)
 
 Create the following test files under `tests/TenantCore.Application.Tests/Features/<Area>/`:
 

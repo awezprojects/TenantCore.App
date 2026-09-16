@@ -2,6 +2,9 @@
 @layout AuthLayout
 @inject IAuthApiClient AuthClient
 @inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject SubscriptionContextService SubscriptionContext
+@inject FeatureFlagsContextService FeatureFlagsContext
 @inject NavigationManager NavigationManager
 @inject IToastService Toast
 
@@ -111,6 +114,14 @@ else
             if (response.Success && response.Data != null)
             {
                 await AuthState.SetAuthenticatedStateAsync(response.Data);
+
+                // See Login.razor — clears any clinic selection left over from a previous
+                // session/account so it can't be auto-attached as a stale X-Application-Id
+                // and 403 the new user's first request.
+                SubscriptionContext.Clear();
+                FeatureFlagsContext.Clear();
+                await ClinicContext.ClearClinicAsync();
+
                 Toast.ShowSuccess("Login successful!");
 
                 if (!string.IsNullOrEmpty(ReturnUrl))

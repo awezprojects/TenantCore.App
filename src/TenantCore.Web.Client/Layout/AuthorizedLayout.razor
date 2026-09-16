@@ -138,6 +138,7 @@ else if (_isAuthenticated)
                         </button>
                         @if (_userMenuOpen)
                         {
+                            <div @onclick="CloseUserMenu" style="position:fixed;inset:0;z-index:199;"></div>
                             <div style="position:absolute;right:0;top:calc(100% + 6px);background:#fff;
                                         border:1px solid #E2E8F0;border-radius:10px;
                                         box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:180px;z-index:200;">
@@ -182,7 +183,7 @@ else if (_isAuthenticated)
             </div>
 
             <!-- Page content — only this div scrolls -->
-            <div style="flex:1;padding:28px 32px;overflow-y:auto;min-height:0;">
+            <div id="cc-page-scroll" style="flex:1;padding:28px 32px;overflow-y:auto;min-height:0;">
                 @if (NeedsSubscriptionGate && !SubscriptionContext.IsLoaded)
                 {
                     <div style="display:flex;justify-content:center;padding:60px 0;">

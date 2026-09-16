@@ -135,17 +135,21 @@ else
                             <input value="@GetVital(field.Key)"
                                    @oninput="e => SetVital(field.Key, e.Value?.ToString())"
                                    placeholder="@field.Placeholder"
+                                   disabled="@_isFinalized"
                                    style="width:100%; border:none; background:transparent; text-align:center; font-size:16px; font-weight:700; outline:none; color:#0F172A;" />
                             <div style="font-size:10px; color:#94A3B8; margin-top:2px;">@field.Label</div>
-                            <select value="" class="vital-quickpick" @onchange="e => SetVital(field.Key, e.Value?.ToString())"
-                                    title="Quick-pick a common value, or type your own above"
-                                    style="width:100%; margin-top:6px; font-size:11px; padding:5px 4px; border:1.5px solid #DBEAFE; border-radius:6px; background:#EFF6FF; color:#2563EB; font-weight:600; outline:none;">
-                                <option value="">Quick pick…</option>
-                                @foreach (var p in _vitalPresets[field.Key])
-                                {
-                                    <option value="@p">@p</option>
-                                }
-                            </select>
+                            @if (!_isFinalized)
+                            {
+                                <select value="" class="vital-quickpick" @onchange="e => SetVital(field.Key, e.Value?.ToString())"
+                                        title="Quick-pick a common value, or type your own above"
+                                        style="width:100%; margin-top:6px; font-size:11px; padding:5px 4px; border:1.5px solid #DBEAFE; border-radius:6px; background:#EFF6FF; color:#2563EB; font-weight:600; outline:none;">
+                                    <option value="">Quick pick…</option>
+                                    @foreach (var p in _vitalPresets[field.Key])
+                                    {
+                                        <option value="@p">@p</option>
+                                    }
+                                </select>
+                            }
                         </div>
                     }
                 </div>
@@ -180,14 +184,14 @@ else
                 <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                     <HistoryChipField Icon="📋" Label="Past Medical History (PAMH)" Type="HistoryItemType.PastMedicalHistory"
                                        SelectedItems="_pamHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                       ShowPrintToggle="true" PrintFlags="_pamHistoryPrint"
+                                       ShowPrintToggle="true" PrintFlags="_pamHistoryPrint" ReadOnly="@_isFinalized"
                                        ChipBg="#FFFBEB" ChipBorder="#FDE68A" ChipText="#92400E" />
                 </div>
 
                 <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                     <HistoryChipField Icon="👨‍👩‍👧" Label="Family History" Type="HistoryItemType.FamilyHistory"
                                        SelectedItems="_familyHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                       ShowPrintToggle="true" PrintFlags="_familyHistoryPrint"
+                                       ShowPrintToggle="true" PrintFlags="_familyHistoryPrint" ReadOnly="@_isFinalized"
                                        ChipBg="#F0FDF4" ChipBorder="#BBF7D0" ChipText="#166534" />
                 </div>
             </div>
@@ -228,6 +232,7 @@ else
                                                value="@GetObsValue(k)"
                                                @oninput="e => SetObsValue(k, e.Value?.ToString())"
                                                placeholder="0"
+                                               disabled="@_isFinalized"
                                                style="width:100%; padding:9px 8px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:18px; font-weight:700; text-align:center; outline:none; box-sizing:border-box; color:#7C3AED;" />
                                     </div>
                                 }
@@ -244,6 +249,7 @@ else
                                           @oninput="e => _obsInformation = e.Value?.ToString() ?? string.Empty"
                                           rows="3"
                                           placeholder="Additional obstetric history notes…"
+                                          disabled="@_isFinalized"
                                           style="width:100%; padding:10px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
                             </div>
                         </div>
@@ -266,10 +272,13 @@ else
                                                 Close this tenure before setting a new LMP.
                                             </div>
                                         </div>
-                                        <button @onclick="() => _showCloseTenureModal = true"
-                                                style="padding:8px 18px; border-radius:8px; border:none; background:#DC2626; color:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
-                                            Close Tenure
-                                        </button>
+                                        @if (!_isFinalized)
+                                        {
+                                            <button @onclick="() => _showCloseTenureModal = true"
+                                                    style="padding:8px 18px; border-radius:8px; border:none; background:#DC2626; color:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                                Close Tenure
+                                            </button>
+                                        }
                                     </div>
                                 }
                                 else
@@ -284,10 +293,13 @@ else
                                                 EDD: <strong>@((_activeTenure.EddByUsg ?? _activeTenure.EddByLmp).ToString("dd MMM yyyy"))</strong>
                                             </div>
                                         </div>
-                                        <button @onclick="() => _showCloseTenureModal = true"
-                                                style="padding:8px 18px; border-radius:8px; border:1.5px solid #1D4ED8; background:#fff; color:#1D4ED8; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
-                                            Close Tenure
-                                        </button>
+                                        @if (!_isFinalized)
+                                        {
+                                            <button @onclick="() => _showCloseTenureModal = true"
+                                                    style="padding:8px 18px; border-radius:8px; border:1.5px solid #1D4ED8; background:#fff; color:#1D4ED8; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">
+                                                Close Tenure
+                                            </button>
+                                        }
                                     </div>
                                 }
                             }
@@ -300,16 +312,16 @@ else
                                            value="@(_lmpValue?.ToString("yyyy-MM-dd") ?? string.Empty)"
                                            @onchange="@(e => { if (DateOnly.TryParse(e.Value?.ToString(), out var d)) _lmpValue = d; else _lmpValue = null; })"
                                            max="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")"
-                                           disabled="@_tenureOverdue"
-                                           style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A; opacity:@(_tenureOverdue ? "0.5" : "1");" />
-                                    @if (PrescriptionId != Guid.Empty && _lmpValue.HasValue && !_tenureOverdue)
+                                           disabled="@(_tenureOverdue || _isFinalized)"
+                                           style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A; opacity:@(_tenureOverdue || _isFinalized ? "0.5" : "1");" />
+                                    @if (PrescriptionId != Guid.Empty && _lmpValue.HasValue && !_tenureOverdue && !_isFinalized)
                                     {
                                         <button @onclick="QuickSaveLmpAsync" disabled="@_savingLmp"
                                                 style="padding:8px 18px; border-radius:8px; border:none; background:#7C3AED; color:#fff; font-size:12px; font-weight:600; cursor:pointer; opacity:@(_savingLmp ? "0.6" : "1");">
                                             @(_savingLmp ? "Saving…" : "Save Now")
                                         </button>
                                     }
-                                    @if (_lmpValue.HasValue)
+                                    @if (_lmpValue.HasValue && !_isFinalized)
                                     {
                                         <button @onclick="() => _confirmDeleteLmp = true"
                                                 title="Delete LMP"
@@ -351,8 +363,9 @@ else
                                            value="@(_correctedLmpByUsgValue?.ToString("yyyy-MM-dd") ?? string.Empty)"
                                            @onchange="OnCorrectedLmpByUsgChanged"
                                            max="@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")"
-                                           style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A;" />
-                                    @if (PrescriptionId != Guid.Empty && _eddByUsgValue.HasValue)
+                                           disabled="@_isFinalized"
+                                           style="padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; color:#0F172A; opacity:@(_isFinalized ? "0.5" : "1");" />
+                                    @if (PrescriptionId != Guid.Empty && _eddByUsgValue.HasValue && !_isFinalized)
                                     {
                                         <button @onclick="QuickSaveEddByUsgAsync" disabled="@_savingEddUsg"
                                                 style="padding:8px 18px; border-radius:8px; border:none; background:#0891B2; color:#fff; font-size:12px; font-weight:600; cursor:pointer; opacity:@(_savingEddUsg ? "0.6" : "1");">
@@ -420,35 +433,35 @@ else
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🩸" Label="Menstrual History" Type="HistoryItemType.MenstrualHistory"
                                                SelectedItems="_menstrualHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                               ShowPrintToggle="true" PrintFlags="_menstrualHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
+                                               ShowPrintToggle="true" PrintFlags="_menstrualHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll" ReadOnly="@_isFinalized"
                                                ChipBg="#FFF1F2" ChipBorder="#FECDD3" ChipText="#BE123C" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🔪" Label="Surgical History" Type="HistoryItemType.SurgicalHistory"
                                                SelectedItems="_surgicalHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                               ShowPrintToggle="true" PrintFlags="_surgicalHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
+                                               ShowPrintToggle="true" PrintFlags="_surgicalHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll" ReadOnly="@_isFinalized"
                                                ChipBg="#FEF3C7" ChipBorder="#FDE68A" ChipText="#92400E" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🤰" Label="Per Abdomen" Type="HistoryItemType.PerAbdomen"
                                                SelectedItems="_perAbdomenHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                               ShowPrintToggle="true" PrintFlags="_perAbdomenHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
+                                               ShowPrintToggle="true" PrintFlags="_perAbdomenHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll" ReadOnly="@_isFinalized"
                                                ChipBg="#EFF6FF" ChipBorder="#BFDBFE" ChipText="#1D4ED8" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🩷" Label="Per Vaginum" Type="HistoryItemType.PerVaginum"
                                                SelectedItems="_perVaginumHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                               ShowPrintToggle="true" PrintFlags="_perVaginumHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
+                                               ShowPrintToggle="true" PrintFlags="_perVaginumHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll" ReadOnly="@_isFinalized"
                                                ChipBg="#FDF2F8" ChipBorder="#FBCFE8" ChipText="#BE185D" />
                         </div>
 
                         <div style="border:1.5px solid #F1F5F9; border-radius:12px; padding:16px;">
                             <HistoryChipField Icon="🔬" Label="Per Speculum" Type="HistoryItemType.PerSpeculum"
                                                SelectedItems="_perSpeculumHistory" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
-                                               ShowPrintToggle="true" PrintFlags="_perSpeculumHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll"
+                                               ShowPrintToggle="true" PrintFlags="_perSpeculumHistoryPrint" PrintStateChanged="RefreshObstetricPrintAll" ReadOnly="@_isFinalized"
                                                ChipBg="#F5F3FF" ChipBorder="#DDD6FE" ChipText="#5B21B6" />
                         </div>
 
@@ -545,7 +558,7 @@ else
                 <div class="responsive-2col">
                     <div style="background:#fff; border-radius:14px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
                         <HistoryChipField Icon="📝" Label="Diagnosis / Clinical Notes" Type="HistoryItemType.Diagnosis"
-                                           SelectedItems="_diagnosisSelected" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                           SelectedItems="_diagnosisSelected" LookupItems="_diagnosisLookup" OnItemCreated="OnHistoryItemCreated" ReadOnly="@_isFinalized"
                                            ChipBg="#EFF6FF" ChipBorder="#BFDBFE" ChipText="#1D4ED8" />
                     </div>
 
@@ -553,14 +566,17 @@ else
                     <div style="background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,0.08); overflow:hidden;">
                         <div style="padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #E2E8F0;">
                             <div style="font-weight:700; font-size:14px; color:#0F172A;">🔬 Investigations</div>
-                            <button @onclick="() => _showInvPicker = true"
-                                    style="padding:6px 14px; border-radius:7px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">
-                                + Add from list
-                            </button>
+                            @if (!_isFinalized)
+                            {
+                                <button @onclick="() => _showInvPicker = true"
+                                        style="padding:6px 14px; border-radius:7px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">
+                                    + Add from list
+                                </button>
+                            }
                         </div>
                         <div style="padding:12px 20px 16px;">
                             <HistoryChipField Icon="" Label="" Type="HistoryItemType.Investigation"
-                                               SelectedItems="_investigations" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated"
+                                               SelectedItems="_investigations" LookupItems="_historyLookup" OnItemCreated="OnHistoryItemCreated" ReadOnly="@_isFinalized"
                                                ChipBg="#F5F3FF" ChipBorder="#DDD6FE" ChipText="#7C3AED" />
                         </div>
                     </div>
@@ -577,8 +593,9 @@ else
                     <div style="padding:16px 20px 18px;">
 
                         <!-- Drug Search — hidden while a medicine is being added/edited so there's
-                             only ever one editor open at a time. -->
-                        @if (_draftItem is null)
+                             only ever one editor open at a time, and hidden entirely once the
+                             prescription is finalized (immutable). -->
+                        @if (_draftItem is null && !_isFinalized)
                         {
                             <div style="margin-bottom:16px;">
                                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
@@ -675,20 +692,28 @@ else
                                         <div style="position:relative;">
                                             <input type="number" min="1" @bind="item.DurationDays"
                                                    @bind:after="() => RecalcQuantity(item)"
-                                                   style="width:100%; padding:9px 38px 9px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box;" />
+                                                   style="width:100%; padding:9px 38px 9px 10px; border:1.5px solid @(item.DurationDays <= 0 ? "#DC2626" : "#E2E8F0"); border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box;" />
                                             <span style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:#94A3B8; font-weight:600; pointer-events:none;">days</span>
                                         </div>
+                                        @if (item.DurationDays <= 0)
+                                        {
+                                            <div style="font-size:10px; color:#DC2626; font-weight:600; margin-top:3px;">Must be greater than 0.</div>
+                                        }
                                     </div>
                                     <div>
                                         <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Quantity</div>
                                         <div style="position:relative;">
                                             <input type="number" min="0" step="0.5" @bind="item.Quantity"
-                                                   style="width:100%; padding:9px 34px 9px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; text-align:center;" />
+                                                   style="width:100%; padding:9px 34px 9px 10px; border:1.5px solid @(item.Quantity <= 0 ? "#DC2626" : "#E2E8F0"); border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box; text-align:center;" />
                                             @if (string.Equals(item.DosageUnit, "ml", StringComparison.OrdinalIgnoreCase))
                                             {
                                                 <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:10px; color:#94A3B8; font-weight:600; pointer-events:none;">ml</span>
                                             }
                                         </div>
+                                        @if (item.Quantity <= 0)
+                                        {
+                                            <div style="font-size:10px; color:#DC2626; font-weight:600; margin-top:3px;">Must be greater than 0.</div>
+                                        }
                                     </div>
                                 </div>
 
@@ -845,8 +870,8 @@ else
                                             style="padding:8px 18px; border-radius:8px; border:1.5px solid #E2E8F0; background:#fff; cursor:pointer; font-size:12px; font-weight:600; color:#334155;">
                                         Cancel
                                     </button>
-                                    <button @onclick="CommitMedicineEdit"
-                                            style="padding:8px 18px; border-radius:8px; border:none; background:#059669; color:#fff; cursor:pointer; font-size:12px; font-weight:700;">
+                                    <button @onclick="CommitMedicineEdit" disabled="@(item.DurationDays <= 0 || item.Quantity <= 0)"
+                                            style="padding:8px 18px; border-radius:8px; border:none; background:#059669; color:#fff; cursor:pointer; font-size:12px; font-weight:700; opacity:@(item.DurationDays <= 0 || item.Quantity <= 0 ? "0.5" : "1");">
                                         @(_editingIndex.HasValue ? "✓ Update Medicine" : "✓ Add to Prescription")
                                     </button>
                                 </div>
@@ -903,12 +928,15 @@ else
                                                     @(remark.Length > 50 ? remark[..50] + "…" : remark)
                                                 </td>
                                                 <td style="padding:10px; vertical-align:top; white-space:nowrap;">
-                                                    <button @onclick="() => StartEditMedicine(idx)"
-                                                            style="width:30px; height:30px; border-radius:7px; border:1.5px solid #BFDBFE; background:#EFF6FF; cursor:pointer; font-size:14px; margin-right:6px; display:inline-flex; align-items:center; justify-content:center;"
-                                                            title="Edit">✏️</button>
-                                                    <button @onclick="() => _confirmDeleteMedicineIdx = idx"
-                                                            style="width:30px; height:30px; border-radius:7px; border:1.5px solid #FECACA; background:#FEF2F2; cursor:pointer; font-size:14px; display:inline-flex; align-items:center; justify-content:center;"
-                                                            title="Remove">🗑️</button>
+                                                    @if (!_isFinalized)
+                                                    {
+                                                        <button @onclick="() => StartEditMedicine(idx)"
+                                                                style="width:30px; height:30px; border-radius:7px; border:1.5px solid #BFDBFE; background:#EFF6FF; cursor:pointer; font-size:14px; margin-right:6px; display:inline-flex; align-items:center; justify-content:center;"
+                                                                title="Edit">✏️</button>
+                                                        <button @onclick="() => _confirmDeleteMedicineIdx = idx"
+                                                                style="width:30px; height:30px; border-radius:7px; border:1.5px solid #FECACA; background:#FEF2F2; cursor:pointer; font-size:14px; display:inline-flex; align-items:center; justify-content:center;"
+                                                                title="Remove">🗑️</button>
+                                                    }
                                                 </td>
                                             </tr>
                                         }
@@ -1026,10 +1054,19 @@ else
                         <div style="font-size:11px; font-weight:600; color:#94A3B8; margin-bottom:6px;">FOLLOW-UP DATE</div>
                         <input type="date"
                                value="@_followup?.ToString("yyyy-MM-dd")"
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")"
                                @onchange="e => _followup = DateTime.TryParse(e.Value?.ToString(), out var d) ? d : (DateTime?)null"
-                               style="width:100%; padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; box-sizing:border-box;" />
+                               disabled="@_isFinalized"
+                               style="width:100%; padding:9px 12px; border:1.5px solid @(_followup.HasValue && _followup.Value.Date < DateTime.Today ? "#DC2626" : "#E2E8F0"); border-radius:8px; font-size:13px; outline:none; box-sizing:border-box; opacity:@(_isFinalized ? "0.6" : "1");" />
                     </div>
-                    @if (_followup.HasValue)
+                    @if (_followup.HasValue && _followup.Value.Date < DateTime.Today)
+                    {
+                        <div style="padding:10px 12px; background:#FEF2F2; border-radius:8px; margin-top:8px;">
+                            <div style="font-size:10px; color:#B91C1C; font-weight:700; text-transform:uppercase;">⚠ Date is in the past</div>
+                            <div style="font-size:13px; font-weight:700; color:#DC2626;">@_followup.Value.ToString("dd MMM yyyy")</div>
+                        </div>
+                    }
+                    else if (_followup.HasValue)
                     {
                         <div style="padding:10px 12px; background:#EFF6FF; border-radius:8px; margin-top:8px;">
                             <div style="font-size:10px; color:#94A3B8; font-weight:700; text-transform:uppercase;">Scheduled</div>
@@ -1040,6 +1077,7 @@ else
                         <div style="font-size:11px; font-weight:600; color:#94A3B8; margin-bottom:6px; text-transform:uppercase;">General Advice</div>
                         <textarea @bind="_notes" rows="4"
                                   placeholder="Diet advice, lifestyle, restrictions…"
+                                  disabled="@_isFinalized"
                                   style="width:100%; padding:9px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; font-family:inherit; resize:vertical; outline:none; box-sizing:border-box;"></textarea>
                     </div>
                 </div>
@@ -1633,6 +1671,10 @@ else
     private int? _editingIndex;
     private int? _confirmDeleteMedicineIdx;
 
+    // Once submitted, a prescription is immutable server-side (PUT is rejected with 403) —
+    // so the UI must not offer edit/remove affordances that would silently be discarded.
+    private bool _isFinalized => _prescription?.Status == PrescriptionStatus.Submitted;
+
     // Diagnosis/Clinical Notes chips, backed by the same HistoryLookupItems table as the
     // obstetric history fields (HistoryItemType.Diagnosis). Prescription.Diagnosis stays a
     // plain comma-joined string on the wire — DiagnosisText derives it on save.
@@ -1723,10 +1765,65 @@ else
     // cost-conscious data fetching rule.
     private List<HistoryLookupItemDto> _historyLookup = [];
 
+    // Diagnosis-only keyword filter for the Male/Female-specific master entries seeded into
+    // the shared lookup (e.g. "Benign Prostatic Hyperplasia (BPH)") so they aren't offered as
+    // quick-picks for a patient of the opposite sex. Best-effort keyword match — not a schema
+    // change — since the lookup list has no per-item gender tag.
+    private static readonly string[] MaleOnlyDiagnosisKeywords = ["prostat", "erectile", "testicular", "testes"];
+    private static readonly string[] FemaleOnlyDiagnosisKeywords = ["ovarian", "ovary", "uterine", "uterus", "cervical", "cervix", "endometri", "vaginal", "vagina", "menstru", "pregnan", "pcos", "vulv"];
+
+    private IReadOnlyList<HistoryLookupItemDto> _diagnosisLookup =>
+        _patient?.Gender switch
+        {
+            Gender.Male => _historyLookup.Where(x => x.Type != HistoryItemType.Diagnosis
+                || !FemaleOnlyDiagnosisKeywords.Any(k => x.Value.Contains(k, StringComparison.OrdinalIgnoreCase))).ToList(),
+            Gender.Female => _historyLookup.Where(x => x.Type != HistoryItemType.Diagnosis
+                || !MaleOnlyDiagnosisKeywords.Any(k => x.Value.Contains(k, StringComparison.OrdinalIgnoreCase))).ToList(),
+            _ => _historyLookup
+        };
+
+    // Values typed into a HistoryChipField that don't exist in the shared master list yet.
+    // HistoryChipField no longer writes these to the backend itself (see RX-007) — they're
+    // only queued here, and PersistPendingHistoryItemsAsync turns the ones still actually
+    // selected into real backend rows right before the prescription is saved. A value that's
+    // typed and removed again without ever being saved never touches the backend at all.
+    private readonly List<HistoryLookupItemDto> _pendingLookupItems = [];
+
     private void OnHistoryItemCreated(HistoryLookupItemDto item)
     {
         if (!_historyLookup.Any(x => x.Id == item.Id))
+        {
             _historyLookup.Add(item);
+            _pendingLookupItems.Add(item);
+        }
+    }
+
+    // Creates a real backend row for every pending item that is still selected somewhere on
+    // the form, and rewrites the selected-item lists to swap the temporary local value in place
+    // (a no-op today since Value doesn't change, but keeps the id-based _historyLookup entries
+    // in sync with what the backend actually persisted). Items typed and then removed before
+    // saving are simply dropped — the shared master list never hears about them.
+    private async Task PersistPendingHistoryItemsAsync()
+    {
+        if (_pendingLookupItems.Count == 0) return;
+
+        var allSelected = _pamHistory.Concat(_familyHistory).Concat(_menstrualHistory)
+            .Concat(_surgicalHistory).Concat(_perAbdomenHistory).Concat(_perVaginumHistory)
+            .Concat(_perSpeculumHistory).Concat(_diagnosisSelected).Concat(_investigations)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var stillUsed = _pendingLookupItems.Where(p => allSelected.Contains(p.Value)).ToList();
+        _pendingLookupItems.Clear();
+
+        foreach (var pending in stillUsed)
+        {
+            var r = await ObstetricClient.AddHistoryLookupItemAsync(new AddHistoryLookupItemDto(pending.Type, pending.Value));
+            if (r.Success && r.Data is not null)
+            {
+                var idx = _historyLookup.FindIndex(x => x.Id == pending.Id);
+                if (idx >= 0) _historyLookup[idx] = r.Data;
+            }
+        }
     }
 
     private static readonly (string Key, string Label, string Placeholder, string Icon)[] _vitalFields =
@@ -2456,6 +2553,19 @@ else
         if (_draftItem is null) return;
         RecalcQuantity(_draftItem);
 
+        if (_draftItem.DurationDays <= 0 || _draftItem.Quantity <= 0)
+        {
+            Toast.ShowWarning("Duration and quantity must be greater than 0.");
+            return;
+        }
+
+        var duplicateIdx = _items.FindIndex(x => x.MedicineId == _draftItem.MedicineId);
+        if (duplicateIdx >= 0 && duplicateIdx != _editingIndex)
+        {
+            Toast.ShowWarning($"{_draftItem.MedicineName} is already in this prescription. Edit the existing entry instead of adding it again.");
+            return;
+        }
+
         if (_editingIndex is { } idx && idx >= 0 && idx < _items.Count)
             _items[idx] = _draftItem;
         else
@@ -2553,9 +2663,16 @@ else
             return false;
         }
 
+        if (_followup.HasValue && _followup.Value.Date < DateTime.Today)
+        {
+            Toast.ShowWarning("Follow-up date cannot be in the past.");
+            return false;
+        }
+
         _saving = true;
         try
         {
+            await PersistPendingHistoryItemsAsync();
             var items = BuildItemDtos();
             if (PrescriptionId == Guid.Empty)
             {

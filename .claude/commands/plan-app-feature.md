@@ -1,6 +1,6 @@
 You are planning a feature for **TenantCore.App**. $ARGUMENTS format: `<feature-name> - <description>`
 
-TenantCore.App is a multi-tenant clinic management system built with Clean Architecture + CQRS via MediatR. Read the CLAUDE.md and relevant ADRs before producing any plan.
+TenantCore.App is a multi-tenant clinic management system built with Clean Architecture + CQRS via MediatR. The repo's distilled knowledge base (`.clinerules`) is **auto-loaded and self-contained** — plan from it; do not re-read `CLAUDE.md` or the ADRs to get oriented (see `.clinerules` §0 for the few edge cases that warrant opening one ADR section).
 
 ---
 
@@ -26,25 +26,27 @@ Read these two files first — before anything else:
 
 ---
 
-## Step 1 — Load context
+## Step 1 — Load context (already in context — do NOT re-read the ADRs)
 
-Read these files in order:
+**`.clinerules` is auto-loaded and self-contained.** It holds architecture (§1), coding patterns for every
+layer (§2), hard rules + error handling + authorization + middleware order (§3), multi-tenancy (§4), testing
+(§5), security (§6), Blazor UI theme (§7), current state (§11) and the feature-registry summary (§12).
 
-1. `CLAUDE.md` — coding patterns, layer rules, absolute constraints
-2. `.claude/docs/adr/ADR-000-index.md` — quick orientation
+**Do not read `CLAUDE.md` or the ADRs to get oriented.** Open a single ADR **section** only for a genuinely
+undocumented edge case:
 
-Then read **only the ADRs relevant to this feature** (do not read all ADRs):
+| If the feature touches… | Covered by `.clinerules` | Open an ADR only for |
+|---|---|---|
+| A new entity or data model | §2 | `BaseEntity`/`AuditableEntity` field lists → ADR-002 |
+| Commands, queries, handlers, validators | §2 | pipeline-behavior registration details → ADR-003 |
+| Repositories, EF migrations, external services | §2 | `ClinicRepository<T>` internals → ADR-004 |
+| Controllers, middleware, authorization | §3 | exact middleware-order rationale → ADR-005 |
+| DTOs, enums, constants | §2 | `Result<T>` / `PagedResult<T>` → ADR-006 |
+| Blazor pages or components | §7 | the full CSS class list / hex palette → ADR-007 |
+| Clinic/tenant data isolation | §4 | JWT claim internals → ADR-008 |
+| Test coverage | §5 | a test template to copy verbatim → ADR-009 |
 
-| If the feature touches… | Read this ADR |
-|------------------------|--------------|
-| A new entity or data model | ADR-002 (Domain Layer) |
-| Commands, queries, handlers, validators | ADR-003 (Application Layer) |
-| Repositories, EF migrations, external services | ADR-004 (Infrastructure Layer) |
-| Controllers, middleware, authorization | ADR-005 (API Layer) |
-| DTOs, enums, constants | ADR-006 (Shared Layer) |
-| Blazor pages or components | ADR-007 (Blazor Client) |
-| Clinic/tenant data isolation | ADR-008 (Multi-Tenancy) |
-| Test coverage | ADR-009 (Unit Testing) |
+> Path note: the ADRs live in `docs/adr/` (ADR-000–ADR-010), **not** `.claude/docs/adr/`.
 
 ---
 

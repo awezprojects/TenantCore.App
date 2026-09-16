@@ -1,9 +1,7 @@
-@inject IObstetricApiClient ObstetricClient
 @inject IToastService Toast
 @inject IJSRuntime JS
 @using TenantCore.Shared.Dtos
 @using TenantCore.Shared.Enums
-@using TenantCore.Web.Client.Clients
 @using TenantCore.Web.Client.Services
 
 <div>
@@ -16,10 +14,11 @@
             }
             @if (ShowPrintToggle && SelectedItems.Count > 0)
             {
-                <label style="display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:#64748B; cursor:pointer; white-space:nowrap;"
+                <label style="display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:#64748B; cursor:@(ReadOnly ? "default" : "pointer"); white-space:nowrap;"
                        title="Print this section on the prescription">
                     <input type="checkbox" @ref="_selectAllRef"
                            checked="@(_triState == TriStateCheckboxValue.Checked)"
+                           disabled="@ReadOnly"
                            @onchange="ToggleAllPrintAsync" />
                     Print this
                 </label>
@@ -33,30 +32,35 @@
             var e = SelectedItems[idx];
             <div style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:@ChipBg; border-radius:14px; border:1px solid @ChipBorder;">
                 <span style="font-size:12px; font-weight:600; color:@ChipText;">@e</span>
-                <button @onclick="() => RemoveAtAsync(idx)"
-                        style="background:none; border:none; cursor:pointer; color:@ChipText; font-size:11px; padding:0; line-height:1;">✕</button>
+                @if (!ReadOnly)
+                {
+                    <button @onclick="() => RemoveAtAsync(idx)"
+                            style="background:none; border:none; cursor:pointer; color:@ChipText; font-size:11px; padding:0; line-height:1;">✕</button>
+                }
             </div>
         }
     </div>
-    <input value="@_search"
-           @oninput="e => _search = e.Value?.ToString() ?? string.Empty"
-           @onkeydown="OnKeyDown"
-           placeholder="Search or type a new item, then press Enter…"
-           disabled="@_saving"
-           style="width:100%; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; box-sizing:border-box; opacity:@(_saving ? "0.6" : "1");" />
-    <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
-        @foreach (var item in MatchingSuggestions())
-        {
-            var value = item.Value;
-            <button @onclick="() => SelectExistingAsync(value)"
-                    style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @value</button>
-        }
-        @if (_search.Trim().Length is >= 3 and <= 256 && !HasExactMatch())
-        {
-            <button @onclick="SubmitAsync" disabled="@_saving"
-                    style="padding:3px 10px; border-radius:12px; border:1px dashed #7C3AED; background:#fff; font-size:11px; cursor:pointer; color:#7C3AED; font-weight:600;">+ Add "@_search.Trim()"</button>
-        }
-    </div>
+    @if (!ReadOnly)
+    {
+        <input value="@_search"
+               @oninput="e => _search = e.Value?.ToString() ?? string.Empty"
+               @onkeydown="OnKeyDown"
+               placeholder="Search or type a new item, then press Enter…"
+               style="width:100%; padding:8px 12px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:13px; outline:none; box-sizing:border-box;" />
+        <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;">
+            @foreach (var item in MatchingSuggestions())
+            {
+                var value = item.Value;
+                <button @onclick="() => SelectExistingAsync(value)"
+                        style="padding:3px 10px; border-radius:12px; border:1px dashed #CBD5E1; background:#fff; font-size:11px; cursor:pointer; color:#94A3B8;">+ @value</button>
+            }
+            @if (_search.Trim().Length is >= 3 and <= 256 && !HasExactMatch())
+            {
+                <button @onclick="SubmitAsync"
+                        style="padding:3px 10px; border-radius:12px; border:1px dashed #7C3AED; background:#fff; font-size:11px; cursor:pointer; color:#7C3AED; font-weight:600;">+ Add "@_search.Trim()"</button>
+            }
+        </div>
+    }
 </div>
 
 @code {
@@ -76,6 +80,11 @@
     [Parameter] public bool ShowPrintToggle { get; set; } = false;
     [Parameter] public List<bool>? PrintFlags { get; set; }
 
+    // Renders chips as static (no remove/add/search controls) — used once a prescription
+    // is finalized, since edits made here would be silently discarded (the backend blocks
+    // the underlying PUT for a Submitted prescription).
+    [Parameter] public bool ReadOnly { get; set; } = false;
+
     // Fired whenever PrintFlags changes (add, remove, or the "Print this" toggle) — lets a
     // parent hosting several of these fields (e.g. a master "Print all" over multiple cards)
     // know to re-render, since mutating a shared List<bool> reference alone doesn't trigger
@@ -83,7 +92,6 @@
     [Parameter] public EventCallback PrintStateChanged { get; set; }
 
     private string _search = string.Empty;
-    private bool _saving;
     private ElementReference _selectAllRef;
     private TriStateCheckboxValue _triState => PrintFlags is null ? TriStateCheckboxValue.Unchecked : TriStateCheckboxState.Compute(PrintFlags);
 
@@ -160,18 +168,15 @@
             return;
         }
 
-        _saving = true;
-        var response = await ObstetricClient.AddHistoryLookupItemAsync(new AddHistoryLookupItemDto(Type, trimmed));
-        _saving = false;
-
-        if (response.Success && response.Data is not null)
-        {
-            await OnItemCreated.InvokeAsync(response.Data);
-            await SelectExistingAsync(response.Data.Value);
-        }
-        else
-        {
-            Toast.ShowError(response.Message ?? "Failed to add item.");
-        }
+        // Deliberately NOT persisted to the backend here. A value typed and removed again
+        // before the prescription is ever saved used to still be written permanently to the
+        // clinic-wide suggestion master list. Instead this is added to the in-memory
+        // LookupItems list only (so it behaves like a real suggestion for the rest of this
+        // session and isn't offered twice); the parent page is responsible for actually
+        // creating it on the backend if — and only if — it's still selected when the
+        // prescription is saved.
+        var pending = new HistoryLookupItemDto { Id = Guid.NewGuid(), Type = Type, Value = trimmed };
+        await OnItemCreated.InvokeAsync(pending);
+        await SelectExistingAsync(trimmed);
     }
 }

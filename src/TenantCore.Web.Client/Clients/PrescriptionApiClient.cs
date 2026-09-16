@@ -22,11 +22,66 @@ public class PrescriptionApiClient(HttpClient httpClient, AuthStateService authS
     {
         if (!response.IsSuccessStatusCode)
         {
-            var err = await response.Content.ReadAsStringAsync();
-            return new ApiResponse<T> { Success = false, Message = err };
+            var (message, fieldErrors) = await ExtractUserMessageAndFields(response);
+            return new ApiResponse<T> { Success = false, Message = message, Errors = fieldErrors };
         }
         var data = await response.Content.ReadFromJsonAsync<T>(JsonOptions);
         return new ApiResponse<T> { Success = true, Data = data };
+    }
+
+    // Parses the ProblemDetails JSON returned by the API and extracts the
+    // user-facing "detail" field (plus per-field validation errors) so the
+    // raw JSON / GUIDs / routes never reach the UI. Mirrors ClinicApiClient.
+    private static async Task<(string Message, List<string> FieldErrors)> ExtractUserMessageAndFields(HttpResponseMessage response)
+    {
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+
+                if (root.ValueKind == JsonValueKind.String)
+                {
+                    var text = root.GetString();
+                    if (!string.IsNullOrWhiteSpace(text)) return (text, []);
+                }
+
+                var fieldErrors = new List<string>();
+                if (root.TryGetProperty("errors", out var errors))
+                {
+                    foreach (var field in errors.EnumerateObject())
+                        foreach (var msg in field.Value.EnumerateArray())
+                        {
+                            var s = msg.GetString();
+                            if (!string.IsNullOrWhiteSpace(s)) fieldErrors.Add($"{field.Name}: {s}");
+                        }
+                }
+
+                if (root.TryGetProperty("detail", out var detail))
+                {
+                    var text = detail.GetString();
+                    if (!string.IsNullOrWhiteSpace(text)) return (text, fieldErrors);
+                }
+
+                if (fieldErrors.Count > 0)
+                    return (string.Join(" ", fieldErrors.Select(e => e[(e.IndexOf(':') + 2)..])), fieldErrors);
+            }
+        }
+        catch { /* fall through to default */ }
+
+        var fallback = response.StatusCode switch
+        {
+            System.Net.HttpStatusCode.BadRequest           => "Please check your input and try again.",
+            System.Net.HttpStatusCode.Unauthorized         => "Your session has expired. Please log in again.",
+            System.Net.HttpStatusCode.Forbidden             => "You don't have permission to perform this action.",
+            System.Net.HttpStatusCode.NotFound              => "The requested record was not found.",
+            System.Net.HttpStatusCode.Conflict              => "This action conflicts with existing data.",
+            System.Net.HttpStatusCode.InternalServerError   => "A server error occurred. Please try again.",
+            _                                                => "Something went wrong. Please try again."
+        };
+        return (fallback, []);
     }
 
     private static ApiResponse<T> Fail<T>(string message) =>

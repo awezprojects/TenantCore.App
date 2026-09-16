@@ -58,14 +58,63 @@ public class UpdatePatientCommandValidatorTests
         _validator.Validate(command).IsValid.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("999")]
+    [InlineData("+91 98123-45699")]
+    public void Validate_WhenPhoneNumberIsNotTenDigits_ReturnsError(string phoneNumber)
+    {
+        var command = CreateCommand(phoneNumber: phoneNumber);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "PhoneNumber");
+    }
+
+    [Fact]
+    public void Validate_WhenEmergencyContactPhoneIsNotTenDigits_ReturnsError()
+    {
+        var command = CreateCommand(emergencyContactPhone: "abcXYZ!!");
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "EmergencyContactPhone");
+    }
+
+    [Fact]
+    public void Validate_WhenFirstNameContainsScriptTag_ReturnsError()
+    {
+        var command = CreateCommand(firstName: "<script>alert('XSS')</script>");
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "FirstName");
+    }
+
+    [Fact]
+    public void Validate_WhenAddressContainsHtmlTags_ReturnsError()
+    {
+        var command = CreateCommand(address: "<img src=x onerror=alert(document.cookie)>");
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "Address");
+    }
+
     private static UpdatePatientCommand CreateCommand(
         Guid? id = null,
-        string phoneNumber = "+1234567890",
+        string firstName = "Jane",
+        string phoneNumber = "9812345670",
+        string? emergencyContactPhone = null,
+        string? address = "123 Main St",
         DateOnly? dateOfBirth = null)
         => new(
             id ?? Guid.NewGuid(),
             Guid.NewGuid(),
-            "Jane",
+            firstName,
             "Doe",
             dateOfBirth ?? new DateOnly(1995, 4, 20),
             Gender.Female,
@@ -73,5 +122,6 @@ public class UpdatePatientCommandValidatorTests
             "jane@example.com",
             "123456789012",
             null,
-            "123 Main St");
+            address,
+            EmergencyContactPhone: emergencyContactPhone);
 }

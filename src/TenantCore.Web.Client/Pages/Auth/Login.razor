@@ -3,6 +3,9 @@
 @layout AuthLayout
 @inject IAuthApiClient AuthClient
 @inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
+@inject SubscriptionContextService SubscriptionContext
+@inject FeatureFlagsContextService FeatureFlagsContext
 @inject NavigationManager NavigationManager
 @inject IToastService Toast
 
@@ -123,6 +126,17 @@
                 else
                 {
                     await AuthState.SetAuthenticatedStateAsync(data);
+
+                    // A previous session on this browser (a different account, or a clinic
+                    // that was switched away from) may have left a clinic selection in
+                    // localStorage. Left uncleared, ClinicAuthorizationHandler auto-attaches
+                    // it as X-Application-Id on this new user's very first request — and if
+                    // that clinic isn't in the new token's app_ids, ClinicContextMiddleware
+                    // 403s it, breaking the landing page before it can show any clinics.
+                    SubscriptionContext.Clear();
+                    FeatureFlagsContext.Clear();
+                    await ClinicContext.ClearClinicAsync();
+
                     Toast.ShowSuccess("Login successful!");
                     NavigateToReturn();
                 }

@@ -22,8 +22,8 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
     {
         if (!response.IsSuccessStatusCode)
         {
-            var message = await ExtractUserMessage(response);
-            return new ApiResponse<T> { Success = false, Message = message };
+            var (message, fieldErrors) = await ExtractUserMessageAndFields(response);
+            return new ApiResponse<T> { Success = false, Message = message, Errors = fieldErrors };
         }
         var data = await response.Content.ReadFromJsonAsync<T>(JsonOptions);
         return new ApiResponse<T> { Success = true, Data = data };
@@ -33,6 +33,12 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
     // user-facing "detail" field. Falls back to a status-code-based default
     // so the raw JSON / GUIDs / routes never reach the UI.
     private static async Task<string> ExtractUserMessage(HttpResponseMessage response)
+        => (await ExtractUserMessageAndFields(response)).Message;
+
+    // Same as ExtractUserMessage, but also returns per-field validation errors
+    // (as "FieldName: message" entries) so callers can highlight the offending
+    // field instead of only showing a flattened toast message.
+    private static async Task<(string Message, List<string> FieldErrors)> ExtractUserMessageAndFields(HttpResponseMessage response)
     {
         try
         {
@@ -42,29 +48,37 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
                 using var doc = JsonDocument.Parse(body);
                 var root = doc.RootElement;
 
-                if (root.TryGetProperty("detail", out var detail))
+                // Plain BadRequest(string) actions serialize as a bare JSON string.
+                if (root.ValueKind == JsonValueKind.String)
                 {
-                    var text = detail.GetString();
-                    if (!string.IsNullOrWhiteSpace(text)) return text;
+                    var text = root.GetString();
+                    if (!string.IsNullOrWhiteSpace(text)) return (text, []);
                 }
 
-                // FluentValidation errors come as extensions["errors"]
+                var fieldErrors = new List<string>();
                 if (root.TryGetProperty("errors", out var errors))
                 {
-                    var messages = new List<string>();
                     foreach (var field in errors.EnumerateObject())
                         foreach (var msg in field.Value.EnumerateArray())
                         {
                             var s = msg.GetString();
-                            if (!string.IsNullOrWhiteSpace(s)) messages.Add(s);
+                            if (!string.IsNullOrWhiteSpace(s)) fieldErrors.Add($"{field.Name}: {s}");
                         }
-                    if (messages.Count > 0) return string.Join(" ", messages);
                 }
+
+                if (root.TryGetProperty("detail", out var detail))
+                {
+                    var text = detail.GetString();
+                    if (!string.IsNullOrWhiteSpace(text)) return (text, fieldErrors);
+                }
+
+                if (fieldErrors.Count > 0)
+                    return (string.Join(" ", fieldErrors.Select(e => e[(e.IndexOf(':') + 2)..])), fieldErrors);
             }
         }
         catch { /* fall through to default */ }
 
-        return response.StatusCode switch
+        var fallback = response.StatusCode switch
         {
             System.Net.HttpStatusCode.BadRequest           => "Please check your input and try again.",
             System.Net.HttpStatusCode.Unauthorized         => "Your session has expired. Please log in again.",
@@ -74,6 +88,7 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
             System.Net.HttpStatusCode.InternalServerError  => "A server error occurred. Please try again.",
             _                                              => "Something went wrong. Please try again."
         };
+        return (fallback, []);
     }
 
     private static ApiResponse<T> Fail<T>(string _) =>
@@ -131,7 +146,7 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
             var response = await httpClient.DeleteAsync($"api/patients/{id}");
             return response.IsSuccessStatusCode
                 ? new ApiResponse<bool> { Success = true, Data = true }
-                : new ApiResponse<bool> { Success = false, Message = await response.Content.ReadAsStringAsync() };
+                : new ApiResponse<bool> { Success = false, Message = await ExtractUserMessage(response) };
         }
         catch (Exception ex) { return Fail<bool>(ex.Message); }
     }
@@ -148,7 +163,7 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
             content.Add(streamContent, "photo", file.Name);
             var response = await httpClient.PostAsync($"api/patients/{id}/upload-photo", content);
             if (!response.IsSuccessStatusCode)
-                return new ApiResponse<string> { Success = false, Message = await response.Content.ReadAsStringAsync() };
+                return new ApiResponse<string> { Success = false, Message = await ExtractUserMessage(response) };
             var result = await response.Content.ReadFromJsonAsync<PhotoUploadResult>(JsonOptions);
             return new ApiResponse<string> { Success = true, Data = result?.Url };
         }

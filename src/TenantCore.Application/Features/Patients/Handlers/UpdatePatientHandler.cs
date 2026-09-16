@@ -20,6 +20,10 @@ public sealed class UpdatePatientHandler(IPatientRepository repository, IApplica
         if (!accessValidator.CanAccess(patient.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
+        var duplicate = await repository.GetByPhoneAsync(request.ApplicationId, request.PhoneNumber, cancellationToken);
+        if (duplicate is not null && duplicate.Id != request.Id)
+            throw new InvalidOperationException($"A patient with phone number '{request.PhoneNumber}' already exists.");
+
         patient.Update(
             request.FirstName, request.LastName, request.DateOfBirth,
             request.Gender, request.PhoneNumber, request.Email,

@@ -74,6 +74,26 @@ public class RegisterPatientHandlerTests
         _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task Handle_WhenPhoneNumberAlreadyExistsForApplication_ThrowsInvalidOperationException()
+    {
+        var command = CreateCommand();
+        var existingPatient = Patient.Create(
+            command.ApplicationId, "Other", "Patient", new DateOnly(1990, 1, 1), Gender.Male,
+            command.PhoneNumber, null, null, null, null);
+
+        _repository.Setup(r => r.GetByPhoneAsync(command.ApplicationId, command.PhoneNumber, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingPatient);
+
+        var handler = new RegisterPatientHandler(_repository.Object, _logger.Object);
+
+        Func<Task> action = () => handler.Handle(command, CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>();
+        _repository.Verify(r => r.AddAsync(It.IsAny<Patient>(), It.IsAny<CancellationToken>()), Times.Never);
+        _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private static RegisterPatientCommand CreateCommand(
         Guid? applicationId = null,
         string firstName = "Jane",
