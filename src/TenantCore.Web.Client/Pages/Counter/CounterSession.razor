@@ -89,17 +89,34 @@
                                 <a href="/amount-handovers" style="color:#2563EB;text-decoration:underline;">Go to Handovers →</a>
                             </div>
                         }
-                        @if (!_sessionHandovers.Any(h => h.Status == HandoverStatus.Accepted))
+                        @if (_staleHandover is not null)
+                        {
+                            <div style="font-size:12px;color:#B91C1C;text-align:right;max-width:280px;">
+                                ⚠ The pending handover of Rs. @_staleHandover.Amount.ToString("N0") no longer matches the
+                                session balance of Rs. @_activeSession.NetAmount.ToString("N0"). Dispute it so Reception can
+                                send the corrected amount.
+                            </div>
+                        }
+                        @if (_isReception && !_sessionHandovers.Any(h => h.Status == HandoverStatus.Accepted))
                         {
                             <button class="opd-btn-primary" style="padding:8px 20px;"
                                     @onclick="OpenHandoverDialog" disabled="@(_saving || _hasPendingHandover)">
                                 💸 Handover
                             </button>
                         }
-                        <button class="opd-btn" style="padding:8px 20px;@(_canClose ? "color:#DC2626;border-color:#DC2626;" : "opacity:.5;cursor:not-allowed;")"
-                                @onclick="CloseSessionAsync" disabled="@(_saving || !_canClose)">
-                            @(_saving ? "Closing..." : "🔒 Close Session")
-                        </button>
+                        @if (_isReception)
+                        {
+                            <button class="opd-btn" style="padding:8px 20px;@(_canClose ? "color:#DC2626;border-color:#DC2626;" : "opacity:.5;cursor:not-allowed;")"
+                                    @onclick="CloseSessionAsync" disabled="@(_saving || !_canClose)">
+                                @(_saving ? "Closing..." : "🔒 Close Session")
+                            </button>
+                        }
+                        else
+                        {
+                            <div style="font-size:12px;color:#94A3B8;text-align:right;max-width:240px;">
+                                🔒 Only Reception can hand over or close the counter session.
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -280,6 +297,21 @@
     private bool _hasPendingHandover => _sessionHandovers.Any(h => h.Status == HandoverStatus.Pending);
     private bool _canClose => _sessionHandovers.Any(h => h.Status == HandoverStatus.Accepted) && !_hasPendingHandover;
 
+    // Reception-only API actions (open/close session, create handover) must not be rendered as
+    // live buttons for roles the server rejects with 403 — the Doctor used to see an enabled
+    // "Close Session" that always failed with a blank toast.
+    private bool _isReception =>
+        AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+                 .Any(r => AppRoles.ReceptionRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
+
+    // A pending handover whose amount no longer matches the session's live balance (e.g. a
+    // refund was processed after the handover was sent). The doctor must not be asked to
+    // accept cash the till does not hold.
+    private AmountHandoverSummaryDto? _staleHandover => _activeSession is null
+        ? null
+        : _sessionHandovers.FirstOrDefault(h =>
+            h.Status == HandoverStatus.Pending && h.Amount != _activeSession.NetAmount);
+
     private bool _handoverVisible;
     private decimal _handoverAmount;
     private string? _handoverNotes;
@@ -292,7 +324,12 @@
     private bool _itemsVisible;
     private Guid _itemsOpdId;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        await ClinicContext.InitializeAsync();
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {

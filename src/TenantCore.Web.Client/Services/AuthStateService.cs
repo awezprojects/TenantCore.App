@@ -168,6 +168,21 @@ public class AuthStateService
     }
 
     /// <summary>
+    /// Returns true if the current user holds any reception role (Receptionist, Clinic Admin,
+    /// Clinic Manager, System Admin) for the given clinic — i.e. whether the Reception-only
+    /// API actions (open/close counter session, create handover, refund, collect fees) can
+    /// actually succeed for them. Used to hide those controls instead of rendering buttons
+    /// that the server always rejects with 403.
+    /// </summary>
+    public bool IsReception(Guid applicationId)
+    {
+        var roles = GetRolesForApplication(applicationId);
+        return roles.Any(r =>
+            TenantCore.Shared.Authorization.AppRoles.ReceptionRoles
+                .Contains(r, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// Returns true if the current user holds any clinical role (Doctor, ClinicAdmin, ClinicManager, SystemAdmin) for the given clinic.
     /// </summary>
     public bool IsClinical(Guid applicationId)

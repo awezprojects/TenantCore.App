@@ -691,6 +691,7 @@ else
                                         <div style="font-size:10px; font-weight:700; color:#94A3B8; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px;">Duration (Days)</div>
                                         <div style="position:relative;">
                                             <input type="number" min="1" @bind="item.DurationDays"
+                                                   @bind:event="oninput"
                                                    @bind:after="() => RecalcQuantity(item)"
                                                    style="width:100%; padding:9px 38px 9px 10px; border:1.5px solid @(item.DurationDays <= 0 ? "#DC2626" : "#E2E8F0"); border-radius:8px; font-size:13px; font-weight:700; outline:none; box-sizing:border-box;" />
                                             <span style="position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:11px; color:#94A3B8; font-weight:600; pointer-events:none;">days</span>
@@ -2018,18 +2019,32 @@ else
             }
             else if (OpdRegistrationId != Guid.Empty)
             {
-                var r = await ClinicClient.GetOpdRegistrationByIdAsync(OpdRegistrationId);
-                if (r.Success && r.Data is not null)
+                // /prescriptions/new/{opdId} is where every "write prescription" entry point
+                // (and any page reload) lands, but an OPD encounter can only ever have one
+                // prescription. Resume the existing draft/submitted prescription for this visit
+                // instead of rendering a blank "New Prescription" form — otherwise a saved draft
+                // appeared to be lost and saving again failed with "At least one medicine is required".
+                var existingR = await PrescriptionClient.GetPrescriptionByOpdIdAsync(OpdRegistrationId);
+                if (existingR.Success && existingR.Data is not null)
                 {
-                    _opd = r.Data;
-                    _vBP = _opd.BloodPressure ?? string.Empty;
-                    _vPulse = _opd.PulseRate?.ToString() ?? string.Empty;
-                    _vWeight = _opd.Weight?.ToString("F1") ?? string.Empty;
-                    _vSpO2 = _opd.OxygenSaturation?.ToString("F1") ?? string.Empty;
-                    _vTemp = _opd.Temperature?.ToString("F1") ?? string.Empty;
-                    _vRR = _opd.RespiratoryRate?.ToString() ?? string.Empty;
-                    _vSugar = _opd.Sugar?.ToString("F1") ?? string.Empty;
-                    await LoadPatientAndHistory(_opd.PatientId);
+                    PrescriptionId = existingR.Data.Id;
+                    await LoadFromPrescription(existingR.Data);
+                }
+                else
+                {
+                    var r = await ClinicClient.GetOpdRegistrationByIdAsync(OpdRegistrationId);
+                    if (r.Success && r.Data is not null)
+                    {
+                        _opd = r.Data;
+                        _vBP = _opd.BloodPressure ?? string.Empty;
+                        _vPulse = _opd.PulseRate?.ToString() ?? string.Empty;
+                        _vWeight = _opd.Weight?.ToString("F1") ?? string.Empty;
+                        _vSpO2 = _opd.OxygenSaturation?.ToString("F1") ?? string.Empty;
+                        _vTemp = _opd.Temperature?.ToString("F1") ?? string.Empty;
+                        _vRR = _opd.RespiratoryRate?.ToString() ?? string.Empty;
+                        _vSugar = _opd.Sugar?.ToString("F1") ?? string.Empty;
+                        await LoadPatientAndHistory(_opd.PatientId);
+                    }
                 }
             }
 

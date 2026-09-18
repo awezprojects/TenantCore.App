@@ -1,6 +1,10 @@
 @inject IOpdPaymentApiClient OpdPaymentClient
 @inject IToastService Toast
+@inject AuthStateService AuthState
+@inject ClinicContextService ClinicContext
 @using TenantCore.Shared.Enums
+@using TenantCore.Shared.Authorization
+@using TenantCore.Web.Client.Services
 
 @if (Visible)
 {
@@ -28,13 +32,22 @@
                     Refund due to patient: <strong>Rs. @_payment.RefundDue.ToString("N2")</strong> — the fee was
                     already collected. Hand the amount back, then confirm below.
                 </div>
-                <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-                    <button @onclick="ProcessRefundAsync" disabled="@_applying"
-                            style="padding:9px 20px;border-radius:8px;border:none;background:#16A34A;color:#fff;
-                                   font-size:13px;font-weight:700;cursor:pointer;opacity:@(_applying ? "0.6" : "1");">
-                        @(_applying ? "Processing..." : "Confirm Refund Returned")
-                    </button>
-                </div>
+                @if (_isReception)
+                {
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+                        <button @onclick="ProcessRefundAsync" disabled="@_applying"
+                                style="padding:9px 20px;border-radius:8px;border:none;background:#16A34A;color:#fff;
+                                       font-size:13px;font-weight:700;cursor:pointer;opacity:@(_applying ? "0.6" : "1");">
+                            @(_applying ? "Processing..." : "Confirm Refund Returned")
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div style="font-size:12px;color:#94A3B8;margin-bottom:16px;">
+                        Only Reception can confirm that the refund was handed back.
+                    </div>
+                }
             }
             else if (_payment.RefundStatus == RefundStatus.Refunded)
             {
@@ -43,7 +56,7 @@
                     Refund returned to patient.
                 </div>
             }
-            else if (_payment.PaymentStatus == PaymentStatus.Received)
+            else if (_payment.PaymentStatus == PaymentStatus.Received && _isReception)
             {
                 <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:8px;padding:10px 14px;
                             font-size:12px;color:#1E40AF;margin-bottom:16px;">
@@ -98,6 +111,12 @@
     private decimal _discount;
     private string? _error;
 
+    // Refund confirmation is Reception-only on the server (RequireReception). Rendering the
+    // button for other roles produced a dead control that 403'd with no feedback at all.
+    private bool _isReception =>
+        AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+                 .Any(r => AppRoles.ReceptionRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
+
     protected override async Task OnParametersSetAsync()
     {
         if (Visible && OpdRegistrationId != Guid.Empty)
@@ -129,6 +148,7 @@
         _applying = false;
     }
 
+    // The "Cancel" path on an already-collected visit is Reception-only server-side.
     private async Task RefundFullAmountAsync()
     {
         if (_payment is null) return;
@@ -140,6 +160,7 @@
         if (!discountResponse.Success)
         {
             _error = discountResponse.Message ?? "Failed to start refund.";
+            Toast.ShowError(_error);
             _applying = false;
             return;
         }
@@ -155,6 +176,7 @@
         else
         {
             _error = refundResponse.Message ?? "Failed to confirm refund.";
+            Toast.ShowError(_error);
         }
         _applying = false;
     }
@@ -175,6 +197,7 @@
         else
         {
             _error = response.Message ?? "Failed to confirm refund.";
+            Toast.ShowError(_error);
         }
         _applying = false;
     }

@@ -16,16 +16,8 @@ public class FinanceReportApiClient(HttpClient httpClient, AuthStateService auth
             ? null
             : new AuthenticationHeaderValue("Bearer", authState.AccessToken);
 
-    private static async Task<ApiResponse<T>> Read<T>(HttpResponseMessage response)
-    {
-        if (!response.IsSuccessStatusCode)
-        {
-            var err = await response.Content.ReadAsStringAsync();
-            return new ApiResponse<T> { Success = false, Message = err };
-        }
-        var data = await response.Content.ReadFromJsonAsync<T>(JsonOptions);
-        return new ApiResponse<T> { Success = true, Data = data };
-    }
+    private static Task<ApiResponse<T>> Read<T>(HttpResponseMessage response)
+        => ApiResponseReader.ReadAsync<T>(response);
 
     public async Task<ApiResponse<FinanceDashboardSummaryDto>> GetDashboardAsync(DateTime? date = null)
     {

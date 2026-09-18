@@ -37,7 +37,15 @@
                 {
                     <div style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:8px;
                                 padding:10px 14px;color:#92400E;font-size:13px;margin-bottom:16px;">
-                        Discount of <strong>Rs. @_payment.Discount.ToString("N2")</strong> applied — use <strong>Collect Full Bill</strong> to collect all at once.
+                        Discount of <strong>Rs. @_payment.Discount.ToString("N2")</strong> applied
+                        @if (_billOutstanding > 0)
+                        {
+                            <text>— use <strong>Collect Full Bill</strong> to collect all at once.</text>
+                        }
+                        else
+                        {
+                            <text>— the full discounted bill has already been collected.</text>
+                        }
                     </div>
                 }
 
@@ -52,13 +60,23 @@
                     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
                         @if (_payment.Discount > 0)
                         {
-                            @if (_payment.PaymentStatus != PaymentStatus.Received)
+                            @* Collects whatever is still owed on the whole bill (visit fee + services
+                               − discount). This is deliberately not gated on PaymentStatus: when the
+                               visit fee had already been collected at registration the button was
+                               hidden, leaving service items with no way to be collected at all. *@
+                            @if (_billOutstanding > 0)
                             {
                                 <button @onclick="CollectFullBillAsync" disabled="@_collecting"
                                         style="padding:7px 16px;border-radius:8px;border:none;background:#16A34A;color:#fff;
                                                font-size:12px;font-weight:700;cursor:pointer;opacity:@(_collecting ? "0.6" : "1");">
-                                    Collect Full Bill — Rs. @_payment.FinalAmount.ToString("N2")
+                                    Collect Full Bill — Rs. @_billOutstanding.ToString("N2")
                                 </button>
+                            }
+                            else
+                            {
+                                <span style="background:#DCFCE7;color:#166534;border-radius:12px;padding:4px 12px;font-size:11px;font-weight:700;">
+                                    ✓ Full bill collected (Rs. @_payment.CollectedAmount.ToString("N2"))
+                                </span>
                             }
                         }
                         else if (pendingItems.Any())
@@ -225,6 +243,12 @@
     private Guid? _selectedParticularId;
     private decimal _addAmount;
 
+    // Amount still owed on the whole bill (visit fee + services − discount). Used to decide
+    // whether "Collect Full Bill" is offered; the API accepts partial bill collection by
+    // topping the counter up to FinalAmount.
+    private decimal _billOutstanding =>
+        _payment is null ? 0 : _payment.FinalAmount - _payment.CollectedAmount;
+
     protected override async Task OnParametersSetAsync()
     {
         if (Visible && OpdRegistrationId != Guid.Empty)
@@ -338,11 +362,12 @@
             return;
         }
         _collecting = true;
+        var outstanding = _billOutstanding;
         var resp = await OpdPaymentClient.AcceptFullAsync(_payment.Id,
             new AcceptOpdPaymentFullRequest { OpdRegistrationId = OpdRegistrationId, CounterSessionId = _activeSessionId });
         if (resp.Success)
         {
-            Toast.ShowSuccess($"Full bill of Rs. {_payment.FinalAmount:N2} collected (discount applied).");
+            Toast.ShowSuccess($"Rs. {outstanding:N2} collected — the full bill of Rs. {_payment.FinalAmount:N2} is settled.");
             await LoadAsync();
             await OnFeesChanged.InvokeAsync();
         }

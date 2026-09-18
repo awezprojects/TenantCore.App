@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
 using TenantCore.Application.Common;
+using TenantCore.Application.Features.Obstetrics.Helpers;
 using TenantCore.Application.Features.Prescriptions.Commands;
 using TenantCore.Application.Features.Prescriptions.Translators;
 using TenantCore.Domain.Entities;
@@ -14,6 +15,7 @@ public sealed class UpdatePrescriptionHandler(
     IPrescriptionRepository prescriptionRepository,
     IObstetricPrescriptionDataRepository obstetricRepository,
     IPatientRepository patientRepository,
+    IPregnancyTenureRepository pregnancyTenureRepository,
     ILogger<UpdatePrescriptionHandler> logger,
     IApplicationAccessValidator accessValidator)
     : IRequestHandler<UpdatePrescriptionCommand, PrescriptionDto>
@@ -85,6 +87,12 @@ public sealed class UpdatePrescriptionHandler(
         }
 
         await prescriptionRepository.SaveChangesAsync(cancellationToken);
+
+        // Keep the patient's pregnancy tenure in step with the LMP on this prescription —
+        // the EDD Overdue list reads tenures, not prescriptions (see PregnancyTenureSync).
+        await PregnancyTenureSync.SyncFromLmpAsync(
+            pregnancyTenureRepository, prescription.PatientId, prescription.ApplicationId,
+            request.ObstetricData?.Lmp, cancellationToken);
 
         var patient = await patientRepository.GetByIdAsync(prescription.PatientId, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), prescription.PatientId);

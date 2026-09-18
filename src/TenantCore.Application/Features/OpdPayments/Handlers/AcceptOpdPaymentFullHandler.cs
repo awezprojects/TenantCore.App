@@ -24,7 +24,10 @@ public sealed class AcceptOpdPaymentFullHandler(
             throw new InvalidOperationException(
                 "Use 'Collect Visit Fee' for no-discount payments. This endpoint is for discounted full-bill collection only.");
 
-        if (payment.PaymentStatus == PaymentStatus.Received)
+        // Accepted when nothing has been collected yet (the normal discounted prepayment), or
+        // when part of the bill was already collected and service items were added afterwards —
+        // in that case AcceptFull credits only the outstanding remainder.
+        if (payment.PaymentStatus == PaymentStatus.Received && payment.CollectedAmount >= payment.FinalAmount)
             throw new InvalidOperationException("Payment has already been fully collected.");
 
         // Collect the entire bill (VisitFee + ParticularsTotal - Discount) as one transaction.

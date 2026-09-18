@@ -23,11 +23,9 @@ public class DoctorSpecialitiesApiClient(HttpClient httpClient, AuthStateService
         {
             SetAuth();
             var response = await httpClient.GetAsync("api/doctor-specialities");
-            if (!response.IsSuccessStatusCode)
-            {
-                var err = await response.Content.ReadAsStringAsync();
-                return new ApiResponse<List<DoctorSpecialityDto>> { Success = false, Message = err };
-            }
+            var result = await ApiResponseReader.ReadAsync<List<DoctorSpecialityDto>>(response);
+            if (!result.Success)
+                return result;
             var data = await response.Content.ReadFromJsonAsync<List<DoctorSpecialityDto>>(JsonOptions);
             return new ApiResponse<List<DoctorSpecialityDto>> { Success = true, Data = data ?? [] };
         }

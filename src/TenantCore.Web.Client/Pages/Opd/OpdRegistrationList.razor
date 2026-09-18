@@ -420,7 +420,7 @@
                     @if (_selected.Status == OpdStatus.InProgress)
                     {
                         <button class="opd-modal-btn-filled"
-                                @onclick="() => { CloseViewModal(); OpenPrescription(_selected); }">
+                                @onclick="() => WritePrescriptionAsync(_selected)">
                             Write Prescription
                         </button>
                     }
@@ -479,7 +479,15 @@
                 {
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label">Fee (₹)</label>
-                        <input class="form-input" type="number" min="0" @bind="_fee" />
+                        <input class="form-input" type="number" min="0" @bind="_fee"
+                               readonly="@_feeLocked"
+                               style="@(_feeLocked ? "background:#F1F5F9;color:#64748B;cursor:not-allowed;" : "")" />
+                        @if (_feeLocked)
+                        {
+                            <div style="font-size:11px;color:#64748B;margin-top:3px;">
+                                🔒 From the selected doctor's fee config. Clear the doctor to enter a custom fee.
+                            </div>
+                        }
                     </div>
                 }
                 <div class="form-group" style="margin-bottom:0;">
@@ -633,6 +641,10 @@
     private Guid    _selectedPatientId;
     private Guid?   _selectedDoctorId;
     private decimal _fee;
+    // True while _fee came from the selected doctor's DoctorFeeConfig — the field is then
+    // read-only (spec A-10). Selecting no doctor (or a doctor with no active fee config)
+    // keeps the field editable for the manual-entry case.
+    private bool    _feeLocked;
     private string? _notes;
     private decimal? _weight;
     private string?  _bloodPressure;
@@ -900,6 +912,15 @@
             Navigation.NavigateTo($"/prescriptions/new/{reg.Id}");
     }
 
+    // The details dialog's "Write Prescription" entry point. The registration must be
+    // captured before the dialog is closed — CloseViewModal() nulls _selected, so the old
+    // inline lambda ran OpenPrescription(null) and the click appeared to do nothing at all.
+    private async Task WritePrescriptionAsync(OpdRegistrationDto reg)
+    {
+        CloseViewModal();
+        await OpenPrescription(reg);
+    }
+
     private async Task ViewPrescription(OpdRegistrationDto reg)
     {
         _checkingRx = true;
@@ -1028,7 +1049,7 @@
     private void OpenNewDialog()
     {
         _selectedPatientId = Guid.Empty; _selectedDoctorId = null;
-        _fee = 0; _notes = null;
+        _fee = 0; _feeLocked = false; _notes = null;
 
         // Only Pulse and O2 Sat pre-fill with a typical value — Weight, BP, Temp, RR and
         // Sugar vary too much patient-to-patient to default, and reception must actually
@@ -1043,6 +1064,7 @@
     {
         _selectedDoctorId = userId;
         _fee = 0;
+        _feeLocked = false;
         if (userId is null) return;
 
         var doctor = _doctors.FirstOrDefault(d => d.UserId == userId);
@@ -1050,7 +1072,10 @@
 
         var resp = await DoctorFeeConfigClient.GetByDoctorIdAsync(doctor.ProfileId.Value);
         if (resp.Success && resp.Data is not null && resp.Data.IsActive)
+        {
             _fee = resp.Data.VisitFee;
+            _feeLocked = true;
+        }
     }
 
     private async Task CreateOpdAsync()

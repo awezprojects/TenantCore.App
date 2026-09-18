@@ -16,26 +16,11 @@ public class SubscriptionApiClient(HttpClient httpClient, AuthStateService authS
             ? null
             : new AuthenticationHeaderValue("Bearer", authState.AccessToken);
 
-    private static async Task<ApiResponse<T>> Read<T>(HttpResponseMessage response)
-    {
-        if (!response.IsSuccessStatusCode)
-        {
-            var err = await response.Content.ReadAsStringAsync();
-            return new ApiResponse<T> { Success = false, Message = err };
-        }
-        var data = await response.Content.ReadFromJsonAsync<T>(JsonOptions);
-        return new ApiResponse<T> { Success = true, Data = data };
-    }
+    private static Task<ApiResponse<T>> Read<T>(HttpResponseMessage response)
+        => ApiResponseReader.ReadAsync<T>(response);
 
-    private static async Task<ApiResponse> ReadVoid(HttpResponseMessage response)
-    {
-        if (!response.IsSuccessStatusCode)
-        {
-            var err = await response.Content.ReadAsStringAsync();
-            return new ApiResponse { Success = false, Message = err };
-        }
-        return new ApiResponse { Success = true };
-    }
+    private static Task<ApiResponse> ReadVoid(HttpResponseMessage response)
+        => ApiResponseReader.ReadAsync(response);
 
     public async Task<ApiResponse<IEnumerable<SubscriptionPlanDto>>> GetPlansAsync()
     {

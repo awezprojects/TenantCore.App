@@ -45,12 +45,12 @@
             {
                 @foreach (var p in _results)
                 {
-                    <div style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F1F5F9;
+                    <div @key="p.Id"
+                         style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F1F5F9;
                                  display:flex;justify-content:space-between;align-items:center;
                                  transition:background 0.1s;"
                          @onmousedown:preventDefault
                          @onclick="@(() => SelectPatient(p))"
-                         @onmouseover="@((e) => { })"
                          class="patient-result-item">
                         <div>
                             <div style="font-size:13px;font-weight:700;color:#1E293B;">@p.FullName</div>
@@ -110,6 +110,11 @@
     private bool _showResults;
     private bool _focused;
     private CancellationTokenSource? _debounce;
+    // Incremented for every keystroke. A search response whose version no longer matches is
+    // discarded, so a slow/finished search can never re-render the dropdown on top of a
+    // selection the user just made (that re-render used to swallow the "Select" click, so the
+    // patient appeared unselected until "Select" was clicked a second time).
+    private int _searchVersion;
 
     private async Task OnInput(ChangeEventArgs e)
     {
@@ -119,6 +124,7 @@
 
         _debounce?.Cancel();
         _debounce = new CancellationTokenSource();
+        var version = ++_searchVersion;
 
         if (_query.Length < 2)
         {
@@ -134,6 +140,7 @@
             StateHasChanged();
             await Task.Delay(300, _debounce.Token);
             var r = await ClinicClient.GetPatientsAsync(1, 15, _query);
+            if (version != _searchVersion || _selectedPatient is not null) return;
             if (r.Success) _results = r.Data?.Items.ToList() ?? [];
             _searched    = true;
             _showResults = true;
@@ -144,8 +151,14 @@
 
     private async Task SelectPatient(PatientDto patient)
     {
+        // Supersede any in-flight search so nothing re-renders over the selection below.
+        _searchVersion++;
+        _debounce?.Cancel();
+
         _selectedPatient = patient;
         _query           = patient.FullName;
+        _results         = [];
+        _searched        = false;
         _showResults     = false;
         await OnPatientSelected.InvokeAsync(patient);
         StateHasChanged();

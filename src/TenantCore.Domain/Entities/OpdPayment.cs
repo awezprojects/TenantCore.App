@@ -50,6 +50,24 @@ public class OpdPayment : AuditableEntity
         ParticularsTotal = particularsTotal;
         TotalAmount = VisitFee + particularsTotal;
         FinalAmount = TotalAmount - Discount;
+
+        // The bill can grow *after* a refund was queued — extra service items added on a
+        // discounted visit whose fee was already collected. Re-evaluate what is owed back:
+        // if the bill now covers the collected amount the queued refund is no longer due
+        // (otherwise Confirm Refund would hand back money the patient still owes).
+        if (PaymentStatus == PaymentStatus.Received && RefundStatus == RefundStatus.PendingRefund)
+        {
+            if (FinalAmount < CollectedAmount)
+            {
+                RefundDue = CollectedAmount - FinalAmount;
+            }
+            else
+            {
+                RefundDue = 0;
+                RefundStatus = RefundStatus.None;
+            }
+        }
+
         SetUpdatedAt();
     }
 
@@ -99,15 +117,20 @@ public class OpdPayment : AuditableEntity
     // Collect the entire bill (visit fee + services - discount) at once.
     // Used when a discount is applied — individual item collection is disabled in that flow.
     // Counter gets FinalAmount; OpdParticulars are marked received via MarkCollectedViaPayment (no individual counter credit).
+    // When part of the bill was already collected (a prepaid OPD visit fee, or service items
+    // added after the fee was collected), only the outstanding remainder is credited now —
+    // the running total still ends up at FinalAmount.
     public void AcceptFull(Guid receivedByUserId, Guid? counterSessionId)
     {
-        if (PaymentStatus == PaymentStatus.Received)
+        if (PaymentStatus == PaymentStatus.Received && CollectedAmount >= FinalAmount)
             throw new InvalidOperationException("Payment has already been fully collected.");
         PaymentStatus = PaymentStatus.Received;
         CollectedAmount = FinalAmount;
         AmountReceivedAt = DateTime.UtcNow;
         ReceivedByUserId = receivedByUserId;
-        CounterSessionId = counterSessionId;
+        // Keep the session that already credited part of this payment — re-attributing it
+        // would silently remove that amount from the earlier session's collected total.
+        CounterSessionId ??= counterSessionId;
         SetUpdatedAt();
     }
 

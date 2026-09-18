@@ -190,7 +190,7 @@ public class PrescriptionApiClient(HttpClient httpClient, AuthStateService authS
             var response = await httpClient.DeleteAsync($"api/dosage-remarks/{id}");
             return response.IsSuccessStatusCode
                 ? new ApiResponse<bool> { Success = true, Data = true }
-                : new ApiResponse<bool> { Success = false, Message = await response.Content.ReadAsStringAsync() };
+                : new ApiResponse<bool> { Success = false, Message = await ApiResponseReader.ExtractMessageAsync(response) };
         }
         catch (Exception ex) { return Fail<bool>(ex.Message); }
     }
