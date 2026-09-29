@@ -2,7 +2,9 @@ namespace TenantCore.Application.Services;
 
 /// <summary>
 /// Writes the business-action audit trail — a "Started" row and a matching "Completed"/"Failed"
-/// row per instrumented command, tied together by <paramref name="correlationId"/>. Used only by
+/// row per command, tied together by <paramref name="correlationId"/>. <c>requestType</c> is the
+/// request type name, optionally followed by " | " and identifier-only context (IActionLogContext).
+/// Used by
 /// <see cref="Common.Behaviors.ActionLoggingBehavior{TRequest,TResponse}"/>; implementations must
 /// never throw — a logging failure must not break the operation being audited.
 /// </summary>

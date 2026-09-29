@@ -43,6 +43,31 @@ public static class OnboardingEmailTemplates
         return (to, subject, body);
     }
 
+    /// <summary>
+    /// Same payload SendEmailTaskHandler already carries, but for the "publish to Service Bus,
+    /// let the notification consumer render the template" flow instead of building HTML locally.
+    /// Reuses Render()'s per-template subject text so both paths never disagree.
+    /// </summary>
+    public static (string To, string Template, string Subject, Dictionary<string, string> TemplateData) RenderForQueue(string payloadJson)
+    {
+        using var doc = JsonDocument.Parse(payloadJson);
+        var root = doc.RootElement;
+        var template = root.TryGetProperty("template", out var t) ? t.GetString() ?? string.Empty : string.Empty;
+        var to = root.TryGetProperty("to", out var toEl) ? toEl.GetString() ?? string.Empty : string.Empty;
+        var model = root.TryGetProperty("model", out var m) ? m : default;
+
+        var (_, subject, _) = Render(payloadJson);
+
+        var templateData = new Dictionary<string, string>();
+        if (model.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in model.EnumerateObject())
+                templateData[property.Name] = Str(model, property.Name);
+        }
+
+        return (to, template, subject, templateData);
+    }
+
     private static (string, string) RequestReceived(JsonElement model)
     {
         var clinicName = Str(model, "ClinicName");

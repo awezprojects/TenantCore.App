@@ -21,6 +21,7 @@ Wrapper API + Blazor WebAssembly frontend that integrates with TenantCore.Auth f
 | [ADR-008: Multi-Tenancy](docs/adr/ADR-008-multi-tenancy.md) | Any feature touching clinic/application context |
 | [ADR-009: Unit Testing](docs/adr/ADR-009-unit-testing.md) | Writing or reviewing tests — **read before writing any test file; mandatory for every feature** |
 | [ADR-010: Security & Code Quality](docs/adr/ADR-010-security.md) | Security analysis, code smell detection, architectural violations, quality review |
+| [ADR-011: Observability & Logging](docs/adr/ADR-011-observability-logging.md) | **Every** new feature, command, endpoint, integration, webhook or background job — logging is mandatory and on by default |
 
 ---
 
@@ -43,7 +44,7 @@ Web.Client ──► Shared
 | `TenantCore.Domain` | Entities, repository interfaces, domain exceptions |
 | `TenantCore.Infrastructure` | EF Core, repositories, Auth HTTP client |
 | `TenantCore.Shared` | DTOs, authorization constants, `Result<T>`, `PagedResult<T>` |
-| `TenantCore.Logging` | Independent error/action logging to Azure Table Storage (`ApiErrorLogs`, `FrontendErrorLogs`, `ActionLogs`) |
+| `TenantCore.Logging` | Independent, queued logging to Azure Table Storage (`ApiErrorLogs`, `FrontendErrorLogs`, `ActionLogs`, `ApiRequestLogs`) — mandatory, on by default (ADR-011) |
 | `TenantCore.Web.Client` | Blazor WASM — typed API clients, pages, components |
 
 > Claude Code auto-loads this `CLAUDE.md`, **not** `.clinerules` (that file is Cline's). The `.claude/commands/*` workflows read `.clinerules` explicitly.
@@ -378,8 +379,32 @@ Named HttpClient: `"AuthApi"`. Base URL: `AuthApi:BaseUrl` in appsettings.
 
 ---
 
+## Email Notifications
+
+**Onboarding/payment emails are published to Azure Service Bus, not sent via SMTP.** `SendEmailTaskHandler` (a `WorkflowTaskType.SendEmail` handler) calls `INotificationPublisher.PublishEmailNotificationAsync` (`ServiceBusNotificationPublisher` in `TenantCore.Infrastructure/Services/`), which publishes an `EmailNotificationDto` to the same `email-notifications-queue` TenantCore.Auth publishes to (`AzureServiceBus:ConnectionString` / `AzureServiceBus:QueueName` — copy the connection string from Auth's config, it's the same Service Bus namespace for both repos). An external Azure Function (`Clinic.Notification`, out of scope) consumes the queue and sends the actual email.
+
+- `OnboardingEmailTemplates.RenderForQueue(payloadJson)` turns the stored `{template, to, model}` payload into `(To, Template, Subject, TemplateData)` — reuses `Render()`'s per-template subject text so the two never drift, but does **not** send the HTML body it also builds (that HTML is currently unused for this path — see the workspace root `CLAUDE.md` → Cross-Repo Rule 9 for why).
+- **`RecipientName` must not be empty** or the consumer dead-letters the message without attempting delivery. `SendEmailTaskHandler` derives it from the first non-empty field in `RequesterName` → `DoctorName` → `ClinicName` (most onboarding models only have `ClinicName`, no person's name).
+- When adding a new onboarding email template in `OnboardingEmailTemplates`, you don't need to touch the notification consumer to make the message deliverable — but per root Rule 9, the recipient will see a plain-text dump of `TemplateData`, not your HTML, until that consumer supports real templates.
+- **Prescription emails are a separate path and still use direct SMTP** — `SubmitPrescriptionHandler` calls `IEmailService.SendAsync` (`TenantCore.Infrastructure/Services/EmailService.cs`) directly, because it needs to attach a generated PDF, which the Service Bus/`EmailNotificationDto` contract doesn't support. That path needs real `Email:Host`/`Email:From`/etc. config to work — `EmailService` throws (not silently no-ops) if that section is missing, so a misconfiguration shows up as a failed/retried task instead of a false "success."
+
+---
+
 ## Rules (Never Violate)
 
+- **Logging is mandatory and on by default ([ADR-011](docs/adr/ADR-011-observability-logging.md)).**
+  - Every `…Command` is action-logged automatically (`ActionLoggingBehavior`).
+  - Every `/api` request that fails, is slow or changes data goes to `ApiRequestLogs`.
+  - Every `IHttpClientFactory` call is logged as an outbound row.
+  - Every `LogError` reaches `ApiErrorLogs`.
+
+  For new work:
+  - **New commands:** name them `…Command`, and add `IActionLogContext` for searchable identifiers (payment, event and link ids).
+  - **New integrations:** use `IHttpClientFactory` only.
+  - **New jobs:** log each run that did work via `IActionLogger`.
+  - **Opting out:** `ISkipActionLog` needs a documented reason.
+  - **Never log** bodies, patient or personal data, secrets, tokens, signatures or query strings.
+  - A feature is **not done** until its logs appear in the Admin Log Explorer.
 - Controllers inherit `ClinicControllerBase` and only call `sender.Send(...)` — no service injection
 - Commands and queries are `sealed record`; handlers are `sealed class`
 - Translators are `static class` with `static` methods — never use AutoMapper

@@ -249,6 +249,21 @@ Rules enforced in handlers — throw named domain exceptions on violation:
 
 ---
 
+## Logging (ADR-011 — mandatory, never omit this section)
+
+| Operation | How it is logged | Searchable context (identifiers only) |
+|---|---|---|
+| `<Name>Command` | ActionLogs (automatic — name ends in `Command`) | `IActionLogContext`: `<e.g. paymentId=…; gatewayLinkId=…>` or "none" |
+| `<METHOD> api/<route>` | ApiRequestLogs (automatic when failed / slow / data-changing) + ApiErrorLogs on exceptions | — |
+| `<external call / webhook / job>` | Outbound handler (IHttpClientFactory) / webhook command / `Job: <Name>` run row | `<ids, counters>` |
+
+- [ ] Every failure path surfaces as an exception or ≥ 400 status (never HTTP 200 with an error body)
+- [ ] No `ISkipActionLog` (or: reason documented here)
+- [ ] Nothing sensitive logged: no bodies, patient/personal data, secrets, tokens, signatures, query strings
+- [ ] Tests assert any new log contract (context, job row, opt-out)
+
+---
+
 ## EF Migration
 
 **Migration name:** `Add<EntityName>`

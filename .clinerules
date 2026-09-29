@@ -62,7 +62,7 @@ All layers ──► TenantCore.Shared (DTOs / constants only)
 | `TenantCore.Shared` | DTOs, `AuthorizationConstants`, enums, `Result<T>` / `PagedResult<T>` — zero deps |
 | `TenantCore.Web.Client` | Blazor WASM — typed HTTP clients, pages, components (HTTP-only, no server refs) |
 | `TenantCore.Web` | Blazor server host |
-| `TenantCore.Logging` | Centralized logging to Azure Table Storage (`ApiErrorLogs`, `FrontendErrorLogs`, `ActionLogs`) |
+| `TenantCore.Logging` | Centralized, queued logging to Azure Table Storage (`ApiErrorLogs`, `FrontendErrorLogs`, `ActionLogs`, `ApiRequestLogs`) — mandatory (ADR-011) |
 | `Requirements` | Requirements documents |
 
 **Test projects:** `tests/TenantCore.Api.Tests`, `TenantCore.Application.Tests`, `TenantCore.Domain.Tests`, `TenantCore.Infrastructure.Tests`, `TenantCore.Web.Client.Tests`.
@@ -318,7 +318,17 @@ Namespaces/types follow: commands `CreateFooCommand` (`sealed record`), handlers
 - **`ClinicDbContext` has 40 DbSets.** Non-tenant-scoped (global lookups / catalogue): `MedicineDosageForms`, `DoctorSpecialities`, `SubscriptionPlans`, `SubscriptionAlertSettings`, `States`, `Cities`. Everything else is tenant-scoped.
 - **`VitalPresetLookupItems` is dual-natured:** `ApplicationId == null` = global system default (read-only, visible to every clinic); set = that clinic's own row.
 - **Three medicine repositories are cached decorators:** `IMedicineRepository` → `CachedMedicineRepository`, `IMedicineTypeRepository` → `CachedMedicineTypeRepository`, `IMedicineDosageFormRepository` → `CachedMedicineDosageFormRepository`, backed by `RefreshableCache<T>` and kept warm by `MedicineCacheWarmupService` (startup + every 30 min). Clinic-owned medicines are always queried live.
-- **Logging is a separate store, not `ClinicDbContext`:** `IErrorLogger` (`ApiErrorLogs` / `FrontendErrorLogs`) and `IActionLogger` (`ActionLogs`) write to **Azure Table Storage via the `TenantCore.Logging` project**. `ActionLoggingBehavior` fires automatically for commands marked `IBusinessAction`.
+- **Logging is a separate store, not `ClinicDbContext`, and it is MANDATORY and ON BY DEFAULT (ADR-011).** Everything is written to **Azure Table Storage via `TenantCore.Logging`**, queued and non-blocking:
+
+  | Writer | Table | What |
+  |---|---|---|
+  | `ActionLoggingBehavior` | `ActionLogs` | Every `…Command`. `IBusinessAction` = display name; `IActionLogContext` = searchable ids; `ISkipActionLog` = documented opt-out |
+  | `OutboundCallLoggingHandler` | `ActionLogs` | Every `IHttpClientFactory` client |
+  | `ApiRequestLoggingMiddleware` | `ApiRequestLogs` | Failed, slow and data-changing requests |
+  | `IErrorLogger` | `ApiErrorLogs` / `FrontendErrorLogs` | Unhandled API exceptions and browser crashes |
+  | `TableStorageErrorSink` | `ApiErrorLogs` | Any `LogError` (jobs, hosted services) |
+
+  Never log bodies, personal or clinical data, secrets, tokens or query strings.
 - **Full 40-row DbSet table + every DI registration:** `.claude/context/current-state.md` — read it before adding/removing a DbSet or a DI registration.
 
 ---

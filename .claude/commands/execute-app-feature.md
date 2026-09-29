@@ -139,6 +139,12 @@ Standard order for TenantCore.App features:
 - Decorate actions with `[ProducesResponseType]` for each possible response
 - Apply `[Authorize(Policy = AuthPolicies.X)]` at class level with the minimum policy; override per-action where a stricter policy is needed
 
+### Logging rules (ADR-011 — mandatory, verify before Step 5)
+- Implement the PLAN.md "Logging" section exactly. Every new command's type name ends in `Command`, which makes it action-logged automatically. Add `IActionLogContext` where the plan lists searchable ids.
+- External calls use `IHttpClientFactory` (logged by the outbound handler). Webhooks go through a `…Command` with `IActionLogContext`. A background job logs each run that did work via `IActionLogger`.
+- Failure paths throw or return ≥ 400. Never return HTTP 200 with an error body, because it would be logged as success.
+- Never log bodies, patient or personal data, secrets, tokens, signatures or query strings. `ISkipActionLog` only with the reason written in the plan.
+
 ---
 
 ## Step 5 — Write Unit Tests

@@ -11,12 +11,12 @@ namespace TenantCore.Application.Tests.Features.Onboarding.Tasks;
 
 public class SendEmailTaskHandlerTests
 {
-    private readonly Mock<IEmailService> _emailService = new();
+    private readonly Mock<INotificationPublisher> _notificationPublisher = new();
 
-    private SendEmailTaskHandler CreateHandler() => new(_emailService.Object);
+    private SendEmailTaskHandler CreateHandler() => new(_notificationPublisher.Object);
 
     [Fact]
-    public async Task HandleAsync_ValidPayload_SendsRenderedTemplateToRecipient()
+    public async Task HandleAsync_ValidPayload_PublishesNotificationForRecipient()
     {
         var payload = OnboardingEmailTemplates.BuildPayload("ClinicReady", "doctor@example.test", new { ClinicName = "Sunrise Clinic" });
         var task = WorkflowTask.Enqueue(WorkflowTaskType.SendEmail, "email:x", nameof(ClinicOnboardingRequest), Guid.NewGuid(), payload);
@@ -24,9 +24,14 @@ public class SendEmailTaskHandlerTests
         var handler = CreateHandler();
         await handler.HandleAsync(task, CancellationToken.None);
 
-        _emailService.Verify(e => e.SendAsync(
-            "doctor@example.test", "Your clinic is ready", It.Is<string>(b => b.Contains("Sunrise Clinic")),
-            null, null, It.IsAny<CancellationToken>()), Times.Once);
+        _notificationPublisher.Verify(p => p.PublishEmailNotificationAsync(
+            It.Is<EmailNotificationDto>(n =>
+                n.RecipientEmail == "doctor@example.test"
+                && n.RecipientName == "Sunrise Clinic"
+                && n.TemplateId == "ClinicReady"
+                && n.Subject == "Your clinic is ready"
+                && n.TemplateData["ClinicName"] == "Sunrise Clinic"),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

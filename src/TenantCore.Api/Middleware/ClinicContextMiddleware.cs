@@ -87,12 +87,21 @@ public class ClinicContextMiddleware(RequestDelegate next, ILogger<ClinicContext
     // Global lookup controllers (DoctorSpecialities, MedicineTypes, MedicineDosageForms,
     // SubscriptionAlertSettings) and app-level controllers (Auth, Application, Clinic) derive
     // from ControllerBase and are deliberately exempt.
+    //
+    // ClinicOnboardingController inherits ClinicControllerBase only to reuse GetCurrentUserId() —
+    // it never calls GetApplicationId(), since no clinic exists yet for a pending onboarding
+    // request. It is explicitly excluded here so callers can submit/check onboarding requests
+    // without ever selecting a clinic first.
+    private static readonly HashSet<Type> ExemptControllerTypes = [typeof(ClinicOnboardingController)];
+
     private static bool IsClinicScopedEndpoint(HttpContext context)
     {
         var controllerType = context.GetEndpoint()
             ?.Metadata.GetMetadata<ControllerActionDescriptor>()?.ControllerTypeInfo.AsType();
 
-        return controllerType is not null && typeof(ClinicControllerBase).IsAssignableFrom(controllerType);
+        return controllerType is not null
+            && typeof(ClinicControllerBase).IsAssignableFrom(controllerType)
+            && !ExemptControllerTypes.Contains(controllerType);
     }
 
     private static async Task WriteProblemAsync(HttpContext context, string title, string detail)

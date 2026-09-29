@@ -36,14 +36,6 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             ? id
             : (Guid?)null;
 
-        await errorLogger.LogExceptionAsync(
-            LogCategory.Api,
-            "Api.Middleware",
-            exception,
-            applicationId: applicationId,
-            userId: context.User.FindFirst("nameid")?.Value ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
-            additionalContext: $"CorrelationId={correlationId}; RequestPath={context.Request.Path}");
-
         // Detail is the user-facing message shown in the UI.
         // Technical context (exception type, stack trace) stays in the log above.
         var (statusCode, title, detail) = exception switch
@@ -63,6 +55,17 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 HttpStatusCode.Conflict, "Conflict", UserMessages.Conflict),
             _ => (HttpStatusCode.InternalServerError, "Server Error",       UserMessages.ServerError)
         };
+
+        // Status first, then log: the error row records the ACTUAL status the client receives.
+        context.Response.StatusCode = (int)statusCode;
+
+        await errorLogger.LogExceptionAsync(
+            LogCategory.Api,
+            "Api.Middleware",
+            exception,
+            applicationId: applicationId,
+            userId: context.User.FindFirst("nameid")?.Value ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+            additionalContext: $"CorrelationId={correlationId}; RequestPath={context.Request.Path}");
 
         var problemDetails = new ProblemDetails
         {

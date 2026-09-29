@@ -88,6 +88,12 @@ Work through every section of ADR-010 against the actual file contents you read.
 - [ ] A03: parameterized queries only
 - [ ] A07: JWT validation config is correct
 
+### Logging & Observability (ADR-011)
+- [ ] Every new command is action-logged: name ends in `Command`, and no undocumented `ISkipActionLog`
+- [ ] Failure paths throw or return ≥ 400 (never HTTP 200 with an error body, which would log as success)
+- [ ] New external calls go through `IHttpClientFactory` (outbound logging); webhooks and jobs log per the ADR
+- [ ] A09: no sensitive data in any log field. No bodies, patient or personal data, secrets, tokens, signatures or query strings, and nothing in `IActionLogContext` beyond identifiers
+
 ---
 
 ## Step 4 — Run the code quality scan

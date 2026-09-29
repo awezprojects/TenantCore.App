@@ -97,43 +97,71 @@ public sealed class PaymentReconciliationService(
 
         logger.LogInformation("Reconciliation sweep checking {Count} payment(s) with Razorpay.", due.Count);
 
-        foreach (var payment in due)
+        // Job run → ActionLogs (ADR-011): only sweeps that had work, so an idle job adds no rows.
+        var actionLogger = services.GetRequiredService<IActionLogger>();
+        var runId = Guid.NewGuid();
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        int paid = 0, expired = 0, cancelled = 0, unreachable = 0;
+        var requestType = $"PaymentReconciliationService | due={due.Count}";
+        await actionLogger.LogStartedAsync(runId, "Job: Payment Reconciliation", requestType, null, null, ct);
+
+        try
         {
-            if (string.IsNullOrEmpty(payment.GatewayPaymentLinkId))
-                continue;
-
-            var (result, link) = await gateway.GetPaymentLinkByIdAsync(payment.GatewayPaymentLinkId, ct);
-            if (!result.Success || link == null)
-                continue; // transient — try again next sweep
-
-            switch (link.Status)
+            foreach (var payment in due)
             {
-                case "paid":
-                    logger.LogWarning(
-                        "Reconciliation found payment {PaymentId} paid at Razorpay with no webhook processed yet — enqueuing ConfirmPayment and alerting ops.",
-                        payment.Id);
-                    await workflowEnqueuer.EnqueueAsync(
-                        WorkflowTaskType.ConfirmPayment, $"confirm-payment:{payment.Id}", nameof(SubscriptionPayment), payment.Id, ct: ct);
-                    await MaybeAlertSilentWebhookAsync(workflowEnqueuer, payment.Id, ct);
-                    break;
+                if (string.IsNullOrEmpty(payment.GatewayPaymentLinkId))
+                    continue;
 
-                case "expired":
-                    payment.MarkExpired();
-                    if (payment.Purpose == PaymentPurpose.Onboarding && payment.OnboardingRequestId.HasValue)
-                    {
-                        var request = await requestRepository.GetByIdAsync(payment.OnboardingRequestId.Value, ct);
-                        request?.MarkLinkExpired();
-                    }
-                    break;
+                var (result, link) = await gateway.GetPaymentLinkByIdAsync(payment.GatewayPaymentLinkId, ct);
+                if (!result.Success || link == null)
+                {
+                    unreachable++;
+                    continue; // transient — try again next sweep
+                }
 
-                case "cancelled":
-                    payment.MarkCancelled();
-                    break;
+                switch (link.Status)
+                {
+                    case "paid":
+                        paid++;
+                        logger.LogWarning(
+                            "Reconciliation found payment {PaymentId} paid at Razorpay with no webhook processed yet — enqueuing ConfirmPayment and alerting ops.",
+                            payment.Id);
+                        await workflowEnqueuer.EnqueueAsync(
+                            WorkflowTaskType.ConfirmPayment, $"confirm-payment:{payment.Id}", nameof(SubscriptionPayment), payment.Id, ct: ct);
+                        await MaybeAlertSilentWebhookAsync(workflowEnqueuer, payment.Id, ct);
+                        break;
+
+                    case "expired":
+                        expired++;
+                        payment.MarkExpired();
+                        if (payment.Purpose == PaymentPurpose.Onboarding && payment.OnboardingRequestId.HasValue)
+                        {
+                            var request = await requestRepository.GetByIdAsync(payment.OnboardingRequestId.Value, ct);
+                            request?.MarkLinkExpired();
+                        }
+                        break;
+
+                    case "cancelled":
+                        cancelled++;
+                        payment.MarkCancelled();
+                        break;
+                }
             }
-        }
 
-        await paymentRepository.SaveChangesAsync(ct);
-        await requestRepository.SaveChangesAsync(ct);
+            await paymentRepository.SaveChangesAsync(ct);
+            await requestRepository.SaveChangesAsync(ct);
+
+            stopwatch.Stop();
+            await actionLogger.LogCompletedAsync(runId, "Job: Payment Reconciliation",
+                $"{requestType}; paidWithoutWebhook={paid}; expired={expired}; cancelled={cancelled}; gatewayUnreachable={unreachable}",
+                null, null, stopwatch.ElapsedMilliseconds, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            stopwatch.Stop();
+            await actionLogger.LogFailedAsync(runId, "Job: Payment Reconciliation", requestType, null, null, stopwatch.ElapsedMilliseconds, ex.Message, ct);
+            throw;   // ExecuteAsync logs it (→ ApiErrorLogs via the error sink) and retries next interval
+        }
     }
 
     private async Task MaybeAlertSilentWebhookAsync(IWorkflowEnqueuer workflowEnqueuer, Guid paymentId, CancellationToken ct)
@@ -160,6 +188,13 @@ public sealed class PaymentReconciliationService(
         var healer = scope.ServiceProvider.GetRequiredService<IOnboardingSelfHealer>();
         var healed = await healer.HealStuckRequestsAsync(ct);
         if (healed > 0)
+        {
             logger.LogInformation("Self-healing sweep re-enqueued the next step for {Count} stuck request(s).", healed);
+
+            // Only sweeps that healed something reach ActionLogs (ADR-011).
+            var actionLogger = scope.ServiceProvider.GetRequiredService<IActionLogger>();
+            await actionLogger.LogCompletedAsync(Guid.NewGuid(), "Job: Onboarding Self-Heal",
+                $"OnboardingSelfHealer | reEnqueued={healed}", null, null, 0, ct);
+        }
     }
 }

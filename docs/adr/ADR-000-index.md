@@ -60,6 +60,7 @@ TenantCore.Web.Client
 | [ADR-008](ADR-008-multi-tenancy.md) | Multi-Tenancy | X-Application-Id header, JWT claims, per-tenant roles |
 | [ADR-009](ADR-009-unit-testing.md) | Unit Testing | xUnit, Moq, FluentAssertions, test organization |
 | [ADR-010](ADR-010-security.md) | Security & Code Quality | Security analysis, architectural violations, quality review |
+| [ADR-011](ADR-011-observability-logging.md) | Observability & Logging | **Mandatory**: every command, request, outbound call, webhook, job and error is logged (on by default) — what to add for new work |
 
 ## Configuration & Local Secrets
 

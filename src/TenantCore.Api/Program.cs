@@ -71,6 +71,9 @@ try
 
     builder.Services.AddHttpContextAccessor();
 
+    // Background/hosted-service errors → ApiErrorLogs (ReadFrom.Services picks the sink up). ADR-011.
+    builder.Services.AddSingleton<Serilog.Core.ILogEventSink, TenantCore.Api.Logging.TableStorageErrorSink>();
+
     builder.Services.AddHttpClient("AuthApi", client =>
     {
         var authBaseUrl = builder.Configuration["AuthApi:BaseUrl"] ?? "https://localhost:7136/";
@@ -89,6 +92,7 @@ try
     var app = builder.Build();
 
     app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseMiddleware<ApiRequestLoggingMiddleware>();   // ApiRequestLogs: failed, slow and data-changing requests (ADR-011)
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseSerilogRequestLogging();
 

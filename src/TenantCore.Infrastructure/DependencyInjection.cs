@@ -7,6 +7,7 @@ using TenantCore.Application.Features.Onboarding.Tasks;
 using TenantCore.Application.Services;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Infrastructure.Logging;
 using TenantCore.Infrastructure.BackgroundJobs;
 using TenantCore.Infrastructure.Caching;
 using TenantCore.Infrastructure.ExternalServices;
@@ -127,10 +128,16 @@ public static class DependencyInjection
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddSingleton<INotificationPublisher, ServiceBusNotificationPublisher>();
         services.AddScoped<IPdfConversionService, PdfConversionService>();
         services.AddScoped<IPrescriptionPdfGenerator, PrescriptionPdfGenerator>();
 
         services.AddAppLogging(configuration);
+
+        // Every IHttpClientFactory client — present and future — logs its outbound calls (ADR-011).
+        // (IHttpContextAccessor is registered by the Api host.)
+        services.AddTransient<OutboundCallLoggingHandler>();
+        services.ConfigureHttpClientDefaults(http => http.AddHttpMessageHandler<OutboundCallLoggingHandler>());
         services.AddScoped<IErrorLogger, ErrorLoggingService>();
         services.AddScoped<IActionLogger, ActionLoggingService>();
         services.AddScoped<ICurrentUserContext, CurrentUserContext>();
