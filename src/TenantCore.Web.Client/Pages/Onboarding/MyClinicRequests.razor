@@ -1,0 +1,261 @@
+@page "/clinic-requests"
+@layout DoctorPortalLayout
+@inject IOnboardingApiClient OnboardingApi
+@inject IAuthApiClient AuthApi
+@inject AuthStateService AuthState
+@inject IToastService Toast
+@inject NavigationManager Nav
+@using TenantCore.Shared.Dtos.Onboarding
+@using TenantCore.Shared.Enums
+
+<PageTitle>My Clinic Requests - CloudClinic</PageTitle>
+
+<div class="opd-header" style="margin-bottom:20px;">
+    <div>
+        <div class="opd-title">My Clinic Requests</div>
+        <div class="opd-subtitle">Track the status of clinics you've requested</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+        <button @onclick="RefreshAsync" disabled="@_loading"
+                style="padding:9px 16px;background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                       border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+            🔄 Refresh
+        </button>
+        @if (_canSubmitNew)
+        {
+            <button @onclick='@(() => Nav.NavigateTo("/clinic-requests/new"))'
+                    style="padding:9px 18px;background:#1565C0;color:#fff;border:none;border-radius:8px;
+                           font-size:13px;font-weight:700;cursor:pointer;">
+                + New Request
+            </button>
+        }
+    </div>
+</div>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:60px 0;">
+        <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
+    </div>
+}
+else if (_confirmingPayment)
+{
+    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 18px;
+                font-size:13px;color:#1E3A8A;font-weight:600;margin-bottom:16px;">
+        Confirming your payment with Razorpay… this can take a few seconds.
+    </div>
+}
+
+@if (!_loading && _requests.Count == 0)
+{
+    <div class="opd-table-card">
+        <div class="opd-empty" style="padding:40px;">
+            You haven't requested a clinic yet.
+            @if (_canSubmitNew)
+            {
+                <div style="margin-top:10px;">
+                    <a href="/clinic-requests/new" style="color:#1565C0;font-weight:700;">Submit your first request →</a>
+                </div>
+            }
+        </div>
+    </div>
+}
+else if (!_loading)
+{
+    <div style="display:flex;flex-direction:column;gap:14px;">
+        @foreach (var r in _requests.OrderByDescending(x => x.CreatedAt))
+        {
+            var (bg, fg, border) = StatusColors(r.Status);
+            <div style="background:#fff;border-radius:14px;border:1px solid #E2E8F0;padding:18px 22px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+                    <div>
+                        <div style="font-size:15px;font-weight:800;color:#1E293B;">@r.ClinicName</div>
+                        <div style="font-size:12px;color:#94A3B8;margin-top:2px;">
+                            @r.PreferredClinicCode &middot; Requested @r.CreatedAt.ToString("dd MMM yyyy")
+                        </div>
+                    </div>
+                    <span style="background:@bg;color:@fg;border:1px solid @border;border-radius:12px;
+                                 padding:4px 12px;font-size:11px;font-weight:800;white-space:nowrap;">
+                        @r.StatusText
+                    </span>
+                </div>
+
+                @if (r.Status == ClinicOnboardingStatus.AwaitingPayment && !string.IsNullOrWhiteSpace(r.PaymentLinkUrl))
+                {
+                    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #F1F5F9;
+                                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                        <div style="font-size:12px;color:#64748B;">
+                            @if (r.ApprovedAmount.HasValue)
+                            {
+                                <text>Amount due: <strong>₹@r.ApprovedAmount.Value.ToString("N2")</strong></text>
+                            }
+                            @if (r.LinkExpiresAt.HasValue)
+                            {
+                                <div>Link expires @r.LinkExpiresAt.Value.ToString("dd MMM yyyy HH:mm")</div>
+                            }
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <a href="@r.PaymentLinkUrl" target="_blank" rel="noopener noreferrer"
+                               style="padding:8px 16px;background:#16A34A;color:#fff;border-radius:8px;
+                                      font-size:12px;font-weight:700;text-decoration:none;">
+                                💳 Pay Now
+                            </a>
+                            <button @onclick="() => CheckPaymentAsync(r.Id)" disabled="@_checkingPaymentId.HasValue"
+                                    style="padding:8px 16px;background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                                           border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
+                                I've paid, refresh status
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                @if (r.Status == ClinicOnboardingStatus.Provisioning)
+                {
+                    <div style="margin-top:12px;font-size:12px;color:#1565C0;font-weight:600;">
+                        ⚙️ Setting up your clinic…
+                    </div>
+                }
+
+                @if (r.Status == ClinicOnboardingStatus.Active)
+                {
+                    <div style="margin-top:12px;">
+                        <button @onclick="() => OpenClinicAsync()"
+                                style="padding:8px 16px;background:#1565C0;color:#fff;border:none;border-radius:8px;
+                                       font-size:12px;font-weight:700;cursor:pointer;">
+                            Open clinic →
+                        </button>
+                    </div>
+                }
+
+                @if (r.Status == ClinicOnboardingStatus.Rejected && !string.IsNullOrWhiteSpace(r.RejectionReason))
+                {
+                    <div style="margin-top:12px;font-size:12px;color:#991B1B;background:#FEE2E2;
+                                border-radius:8px;padding:8px 12px;">
+                        Reason: @r.RejectionReason
+                    </div>
+                }
+
+                @if (r.Status == ClinicOnboardingStatus.Submitted)
+                {
+                    <div style="margin-top:12px;">
+                        <button @onclick="() => OpenCancelConfirm(r)"
+                                style="padding:6px 14px;background:transparent;color:#DC2626;
+                                       border:1.5px solid #FCA5A5;border-radius:8px;font-size:12px;
+                                       font-weight:700;cursor:pointer;">
+                            Cancel request
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<ConfirmDialog Visible="@(_confirmCancel is not null)"
+               Title="Cancel Request"
+               ConfirmText="Cancel Request"
+               BusyText="Cancelling..."
+               IsBusy="_cancelling"
+               OnConfirm="ConfirmCancelAsync"
+               OnCancel="() => _confirmCancel = null">
+    Are you sure you want to cancel the request for <strong>@_confirmCancel?.ClinicName</strong>? You'll need to submit a new request if you change your mind.
+</ConfirmDialog>
+
+@code {
+    private bool _loading = true;
+    private bool _confirmingPayment;
+    private bool _cancelling;
+    private Guid? _checkingPaymentId;
+    private List<ClinicOnboardingRequestDto> _requests = [];
+    private ClinicOnboardingRequestDto? _confirmCancel;
+
+    private static readonly ClinicOnboardingStatus[] OpenStatuses =
+    [
+        ClinicOnboardingStatus.Submitted, ClinicOnboardingStatus.Approved, ClinicOnboardingStatus.AwaitingPayment,
+        ClinicOnboardingStatus.PaymentReceived, ClinicOnboardingStatus.Provisioning
+    ];
+
+    private bool _canSubmitNew => _requests.Count == 0 || !_requests.Any(r => OpenStatuses.Contains(r.Status));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        if (!AuthState.IsAuthenticated)
+        {
+            Nav.NavigateTo("/auth/login", forceLoad: true);
+            return;
+        }
+
+        await LoadAsync();
+
+        // Instant check on return from Razorpay's redirect — the reconciliation sweep and
+        // webhook still cover correctness; this only makes the happy path feel fast.
+        var awaiting = _requests.FirstOrDefault(r => r.Status == ClinicOnboardingStatus.AwaitingPayment);
+        if (awaiting is not null)
+        {
+            _confirmingPayment = true;
+            StateHasChanged();
+            await OnboardingApi.CheckPaymentAsync(awaiting.Id);
+            await LoadAsync();
+            _confirmingPayment = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await OnboardingApi.GetMineAsync();
+        if (result.Success && result.Data is not null)
+            _requests = result.Data.ToList();
+        else if (!result.Success)
+            Toast.ShowError(result.Message ?? "Failed to load your clinic requests.");
+        _loading = false;
+    }
+
+    private async Task RefreshAsync() => await LoadAsync();
+
+    private async Task CheckPaymentAsync(Guid id)
+    {
+        _checkingPaymentId = id;
+        var result = await OnboardingApi.CheckPaymentAsync(id);
+        if (!result.Success)
+            Toast.ShowError(result.Message ?? "Could not check payment status yet. Please try again shortly.");
+        await LoadAsync();
+        _checkingPaymentId = null;
+    }
+
+    private void OpenCancelConfirm(ClinicOnboardingRequestDto r) => _confirmCancel = r;
+
+    private async Task ConfirmCancelAsync()
+    {
+        if (_confirmCancel is null) return;
+        _cancelling = true;
+        var result = await OnboardingApi.CancelAsync(_confirmCancel.Id);
+        if (result.Success)
+            Toast.ShowSuccess("Request cancelled.");
+        else
+            Toast.ShowError(result.Message ?? "Could not cancel the request.");
+        _confirmCancel = null;
+        _cancelling = false;
+        await LoadAsync();
+    }
+
+    private async Task OpenClinicAsync()
+    {
+        // The clinic only appears in app_ids after a token refresh — reuse the existing
+        // refresh path so it shows up in the clinic list immediately.
+        var refreshed = await AuthApi.RefreshTokenAsync();
+        if (refreshed.Success && refreshed.Data is not null)
+            await AuthState.SetAuthenticatedStateAsync(refreshed.Data);
+        Nav.NavigateTo("/select-clinic", forceLoad: true);
+    }
+
+    private static (string Bg, string Fg, string Border) StatusColors(ClinicOnboardingStatus status) => status switch
+    {
+        ClinicOnboardingStatus.Active => ("#DCFCE7", "#166534", "#BBF7D0"),
+        ClinicOnboardingStatus.Rejected or ClinicOnboardingStatus.Cancelled or ClinicOnboardingStatus.PaymentLinkExpired
+            => ("#FEE2E2", "#991B1B", "#FCA5A5"),
+        ClinicOnboardingStatus.AwaitingPayment => ("#FEF3C7", "#92400E", "#FDE68A"),
+        _ => ("#EFF6FF", "#1E3A8A", "#BFDBFE")
+    };
+}

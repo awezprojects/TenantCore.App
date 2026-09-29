@@ -61,4 +61,16 @@ public class SubscriptionApiClient(HttpClient httpClient, AuthStateService authS
         try { SetAuth(); return await ReadVoid(await httpClient.PostAsync($"api/subscriptions/{subscriptionId}/cancel", null)); }
         catch (Exception ex) { return new ApiResponse { Success = false, Message = ex.Message }; }
     }
+
+    public async Task<ApiResponse<SubscriptionPaymentDto>> CreateRenewalPaymentLinkAsync(CreateRenewalPaymentLinkRequest request)
+    {
+        try { SetAuth(); return await Read<SubscriptionPaymentDto>(await httpClient.PostAsJsonAsync("api/subscriptions/payments/links", request, JsonOptions)); }
+        catch (Exception ex) { return new ApiResponse<SubscriptionPaymentDto> { Success = false, Message = ex.Message }; }
+    }
+
+    public async Task<ApiResponse<IEnumerable<SubscriptionPaymentDto>>> GetPaymentsAsync()
+    {
+        try { SetAuth(); return await Read<IEnumerable<SubscriptionPaymentDto>>(await httpClient.GetAsync("api/subscriptions/payments")); }
+        catch (Exception ex) { return new ApiResponse<IEnumerable<SubscriptionPaymentDto>> { Success = false, Message = ex.Message }; }
+    }
 }

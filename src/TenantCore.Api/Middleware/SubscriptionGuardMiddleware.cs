@@ -26,7 +26,13 @@ public class SubscriptionGuardMiddleware(RequestDelegate next, IConfiguration co
         "/api/subscription-alert-settings",
         "/api/auth",
         "/api/clinic/dashboard",
-        "/health"
+        "/health",
+        // Clinic onboarding requests happen before any clinic (and therefore any subscription)
+        // exists, so they never carry X-Application-Id — listed here defensively; none of these
+        // three routes ever reaches the guard's actual check either way.
+        "/api/onboarding",
+        "/api/internal",
+        "/api/payments/razorpay"
     ];
 
     public async Task InvokeAsync(HttpContext context)

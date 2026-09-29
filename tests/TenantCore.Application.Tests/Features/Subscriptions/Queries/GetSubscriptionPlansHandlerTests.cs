@@ -26,7 +26,7 @@ public class GetSubscriptionPlansHandlerTests
         // the mock returns them already ordered, matching what that query produces.
         _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync([trial, monthly, quarterly, yearly]);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
         var result = (await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
@@ -43,7 +43,7 @@ public class GetSubscriptionPlansHandlerTests
         // trusts that and does no additional filtering, so an empty result passes straight through.
         var applicationId = Guid.NewGuid();
         _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
         var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
         var result = await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None);
@@ -52,19 +52,38 @@ public class GetSubscriptionPlansHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ClinicHasUsedTrial_TrialPlanMarkedAlreadyUsed()
+    public async Task Handle_ClinicHasAnySubscriptionHistory_TrialPlanMarkedAlreadyUsed()
     {
+        // AlreadyUsed on the Trial card reflects ANY subscription history, not just a prior trial —
+        // a clinic that came through onboarding always has history (its trial or its paid plan)
+        // by the time it can reach this page.
         var applicationId = Guid.NewGuid();
         var trial = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Trial, "Trial", "d", 14, 0, "INR", true, false, 1);
         var monthly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Monthly, "Monthly", "d", 30, 999, "INR", false, false, 2);
 
         _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>())).ReturnsAsync([trial, monthly]);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
         var result = (await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
 
         result.Single(p => p.Code == SubscriptionPlanCode.Trial).AlreadyUsed.Should().BeTrue();
+        // AlreadyUsed only ever applies to the Trial card — paid plans are never flagged by this rule.
         result.Single(p => p.Code == SubscriptionPlanCode.Monthly).AlreadyUsed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_ClinicHasNoSubscriptionHistory_TrialPlanNotMarkedAlreadyUsed()
+    {
+        var applicationId = Guid.NewGuid();
+        var trial = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Trial, "Trial", "d", 14, 0, "INR", true, false, 1);
+
+        _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>())).ReturnsAsync([trial]);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
+        var result = (await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
+
+        result.Single(p => p.Code == SubscriptionPlanCode.Trial).AlreadyUsed.Should().BeFalse();
     }
 }

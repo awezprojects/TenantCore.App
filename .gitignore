@@ -4,9 +4,15 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 # ── Secret / local config files ──────────────────────────────────────────────
-# Real connection strings and keys must NEVER be committed.
-# Use appsettings.Local.json (gitignored) for local dev, or dotnet user-secrets.
+# appsettings.json is the checked-in TEMPLATE — placeholders only, safe to commit.
+# appsettings.Development.json holds the REAL local values (connection strings, API
+# keys, service keys) and must NEVER be committed. Copy the placeholders from
+# appsettings.json into it and fill in real values, or use dotnet user-secrets.
 # Use environment variables or Azure Key Vault for deployed environments.
+appsettings.Development.json
+appsettings.*.Development.json
+src/**/appsettings.Development.json
+src/**/appsettings.*.Development.json
 appsettings.Local.json
 appsettings.*.Local.json
 src/**/appsettings.Local.json

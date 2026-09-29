@@ -6,6 +6,7 @@
 @inject IToastService Toast
 @inject NavigationManager Nav
 @using TenantCore.Shared.Dtos.Subscriptions
+@using TenantCore.Shared.Enums
 
 <PageTitle>Subscription - CloudClinic</PageTitle>
 
@@ -16,6 +17,11 @@
             <div class="opd-title">Activate your clinic</div>
             <div class="opd-subtitle">@ClinicContext.SelectedApplicationName</div>
         </div>
+        <button @onclick="RefreshAsync" disabled="@_loading"
+                style="padding:9px 16px;background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                       border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+            🔄 Refresh
+        </button>
     </div>
 
     @if (SubscriptionContext.IsLocked)
@@ -37,70 +43,158 @@
     }
     else
     {
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;">
-            @foreach (var plan in _plans.OrderBy(p => p.DisplayOrder))
-            {
-                var disabled = plan.AlreadyUsed;
-                <div style="position:relative;background:#fff;border-radius:14px;padding:22px 20px;
-                            border:@(plan.IsPopular ? "2px solid #1565C0" : "1.5px solid #E2E8F0");
-                            box-shadow:@(plan.IsPopular ? "0 10px 30px rgba(21,101,192,0.15)" : "0 2px 8px rgba(0,0,0,0.04)");
-                            opacity:@(disabled ? "0.55" : "1");">
-
-                    @if (plan.IsPopular)
+        @if (_pendingPayment is not null)
+        {
+            <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:1px solid #BFDBFE;
+                        border-radius:14px;padding:20px 24px;margin-bottom:22px;
+                        display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;">
+                <div>
+                    <div style="font-size:14px;font-weight:800;color:#1E293B;margin-bottom:4px;">
+                        Payment link ready — @_pendingPayment.PlanName
+                    </div>
+                    <div style="font-size:13px;color:#475569;">
+                        Amount: <strong>@_pendingPayment.Currency @_pendingPayment.Amount.ToString("N2")</strong>
+                        @if (_pendingPayment.LinkExpiresAt.HasValue)
+                        {
+                            <text> &middot; Expires @_pendingPayment.LinkExpiresAt.Value.ToString("dd MMM yyyy HH:mm")</text>
+                        }
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    @if (!string.IsNullOrWhiteSpace(_pendingPayment.PaymentLinkUrl))
                     {
-                        <div style="position:absolute;top:-11px;left:50%;transform:translateX(-50%);
-                                    background:#1565C0;color:#fff;font-size:10px;font-weight:800;
-                                    letter-spacing:0.5px;padding:4px 12px;border-radius:20px;white-space:nowrap;">
-                            MOST POPULAR
-                        </div>
+                        <a href="@_pendingPayment.PaymentLinkUrl" target="_blank" rel="noopener noreferrer"
+                           style="padding:9px 18px;background:#16A34A;color:#fff;border-radius:8px;
+                                  font-size:13px;font-weight:700;text-decoration:none;">
+                            💳 Pay Now
+                        </a>
                     }
+                    <button @onclick="RefreshAsync"
+                            style="padding:9px 18px;background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                                   border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+                        I've paid, refresh status
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;">
+                @foreach (var plan in _plans.OrderBy(p => p.DisplayOrder))
+                {
+                    var disabled = plan.AlreadyUsed;
+                    <div style="position:relative;background:#fff;border-radius:14px;padding:22px 20px;
+                                border:@(plan.IsPopular ? "2px solid #1565C0" : "1.5px solid #E2E8F0");
+                                box-shadow:@(plan.IsPopular ? "0 10px 30px rgba(21,101,192,0.15)" : "0 2px 8px rgba(0,0,0,0.04)");
+                                opacity:@(disabled ? "0.55" : "1");">
 
-                    <div style="font-size:15px;font-weight:800;color:#1E293B;margin-top:@(plan.IsPopular ? "8px" : "0");">@plan.Name</div>
-                    <div style="font-size:12px;color:#64748B;margin-top:4px;min-height:32px;">@plan.Description</div>
+                        @if (plan.IsPopular)
+                        {
+                            <div style="position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+                                        background:#1565C0;color:#fff;font-size:10px;font-weight:800;
+                                        letter-spacing:0.5px;padding:4px 12px;border-radius:20px;white-space:nowrap;">
+                                MOST POPULAR
+                            </div>
+                        }
 
-                    <div style="margin-top:14px;">
+                        <div style="font-size:15px;font-weight:800;color:#1E293B;margin-top:@(plan.IsPopular ? "8px" : "0");">@plan.Name</div>
+                        <div style="font-size:12px;color:#64748B;margin-top:4px;min-height:32px;">@plan.Description</div>
+
+                        <div style="margin-top:14px;">
+                            @if (plan.IsTrial)
+                            {
+                                <span style="font-size:26px;font-weight:800;color:#16A34A;">Free</span>
+                            }
+                            else
+                            {
+                                <span style="font-size:26px;font-weight:800;color:#1E293B;">@plan.Currency @plan.Price.ToString("N0")</span>
+                            }
+                        </div>
+                        <div style="font-size:11px;color:#94A3B8;margin-top:2px;">
+                            @plan.DurationDays days
+                            @if (!plan.IsTrial)
+                            {
+                                <text> &middot; @((plan.Price / plan.DurationDays).ToString("N2")) @plan.Currency / day</text>
+                            }
+                        </div>
+
                         @if (plan.IsTrial)
                         {
-                            <span style="font-size:26px;font-weight:800;color:#16A34A;">Free</span>
+                            <div style="margin-top:10px;">
+                                <span style="background:@(disabled ? "#F1F5F9" : "#DCFCE7");color:@(disabled ? "#475569" : "#166534");
+                                            border-radius:12px;padding:3px 10px;font-size:10px;font-weight:700;">
+                                    @(disabled ? "ALREADY USED" : "FREE · ONCE PER CLINIC")
+                                </span>
+                            </div>
+                        }
+
+                        @if (plan.IsTrial)
+                        {
+                            <button disabled="@(disabled || SubscriptionContext.Status?.CanSubscribe != true)"
+                                    @onclick="@(() => OpenConfirm(plan))"
+                                    style="width:100%;margin-top:18px;padding:10px;border-radius:8px;border:none;
+                                           background:@(disabled ? "#E2E8F0" : "#1565C0");color:@(disabled ? "#94A3B8" : "#fff");
+                                           font-size:13px;font-weight:700;cursor:@(disabled ? "not-allowed" : "pointer");">
+                                @(disabled ? "Already Used" : "Choose Plan")
+                            </button>
                         }
                         else
                         {
-                            <span style="font-size:26px;font-weight:800;color:#1E293B;">@plan.Currency @plan.Price.ToString("N0")</span>
+                            <button disabled="@(SubscriptionContext.Status?.CanSubscribe != true || _creatingLinkForPlanId == plan.Id)"
+                                    @onclick="@(() => CreatePaymentLinkAsync(plan))"
+                                    style="width:100%;margin-top:18px;padding:10px;border-radius:8px;border:none;
+                                           background:#1565C0;color:#fff;
+                                           font-size:13px;font-weight:700;cursor:pointer;
+                                           opacity:@(_creatingLinkForPlanId == plan.Id ? "0.7" : "1");">
+                                @(_creatingLinkForPlanId == plan.Id ? "Creating link..." : "Get Payment Link")
+                            </button>
                         }
                     </div>
-                    <div style="font-size:11px;color:#94A3B8;margin-top:2px;">
-                        @plan.DurationDays days
-                        @if (!plan.IsTrial)
-                        {
-                            <text> &middot; @((plan.Price / plan.DurationDays).ToString("N2")) @plan.Currency / day</text>
-                        }
-                    </div>
+                }
+            </div>
 
-                    @if (plan.IsTrial)
-                    {
-                        <div style="margin-top:10px;">
-                            <span style="background:@(disabled ? "#F1F5F9" : "#DCFCE7");color:@(disabled ? "#475569" : "#166534");
-                                        border-radius:12px;padding:3px 10px;font-size:10px;font-weight:700;">
-                                @(disabled ? "ALREADY USED" : "FREE · ONCE PER CLINIC")
-                            </span>
-                        </div>
-                    }
-
-                    <button disabled="@(disabled || SubscriptionContext.Status?.CanSubscribe != true)"
-                            @onclick="@(() => OpenConfirm(plan))"
-                            style="width:100%;margin-top:18px;padding:10px;border-radius:8px;border:none;
-                                   background:@(disabled ? "#E2E8F0" : "#1565C0");color:@(disabled ? "#94A3B8" : "#fff");
-                                   font-size:13px;font-weight:700;cursor:@(disabled ? "not-allowed" : "pointer");">
-                        @(disabled ? "Already Used" : "Choose Plan")
-                    </button>
+            @if (SubscriptionContext.Status?.CanSubscribe != true)
+            {
+                <div style="margin-top:18px;font-size:12px;color:#94A3B8;">
+                    Only a Clinic Admin can choose a subscription plan.
                 </div>
             }
-        </div>
+        }
 
-        @if (SubscriptionContext.Status?.CanSubscribe != true)
+        @if (_payments.Count > 0)
         {
-            <div style="margin-top:18px;font-size:12px;color:#94A3B8;">
-                Only a Clinic Admin can choose a subscription plan.
+            <div style="margin-top:32px;">
+                <div style="font-size:14px;font-weight:800;color:#1E293B;margin-bottom:12px;">Payment History</div>
+                <div class="opd-table-card">
+                    <table class="opd-table">
+                        <thead>
+                            <tr>
+                                <th>Plan</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Paid On</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in _payments.OrderByDescending(p => p.CreatedAt))
+                            {
+                                <tr>
+                                    <td>@p.PlanName</td>
+                                    <td>@p.Currency @p.Amount.ToString("N2")</td>
+                                    <td>
+                                        <span style="background:@StatusBg(p.Status);color:@StatusFg(p.Status);
+                                                     border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">
+                                            @p.Status
+                                        </span>
+                                    </td>
+                                    <td>@(p.PaidAt?.ToString("dd MMM yyyy") ?? "—")</td>
+                                    <td>@p.CreatedAt.ToString("dd MMM yyyy")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             </div>
         }
     }
@@ -118,7 +212,7 @@
         </div>
         <div style="padding:20px 24px;font-size:13px;color:#334155;line-height:1.8;">
             <div><strong>Plan:</strong> @_confirmPlan.Name</div>
-            <div><strong>Price:</strong> @(_confirmPlan.IsTrial ? "Free" : $"{_confirmPlan.Currency} {_confirmPlan.Price:N0}")</div>
+            <div><strong>Price:</strong> Free</div>
             <div><strong>Starts:</strong> @DateTime.UtcNow.ToString("dd MMM yyyy")</div>
             <div><strong>Ends:</strong> @DateTime.UtcNow.AddDays(_confirmPlan.DurationDays).ToString("dd MMM yyyy")</div>
         </div>
@@ -136,21 +230,45 @@
 @code {
     private bool _loading = true;
     private bool _subscribing;
+    private Guid? _creatingLinkForPlanId;
     private List<SubscriptionPlanDto> _plans = [];
+    private List<SubscriptionPaymentDto> _payments = [];
+    private SubscriptionPaymentDto? _pendingPayment;
     private SubscriptionPlanDto? _confirmPlan;
 
     protected override async Task OnInitializedAsync()
     {
-        _loading = true;
-
         if (!SubscriptionContext.IsLoaded)
             await SubscriptionContext.RefreshAsync();
 
-        var response = await SubscriptionApi.GetPlansAsync();
-        if (response.Success && response.Data is not null)
-            _plans = response.Data.ToList();
+        await LoadAsync();
+    }
+
+    private async Task RefreshAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+
+        var plansTask = SubscriptionApi.GetPlansAsync();
+        var paymentsTask = SubscriptionApi.GetPaymentsAsync();
+        await Task.WhenAll(plansTask, paymentsTask);
+
+        var plansResponse = await plansTask;
+        if (plansResponse.Success && plansResponse.Data is not null)
+            _plans = plansResponse.Data.ToList();
         else
-            Toast.ShowError(response.Message ?? "Failed to load subscription plans.");
+            Toast.ShowError(plansResponse.Message ?? "Failed to load subscription plans.");
+
+        var paymentsResponse = await paymentsTask;
+        if (paymentsResponse.Success && paymentsResponse.Data is not null)
+        {
+            _payments = paymentsResponse.Data.ToList();
+            _pendingPayment = _payments
+                .Where(p => p.Status is SubscriptionPaymentStatus.Pending or SubscriptionPaymentStatus.LinkCreated)
+                .OrderByDescending(p => p.CreatedAt)
+                .FirstOrDefault();
+        }
 
         _loading = false;
     }
@@ -183,4 +301,39 @@
 
         _subscribing = false;
     }
+
+    private async Task CreatePaymentLinkAsync(SubscriptionPlanDto plan)
+    {
+        if (SubscriptionContext.Status?.CanSubscribe != true) return;
+        _creatingLinkForPlanId = plan.Id;
+
+        var response = await SubscriptionApi.CreateRenewalPaymentLinkAsync(new CreateRenewalPaymentLinkRequest { SubscriptionPlanId = plan.Id });
+        if (response.Success)
+        {
+            Toast.ShowSuccess("Payment link created.");
+            await LoadAsync();
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Could not create a payment link. Please try again.");
+        }
+
+        _creatingLinkForPlanId = null;
+    }
+
+    private static string StatusBg(SubscriptionPaymentStatus status) => status switch
+    {
+        SubscriptionPaymentStatus.Paid => "#DCFCE7",
+        SubscriptionPaymentStatus.Expired or SubscriptionPaymentStatus.Cancelled => "#FEE2E2",
+        SubscriptionPaymentStatus.LinkCreated => "#FEF3C7",
+        _ => "#F1F5F9"
+    };
+
+    private static string StatusFg(SubscriptionPaymentStatus status) => status switch
+    {
+        SubscriptionPaymentStatus.Paid => "#166534",
+        SubscriptionPaymentStatus.Expired or SubscriptionPaymentStatus.Cancelled => "#991B1B",
+        SubscriptionPaymentStatus.LinkCreated => "#92400E",
+        _ => "#475569"
+    };
 }

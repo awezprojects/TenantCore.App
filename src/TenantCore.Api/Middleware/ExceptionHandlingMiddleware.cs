@@ -57,6 +57,7 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             DomainValidationException dve => (HttpStatusCode.BadRequest,    "Invalid Input", dve.Message),
             DomainException de      => (HttpStatusCode.BadRequest,          "Request Error", de.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized,    "Unauthorized",  UserMessages.Unauthorized),
+            TooManyRequestsException tmr => ((HttpStatusCode)429,           "Too Many Requests", tmr.Message),
             InvalidOperationException ioe => (HttpStatusCode.Conflict,      "Conflict",      ioe.Message),
             DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } } => (
                 HttpStatusCode.Conflict, "Conflict", UserMessages.Conflict),

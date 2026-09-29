@@ -45,6 +45,10 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<City> Cities => Set<City>();
     public DbSet<ClinicLocation> ClinicLocations => Set<ClinicLocation>();
     public DbSet<VitalPresetLookupItem> VitalPresetLookupItems => Set<VitalPresetLookupItem>();
+    public DbSet<ClinicOnboardingRequest> ClinicOnboardingRequests => Set<ClinicOnboardingRequest>();
+    public DbSet<SubscriptionPayment> SubscriptionPayments => Set<SubscriptionPayment>();
+    public DbSet<WorkflowTask> WorkflowTasks => Set<WorkflowTask>();
+    public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

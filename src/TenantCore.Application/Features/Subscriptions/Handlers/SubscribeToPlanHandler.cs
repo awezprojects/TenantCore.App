@@ -10,6 +10,12 @@ using TenantCore.Shared.Dtos.Subscriptions;
 
 namespace TenantCore.Application.Features.Subscriptions.Handlers;
 
+/// <summary>
+/// This free-activation endpoint now only ever grants the Trial plan, and only to a legacy
+/// clinic with no subscription history at all — every clinic created through the onboarding
+/// workflow already has history (its trial or its paid plan) by the time it could reach here.
+/// Paid plans are activated exclusively through a confirmed Razorpay payment link.
+/// </summary>
 public sealed class SubscribeToPlanHandler(
     ISubscriptionPlanRepository planRepository,
     IClinicSubscriptionRepository subscriptionRepository,
@@ -23,33 +29,26 @@ public sealed class SubscribeToPlanHandler(
         if (plan is null || !plan.IsActive)
             throw new NotFoundException(nameof(SubscriptionPlan), request.SubscriptionPlanId);
 
-        // Rule: Trial is once per clinic, ever — including a prior Trial that was
-        // later cancelled or has since expired. Cancelling never restores the entitlement.
-        if (plan.IsTrial)
-        {
-            var hasUsedTrial = await subscriptionRepository.HasUsedTrialAsync(request.ApplicationId, cancellationToken);
-            if (hasUsedTrial)
-                throw new InvalidOperationException("This clinic has already used its free trial and cannot select it again.");
-        }
+        if (!plan.IsTrial)
+            throw new InvalidOperationException(
+                "Paid plans are activated through a payment link, not this endpoint. Get a payment link from the subscription page.");
 
-        // Renewal before expiry does not truncate the current term: if a currently-active
-        // subscription exists, the new one starts the day after it ends. Otherwise it
-        // starts now. This guarantees only one Active subscription ever covers a given moment.
-        var latest = await subscriptionRepository.GetLatestForClinicAsync(request.ApplicationId, cancellationToken);
-        var utcNow = DateTime.UtcNow;
-        var startDate = latest is not null && latest.IsCurrentlyActive(utcNow)
-            ? latest.EndDate.AddDays(1)
-            : utcNow;
+        var hasAnyHistory = await subscriptionRepository.HasAnySubscriptionHistoryAsync(request.ApplicationId, cancellationToken);
+        if (hasAnyHistory)
+            throw new InvalidOperationException("This clinic already has subscription history and cannot select the free trial.");
 
         var (clinicName, billingEmail, billingName) = await ResolveBillingContactAsync(request.ApplicationId, request.ActingUserId, cancellationToken);
 
-        var subscription = ClinicSubscription.Create(request.ApplicationId, plan, startDate, clinicName, billingEmail, billingName);
+        var subscription = ClinicSubscription.Create(
+            request.ApplicationId, plan, DateTime.UtcNow, clinicName, billingEmail, billingName,
+            purchasedByUserId: request.ActingUserId);
+
         await subscriptionRepository.AddAsync(subscription, cancellationToken);
         await subscriptionRepository.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Clinic {ApplicationId} subscribed to plan {PlanCode} ({SubscriptionId}), active {StartDate:d} to {EndDate:d}",
-            request.ApplicationId, plan.Code, subscription.Id, subscription.StartDate, subscription.EndDate);
+            "Clinic {ApplicationId} activated the free trial ({SubscriptionId}), active {StartDate:d} to {EndDate:d}",
+            request.ApplicationId, subscription.Id, subscription.StartDate, subscription.EndDate);
 
         return SubscriptionTranslator.ToDto(subscription);
     }

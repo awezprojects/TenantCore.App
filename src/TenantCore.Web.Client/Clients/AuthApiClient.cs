@@ -140,8 +140,10 @@ public class AuthApiClient(HttpClient httpClient, AuthStateService authState) : 
     {
         try
         {
+            // GET: TenantCore.Auth only exposes verify-email as a GET (the App forwards it as-is). A POST
+            // here would be forwarded to that GET-only endpoint and always fail with 405.
             using var requestMessage = new HttpRequestMessage(
-                HttpMethod.Post,
+                HttpMethod.Get,
                 $"{BaseRoute}/verify-email?userId={userId}&verificationCode={Uri.EscapeDataString(verificationCode)}");
             IncludeCookies(requestMessage);
 

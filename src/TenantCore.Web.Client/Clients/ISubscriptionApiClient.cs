@@ -14,4 +14,6 @@ public interface ISubscriptionApiClient
     Task<ApiResponse<IEnumerable<SubscriptionHistoryItemDto>>> GetHistoryAsync();
     Task<ApiResponse<ClinicSubscriptionDto>> SubscribeAsync(SubscribeRequest request);
     Task<ApiResponse> CancelAsync(Guid subscriptionId);
+    Task<ApiResponse<SubscriptionPaymentDto>> CreateRenewalPaymentLinkAsync(CreateRenewalPaymentLinkRequest request);
+    Task<ApiResponse<IEnumerable<SubscriptionPaymentDto>>> GetPaymentsAsync();
 }

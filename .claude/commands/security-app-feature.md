@@ -4,7 +4,9 @@ You are performing a security and code quality review of a feature implemented i
 
 ## Step 1 — Load the feature context
 
-1. `.clinerules` — **already auto-loaded**: §6 is the security/quality checklist plus the S1–S12 / V1–V7 list, §3 has the hard rules (including the frozen middleware order)
+> All paths in this command are relative to the `TenantCore.App/` repo root. If running from the workspace root (via `/feature-security-analysis`), prefix them with `TenantCore.App/`.
+
+1. `.clinerules` (repo root — Claude Code does **not** auto-load it; read it once if not already in context): §6 is the security/quality checklist plus the S1–S12 / V1–V7 list, §3 has the hard rules (including the frozen middleware order)
 2. `docs/adr/ADR-010-security.md` — the full long-form catalogue. Open it when you need exact wording to score a specific finding, or the §11 safe-fix rules verbatim. (ADRs live in `docs/adr/`, **not** `.claude/docs/adr/`.)
 3. `CLAUDE.md` — no need to read routinely; it duplicates `.clinerules` §2–§3
 

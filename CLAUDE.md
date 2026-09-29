@@ -6,21 +6,21 @@ Wrapper API + Blazor WebAssembly frontend that integrates with TenantCore.Auth f
 
 ## ADR Documents (Architecture Decision Records)
 
-**Always read the relevant ADR before planning or writing code.** All ADRs live in `.claude/docs/adr/`.
+**Always read the relevant ADR before planning or writing code.** All ADRs live in `docs/adr/` (not `.claude/docs/adr/`).
 
 | ADR | Read When |
 |-----|-----------|
-| [ADR-000: Index & Quick Reference](.claude/docs/adr/ADR-000-index.md) | Every session — orientation, tech stack |
-| [ADR-001: Solution Structure](.claude/docs/adr/ADR-001-solution-structure.md) | Adding a project, moving code between layers |
-| [ADR-002: Domain Layer](.claude/docs/adr/ADR-002-domain-layer.md) | Adding/changing entities, repo interfaces, domain exceptions |
-| [ADR-003: Application Layer — CQRS & MediatR](.claude/docs/adr/ADR-003-application-layer.md) | Adding features, commands, queries, handlers, validators |
-| [ADR-004: Infrastructure Layer](.claude/docs/adr/ADR-004-infrastructure-layer.md) | Adding repositories, EF migrations, external services |
-| [ADR-005: API Layer](.claude/docs/adr/ADR-005-api-layer.md) | Adding controllers, middleware, authorization policies |
-| [ADR-006: Shared Layer](.claude/docs/adr/ADR-006-shared-layer.md) | Adding DTOs, enums, authorization constants |
-| [ADR-007: Blazor WebAssembly Client](.claude/docs/adr/ADR-007-blazor-client.md) | Adding pages, components, typed HTTP clients — **always read the UI Theme System section before writing any page** |
-| [ADR-008: Multi-Tenancy](.claude/docs/adr/ADR-008-multi-tenancy.md) | Any feature touching clinic/application context |
-| [ADR-009: Unit Testing](.claude/docs/adr/ADR-009-unit-testing.md) | Writing or reviewing tests — **read before writing any test file; mandatory for every feature** |
-| [ADR-010: Security & Code Quality](.claude/docs/adr/ADR-010-security.md) | Security analysis, code smell detection, architectural violations, quality review |
+| [ADR-000: Index & Quick Reference](docs/adr/ADR-000-index.md) | Every session — orientation, tech stack |
+| [ADR-001: Solution Structure](docs/adr/ADR-001-solution-structure.md) | Adding a project, moving code between layers |
+| [ADR-002: Domain Layer](docs/adr/ADR-002-domain-layer.md) | Adding/changing entities, repo interfaces, domain exceptions |
+| [ADR-003: Application Layer — CQRS & MediatR](docs/adr/ADR-003-application-layer.md) | Adding features, commands, queries, handlers, validators |
+| [ADR-004: Infrastructure Layer](docs/adr/ADR-004-infrastructure-layer.md) | Adding repositories, EF migrations, external services |
+| [ADR-005: API Layer](docs/adr/ADR-005-api-layer.md) | Adding controllers, middleware, authorization policies |
+| [ADR-006: Shared Layer](docs/adr/ADR-006-shared-layer.md) | Adding DTOs, enums, authorization constants |
+| [ADR-007: Blazor WebAssembly Client](docs/adr/ADR-007-blazor-client.md) | Adding pages, components, typed HTTP clients — **always read the UI Theme System section before writing any page** |
+| [ADR-008: Multi-Tenancy](docs/adr/ADR-008-multi-tenancy.md) | Any feature touching clinic/application context |
+| [ADR-009: Unit Testing](docs/adr/ADR-009-unit-testing.md) | Writing or reviewing tests — **read before writing any test file; mandatory for every feature** |
+| [ADR-010: Security & Code Quality](docs/adr/ADR-010-security.md) | Security analysis, code smell detection, architectural violations, quality review |
 
 ---
 
@@ -43,7 +43,10 @@ Web.Client ──► Shared
 | `TenantCore.Domain` | Entities, repository interfaces, domain exceptions |
 | `TenantCore.Infrastructure` | EF Core, repositories, Auth HTTP client |
 | `TenantCore.Shared` | DTOs, authorization constants, `Result<T>`, `PagedResult<T>` |
+| `TenantCore.Logging` | Independent error/action logging to Azure Table Storage (`ApiErrorLogs`, `FrontendErrorLogs`, `ActionLogs`) |
 | `TenantCore.Web.Client` | Blazor WASM — typed API clients, pages, components |
+
+> Claude Code auto-loads this `CLAUDE.md`, **not** `.clinerules` (that file is Cline's). The `.claude/commands/*` workflows read `.clinerules` explicitly.
 
 ---
 

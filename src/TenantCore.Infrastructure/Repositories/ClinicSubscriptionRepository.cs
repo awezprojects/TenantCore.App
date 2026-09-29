@@ -33,4 +33,14 @@ public class ClinicSubscriptionRepository(ClinicDbContext dbContext)
         => await DbSet.AsNoTracking()
             .AnyAsync(s => s.ApplicationId == applicationId
                         && s.PlanCode == SubscriptionPlanCode.Trial, ct);
+
+    public async Task<bool> HasAnySubscriptionHistoryAsync(Guid applicationId, CancellationToken ct = default)
+        => await DbSet.AsNoTracking()
+            .AnyAsync(s => s.ApplicationId == applicationId, ct);
+
+    public async Task<ClinicSubscription?> GetByPaymentIdAsync(Guid subscriptionPaymentId, CancellationToken ct = default)
+        => await DbSet.FirstOrDefaultAsync(s => s.SubscriptionPaymentId == subscriptionPaymentId, ct);
+
+    public async Task<ClinicSubscription?> GetByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken ct = default)
+        => await DbSet.FirstOrDefaultAsync(s => s.OnboardingRequestId == onboardingRequestId, ct);
 }

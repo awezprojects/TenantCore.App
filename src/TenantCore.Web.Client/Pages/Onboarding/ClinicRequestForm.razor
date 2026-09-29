@@ -1,0 +1,289 @@
+@page "/clinic-requests/new"
+@layout DoctorPortalLayout
+@inject IOnboardingApiClient OnboardingApi
+@inject AuthStateService AuthState
+@inject IToastService Toast
+@inject NavigationManager Nav
+@using TenantCore.Shared.Dtos.Onboarding
+@using TenantCore.Shared.Enums
+
+<PageTitle>Request a New Clinic - CloudClinic</PageTitle>
+
+<div style="max-width:760px;">
+
+    @if (_loading)
+    {
+        <div style="display:flex;justify-content:center;padding:60px 0;">
+            <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
+        </div>
+    }
+    else if (_blockedByOpenRequest)
+    {
+        <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:14px;padding:20px 24px;
+                    display:flex;align-items:flex-start;gap:14px;">
+            <div style="font-size:24px;flex-shrink:0;">⏳</div>
+            <div>
+                <div style="font-size:14px;font-weight:800;color:#92400E;margin-bottom:4px;">
+                    You already have an open clinic request
+                </div>
+                <div style="font-size:13px;color:#78350F;line-height:1.6;margin-bottom:12px;">
+                    You can submit a new request only after the current one is completed, rejected, cancelled or the payment link expires.
+                </div>
+                <button @onclick='@(() => Nav.NavigateTo("/clinic-requests"))'
+                        style="padding:8px 16px;background:#92400E;color:#fff;border:none;border-radius:8px;
+                               font-size:12px;font-weight:700;cursor:pointer;">
+                    View my requests
+                </button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Info banner -->
+        <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:14px;
+                    padding:18px 22px;margin-bottom:24px;border:1px solid #BFDBFE;
+                    display:flex;align-items:flex-start;gap:14px;">
+            <div style="font-size:28px;flex-shrink:0;">🏥</div>
+            <div>
+                <div style="font-size:15px;font-weight:800;color:#1E293B;margin-bottom:4px;">
+                    Request a New Clinic
+                </div>
+                <div style="font-size:13px;color:#64748B;line-height:1.6;">
+                    Submit your clinic details for review. An internal admin will check the request and either grant a
+                    trial or send a payment link to activate your subscription.
+                </div>
+            </div>
+        </div>
+
+        <div style="background:#fff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
+            <div style="padding:20px 24px;border-bottom:1px solid #E2E8F0;">
+                <div style="font-size:16px;font-weight:800;color:#1E293B;">Clinic &amp; Doctor Details</div>
+            </div>
+            <div style="padding:24px;">
+
+                <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
+                            text-transform:uppercase;letter-spacing:0.5px;">Clinic Information</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Clinic Name *</label>
+                        <input class="form-input" type="text" maxlength="200" @bind="_model.ClinicName" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Preferred Clinic Code *</label>
+                        <input class="form-input" type="text" maxlength="20" @bind="_model.PreferredClinicCode" disabled="@_submitting"
+                               placeholder="e.g. DMC-001" />
+                        <div class="form-helper">3-20 chars, letters/digits/hyphens only</div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Clinic Contact Number</label>
+                        <input class="form-input" type="text" maxlength="20" @bind="_model.ClinicContactNumber" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Official Email</label>
+                        <input class="form-input" type="email" maxlength="256" @bind="_model.OfficialEmail" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Website</label>
+                        <input class="form-input" type="text" maxlength="256" @bind="_model.Website" disabled="@_submitting" />
+                    </div>
+                </div>
+
+                <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
+                            text-transform:uppercase;letter-spacing:0.5px;">Address</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                    <div class="form-group" style="margin-bottom:0;grid-column:1 / -1;">
+                        <label class="form-label">Address *</label>
+                        <input class="form-input" type="text" maxlength="500" @bind="_model.Address" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">City *</label>
+                        <input class="form-input" type="text" maxlength="100" @bind="_model.City" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">State *</label>
+                        <input class="form-input" type="text" maxlength="100" @bind="_model.State" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Pincode *</label>
+                        <input class="form-input" type="text" maxlength="6" @bind="_model.Pincode" disabled="@_submitting" />
+                        <div class="form-helper">Exactly 6 digits</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:10px;font-size:12px;font-weight:700;color:#94A3B8;
+                            text-transform:uppercase;letter-spacing:0.5px;">Doctor Information</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Doctor Name *</label>
+                        <input class="form-input" type="text" maxlength="150" @bind="_model.DoctorName" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Your Phone *</label>
+                        <input class="form-input" type="text" maxlength="20" @bind="_model.RequesterPhone" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Medical Registration No. *</label>
+                        <input class="form-input" type="text" maxlength="50" @bind="_model.MedicalRegistrationNumber" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Medical Council *</label>
+                        <input class="form-input" type="text" maxlength="150" @bind="_model.MedicalCouncil" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Expected Staff Count *</label>
+                        <input class="form-input" type="number" min="1" max="500" @bind="_model.ExpectedStaffCount" disabled="@_submitting" />
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">Referral Source</label>
+                        <input class="form-input" type="text" maxlength="100" @bind="_model.ReferralSource" disabled="@_submitting" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-input" rows="3" maxlength="1000" @bind="_model.Notes" disabled="@_submitting" style="resize:none;"></textarea>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px;padding:10px 14px;
+                                font-size:12px;color:#991B1B;font-weight:600;margin-bottom:14px;">
+                        @_error
+                    </div>
+                }
+
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;">
+                    <button @onclick='@(() => Nav.NavigateTo("/select-clinic"))' disabled="@_submitting"
+                            style="padding:10px 20px;background:transparent;color:#64748B;border:1.5px solid #E2E8F0;
+                                   border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+                        Cancel
+                    </button>
+                    <button @onclick="SubmitAsync" disabled="@_submitting"
+                            style="padding:10px 24px;background:#1565C0;color:#fff;border:none;border-radius:8px;
+                                   font-size:13px;font-weight:700;cursor:pointer;opacity:@(_submitting ? "0.7" : "1");">
+                        @(_submitting ? "Submitting..." : "Submit Request")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _blockedByOpenRequest;
+    private bool _submitting;
+    private string? _error;
+    private readonly FormModel _model = new();
+
+    // SubmitClinicOnboardingRequest is an immutable record (init-only) — a mutable shadow model
+    // is what @bind targets, and the record is built from it at submit time.
+    private sealed class FormModel
+    {
+        public string ClinicName { get; set; } = string.Empty;
+        public string PreferredClinicCode { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
+        public string Pincode { get; set; } = string.Empty;
+        public string? ClinicContactNumber { get; set; }
+        public string? OfficialEmail { get; set; }
+        public string? Website { get; set; }
+        public string RequesterPhone { get; set; } = string.Empty;
+        public string DoctorName { get; set; } = string.Empty;
+        public string MedicalRegistrationNumber { get; set; } = string.Empty;
+        public string MedicalCouncil { get; set; } = string.Empty;
+        public int ExpectedStaffCount { get; set; } = 1;
+        public string? ReferralSource { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    private static readonly ClinicOnboardingStatus[] OpenStatuses =
+    [
+        ClinicOnboardingStatus.Submitted, ClinicOnboardingStatus.Approved, ClinicOnboardingStatus.AwaitingPayment,
+        ClinicOnboardingStatus.PaymentReceived, ClinicOnboardingStatus.Provisioning
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthState.InitializeAsync();
+        if (!AuthState.IsAuthenticated)
+        {
+            Nav.NavigateTo("/auth/login", forceLoad: true);
+            return;
+        }
+
+        var mine = await OnboardingApi.GetMineAsync();
+        if (mine.Success && mine.Data is not null)
+            _blockedByOpenRequest = mine.Data.Any(r => OpenStatuses.Contains(r.Status));
+
+        var user = AuthState.CurrentUser;
+        if (user is not null)
+        {
+            _model.DoctorName = user.FullName;
+            _model.RequesterPhone = user.MobileNo ?? string.Empty;
+        }
+
+        _loading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = Validate();
+        if (_error is not null) return;
+
+        var request = new SubmitClinicOnboardingRequest
+        {
+            ClinicName = _model.ClinicName,
+            PreferredClinicCode = _model.PreferredClinicCode.Trim().ToUpperInvariant(),
+            Address = _model.Address,
+            City = _model.City,
+            State = _model.State,
+            Pincode = _model.Pincode,
+            ClinicContactNumber = _model.ClinicContactNumber,
+            OfficialEmail = _model.OfficialEmail,
+            Website = _model.Website,
+            RequesterPhone = _model.RequesterPhone,
+            DoctorName = _model.DoctorName,
+            MedicalRegistrationNumber = _model.MedicalRegistrationNumber,
+            MedicalCouncil = _model.MedicalCouncil,
+            ExpectedStaffCount = _model.ExpectedStaffCount,
+            ReferralSource = _model.ReferralSource,
+            Notes = _model.Notes
+        };
+
+        _submitting = true;
+        var response = await OnboardingApi.SubmitAsync(request);
+        _submitting = false;
+
+        if (response.Success)
+        {
+            Toast.ShowSuccess("Your clinic request has been submitted for review.");
+            Nav.NavigateTo("/clinic-requests");
+        }
+        else
+        {
+            _error = response.Message ?? "Could not submit the request. Please try again.";
+        }
+    }
+
+    private string? Validate()
+    {
+        if (string.IsNullOrWhiteSpace(_model.ClinicName)) return "Clinic name is required.";
+        if (string.IsNullOrWhiteSpace(_model.PreferredClinicCode) ||
+            _model.PreferredClinicCode.Trim().Length < 3 ||
+            !System.Text.RegularExpressions.Regex.IsMatch(_model.PreferredClinicCode.Trim(), "^[A-Za-z0-9-]+$"))
+            return "Clinic code must be 3-20 letters, digits or hyphens.";
+        if (string.IsNullOrWhiteSpace(_model.Address)) return "Address is required.";
+        if (string.IsNullOrWhiteSpace(_model.City)) return "City is required.";
+        if (string.IsNullOrWhiteSpace(_model.State)) return "State is required.";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(_model.Pincode?.Trim() ?? "", "^[0-9]{6}$"))
+            return "Pincode must be exactly 6 digits.";
+        if (string.IsNullOrWhiteSpace(_model.RequesterPhone)) return "Your phone number is required.";
+        if (string.IsNullOrWhiteSpace(_model.DoctorName)) return "Doctor name is required.";
+        if (string.IsNullOrWhiteSpace(_model.MedicalRegistrationNumber)) return "Medical registration number is required.";
+        if (string.IsNullOrWhiteSpace(_model.MedicalCouncil)) return "Medical council is required.";
+        if (_model.ExpectedStaffCount is < 1 or > 500) return "Expected staff count must be between 1 and 500.";
+        return null;
+    }
+}

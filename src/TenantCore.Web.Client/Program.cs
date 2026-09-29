@@ -158,6 +158,13 @@ builder.Services.AddHttpClient<ISubscriptionApiClient, SubscriptionApiClient>(cl
 builder.Services.AddScoped<SubscriptionContextService>();
 builder.Services.AddScoped<FeatureFlagsContextService>();
 
+// Register Onboarding API Client — user-scoped only (no clinic exists yet for a request),
+// so no ClinicAuthorizationHandler.
+builder.Services.AddHttpClient<IOnboardingApiClient, OnboardingApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+});
+
 // Register Logging API Client — no ClinicAuthorizationHandler: the endpoint is
 // anonymous-allowed so pre-login frontend crashes are still captured.
 builder.Services.AddHttpClient<ILoggingApiClient, LoggingApiClient>(client =>

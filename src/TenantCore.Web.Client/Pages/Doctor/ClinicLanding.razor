@@ -7,9 +7,12 @@
 @inject IClinicApiClient ClinicApi
 @inject IPrescriptionApiClient PrescriptionApi
 @inject ISubscriptionApiClient SubscriptionApi
+@inject IOnboardingApiClient OnboardingApi
 @inject NavigationManager Nav
 @using TenantCore.Web.Client.Clients
 @using TenantCore.Shared.Dtos.Auth
+@using TenantCore.Shared.Dtos.Onboarding
+@using TenantCore.Shared.Enums
 
 <PageTitle>My Clinics - CloudClinic</PageTitle>
 
@@ -220,8 +223,43 @@ else
                 </div>
             }
 
-            <!-- Register own clinic card — doctors only -->
-            @if (!_hasOwnClinic && _isDoctor)
+            <!-- Open clinic request status card, or the "request a clinic" card — every user -->
+            @if (_openRequest is not null)
+            {
+                <div class="cc-add-clinic-card" style="cursor:default;">
+                    <div style="width:64px;height:64px;border-radius:18px;
+                                background:linear-gradient(135deg,#1565C0,#42A5F5);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:30px;margin-bottom:14px;
+                                box-shadow:0 8px 20px rgba(21,101,192,0.25);">⏳</div>
+                    <div style="font-size:17px;font-weight:800;color:#1E293B;margin-bottom:6px;text-align:center;">
+                        @_openRequest.ClinicName
+                    </div>
+                    <div style="font-size:12px;color:#94A3B8;max-width:280px;
+                                line-height:1.6;margin-bottom:14px;text-align:center;">
+                        @_openRequest.StatusText
+                    </div>
+                    @if (_openRequest.Status == ClinicOnboardingStatus.AwaitingPayment && !string.IsNullOrWhiteSpace(_openRequest.PaymentLinkUrl))
+                    {
+                        <a href="@_openRequest.PaymentLinkUrl" target="_blank" rel="noopener noreferrer"
+                           style="padding:7px 18px;background:#16A34A;color:#fff;border-radius:20px;
+                                  font-size:12px;font-weight:700;text-decoration:none;">Pay Now</a>
+                    }
+                    else if (_openRequest.Status == ClinicOnboardingStatus.Active)
+                    {
+                        <span @onclick='@(() => Nav.NavigateTo("/clinic-requests"))'
+                              style="padding:7px 18px;background:#1565C0;color:#fff;
+                                     border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;">Open clinic</span>
+                    }
+                    else
+                    {
+                        <span @onclick='@(() => Nav.NavigateTo("/clinic-requests"))'
+                              style="padding:7px 18px;background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                                     border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;">View status</span>
+                    }
+                </div>
+            }
+            else if (_canRegisterClinic)
             {
                 <div class="cc-add-clinic-card" @onclick="RegisterClinic">
                     <div style="width:64px;height:64px;border-radius:18px;
@@ -230,17 +268,14 @@ else
                                 font-size:30px;margin-bottom:14px;
                                 box-shadow:0 8px 20px rgba(21,101,192,0.25);">➕</div>
                     <div style="font-size:17px;font-weight:800;color:#1E293B;margin-bottom:6px;">
-                        Register Your Own Clinic
+                        Request a New Clinic
                     </div>
                     <div style="font-size:12px;color:#94A3B8;max-width:280px;
                                 line-height:1.6;margin-bottom:14px;text-align:center;">
-                        Start your own practice on CloudClinic. Complete control over staff, patients, and operations.
+                        Submit your clinic details for review. An admin will approve and send a payment link, or grant a trial.
                     </div>
                     <span style="padding:7px 18px;background:#1565C0;color:#fff;
-                                 border-radius:20px;font-size:12px;font-weight:700;">Register Now</span>
-                    <div style="font-size:10px;color:#94A3B8;margin-top:12px;font-style:italic;">
-                        * 1 application per doctor account
-                    </div>
+                                 border-radius:20px;font-size:12px;font-weight:700;">Request Now</span>
                 </div>
             }
         </div>
@@ -273,11 +308,19 @@ else
     private string _displayName    = string.Empty;
     private string _primaryRole    = string.Empty;
     private bool   _isDoctor;
+    private bool   _canRegisterClinic;
     private bool   _hasOwnClinic;
     private int    _totalAppts;
     private int    _totalPendingRx;
 
     private List<ClinicItem> _clinics = [];
+    private ClinicOnboardingRequestDto? _openRequest;
+
+    private static readonly ClinicOnboardingStatus[] OpenStatuses =
+    [
+        ClinicOnboardingStatus.Submitted, ClinicOnboardingStatus.Approved, ClinicOnboardingStatus.AwaitingPayment,
+        ClinicOnboardingStatus.PaymentReceived, ClinicOnboardingStatus.Provisioning
+    ];
 
     private static readonly string[] Colors =
         ["#1565C0", "#DC2626", "#059669", "#7C3AED", "#D97706", "#0891B2"];
@@ -297,6 +340,9 @@ else
         var user = AuthState.CurrentUser;
         var allRoles = user?.UserRoles.Where(r => r.IsActive).Select(r => r.RoleName).ToList() ?? [];
         _isDoctor    = allRoles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+        // A freshly registered user has no UserRole rows at all yet (roles are assigned at
+        // clinic-creation or invite-acceptance time) — still let them reach clinic registration.
+        _canRegisterClinic = _isDoctor || allRoles.Count == 0;
         _primaryRole = allRoles.FirstOrDefault(r =>
                            r.Equals("Clinic Admin",  StringComparison.OrdinalIgnoreCase) ||
                            r.Equals("System Admin",  StringComparison.OrdinalIgnoreCase))
@@ -308,6 +354,14 @@ else
 
         await LoadClinicsAsync(user?.UserId ?? Guid.Empty);
         _hasOwnClinic = _clinics.Any(c => c.Clinic.IsOwner);
+
+        var mine = await OnboardingApi.GetMineAsync();
+        if (mine.Success && mine.Data is not null)
+            _openRequest = mine.Data
+                .Where(r => OpenStatuses.Contains(r.Status))
+                .OrderByDescending(r => r.CreatedAt)
+                .FirstOrDefault();
+
         _loading = false;
     }
 
@@ -387,7 +441,7 @@ else
         Nav.NavigateTo("/admin/dashboard");
     }
 
-    private void RegisterClinic() => Nav.NavigateTo("/doctor/register-clinic");
+    private void RegisterClinic() => Nav.NavigateTo("/clinic-requests/new");
 
     private string GetClinicColor(Guid id)
         => _colorMap.TryGetValue(id, out var c) ? c : "#1565C0";

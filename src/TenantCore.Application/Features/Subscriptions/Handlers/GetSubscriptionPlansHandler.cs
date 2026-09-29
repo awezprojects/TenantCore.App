@@ -14,8 +14,12 @@ public sealed class GetSubscriptionPlansHandler(
     public async Task<IEnumerable<SubscriptionPlanDto>> Handle(GetSubscriptionPlansQuery request, CancellationToken cancellationToken)
     {
         var plans = await planRepository.GetActivePlansAsync(cancellationToken);
-        var hasUsedTrial = await subscriptionRepository.HasUsedTrialAsync(request.ApplicationId, cancellationToken);
 
-        return plans.Select(p => SubscriptionTranslator.ToPlanDto(p, alreadyUsed: p.IsTrial && hasUsedTrial));
+        // Any subscription history at all — not just a prior trial — rules the Trial card out,
+        // since a clinic created through onboarding always already has one (its trial or paid
+        // plan) by the time it can reach this page. See SubscribeToPlanHandler.
+        var hasAnyHistory = await subscriptionRepository.HasAnySubscriptionHistoryAsync(request.ApplicationId, cancellationToken);
+
+        return plans.Select(p => SubscriptionTranslator.ToPlanDto(p, alreadyUsed: p.IsTrial && hasAnyHistory));
     }
 }

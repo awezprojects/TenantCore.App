@@ -1,7 +1,7 @@
 # TenantCore.App — ADR Index & Quick Reference
 
 ## Repository Path
-`C:\Users\Dell\source\repos\awezprojects\TenantCore.App`
+`C:\Users\awezv\source\repos\awezprojects\TenantCore.App`
 
 ## Solution Overview
 

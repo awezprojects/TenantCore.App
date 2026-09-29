@@ -1,6 +1,9 @@
 You are planning a feature for **TenantCore.App**. $ARGUMENTS format: `<feature-name> - <description>`
 
-TenantCore.App is a multi-tenant clinic management system built with Clean Architecture + CQRS via MediatR. The repo's distilled knowledge base (`.clinerules`) is **auto-loaded and self-contained** — plan from it; do not re-read `CLAUDE.md` or the ADRs to get oriented (see `.clinerules` §0 for the few edge cases that warrant opening one ADR section).
+TenantCore.App is a multi-tenant clinic management system built with Clean Architecture + CQRS via MediatR. The repo's distilled knowledge base (`.clinerules`, at the repo root) is **self-contained** — plan from it; do not re-read the ADRs to get oriented (see `.clinerules` §0 for the few edge cases that warrant opening one ADR section).
+
+> **Claude Code note:** Claude Code auto-loads `CLAUDE.md` but **not** `.clinerules`. If `.clinerules` is not already in context, read it once now before Step 0.
+> All paths in this command are relative to the `TenantCore.App/` repo root. If running from the workspace root (via `/plan-feature`), prefix them with `TenantCore.App/`.
 
 ---
 
@@ -28,7 +31,7 @@ Read these two files first — before anything else:
 
 ## Step 1 — Load context (already in context — do NOT re-read the ADRs)
 
-**`.clinerules` is auto-loaded and self-contained.** It holds architecture (§1), coding patterns for every
+**`.clinerules` (read once, see note above) is self-contained.** It holds architecture (§1), coding patterns for every
 layer (§2), hard rules + error handling + authorization + middleware order (§3), multi-tenancy (§4), testing
 (§5), security (§6), Blazor UI theme (§7), current state (§11) and the feature-registry summary (§12).
 
@@ -314,5 +317,6 @@ Files to create: N
 Files to modify: N
 EF migration required: Yes/No
 
-Next step: run /execute-feature <feature-name> inside TenantCore.App to implement.
+Next step: run /execute-feature <feature-name> from the workspace root
+           (or /execute-app-feature <feature-name> if the session was opened inside TenantCore.App).
 ```

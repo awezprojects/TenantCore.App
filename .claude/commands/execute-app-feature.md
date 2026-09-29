@@ -7,7 +7,9 @@ You are implementing a planned feature for **TenantCore.App**. $ARGUMENTS is the
 Read only this:
 
 1. `plan/$ARGUMENTS/PLAN.md` — the approved implementation blueprint
-2. `.clinerules` — **already auto-loaded** and self-contained (patterns, rules, validation, testing, tenancy, UI theme, middleware order)
+2. `.clinerules` (repo root) — self-contained (patterns, rules, validation, testing, tenancy, UI theme, middleware order). Claude Code does **not** auto-load it — read it once now if it is not already in context.
+
+> All paths in this command are relative to the `TenantCore.App/` repo root. If running from the workspace root (via `/execute-feature`), prefix them with `TenantCore.App/`.
 
 `.clinerules` is sufficient for every layer below. Open a single ADR **section** only for an undocumented edge case:
 

@@ -12,6 +12,11 @@ using Microsoft.Extensions.Logging;
 
 namespace TenantCore.Application.Tests.Features.Subscriptions.Commands;
 
+/// <summary>
+/// This free-activation endpoint now only ever grants the Trial plan, and only to a clinic with
+/// no subscription history at all (clinic-trial-razorpay-subscriptions). Paid plans are rejected
+/// outright — they're activated exclusively through a confirmed Razorpay payment link.
+/// </summary>
 public class SubscribeToPlanHandlerTests
 {
     private readonly Mock<ISubscriptionPlanRepository> _planRepository = new();
@@ -42,15 +47,14 @@ public class SubscribeToPlanHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ValidCommand_CreatesActiveSubscriptionWithDatesFromPlanDuration()
+    public async Task Handle_TrialPlanForClinicWithNoHistory_CreatesActiveTrialSubscription()
     {
         var applicationId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var plan = CreatePlan(durationDays: 90, price: 2499m);
+        var plan = CreatePlan(isTrial: true, durationDays: 14, price: 0m);
 
         _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _subscriptionRepository.Setup(r => r.GetLatestForClinicAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync((ClinicSubscription?)null);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _subscriptionRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         SetupAuthServices(applicationId, userId);
 
@@ -62,16 +66,31 @@ public class SubscribeToPlanHandlerTests
         var after = DateTime.UtcNow;
 
         result.Status.Should().Be(SubscriptionStatus.Active);
-        result.DurationDays.Should().Be(90);
-        result.PricePaid.Should().Be(2499m);
+        result.DurationDays.Should().Be(14);
+        result.PricePaid.Should().Be(0m);
         result.StartDate.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
-        (result.EndDate - result.StartDate).Days.Should().Be(90);
         result.ClinicName.Should().Be("Sunrise Clinic");
         result.BillingContactEmail.Should().Be("admin@sunrise.test");
         result.BillingContactName.Should().Be("Dr. Admin");
 
         _subscriptionRepository.Verify(r => r.AddAsync(It.IsAny<ClinicSubscription>(), It.IsAny<CancellationToken>()), Times.Once);
         _subscriptionRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_PaidPlan_ThrowsInvalidOperationException()
+    {
+        var applicationId = Guid.NewGuid();
+        var plan = CreatePlan(isTrial: false, price: 999m);
+        _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
+
+        var handler = CreateHandler();
+        var action = () => handler.Handle(new SubscribeToPlanCommand(applicationId, plan.Id, Guid.NewGuid()), CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>();
+        _subscriptionRepository.Verify(r => r.AddAsync(It.IsAny<ClinicSubscription>(), It.IsAny<CancellationToken>()), Times.Never);
+        // A paid plan is rejected purely from the plan's own IsTrial flag — no history lookup needed.
+        _subscriptionRepository.Verify(r => r.HasAnySubscriptionHistoryAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -88,7 +107,7 @@ public class SubscribeToPlanHandlerTests
     [Fact]
     public async Task Handle_InactivePlan_ThrowsNotFoundException()
     {
-        var plan = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Monthly, "Monthly", "d", 30, 999m, "INR", false, false, 1);
+        var plan = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Trial, "Trial", "d", 14, 0m, "INR", true, false, 1);
         // CreateForSeed always sets IsActive = true — simulate a deactivated plan the way the repository would return one.
         typeof(SubscriptionPlan).GetProperty(nameof(SubscriptionPlan.IsActive))!.SetValue(plan, false);
 
@@ -101,13 +120,13 @@ public class SubscribeToPlanHandlerTests
     }
 
     [Fact]
-    public async Task Handle_TrialAlreadyUsed_ThrowsInvalidOperationException()
+    public async Task Handle_ClinicAlreadyHasSubscriptionHistory_ThrowsInvalidOperationException()
     {
         var applicationId = Guid.NewGuid();
-        var plan = CreatePlan(isTrial: true);
+        var plan = CreatePlan(isTrial: true, price: 0m);
 
         _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var handler = CreateHandler();
         var action = () => handler.Handle(new SubscribeToPlanCommand(applicationId, plan.Id, Guid.NewGuid()), CancellationToken.None);
@@ -117,16 +136,15 @@ public class SubscribeToPlanHandlerTests
     }
 
     [Fact]
-    public async Task Handle_TrialPreviouslyCancelled_StillThrowsInvalidOperationException()
+    public async Task Handle_HistoryFromAnyPastStatusStillBlocksTheTrial()
     {
-        // HasUsedTrialAsync is defined to return true for a prior trial of ANY status,
-        // including Cancelled — this test locks in that the handler trusts the repository's
-        // answer rather than re-checking status itself.
+        // HasAnySubscriptionHistoryAsync is defined to return true for ANY prior subscription row
+        // regardless of status (even a cancelled one) — the handler trusts that answer as-is.
         var applicationId = Guid.NewGuid();
-        var plan = CreatePlan(isTrial: true);
+        var plan = CreatePlan(isTrial: true, price: 0m);
 
         _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
         var handler = CreateHandler();
         var action = () => handler.Handle(new SubscribeToPlanCommand(applicationId, plan.Id, Guid.NewGuid()), CancellationToken.None);
@@ -135,69 +153,23 @@ public class SubscribeToPlanHandlerTests
     }
 
     [Fact]
-    public async Task Handle_RenewalBeforeExpiry_StartsDayAfterCurrentSubscriptionEnds()
-    {
-        var applicationId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        var newPlan = CreatePlan(durationDays: 30);
-        var existingPlan = CreatePlan(durationDays: 90);
-        var existing = ClinicSubscription.Create(applicationId, existingPlan, DateTime.UtcNow.AddDays(-10), "Clinic", "a@b.com", "Admin");
-        var expectedStart = existing.EndDate.AddDays(1);
-
-        _planRepository.Setup(r => r.GetByIdAsync(newPlan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(newPlan);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _subscriptionRepository.Setup(r => r.GetLatestForClinicAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
-        _subscriptionRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        SetupAuthServices(applicationId, userId);
-
-        var handler = CreateHandler();
-        var result = await handler.Handle(new SubscribeToPlanCommand(applicationId, newPlan.Id, userId), CancellationToken.None);
-
-        result.StartDate.Should().Be(expectedStart);
-        result.EndDate.Should().Be(expectedStart.AddDays(30));
-    }
-
-    [Fact]
-    public async Task Handle_NoExistingSubscription_StartsImmediately()
-    {
-        var applicationId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        var plan = CreatePlan();
-
-        _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _subscriptionRepository.Setup(r => r.GetLatestForClinicAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync((ClinicSubscription?)null);
-        _subscriptionRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        SetupAuthServices(applicationId, userId);
-
-        var handler = CreateHandler();
-
-        var before = DateTime.UtcNow;
-        var result = await handler.Handle(new SubscribeToPlanCommand(applicationId, plan.Id, userId), CancellationToken.None);
-        var after = DateTime.UtcNow;
-
-        result.StartDate.Should().BeOnOrAfter(before).And.BeOnOrBefore(after);
-    }
-
-    [Fact]
     public async Task Handle_PriceAndDurationAlwaysTakenFromPlan_NeverFromCaller()
     {
         var applicationId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        var plan = CreatePlan(durationDays: 365, price: 8999m);
+        var plan = CreatePlan(isTrial: true, durationDays: 21, price: 0m);
 
         _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
-        _subscriptionRepository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
-        _subscriptionRepository.Setup(r => r.GetLatestForClinicAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync((ClinicSubscription?)null);
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
         _subscriptionRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         SetupAuthServices(applicationId, userId);
 
         var handler = CreateHandler();
-        // SubscribeToPlanCommand carries no price/duration fields at all — this test
-        // documents that the DTO shape itself makes client-supplied pricing impossible.
+        // SubscribeToPlanCommand carries no price/duration fields at all — this test documents
+        // that the DTO shape itself makes client-supplied pricing impossible.
         var result = await handler.Handle(new SubscribeToPlanCommand(applicationId, plan.Id, userId), CancellationToken.None);
 
-        result.PricePaid.Should().Be(8999m);
-        result.DurationDays.Should().Be(365);
+        result.PricePaid.Should().Be(0m);
+        result.DurationDays.Should().Be(21);
     }
 }

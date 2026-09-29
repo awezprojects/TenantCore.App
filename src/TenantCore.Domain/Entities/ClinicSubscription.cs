@@ -31,6 +31,15 @@ public class ClinicSubscription : AuditableEntity
     public string BillingContactEmail { get; private set; } = string.Empty;
     public string BillingContactName { get; private set; } = string.Empty;
 
+    /// <summary>Idempotency guard for activation — at most one subscription per payment (unique filtered index).</summary>
+    public Guid? SubscriptionPaymentId { get; private set; }
+
+    /// <summary>Set for a trial grant, which has no payment — guards against a second trial for the same request (unique filtered index).</summary>
+    public Guid? OnboardingRequestId { get; private set; }
+
+    /// <summary>The clinic owner (onboarding) or the Clinic Admin who paid (renewal).</summary>
+    public Guid? PurchasedByUserId { get; private set; }
+
     private ClinicSubscription() { }
 
     public static ClinicSubscription Create(
@@ -39,14 +48,18 @@ public class ClinicSubscription : AuditableEntity
         DateTime startDate,
         string clinicName,
         string billingContactEmail,
-        string billingContactName) => new()
+        string billingContactName,
+        Guid? purchasedByUserId = null,
+        Guid? subscriptionPaymentId = null,
+        Guid? onboardingRequestId = null,
+        decimal? pricePaidOverride = null) => new()
         {
             Id = Guid.NewGuid(),
             ApplicationId = applicationId,
             SubscriptionPlanId = plan.Id,
             PlanCode = plan.Code,
             PlanName = plan.Name,
-            PricePaid = plan.Price,
+            PricePaid = pricePaidOverride ?? plan.Price,
             Currency = plan.Currency,
             DurationDays = plan.DurationDays,
             StartDate = startDate,
@@ -55,7 +68,10 @@ public class ClinicSubscription : AuditableEntity
             ClinicName = clinicName,
             BillingContactEmail = billingContactEmail,
             BillingContactName = billingContactName,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            PurchasedByUserId = purchasedByUserId,
+            SubscriptionPaymentId = subscriptionPaymentId,
+            OnboardingRequestId = onboardingRequestId
         };
 
     public void Cancel(string cancelledBy)

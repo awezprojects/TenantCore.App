@@ -1,5 +1,6 @@
 using Serilog;
 using Serilog.Events;
+using TenantCore.Api.Authentication;
 using TenantCore.Api.Extensions;
 using TenantCore.Api.Middleware;
 using TenantCore.Application;
@@ -60,9 +61,10 @@ try
         });
     });
 
-    builder.Services.AddApplication();
+    builder.Services.AddApplication(builder.Configuration);
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddJwtAuthentication(builder.Configuration, builder.Environment);
+    builder.Services.Configure<InternalApiOptions>(builder.Configuration.GetSection("InternalApi"));
 
     builder.Services.AddHealthChecks()
         .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);

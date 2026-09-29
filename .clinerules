@@ -36,7 +36,7 @@ Do not read them wholesale, and do not read them at session start.
 | `.claude/commands/*.md` | the canonical plan/execute/security workflow text | read-only |
 | `src/TenantCore.Api/Program.cs` | middleware order **as actually built** | §3 |
 
-> **Path note:** `CLAUDE.md` and ADR-000 reference ADRs as `.claude/docs/adr/...`; the ADRs actually live in **`docs/adr/`**. Always use `docs/adr/`.
+> **Path note:** the ADRs live in **`docs/adr/`** (not `.claude/docs/adr/`). Older `plan/*/SECURITY.md` files still cite `.claude/docs/adr/` — those are historical records; always use `docs/adr/`.
 
 ---
 
@@ -286,11 +286,12 @@ Scan the implementation against ADR-010; report findings by severity with file/l
 
 ## 9. Configuration layering (ADR-005)
 
-`Program.cs` load order — later wins: `appsettings.json` → `appsettings.{Environment}.json` → **`appsettings.Local.json`** (last, gitignored).
-- `appsettings.json` / `appsettings.Development.json`: **placeholders only** — checked in, never real secrets or working connection strings.
-- `appsettings.Local.json`: the **real local values**.
+`Program.cs` load order — later wins: `appsettings.json` → `appsettings.{Environment}.json` → **`appsettings.Local.json`** (last, gitignored, optional).
+- `appsettings.json`: the **checked-in template** — placeholders only, never real secrets or working connection strings. Safe to commit.
+- `appsettings.Development.json`: the **real local values** (connection strings, API keys, service keys). **Gitignored — never committed.**
+- `appsettings.Local.json`: optional, gitignored, highest precedence — only for a per-developer override that shouldn't even live in `appsettings.Development.json` (rare; most people never need this file).
 
-New config key ⇒ add it to **both** files (placeholder + real value).
+New config key ⇒ add the placeholder to `appsettings.json` and the real value to `appsettings.Development.json`.
 
 ---
 
