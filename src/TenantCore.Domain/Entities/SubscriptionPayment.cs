@@ -48,6 +48,21 @@ public class SubscriptionPayment : AuditableEntity
     /// <summary>Clinic Admin for a renewal; null for onboarding (the request is admin-initiated).</summary>
     public Guid? InitiatedByUserId { get; private set; }
 
+    /// <summary>Set when an internal admin created this link (Purpose == AdminAssigned).</summary>
+    public string? InitiatedByAdminEmail { get; private set; }
+
+    /// <summary>Why an admin charged an amount other than the clinic's effective price.</summary>
+    public string? AmountReason { get; private set; }
+
+    /// <summary>
+    /// Clinic name at link time. Renewals and admin links carry it so the activation worker can
+    /// name the subscription without an Auth call (it has no user token).
+    /// </summary>
+    public string? ClinicName { get; private set; }
+
+    /// <summary>Throttles the Clinic Admin's "I've paid" check to once per 30 seconds.</summary>
+    public DateTime? LastCheckAt { get; private set; }
+
     private SubscriptionPayment() { }
 
     public static SubscriptionPayment CreateForOnboarding(
@@ -74,10 +89,15 @@ public class SubscriptionPayment : AuditableEntity
             CreatedAt = DateTime.UtcNow
         };
 
+    /// <summary>
+    /// A Clinic Admin renewing or upgrading. listPrice defaults to the amount charged (they match
+    /// unless the clinic has a special offer, where the list price is kept for reporting).
+    /// </summary>
     public static SubscriptionPayment CreateForRenewal(
         Guid applicationId, Guid planId, SubscriptionPlanCode planCode, string planName,
         decimal amount, string currency,
-        string payerName, string payerEmail, string? payerPhone, Guid initiatedByUserId) => new()
+        string payerName, string payerEmail, string? payerPhone, Guid initiatedByUserId,
+        decimal? listPrice = null, string? clinicName = null) => new()
         {
             Id = Guid.NewGuid(),
             Purpose = PaymentPurpose.Renewal,
@@ -88,11 +108,39 @@ public class SubscriptionPayment : AuditableEntity
             Amount = amount,
             AmountInMinorUnits = ToMinorUnits(amount),
             Currency = currency,
-            PlanListPrice = amount,
+            PlanListPrice = listPrice ?? amount,
             PayerName = payerName,
             PayerEmail = payerEmail,
             PayerPhone = payerPhone,
             InitiatedByUserId = initiatedByUserId,
+            ClinicName = clinicName,
+            Status = SubscriptionPaymentStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+
+    /// <summary>An internal admin sending an existing clinic a link for a plan and amount they chose.</summary>
+    public static SubscriptionPayment CreateForAdminAssignment(
+        Guid applicationId, Guid planId, SubscriptionPlanCode planCode, string planName,
+        decimal amount, decimal listPrice, string currency,
+        string clinicName, string payerName, string payerEmail, string? payerPhone,
+        string adminEmail, string? amountReason) => new()
+        {
+            Id = Guid.NewGuid(),
+            Purpose = PaymentPurpose.AdminAssigned,
+            ApplicationId = applicationId,
+            SubscriptionPlanId = planId,
+            PlanCode = planCode,
+            PlanName = planName,
+            Amount = amount,
+            AmountInMinorUnits = ToMinorUnits(amount),
+            Currency = currency,
+            PlanListPrice = listPrice,
+            PayerName = payerName,
+            PayerEmail = payerEmail,
+            PayerPhone = payerPhone,
+            ClinicName = clinicName,
+            InitiatedByAdminEmail = adminEmail,
+            AmountReason = amountReason,
             Status = SubscriptionPaymentStatus.Pending,
             CreatedAt = DateTime.UtcNow
         };
@@ -169,4 +217,13 @@ public class SubscriptionPayment : AuditableEntity
         ReplacedByPaymentId = replacedByPaymentId;
         SetUpdatedAt();
     }
+
+    /// <summary>Records a "check payment now" attempt for throttling. Not an audited state change.</summary>
+    public void RecordCheck() => LastCheckAt = DateTime.UtcNow;
+
+    /// <summary>Renewal and admin-assigned links share one rule: at most one open at a time per clinic.</summary>
+    public bool IsClinicLink => Purpose is PaymentPurpose.Renewal or PaymentPurpose.AdminAssigned;
+
+    /// <summary>Still awaiting payment — a link may exist or be about to be created.</summary>
+    public bool IsOpen => Status is SubscriptionPaymentStatus.Pending or SubscriptionPaymentStatus.LinkCreated;
 }

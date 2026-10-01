@@ -2,34 +2,46 @@ using FluentAssertions;
 using Moq;
 using TenantCore.Application.Features.Subscriptions.Handlers;
 using TenantCore.Application.Features.Subscriptions.Queries;
+using TenantCore.Application.Features.Subscriptions.Services;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Interfaces;
 using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Tests.Features.Subscriptions.Queries;
 
+/// <summary>
+/// The handler now delegates visibility and per-clinic pricing to IClinicPlanCatalog and only
+/// applies the Trial "already used" rule on top. The catalogue's own rules are covered by
+/// ClinicPlanCatalogTests.
+/// </summary>
 public class GetSubscriptionPlansHandlerTests
 {
-    private readonly Mock<ISubscriptionPlanRepository> _planRepository = new();
+    private readonly Mock<IClinicPlanCatalog> _planCatalog = new();
     private readonly Mock<IClinicSubscriptionRepository> _subscriptionRepository = new();
 
+    private GetSubscriptionPlansHandler CreateHandler()
+        => new(_planCatalog.Object, _subscriptionRepository.Object);
+
+    private void SetUpCatalogue(Guid applicationId, params ClinicPlanOption[] options)
+        => _planCatalog.Setup(c => c.GetPlansForClinicAsync(applicationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(options);
+
+    private static ClinicPlanOption Option(SubscriptionPlan plan, decimal? effectivePrice = null, bool isSpecialOffer = false, DateTime? validUntil = null)
+        => new(plan, effectivePrice ?? plan.Price, isSpecialOffer, validUntil);
+
     [Fact]
-    public async Task Handle_FourSeededPlans_ReturnedInDisplayOrder()
+    public async Task Handle_FourSeededPlans_ReturnedInCatalogueOrder()
     {
         var applicationId = Guid.NewGuid();
         var trial = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Trial, "Trial", "d", 14, 0, "INR", true, false, 1);
-        var yearly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Yearly, "Yearly", "d", 365, 8999, "INR", false, false, 4);
-        var quarterly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Quarterly, "Quarterly", "d", 90, 2499, "INR", false, true, 3);
         var monthly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Monthly, "Monthly", "d", 30, 999, "INR", false, false, 2);
+        var quarterly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Quarterly, "Quarterly", "d", 90, 2499, "INR", false, true, 3);
+        var yearly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Yearly, "Yearly", "d", 365, 8999, "INR", false, false, 4);
 
-        // GetActivePlansAsync is the real repository's ordering point (ORDER BY DisplayOrder);
-        // the mock returns them already ordered, matching what that query produces.
-        _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync([trial, monthly, quarterly, yearly]);
+        SetUpCatalogue(applicationId, Option(trial), Option(monthly), Option(quarterly), Option(yearly));
         _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-        var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
-        var result = (await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
+        var result = (await CreateHandler().Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
 
         result.Should().HaveCount(4);
         result.Select(p => p.Code).Should().ContainInOrder(
@@ -37,16 +49,13 @@ public class GetSubscriptionPlansHandlerTests
     }
 
     [Fact]
-    public async Task Handle_InactivePlansExcludedByRepository_HandlerReturnsOnlyWhatRepositoryGives()
+    public async Task Handle_NoVisiblePlans_ReturnsEmptyList()
     {
-        // GetActivePlansAsync already filters IsActive on the repository side — the handler
-        // trusts that and does no additional filtering, so an empty result passes straight through.
         var applicationId = Guid.NewGuid();
-        _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>())).ReturnsAsync([]);
+        SetUpCatalogue(applicationId);
         _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-        var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
-        var result = await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None);
+        var result = await CreateHandler().Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None);
 
         result.Should().BeEmpty();
     }
@@ -61,11 +70,10 @@ public class GetSubscriptionPlansHandlerTests
         var trial = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Trial, "Trial", "d", 14, 0, "INR", true, false, 1);
         var monthly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Monthly, "Monthly", "d", 30, 999, "INR", false, false, 2);
 
-        _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>())).ReturnsAsync([trial, monthly]);
+        SetUpCatalogue(applicationId, Option(trial), Option(monthly));
         _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-        var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
-        var result = (await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
+        var result = (await CreateHandler().Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
 
         result.Single(p => p.Code == SubscriptionPlanCode.Trial).AlreadyUsed.Should().BeTrue();
         // AlreadyUsed only ever applies to the Trial card — paid plans are never flagged by this rule.
@@ -78,12 +86,30 @@ public class GetSubscriptionPlansHandlerTests
         var applicationId = Guid.NewGuid();
         var trial = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Trial, "Trial", "d", 14, 0, "INR", true, false, 1);
 
-        _planRepository.Setup(r => r.GetActivePlansAsync(It.IsAny<CancellationToken>())).ReturnsAsync([trial]);
+        SetUpCatalogue(applicationId, Option(trial));
         _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-        var handler = new GetSubscriptionPlansHandler(_planRepository.Object, _subscriptionRepository.Object);
-        var result = (await handler.Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
+        var result = (await CreateHandler().Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
 
         result.Single(p => p.Code == SubscriptionPlanCode.Trial).AlreadyUsed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_SpecialOffer_SurfacesOfferPriceAndKeepsListPrice()
+    {
+        var applicationId = Guid.NewGuid();
+        var monthly = SubscriptionPlan.CreateForSeed(Guid.NewGuid(), SubscriptionPlanCode.Monthly, "Monthly", "d", 30, 999, "INR", false, false, 2);
+        var validUntil = DateTime.UtcNow.AddDays(30);
+
+        SetUpCatalogue(applicationId, Option(monthly, effectivePrice: 499m, isSpecialOffer: true, validUntil: validUntil));
+        _subscriptionRepository.Setup(r => r.HasAnySubscriptionHistoryAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var result = (await CreateHandler().Handle(new GetSubscriptionPlansQuery(applicationId), CancellationToken.None)).ToList();
+
+        var dto = result.Single();
+        dto.Price.Should().Be(499m, "the clinic pays its offer price");
+        dto.ListPrice.Should().Be(999m, "the catalogue price is kept so the UI can show the saving");
+        dto.IsSpecialOffer.Should().BeTrue();
+        dto.OfferValidUntil.Should().Be(validUntil);
     }
 }

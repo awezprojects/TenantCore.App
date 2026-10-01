@@ -38,14 +38,23 @@ public static class SubscriptionTranslator
         Status = entity.Status
     };
 
-    public static SubscriptionPlanDto ToPlanDto(SubscriptionPlan plan, bool alreadyUsed) => new()
+    /// <summary>Price is what THIS clinic pays; ListPrice stays the catalogue price so the UI can show the saving.</summary>
+    public static SubscriptionPlanDto ToPlanDto(
+        SubscriptionPlan plan,
+        bool alreadyUsed,
+        decimal? effectivePrice = null,
+        bool isSpecialOffer = false,
+        DateTime? offerValidUntil = null) => new()
     {
         Id = plan.Id,
         Code = plan.Code,
         Name = plan.Name,
         Description = plan.Description,
         DurationDays = plan.DurationDays,
-        Price = plan.Price,
+        Price = effectivePrice ?? plan.Price,
+        ListPrice = plan.Price,
+        IsSpecialOffer = isSpecialOffer,
+        OfferValidUntil = offerValidUntil,
         Currency = plan.Currency,
         IsTrial = plan.IsTrial,
         IsPopular = plan.IsPopular,
@@ -53,30 +62,63 @@ public static class SubscriptionTranslator
         AlreadyUsed = alreadyUsed
     };
 
+    public static UpcomingSubscriptionDto ToUpcomingDto(ClinicSubscription entity) => new()
+    {
+        Id = entity.Id,
+        PlanName = entity.PlanName,
+        StartDate = entity.StartDate,
+        EndDate = entity.EndDate,
+        PricePaid = entity.PricePaid,
+        Currency = entity.Currency,
+        IsGrant = entity.GrantedByAdminEmail is not null
+    };
+
     /// <summary>
-    /// Builds the gate's status answer. DaysRemaining is computed as whole days
-    /// between today (UTC) and EndDate — never stored — so it stays correct
-    /// with no background job. Pass activeSubscription = null for a clinic that
-    /// has never held one.
+    /// Builds the gate's status answer. Day counts are computed as whole days between today (UTC)
+    /// and the relevant end date — never stored — so they stay correct with no background job.
+    ///
+    /// "Expiring soon" is measured against COVERAGE end, not the current term's end: a clinic that
+    /// has already bought its next term is covered continuously and must not be nagged to renew.
+    ///
+    /// Pass activeSubscription = null for a clinic with no current term — it is then locked, even
+    /// if it holds an upcoming one (that term simply has not started yet).
     /// </summary>
     public static SubscriptionStatusDto ToStatusDto(
         ClinicSubscription? activeSubscription,
         bool canSubscribe,
         bool hasUsedTrial,
-        DateTime utcNow)
+        DateTime utcNow,
+        IReadOnlyList<ClinicSubscription>? upcoming = null,
+        DateTime? coverageEnd = null,
+        bool isSuspended = false,
+        string? suspensionMessage = null)
     {
+        var upcomingDtos = (upcoming ?? [])
+            .OrderBy(s => s.StartDate)
+            .Select(ToUpcomingDto)
+            .ToList();
+
+        var coverageDaysRemaining = coverageEnd is { } end ? WholeDaysUntil(end, utcNow) : 0;
+
         if (activeSubscription is null)
         {
             return new SubscriptionStatusDto
             {
                 HasActiveSubscription = false,
                 CanSubscribe = canSubscribe,
-                HasUsedTrial = hasUsedTrial
+                HasUsedTrial = hasUsedTrial,
+                IsSuspended = isSuspended,
+                SuspensionMessage = suspensionMessage,
+                CoverageEndDate = coverageEnd,
+                CoverageDaysRemaining = coverageDaysRemaining,
+                Upcoming = upcomingDtos
             };
         }
 
-        var daysRemaining = (int)Math.Ceiling((activeSubscription.EndDate.Date - utcNow.Date).TotalDays);
-        daysRemaining = Math.Max(daysRemaining, 0);
+        var daysRemaining = WholeDaysUntil(activeSubscription.EndDate, utcNow);
+
+        // Without a coverage end (older callers), fall back to this term's own remaining days.
+        var effectiveCoverageDays = coverageEnd is null ? daysRemaining : coverageDaysRemaining;
 
         return new SubscriptionStatusDto
         {
@@ -87,9 +129,17 @@ public static class SubscriptionTranslator
             StartDate = activeSubscription.StartDate,
             EndDate = activeSubscription.EndDate,
             DaysRemaining = daysRemaining,
-            IsExpiringSoon = daysRemaining <= ExpiringSoonThresholdDays,
+            IsExpiringSoon = effectiveCoverageDays <= ExpiringSoonThresholdDays,
             CanSubscribe = canSubscribe,
-            HasUsedTrial = hasUsedTrial
+            HasUsedTrial = hasUsedTrial,
+            IsSuspended = isSuspended,
+            SuspensionMessage = suspensionMessage,
+            CoverageEndDate = coverageEnd ?? activeSubscription.EndDate,
+            CoverageDaysRemaining = effectiveCoverageDays,
+            Upcoming = upcomingDtos
         };
     }
+
+    private static int WholeDaysUntil(DateTime endDate, DateTime utcNow)
+        => Math.Max((int)Math.Ceiling((endDate.Date - utcNow.Date).TotalDays), 0);
 }

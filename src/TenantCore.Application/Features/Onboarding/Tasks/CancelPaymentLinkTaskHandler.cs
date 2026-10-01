@@ -104,6 +104,18 @@ public sealed class CancelPaymentLinkTaskHandler(
             var request = await requestRepository.GetByIdAsync(payment.OnboardingRequestId.Value, ct);
             request?.FlagAttention($"Payment {payment.Id} was paid after its request was closed — refund required.");
             await requestRepository.SaveChangesAsync(ct);
+            return;
+        }
+
+        // A clinic link (renewal or admin-assigned) that was paid just as it was being cancelled.
+        // There is no request to flag and no replacement to fall back on, so confirm it: money
+        // that arrived always ends in an activated term rather than being silently dropped.
+        if (payment.IsClinicLink)
+        {
+            await workflowEnqueuer.EnqueueAsync(
+                WorkflowTaskType.ConfirmPayment, $"confirm-payment:{payment.Id}", nameof(SubscriptionPayment), payment.Id, ct: ct);
+
+            await paymentRepository.SaveChangesAsync(ct);
         }
     }
 }

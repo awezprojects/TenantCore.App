@@ -6,6 +6,7 @@ using TenantCore.Application.Common;
 using TenantCore.Application.Common.Behaviors;
 using TenantCore.Application.Common.Workflow;
 using TenantCore.Application.Features.Onboarding.Services;
+using TenantCore.Application.Features.Subscriptions.Services;
 
 namespace TenantCore.Application;
 
@@ -31,6 +32,7 @@ public static class DependencyInjection
 
         services.AddScoped<IWorkflowEnqueuer, WorkflowEnqueuer>();
         services.AddScoped<IOnboardingSelfHealer, OnboardingSelfHealer>();
+        services.AddScoped<IClinicPlanCatalog, ClinicPlanCatalog>();
 
         return services;
     }

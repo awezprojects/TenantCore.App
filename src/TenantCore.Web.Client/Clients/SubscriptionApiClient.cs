@@ -68,6 +68,12 @@ public class SubscriptionApiClient(HttpClient httpClient, AuthStateService authS
         catch (Exception ex) { return new ApiResponse<SubscriptionPaymentDto> { Success = false, Message = ex.Message }; }
     }
 
+    public async Task<ApiResponse> CheckPaymentAsync(Guid paymentId)
+    {
+        try { SetAuth(); return await ReadVoid(await httpClient.PostAsync($"api/subscriptions/payments/{paymentId}/check", null)); }
+        catch (Exception ex) { return new ApiResponse { Success = false, Message = ex.Message }; }
+    }
+
     public async Task<ApiResponse<IEnumerable<SubscriptionPaymentDto>>> GetPaymentsAsync()
     {
         try { SetAuth(); return await Read<IEnumerable<SubscriptionPaymentDto>>(await httpClient.GetAsync("api/subscriptions/payments")); }

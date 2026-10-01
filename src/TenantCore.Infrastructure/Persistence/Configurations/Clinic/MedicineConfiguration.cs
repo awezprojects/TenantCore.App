@@ -47,6 +47,13 @@ internal sealed class MedicineConfiguration : IEntityTypeConfiguration<Medicine>
         builder.Property(m => m.ApplicationId);
         builder.HasIndex(m => m.ApplicationId);
 
+        // Filtered index used by the medicine-cache warmup query:
+        //   WHERE ApplicationId IS NULL AND IsActive = 1
+        // Avoids a full table scan over clinic-specific medicines when loading the system catalogue.
+        builder.HasIndex(m => new { m.ApplicationId, m.IsActive })
+            .HasFilter("[ApplicationId] IS NULL AND [IsActive] = 1")
+            .HasDatabaseName("IX_Medicines_SystemCatalogue");
+
         builder.HasOne(m => m.DosageForm)
             .WithMany()
             .HasForeignKey(m => m.DosageFormId)

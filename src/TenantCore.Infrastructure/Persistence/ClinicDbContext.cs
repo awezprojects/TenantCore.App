@@ -37,7 +37,9 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<CounterSession> CounterSessions => Set<CounterSession>();
     public DbSet<AmountHandover> AmountHandovers => Set<AmountHandover>();
     public DbSet<ClinicFeatureFlags> ClinicFeatureFlags => Set<ClinicFeatureFlags>();
+    public DbSet<ClinicAccount> ClinicAccounts => Set<ClinicAccount>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<ClinicPlanOffer> ClinicPlanOffers => Set<ClinicPlanOffer>();
     public DbSet<ClinicSubscription> ClinicSubscriptions => Set<ClinicSubscription>();
     public DbSet<SubscriptionAlertSetting> SubscriptionAlertSettings => Set<SubscriptionAlertSetting>();
     public DbSet<HistoryLookupItem> HistoryLookupItems => Set<HistoryLookupItem>();

@@ -113,15 +113,19 @@ public sealed class ActivateSubscriptionTaskHandler(
             purchasedByUserId = payment.InitiatedByUserId;
         }
 
-        var latest = await subscriptionRepository.GetLatestForClinicAsync(applicationId, ct);
         var utcNow = DateTime.UtcNow;
-        var startDate = latest is not null && latest.IsCurrentlyActive(utcNow) ? latest.EndDate.AddDays(1) : utcNow;
 
-        // The clinic's display name is snapshotted from the previous subscription row where one
-        // exists (deliberately no Auth call from the background worker) — a renewal always has
-        // one, since the trial or first paid term already created it. Onboarding always has its
-        // own request's ClinicName instead.
-        var clinicName = onboardingRequest?.ClinicName ?? latest?.ClinicName ?? plan.Name;
+        // Start exactly where the clinic's existing coverage ends — counting terms already bought
+        // but not started, so buying twice in a row chains correctly instead of overlapping. There
+        // is deliberately no "+1 day": that would lock the clinic out for a day between terms.
+        var coverageEnd = await subscriptionRepository.GetCoverageEndAsync(applicationId, utcNow, ct);
+        var startDate = coverageEnd ?? utcNow;
+
+        // The clinic's display name is snapshotted (deliberately no Auth call from the background
+        // worker): the onboarding request's own name, else the one recorded on the payment when
+        // the link was made, else the previous subscription's.
+        var latest = await subscriptionRepository.GetLatestForClinicAsync(applicationId, ct);
+        var clinicName = onboardingRequest?.ClinicName ?? payment.ClinicName ?? latest?.ClinicName ?? plan.Name;
 
         var subscription = ClinicSubscription.Create(
             applicationId, plan, startDate, clinicName, billingEmail, billingName,
@@ -142,6 +146,7 @@ public sealed class ActivateSubscriptionTaskHandler(
                 OnboardingEmailTemplates.BuildPayload("RenewalActivated", payment.PayerEmail, new
                 {
                     ClinicName = clinicName,
+                    StartDate = subscription.StartDate.ToString("dd MMM yyyy"),
                     EndDate = subscription.EndDate.ToString("dd MMM yyyy")
                 }),
                 ct);

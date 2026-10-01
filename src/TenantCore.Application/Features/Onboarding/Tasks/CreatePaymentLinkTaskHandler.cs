@@ -74,8 +74,17 @@ public sealed class CreatePaymentLinkTaskHandler(
         payment.SetLink(link.Id, link.ShortUrl, link.ExpireBy);
         request?.MarkAwaitingPayment();
 
-        var clinicNameForEmail = request?.ClinicName ?? "your clinic";
-        var emailTemplate = payment.Purpose == PaymentPurpose.Onboarding ? "PaymentLink" : "RenewalPaymentLink";
+        // Falls back through the request, then the name snapshotted on the payment. It must never
+        // be empty: SendEmailTaskHandler derives RecipientName from it, and the notification
+        // consumer dead-letters a message with a blank name without attempting delivery.
+        var clinicNameForEmail = request?.ClinicName ?? payment.ClinicName ?? "your clinic";
+
+        var emailTemplate = payment.Purpose switch
+        {
+            PaymentPurpose.Onboarding => "PaymentLink",
+            PaymentPurpose.AdminAssigned => "AssignedPaymentLink",
+            _ => "RenewalPaymentLink"
+        };
         var emailAggregateType = request != null ? nameof(ClinicOnboardingRequest) : nameof(SubscriptionPayment);
         var emailAggregateId = request?.Id ?? payment.Id;
 

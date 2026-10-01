@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -19,10 +20,15 @@ public sealed class MedicineCacheWarmupService(
     ILogger<MedicineCacheWarmupService> logger) : BackgroundService
 {
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan QueryTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan QueryTimeout = TimeSpan.FromSeconds(30);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Let EF migrations, seeding and other startup queries finish before competing for
+        // shared locks on the Medicines table.
+        try { await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); }
+        catch (OperationCanceledException) { return; }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             await RefreshAsync(stoppingToken);
@@ -46,7 +52,16 @@ public sealed class MedicineCacheWarmupService(
             var dbContext = scope.ServiceProvider.GetRequiredService<ClinicDbContext>();
 
             if (dbContext.Database.IsRelational())
+            {
                 dbContext.Database.SetCommandTimeout(QueryTimeout);
+
+                // Cache warmup is a best-effort snapshot — it never participates in any business
+                // transaction and refreshes every 30 minutes, so dirty reads are fine. READ
+                // UNCOMMITTED means the queries acquire no shared locks and can never be blocked
+                // by a concurrent writer holding a lock on the Medicines table.
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED", ct);
+            }
 
             var systemMedicines = await MedicineCacheQueries.LoadSystemMedicinesAsync(dbContext, ct);
             var medicineTypes = await MedicineCacheQueries.LoadMedicineTypesAsync(dbContext, ct);

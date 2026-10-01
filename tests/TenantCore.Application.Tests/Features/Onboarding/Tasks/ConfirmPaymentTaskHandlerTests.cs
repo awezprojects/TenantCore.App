@@ -3,6 +3,7 @@ using Moq;
 using TenantCore.Application.Common.Workflow;
 using TenantCore.Application.Features.Onboarding.Tasks;
 using TenantCore.Application.Services;
+using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Enums;
 using TenantCore.Domain.Exceptions;
@@ -124,8 +125,8 @@ public class ConfirmPaymentTaskHandlerTests
         var handler = CreateHandler();
         var action = () => handler.HandleAsync(CreateTask(payment.Id), CancellationToken.None);
 
-        var exception = await action.Should().ThrowAsync<InvalidOperationException>();
-        exception.Which.Should().NotBeOfType<PermanentWorkflowException>();
+        // "Not yet paid" is a predicted waiting state — the processor retries quietly.
+        await action.Should().ThrowAsync<WaitingWorkflowException>();
     }
 
     [Fact]

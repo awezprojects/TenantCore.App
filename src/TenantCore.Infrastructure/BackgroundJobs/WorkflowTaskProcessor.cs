@@ -9,6 +9,7 @@ using TenantCore.Application.Services;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Interfaces;
+using WaitingEx = TenantCore.Domain.Exceptions.WaitingWorkflowException;
 
 namespace TenantCore.Infrastructure.BackgroundJobs;
 
@@ -122,6 +123,25 @@ public sealed class WorkflowTaskProcessor(
         {
             logger.LogWarning("WorkflowTask {TaskId} ({TaskType}) failed permanently: {Error}", task.Id, task.TaskType, ex.Message);
             await FailAndFlagAsync(services, task, ex.Message, ct);
+            await SafeLogAsync(() => actionLogger.LogFailedAsync(correlationId, $"Workflow:{task.TaskType}", nameof(WorkflowTask), null, null, stopwatch.ElapsedMilliseconds, ex.Message, ct));
+        }
+        catch (WaitingEx ex)
+        {
+            // A predicted waiting state (e.g. payment link not yet paid) — retry on the normal
+            // backoff schedule but stay quiet: no stack-trace, no alarm, just a debug note.
+            logger.LogDebug("WorkflowTask {TaskId} ({TaskType}) waiting (attempt {Attempt}): {Reason}", task.Id, task.TaskType, task.AttemptCount, ex.Message);
+
+            if (task.ExceedsMaxAttempts)
+            {
+                await FailAndFlagAsync(services, task, ex.Message, ct);
+            }
+            else
+            {
+                var delaySeconds = ComputeBackoffSeconds(task.AttemptCount);
+                task.ScheduleRetry(ex.Message, DateTime.UtcNow.AddSeconds(delaySeconds));
+                await taskRepository.SaveChangesAsync(ct);
+            }
+
             await SafeLogAsync(() => actionLogger.LogFailedAsync(correlationId, $"Workflow:{task.TaskType}", nameof(WorkflowTask), null, null, stopwatch.ElapsedMilliseconds, ex.Message, ct));
         }
         catch (Exception ex)

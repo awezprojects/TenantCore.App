@@ -35,7 +35,9 @@ public static class OnboardingEmailTemplates
             "Rejected" => Rejected(model),
             "LinkExpired" => LinkExpired(model),
             "RenewalPaymentLink" => RenewalPaymentLink(model),
+            "AssignedPaymentLink" => AssignedPaymentLink(model),
             "RenewalActivated" => RenewalActivated(model),
+            "SubscriptionGranted" => SubscriptionGranted(model),
             "SilentWebhookAlert" => SilentWebhookAlert(model),
             _ => ("Notification", "<p>Notification</p>")
         };
@@ -161,12 +163,51 @@ public static class OnboardingEmailTemplates
         return ("Renew your subscription", body);
     }
 
+    /// <summary>A link an internal admin sent to an existing clinic, rather than one the clinic asked for.</summary>
+    private static (string, string) AssignedPaymentLink(JsonElement model)
+    {
+        var clinicName = Str(model, "ClinicName");
+        var planName = Str(model, "PlanName");
+        var amount = Str(model, "Amount");
+        var currency = Str(model, "Currency");
+        var url = Str(model, "PaymentLinkUrl");
+        var body = $"""
+            <p>We've prepared a payment link for <strong>{Enc(clinicName)}</strong> on the <strong>{Enc(planName)}</strong> plan.</p>
+            <p>Amount due: <strong>{Enc(currency)} {Enc(amount)}</strong></p>
+            <p><a href="{Enc(url)}">Pay now</a></p>
+            <p>Your new term starts automatically once payment is confirmed — if your clinic is already
+               covered, it begins the moment the current term ends.</p>
+            """;
+        return ("Your CloudClinic payment link", body);
+    }
+
+    private static (string, string) SubscriptionGranted(JsonElement model)
+    {
+        var clinicName = Str(model, "ClinicName");
+        var planName = Str(model, "PlanName");
+        var startDate = Str(model, "StartDate");
+        var endDate = Str(model, "EndDate");
+        var body = $"""
+            <p><strong>{Enc(clinicName)}</strong> has been given the <strong>{Enc(planName)}</strong> plan
+               at no charge.</p>
+            <p>It runs from {Enc(startDate)} to {Enc(endDate)}.</p>
+            """;
+        return ("A subscription has been added to your clinic", body);
+    }
+
     private static (string, string) RenewalActivated(JsonElement model)
     {
         var clinicName = Str(model, "ClinicName");
+        var startDate = Str(model, "StartDate");
         var endDate = Str(model, "EndDate");
+
+        // StartDate is absent on payloads queued before it was added — fall back to the old wording.
+        var period = string.IsNullOrEmpty(startDate)
+            ? $"valid through {Enc(endDate)}"
+            : $"valid from {Enc(startDate)} through {Enc(endDate)}";
+
         var body = $"""
-            <p><strong>{Enc(clinicName)}</strong> has been renewed, valid through {Enc(endDate)}.</p>
+            <p><strong>{Enc(clinicName)}</strong> has been renewed, {period}.</p>
             """;
         return ("Your subscription is renewed", body);
     }

@@ -190,6 +190,12 @@ else if (_isAuthenticated)
                         <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
                     </div>
                 }
+                else if (NeedsSubscriptionGate && SubscriptionContext.IsSuspended)
+                {
+                    @* Before the locked branch: a suspension is a platform lock-out that
+                       subscribing cannot lift, so every role sees this, admins included. *@
+                    <ClinicSuspended />
+                }
                 else if (NeedsSubscriptionGate && SubscriptionContext.IsLocked)
                 {
                     @if (_isAdmin)

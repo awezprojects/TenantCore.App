@@ -19,12 +19,16 @@ namespace TenantCore.Application.Features.Subscriptions.Handlers;
 public sealed class SubscribeToPlanHandler(
     ISubscriptionPlanRepository planRepository,
     IClinicSubscriptionRepository subscriptionRepository,
+    IClinicAccountRepository accountRepository,
     IAuthApplicationService authApplicationService,
     ILogger<SubscribeToPlanHandler> logger)
     : IRequestHandler<SubscribeToPlanCommand, ClinicSubscriptionDto>
 {
     public async Task<ClinicSubscriptionDto> Handle(SubscribeToPlanCommand request, CancellationToken cancellationToken)
     {
+        if (await accountRepository.IsSuspendedAsync(request.ApplicationId, cancellationToken))
+            throw new InvalidOperationException("This clinic is suspended. Contact CloudClinic support.");
+
         var plan = await planRepository.GetByIdAsync(request.SubscriptionPlanId, cancellationToken);
         if (plan is null || !plan.IsActive)
             throw new NotFoundException(nameof(SubscriptionPlan), request.SubscriptionPlanId);

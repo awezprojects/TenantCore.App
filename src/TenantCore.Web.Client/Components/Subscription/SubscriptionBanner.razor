@@ -35,7 +35,10 @@
 }
 else
 {
-    var isCritical = status.DaysRemaining <= 5;
+    @* Colour and the renew prompt follow COVERAGE, not this term: a clinic that already bought its
+       next term is covered continuously and must not be told to renew. *@
+    var nextTerm = status.Upcoming.FirstOrDefault();
+    var isCritical = status.CoverageDaysRemaining <= 5;
     var bg = isCritical ? "#FEE2E2" : status.IsExpiringSoon ? "#FEF3C7" : "#DCFCE7";
     var fg = isCritical ? "#991B1B" : status.IsExpiringSoon ? "#92400E" : "#166534";
     var border = isCritical ? "#FCA5A5" : status.IsExpiringSoon ? "#FDE68A" : "#BBF7D0";
@@ -47,8 +50,14 @@ else
                 display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
         <div style="font-size:13px;color:@fg;font-weight:700;">
             @status.PlanName &middot; @daysLabel
+            @if (nextTerm is not null)
+            {
+                <span style="font-weight:600;opacity:0.85;">
+                    &middot; Next: @nextTerm.PlanName from @nextTerm.StartDate.ToString("dd MMM yyyy")
+                </span>
+            }
         </div>
-        @if (status.IsExpiringSoon && canSubscribe)
+        @if (status.IsExpiringSoon && canSubscribe && nextTerm is null)
         {
             <button @onclick="@(() => Nav.NavigateTo("/subscription"))"
                     style="background:@fg;color:#fff;border:none;border-radius:6px;padding:6px 14px;

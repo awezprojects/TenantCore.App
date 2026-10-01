@@ -14,7 +14,7 @@
 
     <div class="opd-header">
         <div>
-            <div class="opd-title">Activate your clinic</div>
+            <div class="opd-title">@(SubscriptionContext.IsLocked ? "Activate your clinic" : "Subscription")</div>
             <div class="opd-subtitle">@ClinicContext.SelectedApplicationName</div>
         </div>
         <button @onclick="RefreshAsync" disabled="@_loading"
@@ -43,7 +43,9 @@
     }
     else
     {
-        @if (_pendingPayment is not null)
+        <SubscriptionTimelineCard />
+
+        @if (_pendingPayment is not null && !_switchingPlan)
         {
             <div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:1px solid #BFDBFE;
                         border-radius:14px;padding:20px 24px;margin-bottom:22px;
@@ -51,6 +53,13 @@
                 <div>
                     <div style="font-size:14px;font-weight:800;color:#1E293B;margin-bottom:4px;">
                         Payment link ready — @_pendingPayment.PlanName
+                        @if (_pendingPayment.IsAssignedByPlatform)
+                        {
+                            <span style="margin-left:8px;background:#E0E7FF;color:#3730A3;border-radius:12px;
+                                         padding:2px 10px;font-size:10px;font-weight:800;">
+                                SENT BY CLOUDCLINIC
+                            </span>
+                        }
                     </div>
                     <div style="font-size:13px;color:#475569;">
                         Amount: <strong>@_pendingPayment.Currency @_pendingPayment.Amount.ToString("N2")</strong>
@@ -59,8 +68,14 @@
                             <text> &middot; Expires @_pendingPayment.LinkExpiresAt.Value.ToString("dd MMM yyyy HH:mm")</text>
                         }
                     </div>
+                    @if (SubscriptionContext.Status?.CoverageEndDate is { } covered && !SubscriptionContext.IsLocked)
+                    {
+                        <div style="font-size:12px;color:#1565C0;font-weight:600;margin-top:6px;">
+                            Once paid, this term starts on @covered.ToString("dd MMM yyyy") — no time is lost.
+                        </div>
+                    }
                 </div>
-                <div style="display:flex;gap:10px;">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
                     @if (!string.IsNullOrWhiteSpace(_pendingPayment.PaymentLinkUrl))
                     {
                         <a href="@_pendingPayment.PaymentLinkUrl" target="_blank" rel="noopener noreferrer"
@@ -69,16 +84,40 @@
                             💳 Pay Now
                         </a>
                     }
-                    <button @onclick="RefreshAsync"
+                    <button @onclick="CheckPaymentAsync" disabled="@_checkingPayment"
                             style="padding:9px 18px;background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
-                                   border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
-                        I've paid, refresh status
+                                   border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;
+                                   opacity:@(_checkingPayment ? "0.7" : "1");">
+                        @(_checkingPayment ? "Checking…" : "I've paid — check now")
                     </button>
+                    @if (!_pendingPayment.IsAssignedByPlatform)
+                    {
+                        <button @onclick="OpenSwitchPlan"
+                                style="padding:9px 18px;background:transparent;color:#64748B;border:1.5px solid #E2E8F0;
+                                       border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">
+                            Choose a different plan
+                        </button>
+                    }
                 </div>
             </div>
         }
         else
         {
+            @if (_switchingPlan)
+            {
+                <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;padding:12px 18px;
+                            margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;
+                            flex-wrap:wrap;gap:10px;">
+                    <div style="font-size:13px;color:#92400E;font-weight:600;">
+                        Pick a new plan below. Your current link for @_pendingPayment?.PlanName will be cancelled.
+                    </div>
+                    <button @onclick="@(() => _switchingPlan = false)"
+                            style="padding:7px 14px;background:transparent;color:#92400E;border:1.5px solid #FDE68A;
+                                   border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
+                        Keep current link
+                    </button>
+                </div>
+            }
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;">
                 @foreach (var plan in _plans.OrderBy(p => p.DisplayOrder))
                 {
@@ -108,6 +147,12 @@
                             else
                             {
                                 <span style="font-size:26px;font-weight:800;color:#1E293B;">@plan.Currency @plan.Price.ToString("N0")</span>
+                                @if (plan.IsSpecialOffer && plan.ListPrice > plan.Price)
+                                {
+                                    <span style="margin-left:8px;font-size:14px;color:#94A3B8;text-decoration:line-through;">
+                                        @plan.ListPrice.ToString("N0")
+                                    </span>
+                                }
                             }
                         </div>
                         <div style="font-size:11px;color:#94A3B8;margin-top:2px;">
@@ -117,6 +162,22 @@
                                 <text> &middot; @((plan.Price / plan.DurationDays).ToString("N2")) @plan.Currency / day</text>
                             }
                         </div>
+
+                        @if (plan.IsSpecialOffer)
+                        {
+                            <div style="margin-top:10px;">
+                                <span style="background:#E0E7FF;color:#3730A3;border-radius:12px;padding:3px 10px;
+                                             font-size:10px;font-weight:800;">
+                                    SPECIAL PRICE FOR YOUR CLINIC
+                                </span>
+                                @if (plan.OfferValidUntil is { } until)
+                                {
+                                    <div style="font-size:10px;color:#64748B;margin-top:4px;">
+                                        Until @until.ToString("dd MMM yyyy")
+                                    </div>
+                                }
+                            </div>
+                        }
 
                         @if (plan.IsTrial)
                         {
@@ -146,7 +207,7 @@
                                            background:#1565C0;color:#fff;
                                            font-size:13px;font-weight:700;cursor:pointer;
                                            opacity:@(_creatingLinkForPlanId == plan.Id ? "0.7" : "1");">
-                                @(_creatingLinkForPlanId == plan.Id ? "Creating link..." : "Get Payment Link")
+                                @(_creatingLinkForPlanId == plan.Id ? "Creating link..." : BuyLabel())
                             </button>
                         }
                     </div>
@@ -170,6 +231,7 @@
                         <thead>
                             <tr>
                                 <th>Plan</th>
+                                <th>Source</th>
                                 <th>Amount</th>
                                 <th>Status</th>
                                 <th>Paid On</th>
@@ -181,6 +243,7 @@
                             {
                                 <tr>
                                     <td>@p.PlanName</td>
+                                    <td>@SourceLabel(p)</td>
                                     <td>@p.Currency @p.Amount.ToString("N2")</td>
                                     <td>
                                         <span style="background:@StatusBg(p.Status);color:@StatusFg(p.Status);
@@ -230,6 +293,12 @@
 @code {
     private bool _loading = true;
     private bool _subscribing;
+    private bool _checkingPayment;
+
+    // Set by "Choose a different plan": shows the plan grid again even though a link is open.
+    // Picking a plan then supersedes that link server-side.
+    private bool _switchingPlan;
+
     private Guid? _creatingLinkForPlanId;
     private List<SubscriptionPlanDto> _plans = [];
     private List<SubscriptionPaymentDto> _payments = [];
@@ -273,6 +342,45 @@
         _loading = false;
     }
 
+    /// <summary>"Buy — starts <date>" while the clinic is still covered, so the delay is never a surprise.</summary>
+    private string BuyLabel()
+    {
+        var coverageEnd = SubscriptionContext.Status?.CoverageEndDate;
+        return coverageEnd is { } end && !SubscriptionContext.IsLocked
+            ? $"Buy — starts {end:dd MMM}"
+            : "Get Payment Link";
+    }
+
+    private void OpenSwitchPlan() => _switchingPlan = true;
+
+    /// <summary>
+    /// Asks the server to reconcile this payment with Razorpay now. Activation happens on a
+    /// background worker, so the status is re-read once after a short delay rather than polled.
+    /// </summary>
+    private async Task CheckPaymentAsync()
+    {
+        if (_pendingPayment is null) return;
+        _checkingPayment = true;
+
+        var response = await SubscriptionApi.CheckPaymentAsync(_pendingPayment.Id);
+        if (response.Success)
+        {
+            Toast.ShowSuccess("Checking with the payment provider…");
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await SubscriptionContext.RefreshAsync();
+            await LoadAsync();
+
+            if (!SubscriptionContext.IsLocked && _pendingPayment is null)
+                Toast.ShowSuccess("Payment confirmed — your subscription is active.");
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Could not check the payment. Please try again shortly.");
+        }
+
+        _checkingPayment = false;
+    }
+
     private void OpenConfirm(SubscriptionPlanDto plan)
     {
         if (SubscriptionContext.Status?.CanSubscribe != true) return;
@@ -311,6 +419,7 @@
         if (response.Success)
         {
             Toast.ShowSuccess("Payment link created.");
+            _switchingPlan = false;
             await LoadAsync();
         }
         else
@@ -320,6 +429,13 @@
 
         _creatingLinkForPlanId = null;
     }
+
+    private static string SourceLabel(SubscriptionPaymentDto payment) => payment.Purpose switch
+    {
+        PaymentPurpose.Onboarding => "Onboarding",
+        PaymentPurpose.AdminAssigned => "Sent by CloudClinic",
+        _ => "Renewal"
+    };
 
     private static string StatusBg(SubscriptionPaymentStatus status) => status switch
     {

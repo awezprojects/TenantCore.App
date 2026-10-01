@@ -164,13 +164,15 @@ public class ActivateSubscriptionTaskHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Renewal_ActiveExistingSubscription_StartsDayAfterItEnds()
+    public async Task HandleAsync_Renewal_ActiveExistingSubscription_StartsExactlyWhenCoverageEnds()
     {
+        // Previously this started at EndDate + 1 day, which locked the clinic out for the 24 hours
+        // between terms. Coverage must be continuous: the new term begins the moment the old ends.
         var applicationId = Guid.NewGuid();
         var oldPlan = CreatePlan(price: 999m, durationDays: 30);
         var newPlan = CreatePlan(price: 999m, durationDays: 30);
         var existing = ClinicSubscription.Create(applicationId, oldPlan, DateTime.UtcNow.AddDays(-10), "Clinic", "e@x.com", "n");
-        var expectedStart = existing.EndDate.AddDays(1);
+        var expectedStart = existing.EndDate;
 
         var payment = SubscriptionPayment.CreateForRenewal(applicationId, newPlan.Id, newPlan.Code, newPlan.Name, newPlan.Price, "INR", "Admin", "admin@clinic.test", "9876543210", Guid.NewGuid());
         payment.SetLink("plink_1", "https://razorpay.test/pay/plink_1", DateTime.UtcNow.AddDays(7));
@@ -180,6 +182,8 @@ public class ActivateSubscriptionTaskHandlerTests
         _subscriptionRepository.Setup(r => r.GetByPaymentIdAsync(payment.Id, It.IsAny<CancellationToken>())).ReturnsAsync((ClinicSubscription?)null);
         _planRepository.Setup(r => r.GetByIdAsync(newPlan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(newPlan);
         _subscriptionRepository.Setup(r => r.GetLatestForClinicAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+        _subscriptionRepository.Setup(r => r.GetCoverageEndAsync(applicationId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existing.EndDate);
 
         ClinicSubscription? created = null;
         _subscriptionRepository.Setup(r => r.AddAsync(It.IsAny<ClinicSubscription>(), It.IsAny<CancellationToken>()))
@@ -191,9 +195,70 @@ public class ActivateSubscriptionTaskHandlerTests
 
         created.Should().NotBeNull();
         created!.StartDate.Should().Be(expectedStart);
+        created.IsUpcoming(DateTime.UtcNow).Should().BeTrue("it is queued behind the term still running");
         _workflowEnqueuer.Verify(w => w.EnqueueAsync(
             WorkflowTaskType.SendEmail, It.Is<string>(k => k.Contains("renewal-activated")), nameof(SubscriptionPayment), payment.Id,
             It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Renewal_SecondPurchaseWhileOneIsAlreadyQueued_ChainsBehindIt()
+    {
+        // Coverage end counts terms already bought but not started, so buying twice in a row
+        // stacks the terms instead of overlapping them on the same dates.
+        var applicationId = Guid.NewGuid();
+        var plan = CreatePlan(price: 999m, durationDays: 30);
+        var queuedCoverageEnd = DateTime.UtcNow.AddDays(50);
+
+        var payment = SubscriptionPayment.CreateForRenewal(applicationId, plan.Id, plan.Code, plan.Name, plan.Price, "INR", "Admin", "admin@clinic.test", null, Guid.NewGuid());
+        payment.SetLink("plink_2", "https://razorpay.test/pay/plink_2", DateTime.UtcNow.AddDays(7));
+        payment.MarkPaid("pay_2", "upi");
+
+        _paymentRepository.Setup(r => r.GetByIdAsync(payment.Id, It.IsAny<CancellationToken>())).ReturnsAsync(payment);
+        _subscriptionRepository.Setup(r => r.GetByPaymentIdAsync(payment.Id, It.IsAny<CancellationToken>())).ReturnsAsync((ClinicSubscription?)null);
+        _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
+        _subscriptionRepository.Setup(r => r.GetCoverageEndAsync(applicationId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(queuedCoverageEnd);
+
+        ClinicSubscription? created = null;
+        _subscriptionRepository.Setup(r => r.AddAsync(It.IsAny<ClinicSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<ClinicSubscription, CancellationToken>((s, _) => created = s)
+            .Returns(Task.CompletedTask);
+
+        await CreateHandler().HandleAsync(CreatePaymentTask(payment.Id), CancellationToken.None);
+
+        created!.StartDate.Should().Be(queuedCoverageEnd);
+        created.EndDate.Should().Be(queuedCoverageEnd.AddDays(30));
+    }
+
+    [Fact]
+    public async Task HandleAsync_AdminAssignedPayment_ActivatesLikeARenewal()
+    {
+        var applicationId = Guid.NewGuid();
+        var plan = CreatePlan(price: 2499m, durationDays: 90);
+
+        var payment = SubscriptionPayment.CreateForAdminAssignment(
+            applicationId, plan.Id, plan.Code, plan.Name, 1999m, 2499m, "INR",
+            "Sunrise Clinic", "Dr Mehta", "doctor@example.test", null, "admin@example.test", "Negotiated");
+        payment.SetLink("plink_3", "https://razorpay.test/pay/plink_3", DateTime.UtcNow.AddDays(7));
+        payment.MarkPaid("pay_3", "card");
+
+        _paymentRepository.Setup(r => r.GetByIdAsync(payment.Id, It.IsAny<CancellationToken>())).ReturnsAsync(payment);
+        _subscriptionRepository.Setup(r => r.GetByPaymentIdAsync(payment.Id, It.IsAny<CancellationToken>())).ReturnsAsync((ClinicSubscription?)null);
+        _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
+        _subscriptionRepository.Setup(r => r.GetCoverageEndAsync(applicationId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DateTime?)null);
+
+        ClinicSubscription? created = null;
+        _subscriptionRepository.Setup(r => r.AddAsync(It.IsAny<ClinicSubscription>(), It.IsAny<CancellationToken>()))
+            .Callback<ClinicSubscription, CancellationToken>((s, _) => created = s)
+            .Returns(Task.CompletedTask);
+
+        await CreateHandler().HandleAsync(CreatePaymentTask(payment.Id), CancellationToken.None);
+
+        created.Should().NotBeNull();
+        created!.PricePaid.Should().Be(1999m, "the clinic pays the amount on the link, not the list price");
+        created.ClinicName.Should().Be("Sunrise Clinic", "the name snapshotted on the payment is used — no Auth call from the worker");
     }
 
     [Fact]

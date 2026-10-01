@@ -17,4 +17,22 @@ public class SubscriptionPlanRepository(ClinicDbContext dbContext)
 
     public async Task<SubscriptionPlan?> GetByCodeAsync(SubscriptionPlanCode code, CancellationToken ct = default)
         => await DbSet.FirstOrDefaultAsync(p => p.Code == code, ct);
+
+    public async Task<IReadOnlyList<SubscriptionPlan>> GetAllPlansAsync(CancellationToken ct = default)
+        => await DbSet.AsNoTracking()
+            .OrderBy(p => p.DisplayOrder)
+            .ThenBy(p => p.Name)
+            .ToListAsync(ct);
+
+    public async Task<bool> NameExistsAsync(string name, Guid? excludeId = null, CancellationToken ct = default)
+    {
+        // The database collation is case-insensitive, so plain equality is the case-insensitive
+        // comparison here — EF.Functions.Like would add wildcard-escaping concerns for no gain.
+        var query = DbSet.AsNoTracking().Where(p => p.Name == name);
+
+        if (excludeId is { } id)
+            query = query.Where(p => p.Id != id);
+
+        return await query.AnyAsync(ct);
+    }
 }

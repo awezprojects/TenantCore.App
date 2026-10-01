@@ -17,6 +17,13 @@ public class SubscriptionContextService(ISubscriptionApiClient subscriptionApi)
     /// <summary>True once status has loaded and the clinic has no currently-active subscription.</summary>
     public bool IsLocked => IsLoaded && Status?.HasActiveSubscription != true;
 
+    /// <summary>
+    /// True once status has loaded and an internal admin has suspended the clinic. Takes precedence
+    /// over IsLocked: a suspension cannot be cleared by subscribing, so the plan picker must not be
+    /// shown in its place.
+    /// </summary>
+    public bool IsSuspended => IsLoaded && Status?.IsSuspended == true;
+
     public event Action? OnSubscriptionChanged;
 
     public async Task RefreshAsync()

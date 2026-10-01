@@ -16,4 +16,7 @@ public record SubscriptionPaymentDto
     public DateTime? LinkExpiresAt { get; init; }
     public DateTime? PaidAt { get; init; }
     public DateTime CreatedAt { get; init; }
+
+    /// <summary>True for a link an internal admin sent (Purpose == AdminAssigned) — the clinic cannot swap its plan.</summary>
+    public bool IsAssignedByPlatform { get; init; }
 }

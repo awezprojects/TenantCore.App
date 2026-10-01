@@ -1,0 +1,57 @@
+@inject SubscriptionContextService SubscriptionContext
+
+@* Current term plus anything already bought for later. The upcoming cards are the whole point of
+   the "buy now, starts when the current one ends" flow — without them an upgrade looks like it
+   did nothing until the term rolls over. *@
+
+@{
+    var status = SubscriptionContext.Status;
+}
+
+@if (status is not null)
+{
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:22px;">
+
+        @if (status.HasActiveSubscription)
+        {
+            var isCritical = status.CoverageDaysRemaining <= 5;
+            var accent = isCritical ? "#DC2626" : status.IsExpiringSoon ? "#92400E" : "#16A34A";
+            var tint = isCritical ? "#FEE2E2" : status.IsExpiringSoon ? "#FEF3C7" : "#DCFCE7";
+
+            <div style="background:#fff;border:1.5px solid @tint;border-left:4px solid @accent;
+                        border-radius:12px;padding:16px 18px;">
+                <div style="font-size:10px;font-weight:800;color:@accent;letter-spacing:0.6px;">CURRENT PLAN</div>
+                <div style="font-size:16px;font-weight:800;color:#1E293B;margin-top:6px;">@status.PlanName</div>
+                <div style="font-size:12px;color:#64748B;margin-top:4px;">
+                    @status.StartDate?.ToString("dd MMM yyyy") &ndash; @status.EndDate?.ToString("dd MMM yyyy")
+                </div>
+                <div style="font-size:12px;font-weight:700;color:@accent;margin-top:8px;">
+                    @(status.DaysRemaining == 0 ? "Ends today" : $"{status.DaysRemaining} day{(status.DaysRemaining == 1 ? "" : "s")} left")
+                </div>
+            </div>
+        }
+
+        @foreach (var upcoming in status.Upcoming)
+        {
+            <div style="background:#F8FAFC;border:1.5px dashed #BFDBFE;border-radius:12px;padding:16px 18px;">
+                <div style="font-size:10px;font-weight:800;color:#1565C0;letter-spacing:0.6px;">
+                    @(upcoming.IsGrant ? "UPCOMING · ADDED BY CLOUDCLINIC" : "UPCOMING")
+                </div>
+                <div style="font-size:16px;font-weight:800;color:#1E293B;margin-top:6px;">@upcoming.PlanName</div>
+                <div style="font-size:12px;color:#64748B;margin-top:4px;">
+                    @upcoming.StartDate.ToString("dd MMM yyyy") &ndash; @upcoming.EndDate.ToString("dd MMM yyyy")
+                </div>
+                <div style="font-size:12px;font-weight:700;color:#1565C0;margin-top:8px;">
+                    Starts automatically on @upcoming.StartDate.ToString("dd MMM yyyy")
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (status.Upcoming.Count > 0 && status.CoverageEndDate is { } coverageEnd)
+    {
+        <div style="font-size:12px;color:#64748B;margin:-10px 0 20px;">
+            Your clinic is covered without a break until <strong>@coverageEnd.ToString("dd MMM yyyy")</strong>.
+        </div>
+    }
+}

@@ -8,6 +8,10 @@ namespace TenantCore.Shared.Errors;
 public static class SubscriptionErrorCodes
 {
     public const string SubscriptionRequired = "subscription_required";
+
+    /// <summary>403 from SubscriptionGuardMiddleware — the clinic was suspended by an internal admin.</summary>
+    public const string ClinicSuspended = "clinic_suspended";
+
     public const string TrialAlreadyUsed = "trial_already_used";
     public const string SubscriptionAlreadyActive = "subscription_already_active";
 }

@@ -49,14 +49,14 @@ public sealed class ConfirmPaymentTaskHandler(
         }
 
         if (string.IsNullOrEmpty(payment.GatewayPaymentLinkId))
-            throw new InvalidOperationException("Payment has no gateway link yet — not ready to confirm.");
+            throw new WaitingWorkflowException("Payment has no gateway link yet — waiting for link creation.");
 
         var (result, link) = await paymentGateway.GetPaymentLinkByIdAsync(payment.GatewayPaymentLinkId, ct);
         if (!result.Success || link == null)
             throw new InvalidOperationException(result.ErrorMessage ?? "Could not fetch the payment link from Razorpay.");
 
         if (link.Status != "paid" || string.IsNullOrEmpty(link.PaymentId))
-            throw new InvalidOperationException($"Payment link status is '{link.Status}' — not yet paid.");
+            throw new WaitingWorkflowException($"Payment link status is '{link.Status}' — waiting for the clinic to pay.");
 
         if (link.AmountPaid.HasValue && link.AmountPaid.Value != payment.Amount)
         {
@@ -103,8 +103,10 @@ public sealed class ConfirmPaymentTaskHandler(
 
             if (save) await requestRepository.SaveChangesAsync(ct);
         }
-        else if (payment.Purpose == PaymentPurpose.Renewal)
+        else if (payment.IsClinicLink)
         {
+            // Renewals and admin-assigned links both activate the same way — the term is queued
+            // after the clinic's existing coverage by ActivateSubscriptionTaskHandler.
             await workflowEnqueuer.EnqueueAsync(
                 WorkflowTaskType.ActivateSubscription, $"activate-subscription:{payment.Id}", nameof(SubscriptionPayment), payment.Id, ct: ct);
 

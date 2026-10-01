@@ -19,6 +19,7 @@ public static class SubscriptionPaymentTranslator
         PaymentLinkUrl = entity.Status == SubscriptionPaymentStatus.LinkCreated ? entity.PaymentLinkUrl : null,
         LinkExpiresAt = entity.Status == SubscriptionPaymentStatus.LinkCreated ? entity.LinkExpiresAt : null,
         PaidAt = entity.PaidAt,
-        CreatedAt = entity.CreatedAt
+        CreatedAt = entity.CreatedAt,
+        IsAssignedByPlatform = entity.Purpose == PaymentPurpose.AdminAssigned
     };
 }

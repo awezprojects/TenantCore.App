@@ -5,11 +5,23 @@ namespace TenantCore.Domain.Interfaces;
 /// <summary>Every method here filters by applicationId — ClinicSubscription is tenant-scoped.</summary>
 public interface IClinicSubscriptionRepository : IClinicRepository<ClinicSubscription>
 {
-    /// <summary>The subscription (if any) currently granting access — Status Active and EndDate in the future. Used by the access guard.</summary>
+    /// <summary>
+    /// The subscription currently granting access — Active, already started and not yet ended.
+    /// A term bought for later is deliberately NOT returned. Used by the access guard.
+    /// </summary>
     Task<ClinicSubscription?> GetActiveForClinicAsync(Guid applicationId, CancellationToken ct = default);
 
     /// <summary>Most recent subscription by StartDate, regardless of status — used to compute the renewal start date.</summary>
     Task<ClinicSubscription?> GetLatestForClinicAsync(Guid applicationId, CancellationToken ct = default);
+
+    /// <summary>Tracked. Active terms that have not started yet, earliest first — re-chained when one is cancelled.</summary>
+    Task<IReadOnlyList<ClinicSubscription>> GetUpcomingForClinicAsync(Guid applicationId, DateTime utcNow, CancellationToken ct = default);
+
+    /// <summary>
+    /// The last moment the clinic is covered, counting terms bought but not started. Null when
+    /// nothing covers it. Every new term starts here (or now), so terms never gap or overlap.
+    /// </summary>
+    Task<DateTime?> GetCoverageEndAsync(Guid applicationId, DateTime utcNow, CancellationToken ct = default);
 
     Task<IReadOnlyList<ClinicSubscription>> GetHistoryForClinicAsync(Guid applicationId, CancellationToken ct = default);
 

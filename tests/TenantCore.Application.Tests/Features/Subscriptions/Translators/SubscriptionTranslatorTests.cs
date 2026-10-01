@@ -96,4 +96,83 @@ public class SubscriptionTranslatorTests
         dto.HasUsedTrial.Should().BeTrue();
         dto.PlanName.Should().Be("Quarterly");
     }
+
+    [Fact]
+    public void ToStatusDto_NoCoverageEndSupplied_FallsBackToTheCurrentTermsOwnEnd()
+    {
+        var utcNow = new DateTime(2026, 1, 1, 8, 30, 0, DateTimeKind.Utc);
+        var entity = ClinicSubscription.Create(Guid.NewGuid(), CreatePlan(), utcNow.Date.AddDays(-80), "C", "a@b.com", "A");
+
+        var dto = SubscriptionTranslator.ToStatusDto(entity, canSubscribe: false, hasUsedTrial: true, utcNow);
+
+        dto.CoverageEndDate.Should().Be(entity.EndDate);
+        dto.CoverageDaysRemaining.Should().Be(dto.DaysRemaining);
+    }
+
+    [Fact]
+    public void ToStatusDto_NextTermAlreadyBought_MeasuresExpiryAgainstCoverageNotThisTerm()
+    {
+        var utcNow = new DateTime(2026, 1, 1, 8, 30, 0, DateTimeKind.Utc);
+        var current = ClinicSubscription.Create(Guid.NewGuid(), CreatePlan(), utcNow.Date.AddDays(-87), "C", "a@b.com", "A");
+        var next = ClinicSubscription.Create(Guid.NewGuid(), CreatePlan(), current.EndDate, "C", "a@b.com", "A");
+
+        var dto = SubscriptionTranslator.ToStatusDto(
+            current, canSubscribe: true, hasUsedTrial: true, utcNow,
+            upcoming: [next], coverageEnd: next.EndDate);
+
+        dto.DaysRemaining.Should().BeLessThan(15, "this term is nearly over");
+        dto.IsExpiringSoon.Should().BeFalse("the clinic already bought its next term");
+        dto.CoverageEndDate.Should().Be(next.EndDate);
+        dto.Upcoming.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void ToStatusDto_Suspended_CarriesTheFlagAndMessage()
+    {
+        var dto = SubscriptionTranslator.ToStatusDto(
+            null, canSubscribe: true, hasUsedTrial: false, DateTime.UtcNow,
+            isSuspended: true, suspensionMessage: "Payment overdue");
+
+        dto.IsSuspended.Should().BeTrue();
+        dto.SuspensionMessage.Should().Be("Payment overdue");
+    }
+
+    [Fact]
+    public void ToUpcomingDto_AdminGrant_IsFlaggedAsAGrant()
+    {
+        var granted = ClinicSubscription.CreateAdminGrant(
+            Guid.NewGuid(), CreatePlan(), DateTime.UtcNow.AddDays(5), "C", "a@b.com", "A",
+            "admin@example.test", "Goodwill");
+
+        var dto = SubscriptionTranslator.ToUpcomingDto(granted);
+
+        dto.IsGrant.Should().BeTrue();
+        dto.PricePaid.Should().Be(0m);
+        dto.StartDate.Should().Be(granted.StartDate);
+    }
+
+    [Fact]
+    public void ToPlanDto_WithAnOffer_KeepsBothPrices()
+    {
+        var plan = CreatePlan();
+        var validUntil = DateTime.UtcNow.AddDays(30);
+
+        var dto = SubscriptionTranslator.ToPlanDto(plan, alreadyUsed: false,
+            effectivePrice: 1999m, isSpecialOffer: true, offerValidUntil: validUntil);
+
+        dto.Price.Should().Be(1999m);
+        dto.ListPrice.Should().Be(2499m);
+        dto.IsSpecialOffer.Should().BeTrue();
+        dto.OfferValidUntil.Should().Be(validUntil);
+    }
+
+    [Fact]
+    public void ToPlanDto_WithoutAnOffer_PriceEqualsListPrice()
+    {
+        var dto = SubscriptionTranslator.ToPlanDto(CreatePlan(), alreadyUsed: false);
+
+        dto.Price.Should().Be(2499m);
+        dto.ListPrice.Should().Be(2499m);
+        dto.IsSpecialOffer.Should().BeFalse();
+    }
 }

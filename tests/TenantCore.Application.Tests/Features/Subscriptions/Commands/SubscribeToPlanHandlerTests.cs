@@ -21,11 +21,29 @@ public class SubscribeToPlanHandlerTests
 {
     private readonly Mock<ISubscriptionPlanRepository> _planRepository = new();
     private readonly Mock<IClinicSubscriptionRepository> _subscriptionRepository = new();
+    private readonly Mock<IClinicAccountRepository> _accountRepository = new();
     private readonly Mock<IAuthApplicationService> _authApplicationService = new();
     private readonly Mock<ILogger<SubscribeToPlanHandler>> _logger = new();
 
+    public SubscribeToPlanHandlerTests()
+        => _accountRepository.Setup(r => r.IsSuspendedAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
     private SubscribeToPlanHandler CreateHandler() =>
-        new(_planRepository.Object, _subscriptionRepository.Object, _authApplicationService.Object, _logger.Object);
+        new(_planRepository.Object, _subscriptionRepository.Object, _accountRepository.Object,
+            _authApplicationService.Object, _logger.Object);
+
+    [Fact]
+    public async Task Handle_SuspendedClinic_ThrowsInvalidOperationException()
+    {
+        var applicationId = Guid.NewGuid();
+        _accountRepository.Setup(r => r.IsSuspendedAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var action = () => CreateHandler().Handle(
+            new SubscribeToPlanCommand(applicationId, Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>().WithMessage("*suspended*");
+        _planRepository.Verify(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     private static SubscriptionPlan CreatePlan(bool isTrial = false, int durationDays = 30, decimal price = 999m) =>
         SubscriptionPlan.CreateForSeed(

@@ -69,6 +69,34 @@ public class CancelPaymentLinkTaskHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ClinicLinkAlreadyPaidWithNoReplacement_ConfirmsItInsteadOfDroppingTheMoney()
+    {
+        // A renewal or admin link paid at the instant it was being cancelled has no onboarding
+        // request to flag and no replacement to fall back on. It must still be confirmed, or the
+        // clinic would have paid for a term that never activates.
+        var applicationId = Guid.NewGuid();
+        var payment = SubscriptionPayment.CreateForRenewal(
+            applicationId, Guid.NewGuid(), SubscriptionPlanCode.Monthly, "Monthly", 999m, "INR",
+            "Admin", "admin@clinic.test", null, Guid.NewGuid());
+        payment.SetLink("plink_1", "https://razorpay.test/pay/plink_1", DateTime.UtcNow.AddDays(7));
+
+        _paymentRepository.Setup(r => r.GetByIdAsync(payment.Id, It.IsAny<CancellationToken>())).ReturnsAsync(payment);
+        _paymentGateway.Setup(g => g.CancelPaymentLinkAsync("plink_1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(GatewayResult.Permanent("already paid"));
+        var paidLink = new PaymentLinkInfo("plink_1", "https://razorpay.test/pay/plink_1", "paid", "pay_1", "upi", 999m, DateTime.UtcNow.AddDays(7));
+        _paymentGateway.Setup(g => g.GetPaymentLinkByIdAsync("plink_1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((GatewayResult.Ok(), paidLink));
+
+        await CreateHandler().HandleAsync(CreateTask(payment.Id), CancellationToken.None);
+
+        _workflowEnqueuer.Verify(w => w.EnqueueAsync(
+            WorkflowTaskType.ConfirmPayment, $"confirm-payment:{payment.Id}",
+            nameof(SubscriptionPayment), payment.Id, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+
+        payment.Status.Should().NotBe(SubscriptionPaymentStatus.Cancelled, "the payment actually happened");
+    }
+
+    [Fact]
     public async Task HandleAsync_RejectionCase_LinkAlreadyPaid_FlagsRefundRequiredAndNeverAutoProvisions()
     {
         var request = ClinicOnboardingRequest.Submit(

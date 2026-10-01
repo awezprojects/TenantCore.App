@@ -26,10 +26,14 @@ public class SubscriptionPaymentRepository(ClinicDbContext dbContext)
             .Take(100)
             .ToListAsync(ct);
 
-    public async Task<SubscriptionPayment?> GetOpenRenewalForClinicAsync(Guid applicationId, CancellationToken ct = default)
+    public async Task<SubscriptionPayment?> GetOpenLinkForClinicAsync(Guid applicationId, CancellationToken ct = default)
         => await DbSet
-            .Where(p => p.ApplicationId == applicationId && p.Purpose == PaymentPurpose.Renewal
+            .Where(p => p.ApplicationId == applicationId
+                     && (p.Purpose == PaymentPurpose.Renewal || p.Purpose == PaymentPurpose.AdminAssigned)
                      && (p.Status == SubscriptionPaymentStatus.Pending || p.Status == SubscriptionPaymentStatus.LinkCreated))
             .OrderByDescending(p => p.CreatedAt)
             .FirstOrDefaultAsync(ct);
+
+    public async Task<SubscriptionPayment?> GetByIdForClinicAsync(Guid id, Guid applicationId, CancellationToken ct = default)
+        => await DbSet.FirstOrDefaultAsync(p => p.Id == id && p.ApplicationId == applicationId, ct);
 }

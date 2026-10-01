@@ -46,6 +46,10 @@ internal sealed class SubscriptionPaymentConfiguration : IEntityTypeConfiguratio
 
         builder.Property(p => p.ClinicSubscriptionId);
         builder.Property(p => p.InitiatedByUserId);
+        builder.Property(p => p.InitiatedByAdminEmail).HasMaxLength(256);
+        builder.Property(p => p.AmountReason).HasMaxLength(500);
+        builder.Property(p => p.ClinicName).HasMaxLength(200);
+        builder.Property(p => p.LastCheckAt);
 
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.CreatedBy).HasMaxLength(256);
