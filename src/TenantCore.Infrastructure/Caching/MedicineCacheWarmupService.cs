@@ -17,16 +17,24 @@ namespace TenantCore.Infrastructure.Caching;
 /// </summary>
 public sealed class MedicineCacheWarmupService(
     IServiceScopeFactory scopeFactory,
-    ILogger<MedicineCacheWarmupService> logger) : BackgroundService
+    ILogger<MedicineCacheWarmupService> logger,
+    TimeSpan? startupDelay = null) : BackgroundService
 {
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan QueryTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// How long the first fetch waits, so EF migrations and seeding can finish before it competes for
+    /// locks on the Medicines table. Overridable purely so a test does not have to sit through the
+    /// production settle window.
+    /// </summary>
+    private readonly TimeSpan _startupDelay = startupDelay ?? TimeSpan.FromSeconds(10);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Let EF migrations, seeding and other startup queries finish before competing for
         // shared locks on the Medicines table.
-        try { await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); }
+        try { await Task.Delay(_startupDelay, stoppingToken); }
         catch (OperationCanceledException) { return; }
 
         while (!stoppingToken.IsCancellationRequested)

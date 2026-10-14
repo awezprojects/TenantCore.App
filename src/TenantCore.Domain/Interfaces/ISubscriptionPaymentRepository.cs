@@ -20,4 +20,11 @@ public interface ISubscriptionPaymentRepository : IRepository<SubscriptionPaymen
 
     /// <summary>Tracked. Null when the payment does not exist or belongs to another clinic (treated as not found).</summary>
     Task<SubscriptionPayment?> GetByIdForClinicAsync(Guid id, Guid applicationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The clinic's most recent registration fee payment (Open or Expired), no-tracking.
+    /// Returns null when no registration fee payment has ever been created for this clinic.
+    /// Used to show the clinic whether a link already exists and whether it is still payable.
+    /// </summary>
+    Task<SubscriptionPayment?> GetLatestRegistrationFeePaymentAsync(Guid applicationId, CancellationToken ct = default);
 }

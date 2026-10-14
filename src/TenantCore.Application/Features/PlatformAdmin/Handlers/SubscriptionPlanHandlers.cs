@@ -25,7 +25,8 @@ public sealed class CreateSubscriptionPlanHandler(
 
         var plan = SubscriptionPlan.CreateCustom(
             details.Name, details.Description, details.DurationDays, details.Price,
-            details.IsPopular, details.DisplayOrder, details.IsPublic);
+            details.IsPopular, details.DisplayOrder, details.IsPublic,
+            details.RegistrationFee ?? 0m, details.FreeTestDays);
 
         await planRepository.AddAsync(plan, ct);
         await planRepository.SaveChangesAsync(ct);
@@ -73,7 +74,8 @@ public sealed class UpdateSubscriptionPlanHandler(
         // Existing subscriptions and open links keep their snapshotted values either way.
         plan.UpdateDetails(
             details.Name, details.Description, details.DurationDays, details.Price,
-            details.IsPopular, details.DisplayOrder, details.IsPublic);
+            details.IsPopular, details.DisplayOrder, details.IsPublic,
+            details.RegistrationFee, details.FreeTestDays);
 
         planRepository.Update(plan);
         await planRepository.SaveChangesAsync(ct);
@@ -96,5 +98,34 @@ public sealed class SetSubscriptionPlanActiveHandler(ISubscriptionPlanRepository
 
         planRepository.Update(plan);
         await planRepository.SaveChangesAsync(ct);
+    }
+}
+
+/// <summary>
+/// Permanently removes a plan from the catalogue. Blocked when any clinic has an active or
+/// upcoming subscription on it — those clinics would lose their coverage silently.
+/// </summary>
+public sealed class DeleteSubscriptionPlanHandler(
+    ISubscriptionPlanRepository planRepository,
+    IClinicSubscriptionRepository subscriptionRepository,
+    ILogger<DeleteSubscriptionPlanHandler> logger)
+    : IRequestHandler<DeleteSubscriptionPlanCommand>
+{
+    public async Task Handle(DeleteSubscriptionPlanCommand command, CancellationToken ct)
+    {
+        var plan = await planRepository.GetByIdAsync(command.PlanId, ct);
+        if (plan is null)
+            throw new NotFoundException(nameof(SubscriptionPlan), command.PlanId);
+
+        if (await subscriptionRepository.AnyActiveOrUpcomingForPlanAsync(command.PlanId, ct))
+            throw new InvalidOperationException(
+                "Cannot delete a plan that has active or upcoming clinic subscriptions. Deactivate it instead.");
+
+        planRepository.Delete(plan);
+        await planRepository.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Admin {AdminEmail} permanently deleted subscription plan {PlanId} ({PlanName}).",
+            command.AdminEmail, command.PlanId, plan.Name);
     }
 }

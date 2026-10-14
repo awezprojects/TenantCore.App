@@ -43,8 +43,14 @@ public sealed class ChangePaymentAmountHandler(
 
         request.UpdateApprovedAmount(command.Amount, command.Reason);
 
+        // An onboarding payment always originates from a chosen plan, so its plan columns are
+        // populated; they are nullable only so the same table can carry the Phase-2 top-up and
+        // registration-fee purposes. A payment with no plan cannot be re-pointed at a new amount.
+        if (oldPayment.SubscriptionPlanId is not { } planId || oldPayment.PlanCode is not { } planCode)
+            throw new InvalidOperationException("This payment has no plan attached, so its amount cannot be changed.");
+
         var replacement = SubscriptionPayment.CreateForOnboarding(
-            request.Id, oldPayment.SubscriptionPlanId, oldPayment.PlanCode, oldPayment.PlanName,
+            request.Id, planId, planCode, oldPayment.PlanName ?? planCode.ToString(),
             command.Amount, oldPayment.PlanListPrice, oldPayment.Currency,
             oldPayment.PayerName, oldPayment.PayerEmail, oldPayment.PayerPhone, oldPayment.Id);
 

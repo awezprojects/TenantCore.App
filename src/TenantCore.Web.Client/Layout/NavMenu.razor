@@ -2,6 +2,7 @@
 @inject NavigationManager NavigationManager
 @inject ClinicContextService ClinicContext
 @inject FeatureFlagsContextService FeatureFlagsContext
+@inject UsageBillingContextService UsageBillingContext
 @using TenantCore.Web.Client.Services
 @implements IDisposable
 
@@ -12,6 +13,13 @@
         @* Clinic Admin panel — strict to admin role; no doctor-specific items *@
         <NavItem Href="/admin/dashboard" Icon="▦" Label="Dashboard" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
         <NavItem Href="/subscription"    Icon="⚡" Label="Subscription" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+
+        @* Billing & Usage is only relevant to PAYG clinics — subscription clinics pay by plan, so
+           these screens have no data to show and are hidden entirely. *@
+        @if (UsageBillingContext.IsPayAsYouGo)
+        {
+            <NavItem Href="/billing" Icon="💳" Label="Billing & Usage" DrawerOpen="DrawerOpen" CurrentPath="_currentPath" />
+        }
 
         <div style="height:1px;background:rgba(255,255,255,0.08);margin:8px 4px;"></div>
 
@@ -111,6 +119,7 @@
         NavigationManager.LocationChanged += OnLocationChanged;
         ClinicContext.OnClinicChanged += OnClinicContextChanged;
         FeatureFlagsContext.OnFeatureFlagsChanged += OnClinicContextChanged;
+        UsageBillingContext.OnBillingChanged += OnClinicContextChanged;
         UpdatePath(NavigationManager.Uri);
     }
 
@@ -135,5 +144,6 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
         ClinicContext.OnClinicChanged -= OnClinicContextChanged;
         FeatureFlagsContext.OnFeatureFlagsChanged -= OnClinicContextChanged;
+        UsageBillingContext.OnBillingChanged -= OnClinicContextChanged;
     }
 }

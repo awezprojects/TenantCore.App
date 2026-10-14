@@ -1,0 +1,39 @@
+@using TenantCore.Shared.Dtos.UsageBilling
+@using TenantCore.Shared.Enums
+
+@* Reusable billing-mode pill.
+   "Package" / "Pay as you go", plus "switches on <date>" when a mode change is queued.
+   Usage:
+     <BillingModeBadge Summary="_summary" />
+*@
+
+@if (Summary is not null)
+{
+    <span style="display:inline-flex;align-items:center;gap:6px;">
+        <span class="badge @(Summary.EffectiveBillingMode == BillingMode.PayAsYouGo ? "badge-purple" : "badge-info")">
+            @Label(Summary.EffectiveBillingMode)
+        </span>
+
+        @if (Summary.PendingBillingMode is { } pending)
+        {
+            <span class="badge badge-warning" title="@SwitchText(pending)">⏳ @SwitchText(pending)</span>
+        }
+    </span>
+}
+
+@code {
+    [Parameter] public ClinicBillingSummaryDto? Summary { get; set; }
+
+    /// <summary>Human label for a mode — the same wording on every billing screen.</summary>
+    public static string Label(BillingMode mode) => mode switch
+    {
+        BillingMode.PayAsYouGo => "Pay as you go",
+        BillingMode.Subscription => "Package",
+        _ => mode.ToString()
+    };
+
+    private string SwitchText(BillingMode pending)
+        => Summary?.PendingBillingModeEffectiveFrom is { } from
+            ? $"Switches to {Label(pending)} on {from.ToLocalTime():dd MMM yyyy HH:mm}"
+            : $"Switches to {Label(pending)} at the end of current coverage";
+}

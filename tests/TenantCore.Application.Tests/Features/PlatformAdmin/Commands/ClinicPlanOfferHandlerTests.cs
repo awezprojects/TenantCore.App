@@ -20,10 +20,12 @@ public class ClinicPlanOfferHandlerTests
     {
         _offerRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         _accountRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _accountRepository.Setup(r => r.GetBillingModeAsync(_applicationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BillingMode.Subscription);
     }
 
     private CreateClinicPlanOfferHandler CreateHandler()
-        => new(_planRepository.Object, _offerRepository.Object);
+        => new(_planRepository.Object, _accountRepository.Object, _offerRepository.Object);
 
     private WithdrawClinicPlanOfferHandler WithdrawHandler()
         => new(_offerRepository.Object);

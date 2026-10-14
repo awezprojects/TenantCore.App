@@ -1,5 +1,7 @@
+using MediatR;
 using TenantCore.Application.Common.Workflow;
 using TenantCore.Application.Features.Onboarding.Emails;
+using TenantCore.Application.Features.PlatformAdmin.Commands;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Enums;
 using TenantCore.Domain.Exceptions;
@@ -18,7 +20,8 @@ public sealed class ActivateSubscriptionTaskHandler(
     ISubscriptionPaymentRepository paymentRepository,
     ISubscriptionPlanRepository planRepository,
     IClinicSubscriptionRepository subscriptionRepository,
-    IWorkflowEnqueuer workflowEnqueuer)
+    IWorkflowEnqueuer workflowEnqueuer,
+    ISender sender)
     : IWorkflowTaskHandler
 {
     public WorkflowTaskType TaskType => WorkflowTaskType.ActivateSubscription;
@@ -39,6 +42,23 @@ public sealed class ActivateSubscriptionTaskHandler(
 
         if (!request.ProvisionedApplicationId.HasValue)
             throw new InvalidOperationException("Clinic has not been provisioned yet.");
+
+        // Pay-as-you-go clinics have no subscription term — access is governed by wallet balance.
+        // The guard middleware already bypasses the subscription check for PAYG clinics.
+        if (request.ApprovalBillingMode == BillingMode.PayAsYouGo)
+        {
+            if (request.Status != ClinicOnboardingStatus.Active)
+            {
+                request.ActivatePayAsYouGo();
+                await ApplyBillingIntentAsync(request, ct);
+                await workflowEnqueuer.EnqueueAsync(
+                    WorkflowTaskType.SendEmail, $"email:clinic-ready:{request.Id}", nameof(ClinicOnboardingRequest), request.Id,
+                    OnboardingEmailTemplates.BuildPayload("ClinicReady", request.RequesterEmail, new { request.ClinicName }),
+                    ct);
+                await requestRepository.SaveChangesAsync(ct);
+            }
+            return;
+        }
 
         var existing = await subscriptionRepository.GetByOnboardingRequestIdAsync(request.Id, ct);
         if (existing != null)
@@ -78,9 +98,16 @@ public sealed class ActivateSubscriptionTaskHandler(
             return;
         }
 
-        var plan = await planRepository.GetByIdAsync(payment.SubscriptionPlanId, ct);
+        // A plan is mandatory here. Activation only ever runs for the three plan-carrying purposes;
+        // a wallet top-up or a registration fee is branched away by ConfirmPaymentTaskHandler, so a
+        // null plan on this path is a data defect rather than a normal case.
+        if (payment.SubscriptionPlanId is not { } planId)
+            throw new PermanentWorkflowException(
+                $"SubscriptionPayment {payment.Id} ({payment.Purpose}) carries no plan and cannot activate a subscription.");
+
+        var plan = await planRepository.GetByIdAsync(planId, ct);
         if (plan == null)
-            throw new PermanentWorkflowException($"SubscriptionPlan {payment.SubscriptionPlanId} not found.");
+            throw new PermanentWorkflowException($"SubscriptionPlan {planId} not found.");
 
         Guid applicationId;
         string billingEmail;
@@ -175,6 +202,7 @@ public sealed class ActivateSubscriptionTaskHandler(
         if (request.Status != ClinicOnboardingStatus.Active)
         {
             request.Activate(subscriptionId);
+            await ApplyBillingIntentAsync(request, ct);
             await workflowEnqueuer.EnqueueAsync(
                 WorkflowTaskType.SendEmail, $"email:clinic-ready:{request.Id}", nameof(ClinicOnboardingRequest), request.Id,
                 OnboardingEmailTemplates.BuildPayload("ClinicReady", request.RequesterEmail, new { request.ClinicName }),
@@ -182,5 +210,76 @@ public sealed class ActivateSubscriptionTaskHandler(
         }
 
         await requestRepository.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Applies any billing setup that was captured at approval time. Called after the clinic is
+    /// activated; uses the provisioned ApplicationId which does not exist until that point. All
+    /// commands are idempotent — safe to replay if the workflow task is retried.
+    /// </summary>
+    private async Task ApplyBillingIntentAsync(ClinicOnboardingRequest request, CancellationToken ct)
+    {
+        if (!request.ProvisionedApplicationId.HasValue) return;
+
+        var appId = request.ProvisionedApplicationId.Value;
+        var adminEmail = request.ReviewedByAdminEmail ?? "system@tenantcore.internal";
+        var adminId = request.ReviewedByAdminId ?? Guid.Empty;
+        const string reason = "Set at clinic activation";
+
+        // A PAYG clinic with a registration fee must pay the fee before the wallet unlocks.
+        // The initial credit is stored as PendingWalletCreditOnFeePayment and released by
+        // RecordRegistrationFeeTaskHandler once the payment is confirmed.
+        var deferCreditUntilFeePayment =
+            request.ApprovalBillingMode == BillingMode.PayAsYouGo
+            && request.ApprovalRegistrationFee is { } regFee && regFee > 0m
+            && request.ApprovalInitialWalletCredit is { } c && c > 0m;
+
+        // Billing mode, registration fee and free test days — and, when deferral applies, the
+        // pending wallet credit — all go in one command so they land in a single SaveChanges.
+        if (request.ApprovalBillingMode.HasValue
+            || request.ApprovalRegistrationFee.HasValue
+            || request.ApprovalFreeTestDays.HasValue)
+        {
+            await sender.Send(new SetClinicBillingCommand(
+                appId,
+                request.ApprovalBillingMode ?? BillingMode.Subscription,
+                ApplyNow: true,
+                request.ApprovalRegistrationFee,
+                request.ApprovalFreeTestDays,
+                reason,
+                adminId,
+                adminEmail,
+                InitialWalletCreditOnFeePayment: deferCreditUntilFeePayment
+                    ? request.ApprovalInitialWalletCredit
+                    : null), ct);
+        }
+
+        // Usage rates
+        var rates = new List<UsageRateSetting>();
+        if (request.ApprovalOpdRate.HasValue)
+            rates.Add(new UsageRateSetting(BillingItem.OpdRegistration, request.ApprovalOpdRate.Value));
+        if (request.ApprovalIpdAdmissionRate.HasValue)
+            rates.Add(new UsageRateSetting(BillingItem.IpdAdmission, request.ApprovalIpdAdmissionRate.Value));
+        if (request.ApprovalOtSurgeryRate.HasValue)
+            rates.Add(new UsageRateSetting(BillingItem.OtSurgery, request.ApprovalOtSurgeryRate.Value));
+        if (request.ApprovalIpdDischargeRate.HasValue)
+            rates.Add(new UsageRateSetting(BillingItem.IpdDischarge, request.ApprovalIpdDischargeRate.Value));
+
+        if (rates.Count > 0)
+        {
+            await sender.Send(new SetClinicUsageRatesCommand(
+                appId, rates, reason, adminId, adminEmail), ct);
+        }
+
+        // Initial wallet credit — only applied immediately when the clinic has no fee to pay first.
+        // Deferred clinics get the credit in RecordRegistrationFeeTaskHandler after fee confirmation.
+        if (!deferCreditUntilFeePayment && request.ApprovalInitialWalletCredit is { } credit && credit > 0m)
+        {
+            await sender.Send(new CreditClinicWalletCommand(
+                appId, credit,
+                "Initial wallet credit at clinic activation",
+                request.Id,  // idempotency key
+                adminId, adminEmail), ct);
+        }
     }
 }

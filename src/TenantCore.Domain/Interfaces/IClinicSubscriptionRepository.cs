@@ -36,4 +36,10 @@ public interface IClinicSubscriptionRepository : IClinicRepository<ClinicSubscri
 
     /// <summary>Idempotency lookup for a trial grant — at most one subscription per onboarding request.</summary>
     Task<ClinicSubscription?> GetByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken ct = default);
+
+    /// <summary>
+    /// True when any clinic has an active or future subscription on this plan.
+    /// Used to guard plan hard-delete: a plan with active subscribers cannot be deleted.
+    /// </summary>
+    Task<bool> AnyActiveOrUpcomingForPlanAsync(Guid planId, CancellationToken ct = default);
 }

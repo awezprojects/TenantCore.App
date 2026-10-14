@@ -5,6 +5,7 @@
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject SubscriptionContextService SubscriptionContext
+@inject UsageBillingContextService UsageBillingContext
 @inject FeatureFlagsContextService FeatureFlagsContext
 @inject NavigationManager NavigationManager
 @inject IToastService Toast
@@ -134,6 +135,7 @@
                     // that clinic isn't in the new token's app_ids, ClinicContextMiddleware
                     // 403s it, breaking the landing page before it can show any clinics.
                     SubscriptionContext.Clear();
+        UsageBillingContext.Clear();
                     FeatureFlagsContext.Clear();
                     await ClinicContext.ClearClinicAsync();
 

@@ -1,0 +1,62 @@
+@using TenantCore.Shared.Dtos.UsageBilling
+@using TenantCore.Shared.Enums
+
+@* Per-operation totals for the loaded usage range: count, charged and value at live rates.
+   Rendered straight from the cached range — the item filter never re-queries (workspace rule 7).
+   Usage:
+     <UsageTotalsTable Totals="_usage.Totals" Currency="@(_summary?.Currency ?? "INR")" />
+*@
+
+<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:4px;">By operation</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:12px;">
+        “Charged” is what the clinic actually paid. “Value at live rates” also counts operations that were
+        free — subscription-covered or unpriced — so the two differ by design.
+    </div>
+
+    @if (Totals.Count == 0)
+    {
+        <AppEmptyState Icon="🧮" Title="No operations in this range"
+                       Message="Nothing was metered between these dates." />
+    }
+    else
+    {
+        <table class="opd-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;">Operation</th>
+                    <th style="text-align:right;">Count</th>
+                    <th style="text-align:right;">Charged</th>
+                    <th style="text-align:right;">Value at live rates</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Totals)
+                {
+                    <tr>
+                        <td>@Label(item.BillingItem)</td>
+                        <td style="text-align:right;">@item.Count.ToString("N0")</td>
+                        <td style="text-align:right;font-weight:700;">@Money(item.Charged)</td>
+                        <td style="text-align:right;">@Money(item.Notional)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<UsageItemTotalsDto> Totals { get; set; } = [];
+    [Parameter] public string Currency { get; set; } = "INR";
+
+    private string Money(decimal value)
+        => (Currency == "INR" ? "₹" : Currency + " ") + value.ToString("N2");
+
+    private static string Label(BillingItem item) => item switch
+    {
+        BillingItem.OpdRegistration => "OPD registration",
+        BillingItem.IpdAdmission => "IPD admission",
+        BillingItem.IpdDischarge => "IPD discharge",
+        _ => item.ToString()
+    };
+}

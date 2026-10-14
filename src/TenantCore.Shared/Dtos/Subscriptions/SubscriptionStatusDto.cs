@@ -17,6 +17,13 @@ public record SubscriptionStatusDto
     public int DaysRemaining { get; init; }
     public bool IsExpiringSoon { get; init; }
 
+    /// <summary>
+    /// True when the clinic is billed by usage (pay-as-you-go) rather than by subscription term.
+    /// PAYG clinics never have an active subscription — that is their normal state, not a lock-out.
+    /// UI code must check this before treating HasActiveSubscription = false as "clinic is locked".
+    /// </summary>
+    public bool IsPayAsYouGo { get; init; }
+
     /// <summary>True when an internal admin suspended the clinic. Overrides everything else in the UI.</summary>
     public bool IsSuspended { get; init; }
 

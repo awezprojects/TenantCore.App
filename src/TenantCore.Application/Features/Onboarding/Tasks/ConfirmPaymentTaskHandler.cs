@@ -103,7 +103,25 @@ public sealed class ConfirmPaymentTaskHandler(
 
             if (save) await requestRepository.SaveChangesAsync(ct);
         }
-        else if (payment.IsClinicLink)
+        else if (payment.Purpose == PaymentPurpose.WalletTopUp)
+        {
+            // A top-up is not a subscription — it credits the prepaid wallet instead of activating a
+            // term. This branch must sit before the activation one because IsClinicLink is
+            // deliberately wider than "carries a plan" (see SubscriptionPayment.IsPlanPayment).
+            await workflowEnqueuer.EnqueueAsync(
+                WorkflowTaskType.CreditWallet, $"credit-wallet:{payment.Id}", nameof(SubscriptionPayment), payment.Id, ct: ct);
+
+            if (save) await paymentRepository.SaveChangesAsync(ct);
+        }
+        else if (payment.Purpose == PaymentPurpose.RegistrationFee)
+        {
+            // Settling the one-time fee only marks it charged; it never activates a term.
+            await workflowEnqueuer.EnqueueAsync(
+                WorkflowTaskType.RecordRegistrationFee, $"record-registration-fee:{payment.Id}", nameof(SubscriptionPayment), payment.Id, ct: ct);
+
+            if (save) await paymentRepository.SaveChangesAsync(ct);
+        }
+        else if (payment.IsPlanPayment)
         {
             // Renewals and admin-assigned links both activate the same way — the term is queued
             // after the clinic's existing coverage by ActivateSubscriptionTaskHandler.

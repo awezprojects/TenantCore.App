@@ -1,0 +1,241 @@
+@page "/billing/usage/print"
+@layout PrintLayout
+@inject IUsageBillingApiClient UsageBillingApi
+@inject ClinicContextService ClinicContext
+@inject IJSRuntime JS
+@using System.Globalization
+@using TenantCore.Shared.Enums
+@using TenantCore.Shared.Dtos.UsageBilling
+
+<PageTitle>Metered usage report - CloudClinic</PageTitle>
+
+@* Reached from the Usage page's Print button (?from=&to=). This page does its own single fetch of the range it
+   was handed - it is a separate page load, so the Usage page never re-queries on print. *@
+
+<style>
+    .up-bg { background:#F1F5F9; min-height:100vh; padding:24px; }
+    .up-bar { max-width:960px; margin:0 auto 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .up-btn { padding:8px 16px; border-radius:8px; border:none; color:#fff; cursor:pointer; font-size:12px; font-weight:700; }
+    .up-sheet { background:#fff; max-width:960px; margin:0 auto; padding:34px 38px 46px; border-radius:12px;
+                box-shadow:0 4px 16px rgba(15,23,42,0.08); font-family:'Segoe UI',Arial,sans-serif; color:#0F172A; }
+    .up-title { font-size:20px; font-weight:800; letter-spacing:-0.4px; }
+    .up-sub { font-size:12px; color:#64748B; margin-top:2px; }
+    .up-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:22px 0; }
+    .up-cell { border:1px solid #E2E8F0; border-radius:10px; padding:12px 14px; }
+    .up-cell-label { font-size:10.5px; font-weight:800; color:#64748B; text-transform:uppercase; letter-spacing:0.5px; }
+    .up-cell-value { font-size:18px; font-weight:800; margin-top:4px; }
+    .up-section { font-size:13px; font-weight:800; color:#0F172A; margin:22px 0 8px; }
+    .up-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .up-table th { text-align:left; background:#F8FAFC; color:#475569; font-size:10.5px; text-transform:uppercase;
+                   letter-spacing:0.4px; padding:8px 10px; border-bottom:1.5px solid #E2E8F0; }
+    .up-table td { padding:7px 10px; border-bottom:1px solid #F1F5F9; }
+    .up-num { text-align:right; font-variant-numeric:tabular-nums; }
+    .up-note { font-size:11.5px; color:#475569; margin-top:8px; }
+    .up-foot { margin-top:26px; padding-top:12px; border-top:1px solid #E2E8F0; font-size:11px; color:#94A3B8; }
+
+    @@media print {
+        .no-print { display:none !important; }
+        .up-bg { background:#fff !important; padding:0 !important; min-height:unset; }
+        .up-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; padding:0 !important; }
+        body { background:#fff !important; margin:0 !important; padding:0 !important; }
+    }
+</style>
+
+<div class="up-bg">
+
+    <div class="up-bar no-print">
+        <button class="up-btn" style="background:#EF4444;"
+                @onclick='async () => await JS.InvokeVoidAsync("window.close")'>✕ Close</button>
+        <button class="up-btn" style="background:#1E3A5F;"
+                @onclick='async () => await JS.InvokeVoidAsync("window.print")'
+                disabled="@(_usage is null)">🖨️ Print</button>
+        <span style="font-size:12px;color:#475569;">@RangeText()</span>
+    </div>
+
+    <div class="up-sheet">
+        @if (_loading)
+        {
+            <div style="text-align:center;color:#64748B;font-size:13px;padding:30px 0;">Preparing the usage report…</div>
+        }
+        else if (_usage is null)
+        {
+            <div style="text-align:center;color:#B91C1C;font-size:13px;padding:30px 0;">
+                @(_error ?? "The usage report could not be loaded.")
+            </div>
+        }
+        else
+        {
+            var operations = _usage.Totals.Sum(t => t.Count);
+
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
+                        border-bottom:2px solid #0F172A;padding-bottom:14px;">
+                <div>
+                    <div class="up-title">@ClinicContext.SelectedApplicationName</div>
+                    <div class="up-sub">Metered usage report</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="up-sub">@RangeText()</div>
+                    <div class="up-sub">Generated @_generatedAt.ToString("dd MMM yyyy HH:mm")</div>
+                </div>
+            </div>
+
+            <div class="up-strip">
+                <div class="up-cell">
+                    <div class="up-cell-label">Charged in range</div>
+                    <div class="up-cell-value">@Money(_usage.TotalCharged)</div>
+                </div>
+                <div class="up-cell">
+                    <div class="up-cell-label">Value at live rates</div>
+                    <div class="up-cell-value">@Money(_usage.TotalNotional)</div>
+                </div>
+                <div class="up-cell">
+                    <div class="up-cell-label">Operations</div>
+                    <div class="up-cell-value">@operations.ToString("N0")</div>
+                </div>
+            </div>
+
+            <div class="up-section">By operation</div>
+            @if (_usage.Totals.Count == 0)
+            {
+                <div class="up-note">Nothing was metered between these dates.</div>
+            }
+            else
+            {
+                <table class="up-table">
+                    <thead>
+                        <tr>
+                            <th>Operation</th>
+                            <th class="up-num">Count</th>
+                            <th class="up-num">Charged</th>
+                            <th class="up-num">Value at live rates</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _usage.Totals)
+                        {
+                            <tr>
+                                <td>@ItemLabel(item.BillingItem)</td>
+                                <td class="up-num">@item.Count.ToString("N0")</td>
+                                <td class="up-num" style="font-weight:700;">@Money(item.Charged)</td>
+                                <td class="up-num">@Money(item.Notional)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <div class="up-section">Operations</div>
+            @if (_usage.Records.Count == 0)
+            {
+                <div class="up-note">No operation rows to list in this range.</div>
+            }
+            else
+            {
+                <table class="up-table">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Operation</th>
+                            <th class="up-num">Qty</th>
+                            <th class="up-num">Unit rate</th>
+                            <th class="up-num">Amount</th>
+                            <th>Paid by</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var record in _usage.Records)
+                        {
+                            <tr>
+                                <td>@record.ChargedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                <td>@ItemLabel(record.BillingItem)</td>
+                                <td class="up-num">@record.Quantity.ToString("N0")</td>
+                                <td class="up-num">@(record.UnitRate > 0m ? record.UnitRate.ToString("N2") : "—")</td>
+                                <td class="up-num" style="font-weight:700;">@record.Amount.ToString("N2")</td>
+                                <td>@(record.IsFree ? "Free" : "Wallet")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (_usage.IsCapped)
+                {
+                    <div class="up-note">
+                        More operations exist in this range than the newest-rows cap allows, so this list is partial.
+                        Every figure above covers the whole range.
+                    </div>
+                }
+            }
+
+            <div class="up-foot">
+                CloudClinic metered usage. Each operation points at an internal record id and carries no patient
+                detail. Amounts are in INR; "Wallet" means the amount was debited from the clinic wallet and
+                "Free" that it was covered by a subscription or an unpriced operation.
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>The widest window worth asking for — the server caps the rows anyway (mirrors the Usage page).</summary>
+    private static readonly TimeSpan MaxRange = TimeSpan.FromDays(366);
+
+    private ClinicUsageDto? _usage;
+    private DateTime _from = DateTime.Today.AddDays(-29);
+    private DateTime _to = DateTime.Today;
+    private DateTime _generatedAt = DateTime.Now;
+    private bool _loading;
+    private string? _error;
+
+    [SupplyParameterFromQuery] public string? From { get; set; }
+    [SupplyParameterFromQuery] public string? To { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (DateTime.TryParse(From, CultureInfo.InvariantCulture, DateTimeStyles.None, out var from)) _from = from.Date;
+        if (DateTime.TryParse(To, CultureInfo.InvariantCulture, DateTimeStyles.None, out var to)) _to = to.Date;
+
+        // Defensive: a hand-typed query string must not produce an empty or unbounded window.
+        if (_to < _from) (_from, _to) = (_to, _from);
+        if ((_to - _from) > MaxRange) _from = _to - MaxRange;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _generatedAt = DateTime.Now;
+
+        // Both ends inclusive: the end of the range is the last tick of its day, so "today" means all of today.
+        var response = await UsageBillingApi.GetUsageAsync(_from, _to.AddDays(1).AddTicks(-1));
+
+        if (response.Success)
+        {
+            _usage = response.Data;
+            _error = null;
+        }
+        else
+        {
+            _usage = null;
+            _error = response.Message;
+        }
+
+        _loading = false;
+    }
+
+    private string RangeText()
+        => _from.Date == _to.Date
+            ? _from.ToString("dd MMM yyyy")
+            : $"{_from:dd MMM yyyy} – {_to:dd MMM yyyy}";
+
+    private static string Money(decimal value) => "₹" + value.ToString("N2");
+
+    private static string ItemLabel(BillingItem item) => item switch
+    {
+        BillingItem.OpdRegistration => "OPD registration",
+        BillingItem.IpdAdmission => "IPD admission",
+        BillingItem.IpdDischarge => "IPD discharge",
+        BillingItem.OtSurgery => "OT surgery",
+        _ => item.ToString()
+    };
+}

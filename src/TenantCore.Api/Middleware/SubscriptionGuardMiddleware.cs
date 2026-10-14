@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Shared.Enums;
 using TenantCore.Shared.Errors;
 
 namespace TenantCore.Api.Middleware;
@@ -23,6 +24,10 @@ public class SubscriptionGuardMiddleware(RequestDelegate next, IConfiguration co
     private static readonly string[] ExemptPathPrefixes =
     [
         "/api/subscriptions",
+        // Phase 2 — same reasoning as /api/subscriptions: a pay-as-you-go clinic has no subscription
+        // and must be able to reach the wallet screen that tops it up, and a lapsed subscription
+        // clinic must still reach the plan screen that fixes it.
+        "/api/usage-billing",
         "/api/subscription-alert-settings",
         "/api/auth",
         "/api/clinic/dashboard",
@@ -62,6 +67,20 @@ public class SubscriptionGuardMiddleware(RequestDelegate next, IConfiguration co
         }
 
         if (!configuration.GetValue("Subscription:GuardEnabled", true))
+        {
+            await next(context);
+            return;
+        }
+
+        // A pay-as-you-go clinic has no subscription and never will — it is metered instead, so an
+        // absent term is its normal state rather than a lock-out. It must pass the guard, or it could
+        // not reach the wallet screen that tops it up. The mode comes from the same single no-tracking
+        // read the UI's mode badge uses, so the guard and the screen can never disagree.
+        //
+        // Note the ordering: this sits *after* the unconditional suspension check above and *after*
+        // the Subscription:GuardEnabled switch, so a suspended pay-as-you-go clinic is still blocked
+        // with 403 clinic_suspended, and a developer working with the guard off is unaffected.
+        if (await accountRepository.GetBillingModeAsync(applicationId, context.RequestAborted) == BillingMode.PayAsYouGo)
         {
             await next(context);
             return;

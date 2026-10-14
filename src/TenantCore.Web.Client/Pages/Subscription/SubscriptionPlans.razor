@@ -5,7 +5,9 @@
 @inject ClinicContextService ClinicContext
 @inject IToastService Toast
 @inject NavigationManager Nav
+@inject UsageBillingContextService UsageBillingContext
 @using TenantCore.Shared.Dtos.Subscriptions
+@using TenantCore.Shared.Dtos.UsageBilling
 @using TenantCore.Shared.Enums
 
 <PageTitle>Subscription - CloudClinic</PageTitle>
@@ -24,7 +26,25 @@
         </button>
     </div>
 
-    @if (SubscriptionContext.IsLocked)
+    @* Usage/Wallet/Billing tabs are PAYG-only — subscription clinics see Plan only. *@
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        <span style="padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;
+                     background:#1565C0;color:#fff;">⚡ Plan</span>
+        @if (UsageBillingContext.IsPayAsYouGo)
+        {
+            <a href="/billing/usage" style="padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;
+                                            background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                                            text-decoration:none;">📊 Usage</a>
+            <a href="/billing/wallet" style="padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;
+                                             background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                                             text-decoration:none;">💳 Wallet</a>
+            <a href="/billing" style="padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;
+                                      background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;
+                                      text-decoration:none;">🧾 Billing</a>
+        }
+    </div>
+
+    @if (SubscriptionContext.IsLocked && !UsageBillingContext.IsPayAsYouGo)
     {
         <div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:10px;padding:14px 18px;margin-bottom:20px;
                     display:flex;align-items:center;gap:10px;">
@@ -40,6 +60,90 @@
         <div style="display:flex;justify-content:center;padding:60px 0;">
             <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
         </div>
+    }
+    else if (UsageBillingContext.IsPayAsYouGo)
+    {
+        @* Pay-as-you-go clinics have no subscription plan — their access is governed by wallet balance. *@
+        var billing = UsageBillingContext.Summary;
+        <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:14px;padding:22px 24px;margin-bottom:22px;">
+            <div style="font-size:16px;font-weight:800;color:#1E293B;margin-bottom:4px;">💳 Pay as you go</div>
+            <div style="font-size:13px;color:#475569;margin-bottom:18px;">
+                This clinic is billed per operation. There is no subscription plan — operations are charged from the wallet balance.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px;">
+                <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;">
+                    <div style="font-size:10.5px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;">Wallet balance</div>
+                    <div style="font-size:22px;font-weight:800;color:@(billing?.WalletIsLow == true ? "#B45309" : "#166534");margin-top:4px;">
+                        ₹@((billing?.WalletBalance ?? 0m).ToString("N2"))
+                    </div>
+                    @if (billing?.WalletIsLow == true)
+                    {
+                        <div style="font-size:11px;color:#B45309;font-weight:600;margin-top:2px;">⚠ Balance is low</div>
+                    }
+                </div>
+                @if (billing?.Rates.Count > 0)
+                {
+                    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px 16px;">
+                        <div style="font-size:10.5px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Current rates</div>
+                        @foreach (var rate in billing.Rates)
+                        {
+                            <div style="font-size:12px;color:#334155;display:flex;justify-content:space-between;margin-bottom:3px;">
+                                <span>@RateLabel(rate.BillingItem)</span>
+                                <strong>₹@rate.Rate.ToString("N4")</strong>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <a href="/billing/wallet"
+                   style="padding:9px 18px;background:#1565C0;color:#fff;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;">
+                    💳 Top up wallet
+                </a>
+                <a href="/billing/usage"
+                   style="padding:9px 18px;background:#fff;color:#1565C0;border:1.5px solid #BFDBFE;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;">
+                    📊 View usage
+                </a>
+            </div>
+        </div>
+
+        @* Subscription history (may be empty for a pure PAYG clinic) *@
+        @if (_history.Count > 0)
+        {
+            <div style="margin-top:24px;">
+                <div style="font-size:14px;font-weight:800;color:#1E293B;margin-bottom:12px;">Subscription History</div>
+                <div class="opd-table-card">
+                    <table class="opd-table">
+                        <thead>
+                            <tr>
+                                <th>Plan</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Price paid</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var h in _history)
+                            {
+                                <tr>
+                                    <td>@h.PlanName</td>
+                                    <td>@h.StartDate.ToString("dd MMM yyyy")</td>
+                                    <td>@h.EndDate.ToString("dd MMM yyyy")</td>
+                                    <td>@h.Currency @h.PricePaid.ToString("N2")</td>
+                                    <td>
+                                        <span style="background:@SubscriptionStatusBg(h.Status);color:@SubscriptionStatusFg(h.Status);
+                                                     border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">
+                                            @h.Status
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
     }
     else
     {
@@ -260,6 +364,43 @@
                 </div>
             </div>
         }
+
+        @if (_history.Count > 0)
+        {
+            <div style="margin-top:32px;">
+                <div style="font-size:14px;font-weight:800;color:#1E293B;margin-bottom:12px;">Subscription History</div>
+                <div class="opd-table-card">
+                    <table class="opd-table">
+                        <thead>
+                            <tr>
+                                <th>Plan</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Price paid</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var h in _history)
+                            {
+                                <tr>
+                                    <td>@h.PlanName</td>
+                                    <td>@h.StartDate.ToString("dd MMM yyyy")</td>
+                                    <td>@h.EndDate.ToString("dd MMM yyyy")</td>
+                                    <td>@h.Currency @h.PricePaid.ToString("N2")</td>
+                                    <td>
+                                        <span style="background:@SubscriptionStatusBg(h.Status);color:@SubscriptionStatusFg(h.Status);
+                                                     border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">
+                                            @h.Status
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
     }
 </div>
 
@@ -290,7 +431,14 @@
     </div>
 }
 
+<InsufficientBalanceDialog @bind-Visible="_insufficientBalance"
+                          Balance="UsageBillingContext.Summary?.WalletBalance"
+                          Currency="@(UsageBillingContext.Summary?.Currency ?? "INR")" />
+
 @code {
+    /// <summary>Set when the API refused the call with 403 insufficient_wallet_balance.</summary>
+    private bool _insufficientBalance;
+
     private bool _loading = true;
     private bool _subscribing;
     private bool _checkingPayment;
@@ -302,6 +450,7 @@
     private Guid? _creatingLinkForPlanId;
     private List<SubscriptionPlanDto> _plans = [];
     private List<SubscriptionPaymentDto> _payments = [];
+    private List<SubscriptionHistoryItemDto> _history = [];
     private SubscriptionPaymentDto? _pendingPayment;
     private SubscriptionPlanDto? _confirmPlan;
 
@@ -319,9 +468,13 @@
     {
         _loading = true;
 
+        if (!UsageBillingContext.IsLoaded)
+            await UsageBillingContext.RefreshAsync();
+
         var plansTask = SubscriptionApi.GetPlansAsync();
         var paymentsTask = SubscriptionApi.GetPaymentsAsync();
-        await Task.WhenAll(plansTask, paymentsTask);
+        var historyTask = SubscriptionApi.GetHistoryAsync();
+        await Task.WhenAll(plansTask, paymentsTask, historyTask);
 
         var plansResponse = await plansTask;
         if (plansResponse.Success && plansResponse.Data is not null)
@@ -338,6 +491,10 @@
                 .OrderByDescending(p => p.CreatedAt)
                 .FirstOrDefault();
         }
+
+        var historyResponse = await historyTask;
+        if (historyResponse.Success && historyResponse.Data is not null)
+            _history = historyResponse.Data.OrderByDescending(h => h.StartDate).ToList();
 
         _loading = false;
     }
@@ -402,6 +559,12 @@
             await SubscriptionContext.RefreshAsync();
             Nav.NavigateTo("/dashboard");
         }
+        else if (response.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
+        {
+            // Refused for money, not for permission: refresh the shared billing value and explain it.
+            await UsageBillingContext.RefreshAsync();
+            _insufficientBalance = true;
+        }
         else
         {
             Toast.ShowError(response.Message ?? "Could not activate the plan. Please try again.");
@@ -422,6 +585,11 @@
             _switchingPlan = false;
             await LoadAsync();
         }
+        else if (response.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
+        {
+            await UsageBillingContext.RefreshAsync();
+            _insufficientBalance = true;
+        }
         else
         {
             Toast.ShowError(response.Message ?? "Could not create a payment link. Please try again.");
@@ -429,6 +597,15 @@
 
         _creatingLinkForPlanId = null;
     }
+
+    private static string RateLabel(BillingItem item) => item switch
+    {
+        BillingItem.OpdRegistration => "OPD registration",
+        BillingItem.IpdAdmission => "IPD admission",
+        BillingItem.IpdDischarge => "IPD discharge",
+        BillingItem.OtSurgery => "OT surgery",
+        _ => item.ToString()
+    };
 
     private static string SourceLabel(SubscriptionPaymentDto payment) => payment.Purpose switch
     {
@@ -450,6 +627,22 @@
         SubscriptionPaymentStatus.Paid => "#166534",
         SubscriptionPaymentStatus.Expired or SubscriptionPaymentStatus.Cancelled => "#991B1B",
         SubscriptionPaymentStatus.LinkCreated => "#92400E",
+        _ => "#475569"
+    };
+
+    private static string SubscriptionStatusBg(SubscriptionStatus status) => status switch
+    {
+        SubscriptionStatus.Active => "#DCFCE7",
+        SubscriptionStatus.Expired => "#FEE2E2",
+        SubscriptionStatus.Cancelled => "#FEE2E2",
+        _ => "#F1F5F9"
+    };
+
+    private static string SubscriptionStatusFg(SubscriptionStatus status) => status switch
+    {
+        SubscriptionStatus.Active => "#166534",
+        SubscriptionStatus.Expired => "#991B1B",
+        SubscriptionStatus.Cancelled => "#991B1B",
         _ => "#475569"
     };
 }

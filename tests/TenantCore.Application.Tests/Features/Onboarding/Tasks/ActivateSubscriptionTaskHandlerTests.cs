@@ -1,4 +1,5 @@
 using FluentAssertions;
+using MediatR;
 using Moq;
 using TenantCore.Application.Common.Workflow;
 using TenantCore.Application.Features.Onboarding.Tasks;
@@ -27,8 +28,10 @@ public class ActivateSubscriptionTaskHandlerTests
         _paymentRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
     }
 
+    private readonly Mock<ISender> _sender = new();
+
     private ActivateSubscriptionTaskHandler CreateHandler() =>
-        new(_requestRepository.Object, _paymentRepository.Object, _planRepository.Object, _subscriptionRepository.Object, _workflowEnqueuer.Object);
+        new(_requestRepository.Object, _paymentRepository.Object, _planRepository.Object, _subscriptionRepository.Object, _workflowEnqueuer.Object, _sender.Object);
 
     private static SubscriptionPlan CreatePlan(bool isTrial = false, decimal price = 999m, int durationDays = 30) =>
         SubscriptionPlan.CreateForSeed(Guid.NewGuid(), isTrial ? SubscriptionPlanCode.Trial : SubscriptionPlanCode.Monthly,

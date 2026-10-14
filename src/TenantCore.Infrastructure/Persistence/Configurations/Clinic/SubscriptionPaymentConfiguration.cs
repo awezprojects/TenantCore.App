@@ -19,9 +19,11 @@ internal sealed class SubscriptionPaymentConfiguration : IEntityTypeConfiguratio
         builder.Property(p => p.OnboardingRequestId);
         builder.Property(p => p.ApplicationId);
 
-        builder.Property(p => p.SubscriptionPlanId).IsRequired();
-        builder.Property(p => p.PlanCode).IsRequired().HasConversion<int>();
-        builder.Property(p => p.PlanName).IsRequired().HasMaxLength(100);
+        // Phase 2 — a wallet top-up and a registration fee have no plan at all, so these three are
+        // nullable. Every reader must null-guard; the Admin portal mirrors this.
+        builder.Property(p => p.SubscriptionPlanId);
+        builder.Property(p => p.PlanCode).HasConversion<int>();
+        builder.Property(p => p.PlanName).HasMaxLength(100);
 
         builder.Property(p => p.Amount).IsRequired().HasPrecision(18, 2);
         builder.Property(p => p.AmountInMinorUnits).IsRequired();

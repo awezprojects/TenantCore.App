@@ -16,6 +16,7 @@ namespace TenantCore.Application.Tests.Features.PlatformAdmin.Commands;
 public class GrantClinicSubscriptionHandlerTests
 {
     private readonly Mock<ISubscriptionPlanRepository> _planRepository = new();
+    private readonly Mock<IClinicAccountRepository> _accountRepository = new();
     private readonly Mock<IClinicSubscriptionRepository> _subscriptionRepository = new();
     private readonly Mock<IWorkflowEnqueuer> _workflowEnqueuer = new();
     private readonly Guid _applicationId = Guid.NewGuid();
@@ -29,11 +30,13 @@ public class GrantClinicSubscriptionHandlerTests
                 WorkflowTask.Enqueue(t, k, at, aid, p));
 
         _subscriptionRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        _accountRepository.Setup(r => r.GetBillingModeAsync(_applicationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BillingMode.Subscription);
     }
 
     private GrantClinicSubscriptionHandler CreateHandler()
-        => new(_planRepository.Object, _subscriptionRepository.Object, _workflowEnqueuer.Object,
-               Mock.Of<ILogger<GrantClinicSubscriptionHandler>>());
+        => new(_planRepository.Object, _accountRepository.Object, _subscriptionRepository.Object,
+               _workflowEnqueuer.Object, Mock.Of<ILogger<GrantClinicSubscriptionHandler>>());
 
     private static SubscriptionPlan Plan(int durationDays = 30, bool isActive = true)
     {

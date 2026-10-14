@@ -50,6 +50,15 @@ internal sealed class ClinicOnboardingRequestConfiguration : IEntityTypeConfigur
         builder.Property(r => r.ReviewNote).HasMaxLength(1000);
         builder.Property(r => r.RejectionReason).HasMaxLength(1000);
 
+        builder.Property(r => r.ApprovalBillingMode).HasConversion<int?>();
+        builder.Property(r => r.ApprovalRegistrationFee).HasPrecision(18, 4);
+        builder.Property(r => r.ApprovalFreeTestDays);
+        builder.Property(r => r.ApprovalOpdRate).HasPrecision(18, 4);
+        builder.Property(r => r.ApprovalIpdAdmissionRate).HasPrecision(18, 4);
+        builder.Property(r => r.ApprovalOtSurgeryRate).HasPrecision(18, 4);
+        builder.Property(r => r.ApprovalIpdDischargeRate).HasPrecision(18, 4);
+        builder.Property(r => r.ApprovalInitialWalletCredit).HasPrecision(18, 2);
+
         builder.Property(r => r.CurrentPaymentId);
         builder.Property(r => r.ProvisionedApplicationId);
         builder.Property(r => r.ClinicSubscriptionId);

@@ -36,4 +36,15 @@ public class SubscriptionPaymentRepository(ClinicDbContext dbContext)
 
     public async Task<SubscriptionPayment?> GetByIdForClinicAsync(Guid id, Guid applicationId, CancellationToken ct = default)
         => await DbSet.FirstOrDefaultAsync(p => p.Id == id && p.ApplicationId == applicationId, ct);
+
+    public async Task<SubscriptionPayment?> GetLatestRegistrationFeePaymentAsync(Guid applicationId, CancellationToken ct = default)
+        => await DbSet
+            .AsNoTracking()
+            .Where(p => p.ApplicationId == applicationId
+                     && p.Purpose == PaymentPurpose.RegistrationFee
+                     && (p.Status == SubscriptionPaymentStatus.Pending
+                      || p.Status == SubscriptionPaymentStatus.LinkCreated
+                      || p.Status == SubscriptionPaymentStatus.Expired))
+            .OrderByDescending(p => p.CreatedAt)
+            .FirstOrDefaultAsync(ct);
 }

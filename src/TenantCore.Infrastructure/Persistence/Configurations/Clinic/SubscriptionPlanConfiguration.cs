@@ -39,6 +39,12 @@ internal sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<S
         builder.Property(p => p.IsActive).IsRequired().HasDefaultValue(true);
         builder.Property(p => p.IsPublic).IsRequired().HasDefaultValue(true);
 
+        // Phase 2 — catalogue defaults for the one-time registration fee and the package-granted
+        // free trial length. Both default to "no fee / no override" so the existing four seeded rows
+        // are correct without a data update: this plan adds no seeding of any kind.
+        builder.Property(p => p.RegistrationFee).IsRequired().HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Property(p => p.FreeTestDays);
+
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.CreatedBy).HasMaxLength(256);
         builder.Property(p => p.UpdatedBy).HasMaxLength(256);

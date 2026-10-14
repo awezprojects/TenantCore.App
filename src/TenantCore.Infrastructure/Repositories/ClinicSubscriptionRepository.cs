@@ -74,4 +74,13 @@ public class ClinicSubscriptionRepository(ClinicDbContext dbContext)
 
     public async Task<ClinicSubscription?> GetByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken ct = default)
         => await DbSet.FirstOrDefaultAsync(s => s.OnboardingRequestId == onboardingRequestId, ct);
+
+    public async Task<bool> AnyActiveOrUpcomingForPlanAsync(Guid planId, CancellationToken ct = default)
+    {
+        var utcNow = DateTime.UtcNow;
+        return await DbSet.AsNoTracking()
+            .AnyAsync(s => s.SubscriptionPlanId == planId
+                        && s.Status == SubscriptionStatus.Active
+                        && s.EndDate >= utcNow, ct);
+    }
 }

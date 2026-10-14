@@ -11,6 +11,7 @@
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject FeatureFlagsContextService FeatureFlagsContext
+@inject UsageBillingContextService UsageBillingContext
 @inject IToastService Toast
 @inject NavigationManager Navigation
 @using TenantCore.Shared.Enums
@@ -584,7 +585,13 @@
     </div>
 }
 
+<InsufficientBalanceDialog @bind-Visible="_insufficientBalance"
+                          Balance="UsageBillingContext.Summary?.WalletBalance"
+                          Currency="@(UsageBillingContext.Summary?.Currency ?? "INR")" />
+
 @code {
+    /// <summary>Set when the API refused a create with 403 insufficient_wallet_balance.</summary>
+    private bool _insufficientBalance;
     private bool _deleteDialogOpen;
     private OpdRegistrationDto? _deleteTarget;
 
@@ -1100,6 +1107,13 @@
             Toast.ShowSuccess($"OPD registration {response.Data?.RegistrationNumber} created.");
             _newDialogVisible = false;
             await ReloadAll();
+        }
+        else if (response.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
+        {
+            // Pay-as-you-go clinic with an empty wallet: nothing was created and nothing was charged, so
+            // refresh the shared billing value and show the way out instead of a bare error toast.
+            await UsageBillingContext.RefreshAsync();
+            _insufficientBalance = true;
         }
         else if (response.Message?.Contains("counter session", StringComparison.OrdinalIgnoreCase) == true)
             Toast.ShowError(response.Message, "Open counter session", "/counter-session");

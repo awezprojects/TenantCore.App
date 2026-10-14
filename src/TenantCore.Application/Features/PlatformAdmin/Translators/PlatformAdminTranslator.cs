@@ -26,7 +26,9 @@ public static class PlatformAdminTranslator
         request.Price,
         request.IsPopular,
         request.IsPublic,
-        request.DisplayOrder);
+        request.DisplayOrder,
+        request.RegistrationFee,
+        request.FreeTestDays);
 
     /// <summary>Null for a blank reason, so an "unchanged amount" link stores no reason at all.</summary>
     public static string? NormalizeOptionalText(string? value)

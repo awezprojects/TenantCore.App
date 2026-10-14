@@ -13,9 +13,13 @@ public class SubscriptionPayment : AuditableEntity
     public Guid? OnboardingRequestId { get; private set; }
     public Guid? ApplicationId { get; private set; }
 
-    public Guid SubscriptionPlanId { get; private set; }
-    public SubscriptionPlanCode PlanCode { get; private set; }
-    public string PlanName { get; private set; } = string.Empty;
+    /// <summary>Null for a wallet top-up or a registration fee — those purposes carry no plan at all.</summary>
+    public Guid? SubscriptionPlanId { get; private set; }
+
+    public SubscriptionPlanCode? PlanCode { get; private set; }
+
+    /// <summary>Plan name snapshot. Null whenever <see cref="IsPlanPayment"/> is false.</summary>
+    public string? PlanName { get; private set; }
 
     public decimal Amount { get; private set; }
     public long AmountInMinorUnits { get; private set; }
@@ -147,6 +151,55 @@ public class SubscriptionPayment : AuditableEntity
 
     public static long ToMinorUnits(decimal amount) => (long)Math.Round(amount * 100m, MidpointRounding.AwayFromZero);
 
+    /// <summary>
+    /// A wallet top-up link requested by a Clinic Admin or sent by an internal admin. Deliberately
+    /// plan-free — there is no subscription behind a top-up, which is why the three plan columns are
+    /// nullable. Settling it credits the wallet; it never activates a term.
+    /// </summary>
+    public static SubscriptionPayment CreateForWalletTopUp(
+        Guid applicationId, decimal amount, string currency,
+        string payerName, string payerEmail, string? payerPhone, string clinicName,
+        string? adminEmail = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            Purpose = PaymentPurpose.WalletTopUp,
+            ApplicationId = applicationId,
+            Amount = amount,
+            AmountInMinorUnits = ToMinorUnits(amount),
+            Currency = currency,
+            PlanListPrice = amount,
+            PayerName = payerName,
+            PayerEmail = payerEmail,
+            PayerPhone = payerPhone,
+            ClinicName = clinicName,
+            InitiatedByAdminEmail = adminEmail,
+            Status = SubscriptionPaymentStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+
+    /// <summary>
+    /// The one-time registration fee's link. Plan-free and clinic-initiated; settling it marks the
+    /// clinic's fee charged and nothing else. The fee is charged once, ever, per clinic.
+    /// </summary>
+    public static SubscriptionPayment CreateForRegistrationFee(
+        Guid applicationId, decimal amount, string currency,
+        string payerName, string payerEmail, string? payerPhone, string clinicName) => new()
+        {
+            Id = Guid.NewGuid(),
+            Purpose = PaymentPurpose.RegistrationFee,
+            ApplicationId = applicationId,
+            Amount = amount,
+            AmountInMinorUnits = ToMinorUnits(amount),
+            Currency = currency,
+            PlanListPrice = amount,
+            PayerName = payerName,
+            PayerEmail = payerEmail,
+            PayerPhone = payerPhone,
+            ClinicName = clinicName,
+            Status = SubscriptionPaymentStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+
     public void SetLink(string gatewayPaymentLinkId, string paymentLinkUrl, DateTime? expiresAt)
     {
         GatewayPaymentLinkId = gatewayPaymentLinkId;
@@ -221,8 +274,17 @@ public class SubscriptionPayment : AuditableEntity
     /// <summary>Records a "check payment now" attempt for throttling. Not an audited state change.</summary>
     public void RecordCheck() => LastCheckAt = DateTime.UtcNow;
 
-    /// <summary>Renewal and admin-assigned links share one rule: at most one open at a time per clinic.</summary>
-    public bool IsClinicLink => Purpose is PaymentPurpose.Renewal or PaymentPurpose.AdminAssigned;
+    /// <summary>
+    /// Renewal, admin-assigned, wallet top-up and registration-fee links all share one rule: at most
+    /// one open at a time per clinic. Widening this is what applies Phase 1's supersede rules to the
+    /// two Phase-2 purposes, unchanged.
+    /// </summary>
+    public bool IsClinicLink => Purpose is PaymentPurpose.Renewal or PaymentPurpose.AdminAssigned
+        or PaymentPurpose.WalletTopUp or PaymentPurpose.RegistrationFee;
+
+    /// <summary>True for the three purposes that carry a plan; false for a wallet top-up or a fee.</summary>
+    public bool IsPlanPayment => Purpose is PaymentPurpose.Onboarding or PaymentPurpose.Renewal
+        or PaymentPurpose.AdminAssigned;
 
     /// <summary>Still awaiting payment — a link may exist or be about to be created.</summary>
     public bool IsOpen => Status is SubscriptionPaymentStatus.Pending or SubscriptionPaymentStatus.LinkCreated;

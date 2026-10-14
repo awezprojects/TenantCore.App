@@ -41,7 +41,15 @@ public sealed class CreatePaymentLinkTaskHandler(
         var expiryDays = configuration.GetValue("Razorpay:PaymentLinkExpiryDays", 7);
         var callbackUrl = configuration["Razorpay:CallbackUrl"] ?? string.Empty;
         var expireBy = DateTime.UtcNow.AddDays(expiryDays);
-        var description = $"{payment.PlanName} subscription";
+        // Phase 2 made the plan columns nullable: a wallet top-up and a registration fee carry no
+        // plan at all, so the Razorpay description is derived from the purpose. Reading PlanName
+        // here would render a top-up as " subscription". Plan: "<Clinic> — wallet top-up ₹X".
+        var description = payment.Purpose switch
+        {
+            PaymentPurpose.WalletTopUp => $"{payment.ClinicName ?? "Clinic"} — wallet top-up ₹{payment.Amount:N2}",
+            PaymentPurpose.RegistrationFee => $"{payment.ClinicName ?? "Clinic"} — registration fee ₹{payment.Amount:N2}",
+            _ => $"{payment.PlanName} subscription"
+        };
 
         var (result, link) = await paymentGateway.CreatePaymentLinkAsync(
             payment.Id.ToString("N"), payment.AmountInMinorUnits, payment.Currency, description,
@@ -93,7 +101,7 @@ public sealed class CreatePaymentLinkTaskHandler(
             OnboardingEmailTemplates.BuildPayload(emailTemplate, payment.PayerEmail, new
             {
                 ClinicName = clinicNameForEmail,
-                PlanName = payment.PlanName,
+                PlanName = payment.PlanName ?? PurposeLabel(payment.Purpose),
                 Amount = payment.Amount.ToString("N2"),
                 Currency = payment.Currency,
                 PaymentLinkUrl = payment.PaymentLinkUrl,
@@ -103,4 +111,16 @@ public sealed class CreatePaymentLinkTaskHandler(
 
         await paymentRepository.SaveChangesAsync(ct);
     }
+
+    /// <summary>
+    /// A human name for the two planless Phase-2 purposes, so the payment-link payload never renders
+    /// a blank where a plan name would otherwise be. Plan-carrying purposes keep their snapshotted
+    /// plan name; "Subscription" is only a last-resort fallback.
+    /// </summary>
+    private static string PurposeLabel(PaymentPurpose purpose) => purpose switch
+    {
+        PaymentPurpose.WalletTopUp => "Wallet top-up",
+        PaymentPurpose.RegistrationFee => "Registration fee",
+        _ => "Subscription"
+    };
 }

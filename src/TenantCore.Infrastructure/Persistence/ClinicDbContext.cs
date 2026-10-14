@@ -51,6 +51,10 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<SubscriptionPayment> SubscriptionPayments => Set<SubscriptionPayment>();
     public DbSet<WorkflowTask> WorkflowTasks => Set<WorkflowTask>();
     public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
+    public DbSet<ClinicWallet> ClinicWallets => Set<ClinicWallet>();
+    public DbSet<ClinicWalletTransaction> ClinicWalletTransactions => Set<ClinicWalletTransaction>();
+    public DbSet<ClinicUsageRate> ClinicUsageRates => Set<ClinicUsageRate>();
+    public DbSet<ClinicUsageRecord> ClinicUsageRecords => Set<ClinicUsageRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -57,21 +57,26 @@ public sealed class ProvisionClinicTaskHandler(
     }
 
     /// <summary>
-    /// For a trial grant, the aggregate is the request itself. For a paid plan, this key matches
-    /// exactly what OnboardingSelfHealer already enqueues ($"activate-subscription:{paymentId}"),
-    /// since request.CurrentPaymentId is that same confirmed payment's id — a natural convergence
-    /// point, not a coincidence, so either handler enqueuing first is fine.
+    /// Returns the workflow dedup key for the ActivateSubscription task.
+    /// Trial grants and direct-provisioned clinics (Subscription / PAYG approved without an upfront
+    /// payment) both use the request as the aggregate; paid-plan clinics use the payment.
     /// </summary>
-    private static string ActivationKey(ClinicOnboardingRequest request) =>
-        request.IsTrialGrant ? $"activate-subscription:trial:{request.Id}" : $"activate-subscription:{request.CurrentPaymentId}";
+    private static string ActivationKey(ClinicOnboardingRequest request)
+    {
+        if (request.IsTrialGrant)        return $"activate-subscription:trial:{request.Id}";
+        if (!request.CurrentPaymentId.HasValue) return $"activate-subscription:direct:{request.Id}";
+        return $"activate-subscription:{request.CurrentPaymentId}";
+    }
 
     /// <summary>
-    /// Must match the aggregate ActivateSubscriptionTaskHandler dispatches on: the request itself
-    /// for a trial grant, or the confirmed SubscriptionPayment for a paid plan. Passing the wrong
-    /// one here previously routed every paid activation into the trial code path.
+    /// Must match the aggregate ActivateSubscriptionTaskHandler dispatches on. The handler routes
+    /// on AggregateType: ClinicOnboardingRequest → HandleTrialGrantAsync (covers trial grants, PAYG
+    /// and direct-provisioned subscriptions); SubscriptionPayment → HandlePaymentBasedAsync.
     /// </summary>
-    private static (string AggregateType, Guid AggregateId) ActivationAggregate(ClinicOnboardingRequest request) =>
-        request.IsTrialGrant
-            ? (nameof(ClinicOnboardingRequest), request.Id)
-            : (nameof(SubscriptionPayment), request.CurrentPaymentId!.Value);
+    private static (string AggregateType, Guid AggregateId) ActivationAggregate(ClinicOnboardingRequest request)
+    {
+        if (request.IsTrialGrant || !request.CurrentPaymentId.HasValue)
+            return (nameof(ClinicOnboardingRequest), request.Id);
+        return (nameof(SubscriptionPayment), request.CurrentPaymentId!.Value);
+    }
 }

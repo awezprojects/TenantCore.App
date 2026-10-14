@@ -1,0 +1,50 @@
+@using TenantCore.Shared.Dtos.UsageBilling
+
+@* Daily charged buckets as inline SVG — no chart library, no extra request.
+   Drawn from the already-loaded usage range, so a date-range change is the only thing that
+   ever refetches it (workspace rule 7).
+   Usage:
+     <UsageTrendChart Series="_usage.Series" Currency="@(_summary?.Currency ?? "INR")" />
+*@
+
+@if (Series.Count > 0)
+{
+    var max = Series.Max(p => p.Charged);
+    var scale = max > 0m ? max : 1m;
+
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:4px;">Charged per day</div>
+        <div style="font-size:12px;color:#64748B;margin-bottom:14px;">Drawn from the cached range — no extra request.</div>
+
+        <svg viewBox="0 0 720 180" preserveAspectRatio="none" style="width:100%;height:180px;">
+            <line x1="0" y1="150" x2="720" y2="150" stroke="#E2E8F0" stroke-width="1" />
+            @for (var i = 0; i < Series.Count; i++)
+            {
+                var point = Series[i];
+                var height = (double)(point.Charged / scale) * 130.0;
+                var left = 8.0 + (i * 704.0 / Series.Count);
+
+                <rect x="@left.ToString("F2")" y="@((150 - height).ToString("F2"))"
+                      width="@((704.0 / Series.Count - 2).ToString("F2"))" height="@height.ToString("F2")"
+                      fill="@(point.Charged > 0m ? "#2563EB" : "#CBD5E1")" rx="2">
+                    <title>@point.Date.ToString("dd MMM yyyy") — @Money(point.Charged) (@point.Count ops)</title>
+                </rect>
+            }
+        </svg>
+
+        @* Buckets are UTC days — the same boundary the rows were metered on — so the labels are
+           deliberately not shifted to local time. *@
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#94A3B8;margin-top:6px;">
+            <span>@Series.First().Date.ToString("dd MMM") (UTC)</span>
+            <span>@Series.Last().Date.ToString("dd MMM") (UTC)</span>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<UsageSeriesPointDto> Series { get; set; } = [];
+    [Parameter] public string Currency { get; set; } = "INR";
+
+    private string Money(decimal value)
+        => (Currency == "INR" ? "₹" : Currency + " ") + value.ToString("N2");
+}

@@ -30,6 +30,20 @@ internal sealed class PlanDetailsValidator : AbstractValidator<PlanDetails>
             .WithMessage("The price can have at most 2 decimal places.");
 
         RuleFor(x => x.DisplayOrder).InclusiveBetween(0, 999);
+
+        RuleFor(x => x.RegistrationFee)
+            .GreaterThanOrEqualTo(0m)
+            .When(x => x.RegistrationFee.HasValue)
+            .WithMessage("The registration fee cannot be negative.");
+
+        RuleFor(x => x.RegistrationFee)
+            .Must(f => f is null || decimal.Round(f.Value, 2) == f.Value)
+            .WithMessage("The registration fee can have at most 2 decimal places.");
+
+        RuleFor(x => x.FreeTestDays)
+            .InclusiveBetween(30, 90)
+            .When(x => x.FreeTestDays.HasValue)
+            .WithMessage("Free test days must be between 30 and 90.");
     }
 }
 
@@ -57,6 +71,16 @@ public sealed class UpdateSubscriptionPlanCommandValidator : AbstractValidator<U
 public sealed class SetSubscriptionPlanActiveCommandValidator : AbstractValidator<SetSubscriptionPlanActiveCommand>
 {
     public SetSubscriptionPlanActiveCommandValidator()
+    {
+        RuleFor(x => x.PlanId).NotEmpty();
+        RuleFor(x => x.AdminUserId).AdminUserIdRules();
+        RuleFor(x => x.AdminEmail).AdminEmailRules();
+    }
+}
+
+public sealed class DeleteSubscriptionPlanCommandValidator : AbstractValidator<DeleteSubscriptionPlanCommand>
+{
+    public DeleteSubscriptionPlanCommandValidator()
     {
         RuleFor(x => x.PlanId).NotEmpty();
         RuleFor(x => x.AdminUserId).AdminUserIdRules();

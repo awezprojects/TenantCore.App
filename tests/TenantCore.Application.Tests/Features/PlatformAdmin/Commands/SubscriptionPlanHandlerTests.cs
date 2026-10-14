@@ -31,8 +31,8 @@ public class SubscriptionPlanHandlerTests
     private SetSubscriptionPlanActiveHandler ActiveHandler()
         => new(_planRepository.Object);
 
-    private static PlanDetails Details(string name = "Clinic Pro", decimal price = 4999m)
-        => new(name, "desc", 90, price, IsPopular: false, IsPublic: true, DisplayOrder: 5);
+    private static PlanDetails Details(string name = "Clinic Pro", decimal price = 4999m, decimal? fee = null, int? freeTestDays = null)
+        => new(name, "desc", 90, price, IsPopular: false, IsPublic: true, DisplayOrder: 5, RegistrationFee: fee, FreeTestDays: freeTestDays);
 
     [Fact]
     public async Task Handle_Create_ValidPlan_AddsCustomPlan()
@@ -75,6 +75,38 @@ public class SubscriptionPlanHandlerTests
     }
 
     [Fact]
+    public async Task Handle_Create_CarriesTheRegistrationFeeAndFreeTestDays()
+    {
+        _planRepository.Setup(r => r.NameExistsAsync("Clinic Pro", null, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        SubscriptionPlan? added = null;
+        _planRepository.Setup(r => r.AddAsync(It.IsAny<SubscriptionPlan>(), It.IsAny<CancellationToken>()))
+            .Callback<SubscriptionPlan, CancellationToken>((p, _) => added = p);
+
+        await CreateHandler().Handle(
+            new CreateSubscriptionPlanCommand(Details(fee: 500m, freeTestDays: 45), Guid.NewGuid(), "admin@example.test"),
+            CancellationToken.None);
+
+        added!.RegistrationFee.Should().Be(500m);
+        added.FreeTestDays.Should().Be(45);
+    }
+
+    [Fact]
+    public async Task Handle_Update_CarriesTheRegistrationFeeAndFreeTestDays()
+    {
+        var plan = SubscriptionPlan.CreateCustom("Clinic Pro", "desc", 90, 4999m, isPopular: false, displayOrder: 5, isPublic: true);
+        _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
+        _planRepository.Setup(r => r.NameExistsAsync(It.IsAny<string>(), plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        await UpdateHandler().Handle(
+            new UpdateSubscriptionPlanCommand(plan.Id, Details(fee: 750m, freeTestDays: 60), Guid.NewGuid(), "admin@example.test"),
+            CancellationToken.None);
+
+        plan.RegistrationFee.Should().Be(750m);
+        plan.FreeTestDays.Should().Be(60);
+    }
+
+    [Fact]
     public async Task Handle_Update_KeepsCodeAndAppliesChanges()
     {
         var plan = SubscriptionPlan.CreateCustom("Old", "old", 30, 999m, false, 1, true);
@@ -114,7 +146,7 @@ public class SubscriptionPlanHandlerTests
 
         await UpdateHandler().Handle(
             new UpdateSubscriptionPlanCommand(trial.Id,
-                new PlanDetails("Free Trial", "d", 21, 0m, false, true, 1), Guid.NewGuid(), "admin@example.test"),
+                new PlanDetails("Free Trial", "d", 21, 0m, false, true, 1, null, null), Guid.NewGuid(), "admin@example.test"),
             CancellationToken.None);
 
         trial.DurationDays.Should().Be(21);
@@ -153,5 +185,52 @@ public class SubscriptionPlanHandlerTests
 
         activate.ActionName.Should().Be("Subscription Plan Activated");
         deactivate.ActionName.Should().Be("Subscription Plan Deactivated");
+    }
+
+    // --- DeleteSubscriptionPlanHandler ---
+
+    private DeleteSubscriptionPlanHandler DeleteHandler()
+        => new(_planRepository.Object, _subscriptionRepository.Object, Mock.Of<ILogger<DeleteSubscriptionPlanHandler>>());
+
+    private readonly Mock<IClinicSubscriptionRepository> _subscriptionRepository = new();
+
+    [Fact]
+    public async Task Handle_Delete_NoActiveSubs_DeletesAndLogs()
+    {
+        var plan = SubscriptionPlan.CreateCustom("Old Plan", "d", 30, 999m, false, 1, true);
+        _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
+        _subscriptionRepository.Setup(r => r.AnyActiveOrUpcomingForPlanAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+
+        await DeleteHandler().Handle(
+            new DeleteSubscriptionPlanCommand(plan.Id, Guid.NewGuid(), "admin@example.test"), CancellationToken.None);
+
+        _planRepository.Verify(r => r.Delete(plan), Times.Once);
+        _planRepository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Handle_Delete_ActiveSubExists_Throws()
+    {
+        var plan = SubscriptionPlan.CreateCustom("Active Plan", "d", 30, 999m, false, 1, true);
+        _planRepository.Setup(r => r.GetByIdAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(plan);
+        _subscriptionRepository.Setup(r => r.AnyActiveOrUpcomingForPlanAsync(plan.Id, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+
+        var act = async () => await DeleteHandler().Handle(
+            new DeleteSubscriptionPlanCommand(plan.Id, Guid.NewGuid(), "admin@example.test"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*active or upcoming*");
+        _planRepository.Verify(r => r.Delete(It.IsAny<SubscriptionPlan>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Delete_MissingPlan_ThrowsNotFoundException()
+    {
+        _planRepository.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((SubscriptionPlan?)null);
+
+        var act = async () => await DeleteHandler().Handle(
+            new DeleteSubscriptionPlanCommand(Guid.NewGuid(), Guid.NewGuid(), "admin@example.test"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<NotFoundException>();
     }
 }

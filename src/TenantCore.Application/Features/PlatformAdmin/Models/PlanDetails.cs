@@ -8,4 +8,6 @@ public sealed record PlanDetails(
     decimal Price,
     bool IsPopular,
     bool IsPublic,
-    int DisplayOrder);
+    int DisplayOrder,
+    decimal? RegistrationFee,
+    int? FreeTestDays);

@@ -7,6 +7,7 @@ using TenantCore.Domain.Entities;
 using TenantCore.Domain.Enums;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Features.PlatformAdmin.Handlers;
 
@@ -16,6 +17,7 @@ namespace TenantCore.Application.Features.PlatformAdmin.Handlers;
 /// </summary>
 public sealed class GrantClinicSubscriptionHandler(
     ISubscriptionPlanRepository planRepository,
+    IClinicAccountRepository accountRepository,
     IClinicSubscriptionRepository subscriptionRepository,
     IWorkflowEnqueuer workflowEnqueuer,
     ILogger<GrantClinicSubscriptionHandler> logger)
@@ -23,6 +25,10 @@ public sealed class GrantClinicSubscriptionHandler(
 {
     public async Task<Guid> Handle(GrantClinicSubscriptionCommand command, CancellationToken ct)
     {
+        var billingMode = await accountRepository.GetBillingModeAsync(command.ApplicationId, ct);
+        if (billingMode == BillingMode.PayAsYouGo)
+            throw new InvalidOperationException("Subscription plans cannot be granted to a Pay As You Go clinic.");
+
         var plan = await planRepository.GetByIdAsync(command.SubscriptionPlanId, ct);
         if (plan is null || !plan.IsActive)
             throw new NotFoundException(nameof(SubscriptionPlan), command.SubscriptionPlanId);

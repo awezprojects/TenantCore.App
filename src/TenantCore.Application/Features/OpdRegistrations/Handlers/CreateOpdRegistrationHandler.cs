@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TenantCore.Application.Features.OpdPayments.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Translators;
+using TenantCore.Application.Features.UsageBilling.Commands;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Interfaces;
@@ -64,6 +65,16 @@ public sealed class CreateOpdRegistrationHandler(
             request.Temperature, request.RespiratoryRate, request.Sugar);
 
         await opdRepository.AddAsync(registration, cancellationToken);
+
+        // Platform billing is deliberately NOT the clinic's patient-billing module, so this sits
+        // outside the billingEnabled block below. Dispatched BEFORE the SaveChanges, so the
+        // registration, its usage row and any wallet debit commit as one transaction: a refusal
+        // commits nothing and never leaves an operation that exists but was never billed.
+        // OpdRegistration.Create assigns Id before the insert, so registration.Id is already valid.
+        await sender.Send(new ChargeUsageCommand(
+            request.ApplicationId, BillingItem.OpdRegistration, registration.Id,
+            Quantity: 1, UserId: request.ReceivedByUserId, OccurredAt: null), cancellationToken);
+
         await opdRepository.SaveChangesAsync(cancellationToken);
 
         if (billingEnabled)

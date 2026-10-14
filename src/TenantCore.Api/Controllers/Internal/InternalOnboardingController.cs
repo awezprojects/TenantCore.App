@@ -26,8 +26,12 @@ public class InternalOnboardingController(ISender sender) : ControllerBase
     public async Task<IActionResult> Approve(Guid id, [FromBody] ApproveClinicOnboardingRequest request, CancellationToken ct)
     {
         await sender.Send(new ApproveClinicOnboardingCommand(
-            id, request.SubscriptionPlanId, request.GrantTrial, request.Amount, request.AmountReason,
-            request.ClinicCode, request.ReviewNote, request.AdminUserId, request.AdminEmail), ct);
+            id, request.GrantTrial,
+            request.ClinicCode, request.ReviewNote, request.AdminUserId, request.AdminEmail,
+            request.BillingModeOverride, request.RegistrationFeeOverride, request.FreeTestDaysOverride,
+            request.PayAsYouGoOpdRate, request.PayAsYouGoIpdAdmissionRate,
+            request.PayAsYouGoOtSurgeryRate, request.PayAsYouGoIpdDischargeRate,
+            request.PayAsYouGoInitialWalletCredit), ct);
         return NoContent();
     }
 

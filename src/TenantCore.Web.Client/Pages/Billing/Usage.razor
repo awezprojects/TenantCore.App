@@ -1,0 +1,408 @@
+@page "/billing/usage"
+@layout AuthorizedLayout
+@inject IUsageBillingApiClient UsageBillingApi
+@inject UsageBillingContextService UsageBillingContext
+@inject NavigationManager NavigationManager
+@inject ClinicContextService ClinicContext
+@inject IToastService Toast
+@inject IJSRuntime JS
+@using System.Globalization
+@using System.Text
+@using TenantCore.Shared.Enums
+@using TenantCore.Shared.Dtos.UsageBilling
+
+<PageTitle>Usage - CloudClinic</PageTitle>
+
+<div class="opd-page">
+
+    <AppPageHeader Title="Metered usage" Subtitle="@ClinicContext.SelectedApplicationName">
+        <Actions>
+            <a href="/billing" class="btn btn-outline-primary">🧾 Billing</a>
+            <a href="/billing/wallet" class="btn btn-outline-primary">💳 Wallet</a>
+            <button class="btn btn-outline-primary" @onclick="ExportCsvAsync" disabled="@(_usage is null)">⬇️ Export CSV</button>
+            <button class="btn btn-outline-primary" @onclick="ExportExcelAsync" disabled="@(_usage is null || _exportingExcel)">
+                @(_exportingExcel ? "Exporting…" : "⬇️ Export Excel")
+            </button>
+            <button class="btn btn-outline-primary" @onclick="PrintAsync" disabled="@(_usage is null)">🖨️ Print</button>
+        </Actions>
+    </AppPageHeader>
+
+    @* The one and only query on this page: everything below it — the item filter, the chart and the
+       export — is served from the dataset this returns (workspace rule 7). *@
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px 20px;margin-bottom:18px;
+                display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+        <div>
+            <label for="usage-from" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">From</label>
+            <input id="usage-from" type="date" value="@_from.ToString("yyyy-MM-dd")" @onchange="OnFromChanged"
+                   style="padding:9px 12px;border:1.5px solid #CBD5E1;border-radius:8px;font-size:14px;" />
+        </div>
+        <div>
+            <label for="usage-to" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">To</label>
+            <input id="usage-to" type="date" value="@_to.ToString("yyyy-MM-dd")" @onchange="OnToChanged"
+                   style="padding:9px 12px;border:1.5px solid #CBD5E1;border-radius:8px;font-size:14px;" />
+        </div>
+        <button class="btn btn-primary" @onclick="LoadAsync" disabled="@_loading">Load usage</button>
+        <button class="btn btn-outline-primary" @onclick="ResetRange">Last 30 days</button>
+
+        @if (_rangeError is not null)
+        {
+            <span style="font-size:12px;color:#B91C1C;font-weight:700;">@_rangeError</span>
+        }
+    </div>
+
+    <AppLoadingBar Loading="_loading" />
+
+    @if (_usage is null)
+    {
+        @if (!_loading)
+        {
+            <AppEmptyState Icon="📊" Title="No usage loaded yet"
+                           Message="@(_error ?? "Pick a range and load it — the range is fetched once and everything else reads from it.")" />
+        }
+    }
+    else
+    {
+        var charged = _usage.TotalCharged;
+        var notional = _usage.TotalNotional;
+        var operations = _usage.Totals.Sum(t => t.Count);
+        var isPayg = _summary?.EffectiveBillingMode == BillingMode.PayAsYouGo;
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:18px;">
+            <AppStatCard Icon="💸" Label="Charged in range" Value="@Money(charged)"
+                         Sub="@($"{_usage.From.ToLocalTime():dd MMM} – {_usage.To.ToLocalTime():dd MMM yyyy}")"
+                         Color="green" />
+            <AppStatCard Icon="📈" Label="Value at live rates" Value="@Money(notional)"
+                         Sub="What this usage would cost at today's rates" Color="blue" />
+            <AppStatCard Icon="🧾" Label="Operations" Value="@operations.ToString("N0")"
+                         Sub="@(_usage.IsCapped ? "Newest rows only — the list is capped" : "All operations in range")" />
+            @if (isPayg && _summary?.WalletBalance is { } walletBal)
+            {
+                <AppStatCard Icon="💳" Label="Wallet balance"
+                             Value="@Money(walletBal)"
+                             Sub="@(_summary.WalletIsLow ? "⚠ Balance is low — top up soon" : "Current available balance")"
+                             Color="@(_summary.WalletIsLow ? "yellow" : "green")" />
+            }
+        </div>
+
+        @* Per-item breakdown — served from the cached range (workspace rule 7). *@
+        @if (_usage.Totals.Count > 0)
+        {
+            <div style="margin-bottom:18px;">
+                <div style="font-size:13px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+                    By operation type
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+                    @foreach (var tot in _usage.Totals.OrderBy(t => (int)t.BillingItem))
+                    {
+                        var icon = tot.BillingItem switch
+                        {
+                            BillingItem.OpdRegistration => "🏥",
+                            BillingItem.IpdAdmission    => "🛏️",
+                            BillingItem.IpdDischarge    => "🚪",
+                            BillingItem.OtSurgery       => "🔪",
+                            _                           => "📋"
+                        };
+                        <div style="background:#fff;border:1.5px solid #E2E8F0;border-radius:12px;padding:14px 16px;">
+                            <div style="font-size:10.5px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;">
+                                @icon @ItemLabel(tot.BillingItem)
+                            </div>
+                            <div style="display:flex;align-items:baseline;gap:12px;margin-top:8px;flex-wrap:wrap;">
+                                <div>
+                                    <div style="font-size:22px;font-weight:800;color:#0F172A;">@tot.Count.ToString("N0")</div>
+                                    <div style="font-size:10px;color:#94A3B8;margin-top:1px;">operations</div>
+                                </div>
+                                @if (isPayg && tot.Charged > 0m)
+                                {
+                                    <div style="border-left:2px solid #E2E8F0;padding-left:12px;">
+                                        <div style="font-size:16px;font-weight:700;color:#166534;">@Money(tot.Charged)</div>
+                                        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">charged</div>
+                                    </div>
+                                }
+                                else if (!isPayg && tot.Notional > 0m)
+                                {
+                                    <div style="border-left:2px solid #E2E8F0;padding-left:12px;">
+                                        <div style="font-size:16px;font-weight:700;color:#1565C0;">@Money(tot.Notional)</div>
+                                        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">at live rates</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_usage.IsCapped)
+        {
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 18px;margin-bottom:18px;
+                        font-size:13px;color:#1E40AF;font-weight:600;">
+                More operations exist in this range than the newest-rows cap allows, so the table below is a partial
+                list. The totals, the chart and every other figure on this page cover the whole range.
+            </div>
+        }
+
+        @* Per-operation totals and the daily trend, both straight off the cached range. *@
+        <UsageTotalsTable Totals="_usage.Totals" Currency="@Currency" />
+
+        <UsageTrendChart Series="_usage.Series" Currency="@Currency" />
+
+        @* Operations — the filter is served from memory, so it never re-queries (workspace rule 7). *@
+        <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:4px;">Operations</div>
+                    <div style="font-size:12px;color:#64748B;">
+                        No patient detail is shown — an operation points at a record id, never a name or MR number.
+                    </div>
+                </div>
+                <div>
+                    <label for="usage-item-filter" style="font-size:12px;font-weight:700;color:#475569;margin-right:6px;">Operation</label>
+                    <select id="usage-item-filter" value="@_itemFilter" @onchange="OnItemFilterChanged"
+                            style="padding:8px 10px;border:1.5px solid #CBD5E1;border-radius:8px;font-size:13px;">
+                        <option value="">All</option>
+                        @foreach (var item in Enum.GetValues<BillingItem>())
+                        {
+                            <option value="@item">@ItemLabel(item)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            @if (FilteredRecords.Count == 0)
+            {
+                <AppEmptyState Icon="🧾" Title="Nothing to show"
+                               Message="No operations match the selected filter in this range." />
+            }
+            else
+            {
+                <div style="overflow-x:auto;">
+                    <table class="opd-table" style="width:100%;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">When</th>
+                                <th style="text-align:left;">Operation</th>
+                                <th style="text-align:right;">Qty</th>
+                                <th style="text-align:right;">Unit rate</th>
+                                <th style="text-align:right;">Amount</th>
+                                <th style="text-align:left;">Paid by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var record in FilteredRecords)
+                            {
+                                <tr>
+                                    <td>@record.ChargedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                    <td>@ItemLabel(record.BillingItem)</td>
+                                    <td style="text-align:right;">@record.Quantity.ToString("N0")</td>
+                                    <td style="text-align:right;">@(record.UnitRate > 0m ? record.UnitRate.ToString("N2") : "—")</td>
+                                    <td style="text-align:right;font-weight:700;">@record.Amount.ToString("N2")</td>
+                                    <td>
+                                        @if (record.IsFree)
+                                        {
+                                            <AppBadge Text="Free" Variant="neutral" />
+                                        }
+                                        else
+                                        {
+                                            <AppBadge Text="Wallet" Variant="success" />
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>The widest window worth asking for in one go — the server caps the rows anyway.</summary>
+    private static readonly TimeSpan MaxRange = TimeSpan.FromDays(366);
+
+    private ClinicUsageDto? _usage;
+    private ClinicBillingSummaryDto? _summary;
+
+    private DateTime _from = DateTime.Today.AddDays(-29);
+    private DateTime _to = DateTime.Today;
+
+    private bool _loading;
+    private bool _exportingExcel;
+    private string? _error;
+    private string? _rangeError;
+    private string _itemFilter = string.Empty;
+
+    /// <summary>Currency for every figure on the page, taken from the cached summary.</summary>
+    private string Currency => string.IsNullOrEmpty(_summary?.Currency) ? "INR" : _summary!.Currency;
+
+    /// <summary>
+    /// Served entirely from the cached range: switching the operation filter never goes back to the API
+    /// (workspace rule 7).
+    /// </summary>
+    private IReadOnlyList<UsageRecordDto> FilteredRecords
+    {
+        get
+        {
+            if (_usage is null) return [];
+            if (string.IsNullOrEmpty(_itemFilter)) return _usage.Records;
+
+            return _usage.Records.Where(r => r.BillingItem.ToString() == _itemFilter).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Billing/usage pages are PAYG-only — redirect subscription clinics.
+        // The layout loads billing context before rendering, so IsLoaded is true here.
+        if (UsageBillingContext.IsLoaded && !UsageBillingContext.IsPayAsYouGo)
+        {
+            NavigationManager.NavigateTo("/subscription", replace: true);
+            return;
+        }
+
+        // Use the layout's cached summary for currency — no extra fetch needed (workspace rule 7).
+        _summary = UsageBillingContext.Summary;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _rangeError = null;
+
+        if (_from.Date > _to.Date)
+        {
+            _rangeError = "The start date must be on or before the end date.";
+            return;
+        }
+
+        if ((_to.Date - _from.Date) > MaxRange)
+        {
+            _rangeError = "Pick a range of about a year or less — a wider window is capped anyway.";
+            return;
+        }
+
+        _loading = true;
+
+        // Both ends are inclusive: the end is pushed to the last tick of its day so "today" means all of today.
+        var response = await UsageBillingApi.GetUsageAsync(_from.Date, _to.Date.AddDays(1).AddTicks(-1));
+
+        if (response.Success)
+        {
+            _usage = response.Data;
+            _error = null;
+        }
+        else
+        {
+            _usage = null;
+            _error = response.Message;
+        }
+
+        _loading = false;
+    }
+
+    private void OnFromChanged(ChangeEventArgs args)
+    {
+        if (DateTime.TryParse(args.Value?.ToString(), out var value)) _from = value;
+    }
+
+    private void OnToChanged(ChangeEventArgs args)
+    {
+        if (DateTime.TryParse(args.Value?.ToString(), out var value)) _to = value;
+    }
+
+    private void OnItemFilterChanged(ChangeEventArgs args) => _itemFilter = args.Value?.ToString() ?? string.Empty;
+
+    private void ResetRange()
+    {
+        _to = DateTime.Today;
+        _from = _to.AddDays(-29);
+    }
+
+    /// <summary>
+    /// Exports the rows currently on screen — the filtered slice of the cached range — so the export is a
+    /// secondary interaction that never re-queries (workspace rule 7).
+    /// </summary>
+    private async Task ExportCsvAsync()
+    {
+        var rows = FilteredRecords;
+        if (rows.Count == 0)
+        {
+            Toast.ShowError("There is nothing to export in this range.");
+            return;
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine("ChargedAtUtc,Operation,Quantity,UnitRate,Amount,PaidBy,RecordId");
+
+        foreach (var row in rows)
+        {
+            // Every cell goes through the shared CSV helper, and amounts are written with the invariant
+            // culture, so a CSV opened in Excel, Numbers or Sheets anywhere reads the same values.
+            UsagePrintCsv.Line(builder,
+                UsagePrintCsv.Field(row.ChargedAt.ToString("O", CultureInfo.InvariantCulture)),
+                UsagePrintCsv.Field(ItemLabel(row.BillingItem)),
+                UsagePrintCsv.Field(row.Quantity.ToString(CultureInfo.InvariantCulture)),
+                UsagePrintCsv.Field(row.UnitRate.ToString(CultureInfo.InvariantCulture)),
+                UsagePrintCsv.Field(row.Amount.ToString(CultureInfo.InvariantCulture)),
+                UsagePrintCsv.Field(row.IsFree ? "Free" : "Wallet"),
+                UsagePrintCsv.Field(row.Id.ToString()));
+        }
+
+        await JS.InvokeVoidAsync(
+            "ccDownloadTextFile", $"usage_{_from:yyyy-MM-dd}_{_to:yyyy-MM-dd}.csv", builder.ToString());
+
+        Toast.ShowSuccess($"Exported {rows.Count} operation(s).");
+    }
+
+    /// <summary>
+    /// Opens the printable report in its own window for the current range. The print page is a separate page
+    /// load that fetches the range itself, so this stays a navigation and never re-queries the current page
+    /// (workspace rule 7).
+    /// </summary>
+    private async Task PrintAsync()
+    {
+        var url = $"/billing/usage/print?from={_from:yyyy-MM-dd}&to={_to:yyyy-MM-dd}";
+        await JS.InvokeVoidAsync("window.open", url, "_blank");
+    }
+
+    /// <summary>
+    /// Sends the already-loaded range to the server for ClosedXML formatting and downloads the result.
+    /// The data is sent back from the client's cache — no re-query to the DB (workspace rule 7).
+    /// </summary>
+    private async Task ExportExcelAsync()
+    {
+        if (_usage is null) return;
+        _exportingExcel = true;
+
+        var response = await UsageBillingApi.ExportExcelAsync(_usage, Currency);
+
+        if (response.Success && response.Data is { Length: > 0 } bytes)
+        {
+            var base64 = Convert.ToBase64String(bytes);
+            var fileName = $"usage_{_from:yyyy-MM-dd}_{_to:yyyy-MM-dd}.xlsx";
+            await JS.InvokeVoidAsync("ccDownloadBinaryFile", fileName, base64,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+            Toast.ShowSuccess($"Excel exported.");
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Could not export to Excel. Please try again.");
+        }
+
+        _exportingExcel = false;
+    }
+
+    private string Money(decimal value)
+        => (Currency == "INR" ? "₹" : Currency + " ") + value.ToString("N2");
+
+    private static string ItemLabel(BillingItem item) => item switch
+    {
+        BillingItem.OpdRegistration => "OPD registration",
+        BillingItem.IpdAdmission => "IPD admission",
+        BillingItem.IpdDischarge => "IPD discharge",
+        BillingItem.OtSurgery => "OT surgery",
+        _ => item.ToString()
+    };
+}

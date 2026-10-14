@@ -200,4 +200,24 @@ public class GetSubscriptionStatusHandlerTests
         result.IsSuspended.Should().BeFalse();
         result.SuspensionMessage.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Handle_PayAsYouGoClinic_IsPayAsYouGoTrueAndHasActiveSubscriptionFalse()
+    {
+        // PAYG clinics have no subscription term by design — the guard bypasses them. The DTO
+        // must tell the UI this is normal, so it does not show the "no active subscription" lock badge.
+        var applicationId = Guid.NewGuid();
+        var account = ClinicAccount.CreateDefault(applicationId);
+        account.SetBillingMode(BillingMode.PayAsYouGo, DateTime.UtcNow, applyNow: true);
+
+        _repository.Setup(r => r.GetActiveForClinicAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync((ClinicSubscription?)null);
+        _repository.Setup(r => r.HasUsedTrialAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
+        _accountRepository.Setup(r => r.GetByApplicationIdAsync(applicationId, It.IsAny<CancellationToken>())).ReturnsAsync(account);
+
+        var result = await CreateHandler().Handle(new GetSubscriptionStatusQuery(applicationId, IsClinicAdmin: true), CancellationToken.None);
+
+        result.IsPayAsYouGo.Should().BeTrue();
+        result.HasActiveSubscription.Should().BeFalse();
+        result.IsSuspended.Should().BeFalse();
+    }
 }

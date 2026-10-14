@@ -19,6 +19,7 @@ public class AssignPlanPaymentLinkHandlerTests
 {
     private readonly Mock<ISubscriptionPlanRepository> _planRepository = new();
     private readonly Mock<ISubscriptionPaymentRepository> _paymentRepository = new();
+    private readonly Mock<IClinicAccountRepository> _accountRepository = new();
     private readonly Mock<IClinicPlanCatalog> _planCatalog = new();
     private readonly Mock<IPaymentGateway> _paymentGateway = new();
     private readonly Mock<IWorkflowEnqueuer> _workflowEnqueuer = new();
@@ -33,11 +34,13 @@ public class AssignPlanPaymentLinkHandlerTests
                 It.IsAny<Guid>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((WorkflowTaskType t, string k, string at, Guid aid, string? p, CancellationToken _) =>
                 WorkflowTask.Enqueue(t, k, at, aid, p));
+        _accountRepository.Setup(r => r.GetBillingModeAsync(_applicationId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(BillingMode.Subscription);
     }
 
     private AssignPlanPaymentLinkHandler CreateHandler()
-        => new(_planRepository.Object, _paymentRepository.Object, _planCatalog.Object,
-               _paymentGateway.Object, _workflowEnqueuer.Object,
+        => new(_planRepository.Object, _paymentRepository.Object, _accountRepository.Object,
+               _planCatalog.Object, _paymentGateway.Object, _workflowEnqueuer.Object,
                Mock.Of<ILogger<AssignPlanPaymentLinkHandler>>());
 
     private SubscriptionPlan SetUpPlan(decimal listPrice = 999m, decimal? effectivePrice = null, bool isTrial = false)

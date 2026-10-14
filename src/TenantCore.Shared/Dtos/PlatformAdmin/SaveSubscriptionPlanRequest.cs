@@ -14,6 +14,12 @@ public record SaveSubscriptionPlanRequest
 
     public int DisplayOrder { get; init; }
 
+    /// <summary>Package default registration fee; null leaves the current catalogue value untouched.</summary>
+    public decimal? RegistrationFee { get; init; }
+
+    /// <summary>Package default free test days (30–90); null leaves the current catalogue value untouched.</summary>
+    public int? FreeTestDays { get; init; }
+
     public Guid AdminUserId { get; init; }
     public string AdminEmail { get; init; } = string.Empty;
 }

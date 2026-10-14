@@ -6,6 +6,7 @@
 @inject IToastService Toast
 @inject NavigationManager Navigation
 @inject FeatureFlagsContextService FeatureFlagsContext
+@inject UsageBillingContextService UsageBillingContext
 @using TenantCore.Web.Client.Services
 @using TenantCore.Shared.Enums
 @implements IDisposable
@@ -837,7 +838,13 @@ else
     </div>
 }
 
+<InsufficientBalanceDialog @bind-Visible="_insufficientBalance"
+                          Balance="UsageBillingContext.Summary?.WalletBalance"
+                          Currency="@(UsageBillingContext.Summary?.Currency ?? "INR")" />
+
 @code {
+    /// <summary>Set when the API refused an admit or discharge with 403 insufficient_wallet_balance.</summary>
+    private bool _insufficientBalance;
     // ── page-level state ─────────────────────────────────────────────────────
     private bool _loading = true;
     private bool _isAdmin;
@@ -1048,6 +1055,12 @@ else
             _adminAdmitVisible = false;
             await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync());
         }
+        else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
+        {
+            // Nothing was admitted and nothing was charged — explain the way out, don't dead-end the user.
+            await UsageBillingContext.RefreshAsync();
+            _insufficientBalance = true;
+        }
         else Toast.ShowError(r.Message ?? "Failed.");
         _saving = false;
     }
@@ -1068,6 +1081,12 @@ else
             Toast.ShowSuccess("Patient discharged.");
             _dischargeDialogVisible = false;
             await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync());
+        }
+        else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
+        {
+            // The metered discharge was refused: the patient is still admitted and nothing was charged.
+            await UsageBillingContext.RefreshAsync();
+            _insufficientBalance = true;
         }
         else Toast.ShowError(r.Message ?? "Failed.");
         _saving = false;
@@ -1180,6 +1199,11 @@ else
             _bedAdmitVisible = false;
             await Task.WhenAll(RefreshWardsAsync(), SelectWardAsync(_selectedWard));
         }
+        else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
+        {
+            await UsageBillingContext.RefreshAsync();
+            _insufficientBalance = true;
+        }
         else Toast.ShowError(r.Message ?? "Failed.");
         _saving = false;
     }
@@ -1195,6 +1219,11 @@ else
             _bedDetailVisible = false;
             if (_selectedWard != null)
                 await Task.WhenAll(RefreshWardsAsync(), SelectWardAsync(_selectedWard));
+        }
+        else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
+        {
+            await UsageBillingContext.RefreshAsync();
+            _insufficientBalance = true;
         }
         else Toast.ShowError(r.Message ?? "Failed.");
         _saving = false;

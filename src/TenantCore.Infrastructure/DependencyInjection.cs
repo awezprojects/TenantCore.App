@@ -9,6 +9,7 @@ using TenantCore.Domain.Entities;
 using TenantCore.Domain.Interfaces;
 using TenantCore.Infrastructure.Logging;
 using TenantCore.Infrastructure.BackgroundJobs;
+using TenantCore.Application.Features.UsageBilling.Services;
 using TenantCore.Infrastructure.Caching;
 using TenantCore.Infrastructure.ExternalServices;
 using TenantCore.Infrastructure.ExternalServices.Razorpay;
@@ -35,6 +36,14 @@ public static class DependencyInjection
         services.AddScoped<IOpdRegistrationRepository, OpdRegistrationRepository>();
         services.AddScoped<IIpdRegistrationRepository, IpdRegistrationRepository>();
         services.AddScoped<IClinicFeeConfigRepository, ClinicFeeConfigRepository>();
+
+        // Pay-as-you-go metering (Phase 2). The options carry safe defaults, so the feature runs with
+        // no UsageBilling section present at all.
+        services.Configure<UsageBillingOptions>(configuration.GetSection(UsageBillingOptions.SectionName));
+        services.AddScoped<IClinicWalletRepository, ClinicWalletRepository>();
+        services.AddScoped<IClinicWalletTransactionRepository, ClinicWalletTransactionRepository>();
+        services.AddScoped<IClinicUsageRateRepository, ClinicUsageRateRepository>();
+        services.AddScoped<IClinicUsageRecordRepository, ClinicUsageRecordRepository>();
 
         // Medicines, medicine types and dosage forms are served through caching decorators backed
         // by RefreshableCache<T> snapshots that a background hosted service keeps warm (initial
@@ -126,6 +135,9 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowTaskHandler, ProvisionClinicTaskHandler>();
         services.AddScoped<IWorkflowTaskHandler, ActivateSubscriptionTaskHandler>();
         services.AddScoped<IWorkflowTaskHandler, ProcessWebhookEventTaskHandler>();
+        // Phase 2 — the two new purposes ride the same durable-outbox pipeline as the seven above.
+        services.AddScoped<IWorkflowTaskHandler, CreditWalletTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, RecordRegistrationFeeTaskHandler>();
 
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();

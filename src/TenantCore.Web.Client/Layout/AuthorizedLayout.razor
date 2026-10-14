@@ -4,6 +4,7 @@
 @inject ClinicContextService ClinicContext
 @inject SubscriptionContextService SubscriptionContext
 @inject FeatureFlagsContextService FeatureFlagsContext
+@inject UsageBillingContextService UsageBillingContext
 @implements IDisposable
 
 <ToastContainer />
@@ -123,6 +124,21 @@ else if (_isAuthenticated)
                         <SubscriptionStatusPill />
                     }
 
+                    @* The wallet chip: only for a metered (pay-as-you-go) clinic, and warning-styled once the
+                       balance is at or below the clinic's own threshold. It reads the shared billing context,
+                       so it never costs an extra call. *@
+                    @if (UsageBillingContext.IsPayAsYouGo)
+                    {
+                        <a href="/billing/wallet"
+                           style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;
+                                  text-decoration:none;white-space:nowrap;
+                                  background:@(UsageBillingContext.WalletIsLow ? "#FEF9C3" : "#F0FDF4");
+                                  color:@(UsageBillingContext.WalletIsLow ? "#854D0E" : "#166534");
+                                  border:1px solid @(UsageBillingContext.WalletIsLow ? "#FDE047" : "#BBF7D0");">
+                            💳 Wallet @Money(UsageBillingContext.Summary?.WalletBalance ?? 0m)
+                        </a>
+                    }
+
                     <div style="padding:6px 14px;background:#EFF6FF;border-radius:20px;
                                 font-size:12px;font-weight:600;color:#1565C0;">
                         🟢 Online
@@ -184,7 +200,7 @@ else if (_isAuthenticated)
 
             <!-- Page content — only this div scrolls -->
             <div id="cc-page-scroll" style="flex:1;padding:28px 32px;overflow-y:auto;min-height:0;">
-                @if (NeedsSubscriptionGate && !SubscriptionContext.IsLoaded)
+                @if (NeedsSubscriptionGate && (!SubscriptionContext.IsLoaded || !UsageBillingContext.IsLoaded))
                 {
                     <div style="display:flex;justify-content:center;padding:60px 0;">
                         <div class="auth-spinner" style="width:40px;height:40px;border-width:3px;"></div>
@@ -196,7 +212,19 @@ else if (_isAuthenticated)
                        subscribing cannot lift, so every role sees this, admins included. *@
                     <ClinicSuspended />
                 }
-                else if (NeedsSubscriptionGate && SubscriptionContext.IsLocked)
+                else if (NeedsSubscriptionGate && UsageBillingContext.IsPayAsYouGo && UsageBillingContext.RegistrationFeeDue)
+                {
+                    @* PAYG clinic that has not yet paid the registration fee — wallet is locked.
+                       Shown to all roles so even a Doctor sees a clear message, not a blank page. *@
+                    <ClinicRegistrationFeePending />
+                }
+                else if (NeedsSubscriptionGate && UsageBillingContext.IsPayAsYouGo && UsageBillingContext.WalletIsEmpty)
+                {
+                    @* PAYG clinic with a zero/negative wallet balance — operations are blocked.
+                       The top-up button inside the component navigates to /billing/wallet. *@
+                    <ClinicWalletEmpty />
+                }
+                else if (NeedsSubscriptionGate && !UsageBillingContext.IsPayAsYouGo && SubscriptionContext.IsLocked)
                 {
                     @if (_isAdmin)
                     {
@@ -278,6 +306,10 @@ else if (_isAuthenticated)
         {
             await SubscriptionContext.RefreshAsync();
             await FeatureFlagsContext.RefreshAsync();
+
+            // Refreshed alongside the subscription wherever the selected clinic changes, so the wallet
+            // chip and every billing screen share one value (plan: same lifecycle, same call sites).
+            await UsageBillingContext.RefreshAsync();
         }
     }
 
@@ -374,10 +406,21 @@ else if (_isAuthenticated)
     private void ToggleUserMenu() => _userMenuOpen = !_userMenuOpen;
     private void CloseUserMenu() => _userMenuOpen = false;
 
+    /// <summary>The wallet chip's money format — the currency comes from the cached billing summary.</summary>
+    private string Money(decimal value)
+    {
+        var currency = string.IsNullOrEmpty(UsageBillingContext.Summary?.Currency)
+            ? "INR"
+            : UsageBillingContext.Summary!.Currency;
+
+        return (currency == "INR" ? "₹" : currency + " ") + value.ToString("N2");
+    }
+
     private async Task SwitchClinic()
     {
         SubscriptionContext.Clear();
         FeatureFlagsContext.Clear();
+        UsageBillingContext.Clear();
         await ClinicContext.ClearClinicAsync();
         NavigationManager.NavigateTo("/select-clinic");
     }
@@ -393,6 +436,7 @@ else if (_isAuthenticated)
         _userMenuOpen = false;
         SubscriptionContext.Clear();
         FeatureFlagsContext.Clear();
+        UsageBillingContext.Clear();
         await ClinicContext.ClearClinicAsync();
         await AuthState.ClearAuthStateAsync();
         NavigationManager.NavigateTo("/auth/login", forceLoad: true);

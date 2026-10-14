@@ -24,6 +24,7 @@ namespace TenantCore.Application.Features.PlatformAdmin.Handlers;
 public sealed class AssignPlanPaymentLinkHandler(
     ISubscriptionPlanRepository planRepository,
     ISubscriptionPaymentRepository paymentRepository,
+    IClinicAccountRepository accountRepository,
     IClinicPlanCatalog planCatalog,
     IPaymentGateway paymentGateway,
     IWorkflowEnqueuer workflowEnqueuer,
@@ -34,6 +35,10 @@ public sealed class AssignPlanPaymentLinkHandler(
     {
         if (!paymentGateway.IsConfigured)
             throw new InvalidOperationException("Payments are not configured.");
+
+        var billingMode = await accountRepository.GetBillingModeAsync(command.ApplicationId, ct);
+        if (billingMode == BillingMode.PayAsYouGo)
+            throw new InvalidOperationException("Subscription plans cannot be assigned to a Pay As You Go clinic.");
 
         var plan = await planRepository.GetByIdAsync(command.SubscriptionPlanId, ct);
         if (plan is null || !plan.IsActive)

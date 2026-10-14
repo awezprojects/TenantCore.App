@@ -5,6 +5,7 @@ using TenantCore.Application.Common;
 using TenantCore.Application.Features.PlatformAdmin.Commands;
 using TenantCore.Application.Features.PlatformAdmin.Models;
 using TenantCore.Application.Features.PlatformAdmin.Validators;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Tests.Features.PlatformAdmin.Validators;
 
@@ -131,8 +132,10 @@ public class PlatformAdminValidatorTests
 
     // ---------- Plan catalogue ----------
 
-    private static PlanDetails Details(string name = "Clinic Pro", int durationDays = 90, decimal price = 4999m, int displayOrder = 5)
-        => new(name, "desc", durationDays, price, false, true, displayOrder);
+    private static PlanDetails Details(
+        string name = "Clinic Pro", int durationDays = 90, decimal price = 4999m, int displayOrder = 5,
+        decimal? fee = null, int? freeTestDays = null)
+        => new(name, "desc", durationDays, price, false, true, displayOrder, fee, freeTestDays);
 
     [Fact]
     public void CreatePlanValidator_ValidCommand_Passes()
@@ -217,4 +220,171 @@ public class PlatformAdminValidatorTests
         => new WithdrawClinicPlanOfferCommandValidator()
             .Validate(new WithdrawClinicPlanOfferCommand(Guid.NewGuid(), Guid.Empty, Guid.NewGuid(), "admin@example.test"))
             .IsValid.Should().BeFalse();
+
+    // ---------- Billing (registration fee & usage) ----------
+
+    private static SetClinicBillingCommand BillingCommand(
+        BillingMode mode = BillingMode.Subscription, bool applyNow = true,
+        decimal? fee = null, int? freeTestDays = null, string? reason = "Negotiated")
+        => new(Guid.NewGuid(), mode, applyNow, fee, freeTestDays, reason, Guid.NewGuid(), "admin@example.test");
+
+    [Fact]
+    public void SetBillingValidator_ValidCommand_Passes()
+        => new SetClinicBillingCommandValidator().Validate(BillingCommand()).IsValid.Should().BeTrue();
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("ab")]
+    public void SetBillingValidator_ReasonMissingOrTooShort_Fails(string reason)
+        => new SetClinicBillingCommandValidator().Validate(BillingCommand(reason: reason)).IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetBillingValidator_ReasonRequiredEvenWhenAppliedImmediately()
+        => new SetClinicBillingCommandValidator()
+            .Validate(BillingCommand(applyNow: true, reason: ""))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetBillingValidator_ReasonAtMaxLength_Passes()
+        => new SetClinicBillingCommandValidator()
+            .Validate(BillingCommand(reason: new string('x', 500)))
+            .IsValid.Should().BeTrue();
+
+    [Fact]
+    public void SetBillingValidator_UndefinedBillingMode_Fails()
+        => new SetClinicBillingCommandValidator()
+            .Validate(BillingCommand(mode: (BillingMode)99))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetBillingValidator_NegativeRegistrationFee_Fails()
+        => new SetClinicBillingCommandValidator().Validate(BillingCommand(fee: -1m)).IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetBillingValidator_RegistrationFeeWithThreeDecimals_Fails()
+        => new SetClinicBillingCommandValidator().Validate(BillingCommand(fee: 10.123m)).IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetBillingValidator_RegistrationFeeWithTwoDecimals_Passes()
+        => new SetClinicBillingCommandValidator().Validate(BillingCommand(fee: 499.99m)).IsValid.Should().BeTrue();
+
+    [Theory]
+    [InlineData(29)]
+    [InlineData(91)]
+    public void SetBillingValidator_FreeTestDaysOutOfRange_Fails(int days)
+        => new SetClinicBillingCommandValidator()
+            .Validate(BillingCommand(freeTestDays: days))
+            .IsValid.Should().BeFalse();
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(90)]
+    public void SetBillingValidator_FreeTestDaysAtTheBounds_Pass(int days)
+        => new SetClinicBillingCommandValidator()
+            .Validate(BillingCommand(freeTestDays: days))
+            .IsValid.Should().BeTrue();
+
+    private static SetClinicUsageRatesCommand RatesCommand(params UsageRateSetting[] rates)
+        => new(Guid.NewGuid(), rates, "New price", Guid.NewGuid(), "admin@example.test");
+
+    [Fact]
+    public void SetUsageRatesValidator_ValidRate_Passes()
+        => new SetClinicUsageRatesCommandValidator()
+            .Validate(RatesCommand(new UsageRateSetting(BillingItem.OpdRegistration, 5m)))
+            .IsValid.Should().BeTrue();
+
+    [Fact]
+    public void SetUsageRatesValidator_NoRates_Fails()
+        => new SetClinicUsageRatesCommandValidator().Validate(RatesCommand()).IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetUsageRatesValidator_DuplicateItem_Fails()
+        => new SetClinicUsageRatesCommandValidator()
+            .Validate(RatesCommand(
+                new UsageRateSetting(BillingItem.OpdRegistration, 5m),
+                new UsageRateSetting(BillingItem.OpdRegistration, 6m)))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetUsageRatesValidator_RateWithFiveDecimals_Fails()
+        => new SetClinicUsageRatesCommandValidator()
+            .Validate(RatesCommand(new UsageRateSetting(BillingItem.OpdRegistration, 1.12345m)))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void SetUsageRatesValidator_NegativeRate_Fails()
+        => new SetClinicUsageRatesCommandValidator()
+            .Validate(RatesCommand(new UsageRateSetting(BillingItem.OpdRegistration, -1m)))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void WalletTopUpValidator_ValidCommand_Passes()
+        => new SendClinicWalletTopUpCommandValidator()
+            .Validate(new SendClinicWalletTopUpCommand(
+                Guid.NewGuid(), 1000m, "Top up", Guid.NewGuid(), Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeTrue();
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void WalletTopUpValidator_NonPositiveAmount_Fails(decimal amount)
+        => new SendClinicWalletTopUpCommandValidator()
+            .Validate(new SendClinicWalletTopUpCommand(
+                Guid.NewGuid(), amount, "Top up", null, Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void WalletCreditValidator_MissingReferenceId_Fails()
+        => new CreditClinicWalletCommandValidator()
+            .Validate(new CreditClinicWalletCommand(
+                Guid.NewGuid(), 1000m, "Goodwill", Guid.Empty, Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void WalletCreditValidator_ValidCommand_Passes()
+        => new CreditClinicWalletCommandValidator()
+            .Validate(new CreditClinicWalletCommand(
+                Guid.NewGuid(), 1000m, "Goodwill", Guid.NewGuid(), Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeTrue();
+
+    [Fact]
+    public void WaiveFeeValidator_EmptyReason_Fails()
+        => new WaiveRegistrationFeeCommandValidator()
+            .Validate(new WaiveRegistrationFeeCommand(Guid.NewGuid(), "", Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void WaiveFeeValidator_ValidCommand_Passes()
+        => new WaiveRegistrationFeeCommandValidator()
+            .Validate(new WaiveRegistrationFeeCommand(Guid.NewGuid(), "Founding clinic", Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeTrue();
+
+    // ---------- Plan catalogue: the Phase-2 catalogue defaults ----------
+
+    [Fact]
+    public void CreatePlanValidator_NegativeRegistrationFee_Fails()
+        => new CreateSubscriptionPlanCommandValidator(Options)
+            .Validate(new CreateSubscriptionPlanCommand(Details(fee: -1m), Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void CreatePlanValidator_RegistrationFeeWithThreeDecimals_Fails()
+        => new CreateSubscriptionPlanCommandValidator(Options)
+            .Validate(new CreateSubscriptionPlanCommand(Details(fee: 10.123m), Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeFalse();
+
+    [Theory]
+    [InlineData(29)]
+    [InlineData(91)]
+    public void CreatePlanValidator_FreeTestDaysOutOfRange_Fails(int days)
+        => new CreateSubscriptionPlanCommandValidator(Options)
+            .Validate(new CreateSubscriptionPlanCommand(Details(freeTestDays: days), Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeFalse();
+
+    [Fact]
+    public void CreatePlanValidator_FeeAndFreeDaysAtTheBounds_Pass()
+        => new CreateSubscriptionPlanCommandValidator(Options)
+            .Validate(new CreateSubscriptionPlanCommand(Details(fee: 500m, freeTestDays: 30), Guid.NewGuid(), "admin@example.test"))
+            .IsValid.Should().BeTrue();
 }

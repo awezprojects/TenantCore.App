@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using TenantCore.Application.Common.Exceptions;
 using TenantCore.Application.Services;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Shared.Enums;
@@ -47,6 +48,13 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
 
             NotFoundException       => (HttpStatusCode.NotFound,            "Not Found",    UserMessages.NotFound),
             DomainValidationException dve => (HttpStatusCode.BadRequest,    "Invalid Input", dve.Message),
+
+            // Phase 2 — a business refusal that carries a stable machine-readable code (an empty
+            // wallet, a locked billing mode, an open top-up link). Deliberately placed before the
+            // generic DomainException arm, because it is NOT a DomainException: its status comes from
+            // the exception (403/409) rather than being fixed at 400.
+            ErrorCodeException ece  => ((HttpStatusCode)ece.StatusCode,     "Request Refused", ece.Message),
+
             DomainException de      => (HttpStatusCode.BadRequest,          "Request Error", de.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized,    "Unauthorized",  UserMessages.Unauthorized),
             TooManyRequestsException tmr => ((HttpStatusCode)429,           "Too Many Requests", tmr.Message),
@@ -83,6 +91,13 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
             problemDetails.Extensions["errors"] = errors;
         }
+
+        // Phase 2 — the machine-readable code the Blazor client keys UI behaviour off (e.g. it opens
+        // the insufficient-balance dialog on insufficient_wallet_balance). Additive: the pre-existing
+        // status mappings and the correlationId extension above are untouched, and the Phase-1 guard
+        // codes keep being written by the two guard middlewares themselves.
+        if (exception is ErrorCodeException errorCodeException)
+            problemDetails.Extensions["errorCode"] = errorCodeException.ErrorCode;
 
         context.Response.StatusCode = (int)statusCode;
         context.Response.ContentType = "application/problem+json";

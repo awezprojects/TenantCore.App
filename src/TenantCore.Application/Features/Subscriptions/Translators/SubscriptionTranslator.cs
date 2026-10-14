@@ -91,7 +91,8 @@ public static class SubscriptionTranslator
         IReadOnlyList<ClinicSubscription>? upcoming = null,
         DateTime? coverageEnd = null,
         bool isSuspended = false,
-        string? suspensionMessage = null)
+        string? suspensionMessage = null,
+        bool isPayAsYouGo = false)
     {
         var upcomingDtos = (upcoming ?? [])
             .OrderBy(s => s.StartDate)
@@ -105,6 +106,7 @@ public static class SubscriptionTranslator
             return new SubscriptionStatusDto
             {
                 HasActiveSubscription = false,
+                IsPayAsYouGo = isPayAsYouGo,
                 CanSubscribe = canSubscribe,
                 HasUsedTrial = hasUsedTrial,
                 IsSuspended = isSuspended,
@@ -123,6 +125,7 @@ public static class SubscriptionTranslator
         return new SubscriptionStatusDto
         {
             HasActiveSubscription = true,
+            IsPayAsYouGo = isPayAsYouGo,
             SubscriptionId = activeSubscription.Id,
             PlanCode = activeSubscription.PlanCode,
             PlanName = activeSubscription.PlanName,

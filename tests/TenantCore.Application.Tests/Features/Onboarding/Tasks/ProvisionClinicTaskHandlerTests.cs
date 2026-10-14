@@ -47,6 +47,15 @@ public class ProvisionClinicTaskHandlerTests
         return request;
     }
 
+    private static ClinicOnboardingRequest CreateDirectProvisionedRequest(string? clinicCodeOverride = null)
+    {
+        var request = ClinicOnboardingRequest.Submit(
+            Guid.NewGuid(), "Requester", "requester@example.test", "9876543210", "Clinic", "PREFERRED", "addr", "city", "state", "411001",
+            null, null, null, "Doc", "MR1", "MCI", 1, null, null);
+        request.ApproveDirect(clinicCodeOverride, null, Guid.NewGuid(), "admin@example.test");
+        return request;
+    }
+
     private static WorkflowTask CreateTask(Guid requestId) =>
         WorkflowTask.Enqueue(WorkflowTaskType.ProvisionClinic, $"provision:{requestId}", nameof(ClinicOnboardingRequest), requestId);
 
@@ -153,5 +162,29 @@ public class ProvisionClinicTaskHandlerTests
         var action = () => handler.HandleAsync(CreateTask(requestId), CancellationToken.None);
 
         await action.Should().ThrowAsync<PermanentWorkflowException>();
+    }
+
+    [Fact]
+    public async Task HandleAsync_DirectProvisioned_NoPayment_EnqueuesActivationWithRequestAsAggregate()
+    {
+        // Regression: was crashing with "Nullable object must have a value" because
+        // CurrentPaymentId is null for direct-provisioned clinics (no upfront payment).
+        var request = CreateDirectProvisionedRequest();
+        var applicationId = Guid.NewGuid();
+        _requestRepository.Setup(r => r.GetByIdAsync(request.Id, It.IsAny<CancellationToken>())).ReturnsAsync(request);
+        _authProvisioningService.Setup(s => s.ProvisionClinicAsync(
+            It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>(),
+            It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ProvisioningOutcome.Success(applicationId));
+
+        var handler = CreateHandler();
+        await handler.HandleAsync(CreateTask(request.Id), CancellationToken.None);
+
+        request.ProvisionedApplicationId.Should().Be(applicationId);
+        _workflowEnqueuer.Verify(w => w.EnqueueAsync(
+            WorkflowTaskType.ActivateSubscription,
+            It.Is<string>(k => k.StartsWith("activate-subscription:direct:")),
+            nameof(ClinicOnboardingRequest), request.Id,
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

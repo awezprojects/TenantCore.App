@@ -36,3 +36,15 @@ public sealed record SetSubscriptionPlanActiveCommand(
 
     public string ActionLogContext => $"planId={PlanId}; isActive={IsActive}; adminUserId={AdminUserId}";
 }
+
+/// <summary>
+/// Internal — permanently removes a plan from the catalogue. Blocked if any clinic currently holds
+/// an active or upcoming subscription on this plan.
+/// </summary>
+public sealed record DeleteSubscriptionPlanCommand(Guid PlanId, Guid AdminUserId, string AdminEmail)
+    : IRequest, IBusinessAction, IActionLogContext
+{
+    public string ActionName => "Subscription Plan Deleted";
+
+    public string ActionLogContext => $"planId={PlanId}; adminUserId={AdminUserId}";
+}

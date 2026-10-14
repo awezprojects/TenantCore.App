@@ -4,6 +4,7 @@ using TenantCore.Application.Features.PlatformAdmin.Translators;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Features.PlatformAdmin.Handlers;
 
@@ -13,11 +14,16 @@ namespace TenantCore.Application.Features.PlatformAdmin.Handlers;
 /// </summary>
 public sealed class CreateClinicPlanOfferHandler(
     ISubscriptionPlanRepository planRepository,
+    IClinicAccountRepository accountRepository,
     IClinicPlanOfferRepository offerRepository)
     : IRequestHandler<CreateClinicPlanOfferCommand, Guid>
 {
     public async Task<Guid> Handle(CreateClinicPlanOfferCommand command, CancellationToken ct)
     {
+        var billingMode = await accountRepository.GetBillingModeAsync(command.ApplicationId, ct);
+        if (billingMode == BillingMode.PayAsYouGo)
+            throw new InvalidOperationException("Subscription plan offers cannot be created for a Pay As You Go clinic.");
+
         var plan = await planRepository.GetByIdAsync(command.SubscriptionPlanId, ct);
         if (plan is null || !plan.IsActive)
             throw new NotFoundException(nameof(SubscriptionPlan), command.SubscriptionPlanId);

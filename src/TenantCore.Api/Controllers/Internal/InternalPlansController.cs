@@ -62,4 +62,15 @@ public class InternalPlansController(ISender sender) : ControllerBase
             planId, IsActive: false, request.AdminUserId, request.AdminEmail), ct);
         return NoContent();
     }
+
+    [HttpDelete("{planId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(Guid planId, [FromBody] AdminActionRequest request, CancellationToken ct)
+    {
+        await sender.Send(new DeleteSubscriptionPlanCommand(
+            planId, request.AdminUserId, request.AdminEmail), ct);
+        return NoContent();
+    }
 }

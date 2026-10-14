@@ -10,6 +10,15 @@ namespace TenantCore.Domain.Entities;
 /// </summary>
 public class ClinicOnboardingRequest : AuditableEntity
 {
+    // Billing intent captured at approval time and applied after provisioning + activation.
+    public BillingMode? ApprovalBillingMode { get; private set; }
+    public decimal? ApprovalRegistrationFee { get; private set; }
+    public int? ApprovalFreeTestDays { get; private set; }
+    public decimal? ApprovalOpdRate { get; private set; }
+    public decimal? ApprovalIpdAdmissionRate { get; private set; }
+    public decimal? ApprovalOtSurgeryRate { get; private set; }
+    public decimal? ApprovalIpdDischargeRate { get; private set; }
+    public decimal? ApprovalInitialWalletCredit { get; private set; }
     public Guid RequestedByUserId { get; private set; }
     public string RequesterName { get; private set; } = string.Empty;
     public string RequesterEmail { get; private set; } = string.Empty;
@@ -119,6 +128,20 @@ public class ClinicOnboardingRequest : AuditableEntity
         SetUpdatedAt();
     }
 
+    /// <summary>
+    /// Approves the request for direct provisioning without an upfront subscription payment.
+    /// Used for Subscription and Pay-as-you-go approvals; billing intent is applied post-activation.
+    /// </summary>
+    public void ApproveDirect(string? clinicCodeOverride, string? reviewNote, Guid adminId, string adminEmail)
+    {
+        EnsureStatus(ClinicOnboardingStatus.Submitted, "approve");
+        IsTrialGrant = false;
+        ApplyClinicCodeOverride(clinicCodeOverride);
+        ApplyReview(reviewNote, adminId, adminEmail);
+        Status = ClinicOnboardingStatus.Provisioning;
+        SetUpdatedAt();
+    }
+
     public void Reject(string reason, Guid adminId, string adminEmail)
     {
         if (Status is not (ClinicOnboardingStatus.Submitted or ClinicOnboardingStatus.Approved or ClinicOnboardingStatus.AwaitingPayment))
@@ -173,9 +196,40 @@ public class ClinicOnboardingRequest : AuditableEntity
         SetUpdatedAt();
     }
 
+    public void SetBillingApprovalIntent(
+        BillingMode? mode,
+        decimal? registrationFee,
+        int? freeTestDays,
+        decimal? opdRate,
+        decimal? ipdAdmissionRate,
+        decimal? otSurgeryRate,
+        decimal? ipdDischargeRate,
+        decimal? initialWalletCredit)
+    {
+        ApprovalBillingMode = mode;
+        ApprovalRegistrationFee = registrationFee;
+        ApprovalFreeTestDays = freeTestDays;
+        ApprovalOpdRate = opdRate;
+        ApprovalIpdAdmissionRate = ipdAdmissionRate;
+        ApprovalOtSurgeryRate = otSurgeryRate;
+        ApprovalIpdDischargeRate = ipdDischargeRate;
+        ApprovalInitialWalletCredit = initialWalletCredit;
+    }
+
     public void Activate(Guid clinicSubscriptionId)
     {
         ClinicSubscriptionId = clinicSubscriptionId;
+        ActivatedAt = DateTime.UtcNow;
+        Status = ClinicOnboardingStatus.Active;
+        NeedsAttention = false;
+        AttentionReason = null;
+        SetUpdatedAt();
+    }
+
+    /// <summary>Activates a pay-as-you-go clinic that has no subscription term.</summary>
+    public void ActivatePayAsYouGo()
+    {
+        ClinicSubscriptionId = null;
         ActivatedAt = DateTime.UtcNow;
         Status = ClinicOnboardingStatus.Active;
         NeedsAttention = false;

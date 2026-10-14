@@ -10,7 +10,7 @@ public static class SubscriptionPaymentTranslator
     {
         Id = entity.Id,
         Purpose = entity.Purpose,
-        PlanName = entity.PlanName,
+        PlanName = entity.PlanName ?? ResolvePurposeLabel(entity.Purpose),
         Amount = entity.Amount,
         PlanListPrice = entity.PlanListPrice,
         Currency = entity.Currency,
@@ -21,5 +21,17 @@ public static class SubscriptionPaymentTranslator
         PaidAt = entity.PaidAt,
         CreatedAt = entity.CreatedAt,
         IsAssignedByPlatform = entity.Purpose == PaymentPurpose.AdminAssigned
+    };
+
+    /// <summary>
+    /// Phase 2 made the plan columns nullable, so a wallet top-up and a registration fee carry no
+    /// plan at all. Those two purposes get a human label instead of a blank, so the payments list
+    /// still reads sensibly; every plan-carrying purpose keeps its snapshotted plan name.
+    /// </summary>
+    private static string ResolvePurposeLabel(PaymentPurpose purpose) => purpose switch
+    {
+        PaymentPurpose.WalletTopUp => "Wallet top-up",
+        PaymentPurpose.RegistrationFee => "Registration fee",
+        _ => "—"
     };
 }
