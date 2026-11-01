@@ -1,0 +1,161 @@
+@using TenantCore.Shared.Dtos.UsageBilling
+@inject IUsageBillingApiClient UsageBillingApi
+@inject IToastService Toast
+@inject IJSRuntime JS
+
+@* Wallet top-up: amount entry with presets and min/max hints, a confirmation, then the payment link
+   with copy and "I've paid — check now". Nothing is credited until the gateway confirms; raises
+   OnChanged so the host screen reloads the balance.
+   Usage:
+     <TopUpDialog Wallet="_wallet" OnChanged="LoadAsync" />
+*@
+
+<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:4px;">Top up the wallet</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:12px;">
+        A payment link is created for the amount below. The wallet is credited only once the gateway
+        confirms the payment — the link can be shared with whoever pays.
+    </div>
+
+    <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+        <div>
+            <label for="topup-amount" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">
+                Amount (@Currency)
+            </label>
+            <input id="topup-amount" class="form-input" type="number" min="1" step="1" @bind="_amount"
+                   style="width:160px;" />
+        </div>
+
+        @foreach (var quick in QuickAmounts)
+        {
+            <button class="btn btn-outline-primary" @onclick="() => _amount = quick" disabled="@_busy">
+                @Money(quick)
+            </button>
+        }
+
+        <button class="btn btn-primary" @onclick="() => _confirm = true" disabled="@_busy || _amount <= 0m">
+            Create payment link
+        </button>
+    </div>
+
+    <div style="font-size:12px;color:#64748B;margin-top:8px;">
+        The amount is checked against CloudClinic's top-up limits — an amount outside them creates nothing
+        and the reason is shown here.
+    </div>
+
+    @if (_topUp is not null)
+    {
+        <div style="margin-top:14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:6px;">
+                Top-up link — @_topUp.Amount.ToString("N2")
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_topUp.PaymentLinkUrl))
+            {
+                <a href="@_topUp.PaymentLinkUrl" target="_blank" rel="noopener"
+                   style="font-size:13px;font-weight:700;color:#1565C0;word-break:break-all;">@_topUp.PaymentLinkUrl</a>
+                <div style="margin-top:8px;">
+                    <button class="btn btn-outline-primary" @onclick="CopyLinkAsync" disabled="@_busy">📋 Copy link</button>
+                </div>
+            }
+            else
+            {
+                <div style="font-size:13px;color:#475569;">
+                    The link is being created — this takes a few seconds. Use <em>Check now</em> shortly.
+                </div>
+            }
+            <div style="margin-top:10px;">
+                <button class="btn btn-primary" @onclick="CheckTopUpAsync" disabled="@_busy">
+                    I've paid — check now
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<ConfirmDialog Visible="_confirm" IsDangerous="false" IsBusy="_busy"
+               Title="Create a top-up link?" ConfirmText="Create link" BusyText="Creating…"
+               OnConfirm="CreateTopUpAsync" OnCancel="CloseConfirm">
+    <div>
+        This creates a payment link for <strong>@Money(_amount)</strong>. Nothing is credited until the link is
+        paid and the gateway confirms it; a second, older unpaid link for this clinic is cancelled automatically.
+    </div>
+</ConfirmDialog>
+
+@code {
+    private static readonly decimal[] QuickAmounts = [500m, 1000m, 5000m];
+
+    [Parameter] public ClinicWalletDto? Wallet { get; set; }
+
+    /// <summary>Raised after a link is created or a check has run, so the host reloads the wallet.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private WalletTopUpPaymentDto? _topUp;
+    private decimal _amount = 1000m;
+    private bool _busy;
+    private bool _confirm;
+
+    private string Currency => string.IsNullOrEmpty(Wallet?.Currency) ? "INR" : Wallet!.Currency;
+
+    private void CloseConfirm() => _confirm = false;
+
+    private async Task CreateTopUpAsync()
+    {
+        if (!_confirm || _amount <= 0m) return;
+        _busy = true;
+
+        var response = await UsageBillingApi.CreateTopUpAsync(_amount);
+        if (response.Success)
+        {
+            _topUp = response.Data;
+            _confirm = false;
+            Toast.ShowSuccess("Top-up payment link created.");
+            await OnChanged.InvokeAsync();
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Could not create the payment link. Please try again.");
+        }
+
+        _busy = false;
+    }
+
+    private async Task CheckTopUpAsync()
+    {
+        if (_topUp is null) return;
+        _busy = true;
+
+        var response = await UsageBillingApi.CheckTopUpAsync(_topUp.PaymentId);
+        if (response.Success)
+        {
+            // The gateway webhook is the source of truth; this only asks it to look now.
+            Toast.ShowSuccess("Checking with the payment provider…");
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await OnChanged.InvokeAsync();
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Could not check the payment. Please try again shortly.");
+        }
+
+        _busy = false;
+    }
+
+    private async Task CopyLinkAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_topUp?.PaymentLinkUrl)) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _topUp.PaymentLinkUrl);
+            Toast.ShowSuccess("Payment link copied.");
+        }
+        catch
+        {
+            // Clipboard access can be blocked by the browser; the link stays on screen and is selectable.
+            Toast.ShowWarning("Could not copy automatically — select the link and copy it.");
+        }
+    }
+
+    private string Money(decimal value)
+        => (Currency == "INR" ? "₹" : Currency + " ") + value.ToString("N2");
+}

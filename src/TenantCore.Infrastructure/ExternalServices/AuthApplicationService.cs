@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using TenantCore.Application.Common.Exceptions;
 using TenantCore.Application.Services;
 using TenantCore.Shared.Dtos.Auth;
 using TenantCore.Shared.Enums;
@@ -243,7 +244,7 @@ public sealed class AuthApplicationService(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
-            var error = new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            var error = new AuthApiException((int)response.StatusCode, DescribeAuthFailure(response.StatusCode));
             await LogAuthCallFailureAsync(error, response.StatusCode, cancellationToken);
             throw error;
         }
@@ -272,11 +273,22 @@ public sealed class AuthApplicationService(
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
-            var error = new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            var error = new AuthApiException((int)response.StatusCode, DescribeAuthFailure(response.StatusCode));
             await LogAuthCallFailureAsync(error, response.StatusCode, cancellationToken);
             throw error;
         }
     }
+
+    // User-safe message only — the actual upstream body (which can contain internal details such
+    // as raw EF Core exception text) is logged above, never surfaced to the client (DEF-UM-03).
+    private static string DescribeAuthFailure(System.Net.HttpStatusCode statusCode) => statusCode switch
+    {
+        System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden
+            => "You are not authorized to perform this action.",
+        System.Net.HttpStatusCode.NotFound => "The requested item was not found.",
+        System.Net.HttpStatusCode.BadRequest => "The request was invalid.",
+        _ => "The authentication service could not complete this request."
+    };
 
     // Auth API always returns HTTP 200. This helper also checks the JSON body's
     // Success field so business errors (duplicate invite, etc.) surface correctly.
@@ -287,7 +299,7 @@ public sealed class AuthApplicationService(
         if (!response.IsSuccessStatusCode)
         {
             logger.LogWarning("Auth API returned {StatusCode}: {Body}", (int)response.StatusCode, body);
-            var error = new InvalidOperationException($"Auth API error ({(int)response.StatusCode}): {body}");
+            var error = new AuthApiException((int)response.StatusCode, DescribeAuthFailure(response.StatusCode));
             await LogAuthCallFailureAsync(error, response.StatusCode, cancellationToken);
             throw error;
         }

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Moq;
 using TenantCore.Application.Features.OpdPayments.Commands;
 using TenantCore.Application.Features.OpdPayments.Handlers;
@@ -13,6 +14,14 @@ namespace TenantCore.Application.Tests.Features.OpdPayments.Handlers;
 public class ProcessOpdRefundHandlerTests
 {
     private readonly Mock<IOpdPaymentRepository> _repository = new();
+    private readonly Mock<IClinicUsageRecordRepository> _usageRecordRepository = new();
+    private readonly Mock<IClinicWalletRepository> _walletRepository = new();
+    private readonly Mock<IClinicWalletTransactionRepository> _walletTransactionRepository = new();
+    private readonly Mock<ILogger<ProcessOpdRefundHandler>> _logger = new();
+
+    private ProcessOpdRefundHandler CreateHandler() =>
+        new(_repository.Object, _usageRecordRepository.Object, _walletRepository.Object,
+            _walletTransactionRepository.Object, _logger.Object);
 
     [Fact]
     public async Task Handle_PendingRefund_ReducesCollectedAmountAndMarksRefunded()
@@ -29,7 +38,7 @@ public class ProcessOpdRefundHandlerTests
         _repository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        var handler = new ProcessOpdRefundHandler(_repository.Object);
+        var handler = CreateHandler();
         var command = new ProcessOpdRefundCommand(new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, refundedBy, appId);
         var result = await handler.Handle(command, CancellationToken.None);
 
@@ -49,7 +58,7 @@ public class ProcessOpdRefundHandlerTests
         _repository.Setup(r => r.GetByOpdRegistrationIdAsync(opdId, appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((OpdPayment?)null);
 
-        var handler = new ProcessOpdRefundHandler(_repository.Object);
+        var handler = CreateHandler();
         var action = () => handler.Handle(
             new ProcessOpdRefundCommand(new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, Guid.NewGuid(), appId),
             CancellationToken.None);
@@ -68,7 +77,7 @@ public class ProcessOpdRefundHandlerTests
         _repository.Setup(r => r.GetByOpdRegistrationIdAsync(opdId, appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
 
-        var handler = new ProcessOpdRefundHandler(_repository.Object);
+        var handler = CreateHandler();
         var action = () => handler.Handle(
             new ProcessOpdRefundCommand(new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, Guid.NewGuid(), appId),
             CancellationToken.None);

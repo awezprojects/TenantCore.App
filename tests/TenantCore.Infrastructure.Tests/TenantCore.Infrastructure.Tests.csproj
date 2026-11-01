@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="FluentAssertions" Version="6.12.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.14" />
@@ -25,7 +29,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TenantCore.Domain\TenantCore.Domain.csproj" />
-    <ProjectReference Include="..\..\src\TenantCore.Infrastructure\TenantCore.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

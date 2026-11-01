@@ -14,8 +14,9 @@
 <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Create Your Account</h2>
 <p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">Start managing your clinic today.</p>
 
-<EditForm Model="_model" OnValidSubmit="HandleRegister">
+<EditForm Model="_model" OnSubmit="HandleSubmit">
     <DataAnnotationsValidator />
+    <ValidationSummary />
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="auth-input-wrap" style="margin-bottom:0;">
@@ -91,9 +92,12 @@
     private bool _showPassword;
     private string? _errorMessage;
 
-    private async Task HandleRegister()
+    private async Task HandleSubmit(EditContext editContext)
     {
         _errorMessage = null;
+
+        if (!editContext.Validate())
+            return;
 
         if (_model.Password != _confirmPassword)
         {

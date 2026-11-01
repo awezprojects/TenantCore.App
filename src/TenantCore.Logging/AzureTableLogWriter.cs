@@ -47,18 +47,20 @@ public sealed class AzureTableLogWriter : IAppLogWriter
         {
             { nameof(LogEntry.Category), entry.Category },
             { nameof(LogEntry.Source), entry.Source },
-            { nameof(LogEntry.Message), entry.Message },
+            { nameof(LogEntry.Message), LogScrubber.Scrub(entry.Message, 8000) },
             { nameof(LogEntry.ExceptionType), entry.ExceptionType },
-            { nameof(LogEntry.StackTrace), entry.StackTrace },
+            { nameof(LogEntry.StackTrace), LogScrubber.Scrub(entry.StackTrace) },
             { nameof(LogEntry.ApplicationId), entry.ApplicationId },
             { nameof(LogEntry.UserId), entry.UserId },
             { nameof(LogEntry.RequestPath), entry.RequestPath },
-            { nameof(LogEntry.AdditionalContext), entry.AdditionalContext },
+            { nameof(LogEntry.AdditionalContext), LogScrubber.Scrub(entry.AdditionalContext, 8000) },
             { nameof(LogEntry.Environment), entry.Environment },
             { nameof(LogEntry.TimestampUtc), entry.TimestampUtc },
             { nameof(LogEntry.CorrelationId), entry.CorrelationId },
             { nameof(LogEntry.Status), entry.Status },
-            { nameof(LogEntry.DurationMs), entry.DurationMs }
+            { nameof(LogEntry.DurationMs), entry.DurationMs },
+            { nameof(LogEntry.HttpMethod), entry.HttpMethod },
+            { nameof(LogEntry.StatusCode), entry.StatusCode }
         };
 
         await tableClient.AddEntityAsync(tableEntity, ct);

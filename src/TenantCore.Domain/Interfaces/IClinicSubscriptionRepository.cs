@@ -5,14 +5,41 @@ namespace TenantCore.Domain.Interfaces;
 /// <summary>Every method here filters by applicationId — ClinicSubscription is tenant-scoped.</summary>
 public interface IClinicSubscriptionRepository : IClinicRepository<ClinicSubscription>
 {
-    /// <summary>The subscription (if any) currently granting access — Status Active and EndDate in the future. Used by the access guard.</summary>
+    /// <summary>
+    /// The subscription currently granting access — Active, already started and not yet ended.
+    /// A term bought for later is deliberately NOT returned. Used by the access guard.
+    /// </summary>
     Task<ClinicSubscription?> GetActiveForClinicAsync(Guid applicationId, CancellationToken ct = default);
 
     /// <summary>Most recent subscription by StartDate, regardless of status — used to compute the renewal start date.</summary>
     Task<ClinicSubscription?> GetLatestForClinicAsync(Guid applicationId, CancellationToken ct = default);
 
+    /// <summary>Tracked. Active terms that have not started yet, earliest first — re-chained when one is cancelled.</summary>
+    Task<IReadOnlyList<ClinicSubscription>> GetUpcomingForClinicAsync(Guid applicationId, DateTime utcNow, CancellationToken ct = default);
+
+    /// <summary>
+    /// The last moment the clinic is covered, counting terms bought but not started. Null when
+    /// nothing covers it. Every new term starts here (or now), so terms never gap or overlap.
+    /// </summary>
+    Task<DateTime?> GetCoverageEndAsync(Guid applicationId, DateTime utcNow, CancellationToken ct = default);
+
     Task<IReadOnlyList<ClinicSubscription>> GetHistoryForClinicAsync(Guid applicationId, CancellationToken ct = default);
 
     /// <summary>True when the clinic has ever held a Trial subscription, of any status — enforces the once-per-clinic trial rule.</summary>
     Task<bool> HasUsedTrialAsync(Guid applicationId, CancellationToken ct = default);
+
+    /// <summary>True when the clinic has ANY subscription history at all, of any plan/status — the legacy-only trial rule for existing clinics once onboarding payments are required.</summary>
+    Task<bool> HasAnySubscriptionHistoryAsync(Guid applicationId, CancellationToken ct = default);
+
+    /// <summary>Idempotency lookup for activation — at most one subscription per payment.</summary>
+    Task<ClinicSubscription?> GetByPaymentIdAsync(Guid subscriptionPaymentId, CancellationToken ct = default);
+
+    /// <summary>Idempotency lookup for a trial grant — at most one subscription per onboarding request.</summary>
+    Task<ClinicSubscription?> GetByOnboardingRequestIdAsync(Guid onboardingRequestId, CancellationToken ct = default);
+
+    /// <summary>
+    /// True when any clinic has an active or future subscription on this plan.
+    /// Used to guard plan hard-delete: a plan with active subscribers cannot be deleted.
+    /// </summary>
+    Task<bool> AnyActiveOrUpcomingForPlanAsync(Guid planId, CancellationToken ct = default);
 }

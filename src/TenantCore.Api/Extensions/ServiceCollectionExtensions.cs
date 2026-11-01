@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using TenantCore.Api.Authentication;
 using TenantCore.Api.Authorization;
 using TenantCore.Shared.Authorization;
 
@@ -42,7 +44,12 @@ public static class ServiceCollectionExtensions
                 RoleClaimType = "role",
                 NameClaimType = "email"
             };
-        });
+        })
+        // "InternalService" — guards api/internal/* for the TenantCore.Admin portal only.
+        // Added to the same builder chain, not the default scheme, so every existing
+        // [Authorize] using JWT bearer auth is completely unaffected.
+        .AddScheme<AuthenticationSchemeOptions, InternalServiceKeyAuthenticationHandler>(
+            InternalServiceKeyAuthenticationHandler.SchemeName, options => { });
 
         // Register the handler that enforces per-clinic role checks via the app_roles JWT claim.
         services.AddSingleton<IAuthorizationHandler, ClinicRoleAuthorizationHandler>();

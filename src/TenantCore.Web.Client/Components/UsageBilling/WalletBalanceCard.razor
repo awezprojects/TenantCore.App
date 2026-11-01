@@ -1,0 +1,62 @@
+@using TenantCore.Shared.Dtos.UsageBilling
+
+@* Reusable wallet summary: balance, low-balance threshold, the low warning, the last top-up and a
+   Top up button — so the billing overview and the wallet screen show the same figures the same way.
+   Usage:
+     /billing         <WalletBalanceCard Balance="@(s.WalletBalance ?? 0m)" LowBalanceThreshold="@(s.LowBalanceThreshold ?? 0m)"
+                                            IsLow="s.WalletIsLow" Currency="s.Currency" TopUpHref="/billing/wallet" />
+     /billing/wallet  <WalletBalanceCard Wallet="_wallet" TopUpHref="#topup-amount" />
+*@
+
+@{
+    var balance = Wallet?.Balance ?? Balance;
+    var threshold = Wallet?.LowBalanceThreshold ?? LowBalanceThreshold;
+    var isLow = Wallet?.IsLow ?? IsLow;
+    var lastTopUpAt = Wallet?.LastTopUpAt ?? LastTopUpAt;
+    var currency = string.IsNullOrEmpty(Wallet?.Currency) ? Currency : Wallet!.Currency;
+}
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">
+    <AppStatCard Icon="💳" Label="Balance" Value="@Money(balance, currency)"
+                 Sub="@(isLow ? "At or below the warning level" : "Healthy")"
+                 Color="@(isLow ? "yellow" : "green")" />
+    <AppStatCard Icon="🔔" Label="Low-balance warning" Value="@Money(threshold, currency)"
+                 Sub="A warning only — it never blocks the app" />
+    <AppStatCard Icon="⬆️" Label="Last top-up"
+                 Value="@(lastTopUpAt?.ToLocalTime().ToString("dd MMM yyyy") ?? "Never")"
+                 Sub="@(lastTopUpAt?.ToLocalTime().ToString("HH:mm") ?? "No credit has been received yet")" />
+</div>
+
+@if (isLow)
+{
+    <div style="background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;padding:14px 18px;margin-bottom:18px;
+                display:flex;align-items:flex-start;gap:10px;">
+        <span style="font-size:18px;">⚠️</span>
+        <div style="font-size:13px;color:#854D0E;font-weight:600;">
+            The balance is at or below @Money(threshold, currency). Top up to avoid metered charges piling up
+            against an empty wallet.
+        </div>
+    </div>
+}
+
+@if (ShowTopUp)
+{
+    <div style="margin:-4px 0 18px;">
+        <a href="@TopUpHref" class="btn btn-primary">⬆️ Top up the wallet</a>
+    </div>
+}
+
+@code {
+    /// <summary>Pass either a wallet DTO or the raw figures (the billing summary carries no ledger).</summary>
+    [Parameter] public ClinicWalletDto? Wallet { get; set; }
+    [Parameter] public decimal Balance { get; set; }
+    [Parameter] public decimal LowBalanceThreshold { get; set; }
+    [Parameter] public bool IsLow { get; set; }
+    [Parameter] public DateTime? LastTopUpAt { get; set; }
+    [Parameter] public string Currency { get; set; } = "INR";
+    [Parameter] public bool ShowTopUp { get; set; } = true;
+    [Parameter] public string TopUpHref { get; set; } = "/billing/wallet";
+
+    private static string Money(decimal value, string currency)
+        => (currency == "INR" ? "₹" : currency + " ") + value.ToString("N2");
+}

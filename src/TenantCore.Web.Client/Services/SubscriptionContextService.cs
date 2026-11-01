@@ -14,8 +14,18 @@ public class SubscriptionContextService(ISubscriptionApiClient subscriptionApi)
     public SubscriptionStatusDto? Status { get; private set; }
     public bool IsLoaded { get; private set; }
 
-    /// <summary>True once status has loaded and the clinic has no currently-active subscription.</summary>
-    public bool IsLocked => IsLoaded && Status?.HasActiveSubscription != true;
+    /// <summary>
+    /// True once status has loaded and the clinic has no active subscription AND is not pay-as-you-go.
+    /// PAYG clinics are metered, not subscription-gated — an absent subscription is their normal state.
+    /// </summary>
+    public bool IsLocked => IsLoaded && Status?.HasActiveSubscription != true && Status?.IsPayAsYouGo != true;
+
+    /// <summary>
+    /// True once status has loaded and an internal admin has suspended the clinic. Takes precedence
+    /// over IsLocked: a suspension cannot be cleared by subscribing, so the plan picker must not be
+    /// shown in its place.
+    /// </summary>
+    public bool IsSuspended => IsLoaded && Status?.IsSuspended == true;
 
     public event Action? OnSubscriptionChanged;
 

@@ -74,6 +74,21 @@ public class ClinicContextMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_OnboardingRouteWithoutHeader_PassesThrough()
+    {
+        // ClinicOnboardingController inherits ClinicControllerBase (for GetCurrentUserId reuse)
+        // but is not clinic-scoped — no clinic exists yet for a pending onboarding request.
+        var context = CreateContext(authenticated: true, appIdHeader: null, typeof(ClinicOnboardingController));
+        var nextCalled = false;
+        var middleware = CreateMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+
+        await middleware.InvokeAsync(context);
+
+        nextCalled.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
+    [Fact]
     public async Task InvokeAsync_NoEndpointResolvedWithoutHeader_PassesThrough()
     {
         var context = CreateContext(authenticated: true, appIdHeader: null, controllerType: null);

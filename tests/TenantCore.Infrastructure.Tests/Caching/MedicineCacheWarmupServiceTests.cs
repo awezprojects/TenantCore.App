@@ -35,7 +35,10 @@ public class MedicineCacheWarmupServiceTests
 
         var service = new MedicineCacheWarmupService(
             provider.GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<MedicineCacheWarmupService>.Instance);
+            NullLogger<MedicineCacheWarmupService>.Instance,
+            // The production settle window is 10s (migrations/seeding first); the test skips it so the
+            // assertion below does not have to wait it out.
+            startupDelay: TimeSpan.Zero);
 
         var medicineCache = provider.GetRequiredService<RefreshableCache<Medicine>>();
         var typeCache = provider.GetRequiredService<RefreshableCache<MedicineType>>();

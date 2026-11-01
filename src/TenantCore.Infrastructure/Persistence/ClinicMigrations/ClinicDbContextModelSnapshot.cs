@@ -184,6 +184,112 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("Cities", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AccessStatus")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("BillingMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int?>("FreeTestDays")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PendingBillingMode")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PendingBillingModeEffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("PendingWalletCreditOnFeePayment")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ReactivatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReactivatedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<decimal?>("RegistrationFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("RegistrationFeeChargedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RegistrationFeeChargedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("RegistrationFeeWaiveReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("RegistrationFeeWaived")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("RegistrationFeeWaivedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("RestrictToOfferedPlans")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("SuspendedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SuspendedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("SuspensionMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("TrialStartedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicAccounts", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicFeatureFlags", b =>
                 {
                     b.Property<Guid>("Id")
@@ -286,6 +392,303 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("ClinicLocations", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicOnboardingRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ActivatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("AmountReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("ApprovalBillingMode")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ApprovalFreeTestDays")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("ApprovalInitialWalletCredit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("ApprovalIpdAdmissionRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ApprovalIpdDischargeRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ApprovalOpdRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ApprovalOtSurgeryRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ApprovalRegistrationFee")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("ApprovedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ApprovedClinicCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("ApprovedPlanCode")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ApprovedPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AttentionReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ClinicContactNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ClinicName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ClinicSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("CurrentPaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DoctorName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("ExpectedStaffCount")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsTrialGrant")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LastPaymentCheckAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MedicalCouncil")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("MedicalRegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("NeedsAttention")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("OfficialEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Pincode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal?>("PlanListPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PreferredClinicCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("ProvisionedApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReferralSource")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RequesterEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("RequesterName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("RequesterPhone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReviewedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("ReviewedByAdminId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Website")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NeedsAttention");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("ClinicOnboardingRequests", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicPlanOffer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("CreatedByAdminEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<decimal?>("OfferPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SubscriptionPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("ValidUntil")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("WithdrawnAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WithdrawnByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubscriptionPlanId");
+
+                    b.HasIndex("ApplicationId", "IsActive");
+
+                    b.HasIndex("ApplicationId", "SubscriptionPlanId")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("ClinicPlanOffers", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClinicPlanOffers_OfferPrice_NonNegative", "[OfferPrice] IS NULL OR [OfferPrice] >= 0");
+                        });
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicSubscription", b =>
                 {
                     b.Property<Guid>("Id")
@@ -303,6 +706,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("CancelledAt")
                         .HasColumnType("datetime2");
@@ -334,6 +741,17 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("GrantReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("GrantedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("OnboardingRequestId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("PlanCode")
                         .HasColumnType("int");
 
@@ -346,6 +764,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<Guid?>("PurchasedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -356,6 +777,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("SubscriptionPaymentId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("SubscriptionPlanId")
                         .HasColumnType("uniqueidentifier");
@@ -369,9 +793,19 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OnboardingRequestId")
+                        .IsUnique()
+                        .HasFilter("[OnboardingRequestId] IS NOT NULL");
+
+                    b.HasIndex("SubscriptionPaymentId")
+                        .IsUnique()
+                        .HasFilter("[SubscriptionPaymentId] IS NOT NULL");
+
                     b.HasIndex("SubscriptionPlanId");
 
                     b.HasIndex("ApplicationId", "Status", "EndDate");
+
+                    b.HasIndex("ApplicationId", "Status", "StartDate");
 
                     b.ToTable("ClinicSubscriptions", "clinic", t =>
                         {
@@ -379,6 +813,132 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
 
                             t.HasCheckConstraint("CK_ClinicSubscriptions_PricePaid_NonNegative", "[PricePaid] >= 0");
                         });
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicUsageRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("BillingItem")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("UpdatedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "BillingItem")
+                        .IsUnique()
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("ClinicUsageRates", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicUsageRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("BillingItem")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ChargedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsFree")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PayerMode")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SourceEntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("UnitRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("WalletTransactionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "ChargedAt");
+
+                    b.HasIndex("ApplicationId", "BillingItem", "ChargedAt");
+
+                    b.HasIndex("ApplicationId", "BillingItem", "SourceEntityId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicUsageRecords", "clinic");
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicUsgTemplate", b =>
@@ -409,6 +969,131 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .IsUnique();
 
                     b.ToTable("ClinicUsgTemplates", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicWallet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<DateTime?>("LastDebitAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastTopUpAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("LowBalanceThreshold")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicWallets", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicWalletTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("CreatedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ReferenceType")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "OccurredAt")
+                        .IsDescending(false, true);
+
+                    b.HasIndex("ApplicationId", "ReferenceType", "ReferenceId")
+                        .IsUnique()
+                        .HasFilter("[ReferenceId] IS NOT NULL");
+
+                    b.ToTable("ClinicWalletTransactions", "clinic");
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.CounterSession", b =>
@@ -1310,6 +1995,10 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasIndex("MedicineTypeId");
 
                     b.HasIndex("Name");
+
+                    b.HasIndex("ApplicationId", "IsActive")
+                        .HasDatabaseName("IX_Medicines_SystemCatalogue")
+                        .HasFilter("[ApplicationId] IS NULL AND [IsActive] = 1");
 
                     b.ToTable("Medicines", (string)null);
                 });
@@ -2228,6 +2917,55 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("Patients", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.PaymentWebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Gateway")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique();
+
+                    b.ToTable("PaymentWebhookEvents", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.PregnancyTenure", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2751,7 +3489,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0001-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription is set to expire on {ExpiryDate}. Renew now to avoid any interruption to your clinic's access.",
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(639),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2898),
                             DaysBeforeExpiry = 10,
                             DisplayOrder = 1,
                             Headline = "Time to renew soon",
@@ -2763,7 +3501,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0002-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Only a few days left. Renew before {ExpiryDate} to keep your clinic running without interruption.",
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(641),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2903),
                             DaysBeforeExpiry = 5,
                             DisplayOrder = 2,
                             Headline = "Your subscription expires soon",
@@ -2775,7 +3513,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0003-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription expires on {ExpiryDate}. Renew today to avoid losing access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(646),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2907),
                             DaysBeforeExpiry = 2,
                             DisplayOrder = 3,
                             Headline = "Final reminder — act now",
@@ -2787,12 +3525,163 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0004-0000-0000-000000000000"),
                             AlertType = 2,
                             BodyMessage = "Your subscription expired on {ExpiryDate}. Choose a plan to restore access to your clinic.",
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(647),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2935),
                             DaysBeforeExpiry = 0,
                             DisplayOrder = 4,
                             Headline = "Subscription expired",
                             IsEnabled = true,
                             Subject = "Your {ClinicName} subscription has expired"
+                        });
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.SubscriptionPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("AmountInMinorUnits")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AmountReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ClinicName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ClinicSubscriptionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("GatewayPaymentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("GatewayPaymentLinkId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("InitiatedByAdminEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("InitiatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("LastCheckAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LinkExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Method")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("OnboardingRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PayerEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("PayerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PayerPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("PaymentLinkUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("PlanCode")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PlanListPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("PlanName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("ReplacedByPaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReplacesPaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("SubscriptionPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId");
+
+                    b.HasIndex("ClinicSubscriptionId")
+                        .IsUnique()
+                        .HasFilter("[ClinicSubscriptionId] IS NOT NULL");
+
+                    b.HasIndex("GatewayPaymentId")
+                        .IsUnique()
+                        .HasFilter("[GatewayPaymentId] IS NOT NULL");
+
+                    b.HasIndex("GatewayPaymentLinkId")
+                        .IsUnique()
+                        .HasFilter("[GatewayPaymentLinkId] IS NOT NULL");
+
+                    b.HasIndex("OnboardingRequestId");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("SubscriptionPayments", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_SubscriptionPayments_Amount_NonNegative", "[Amount] >= 0");
                         });
                 });
 
@@ -2829,6 +3718,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<int>("DurationDays")
                         .HasColumnType("int");
 
+                    b.Property<int?>("FreeTestDays")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -2838,6 +3730,11 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
+
+                    b.Property<bool>("IsPublic")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("IsTrial")
                         .ValueGeneratedOnAdd()
@@ -2852,6 +3749,12 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("RegistrationFee")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -2868,7 +3771,8 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Code] <> 5");
 
                     b.ToTable("SubscriptionPlans", "clinic");
 
@@ -2877,61 +3781,69 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0001-0000-0000-000000000000"),
                             Code = 1,
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(5253),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(461),
                             Currency = "INR",
                             Description = "Try every feature free for 14 days.",
                             DisplayOrder = 1,
                             DurationDays = 14,
                             IsActive = true,
                             IsPopular = false,
+                            IsPublic = true,
                             IsTrial = true,
                             Name = "Free Trial",
-                            Price = 0m
+                            Price = 0m,
+                            RegistrationFee = 0m
                         },
                         new
                         {
                             Id = new Guid("b2c3d4e5-0002-0000-0000-000000000000"),
                             Code = 2,
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(5272),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(469),
                             Currency = "INR",
                             Description = "Billed every 30 days. Cancel anytime.",
                             DisplayOrder = 2,
                             DurationDays = 30,
                             IsActive = true,
                             IsPopular = false,
+                            IsPublic = true,
                             IsTrial = false,
                             Name = "Monthly",
-                            Price = 999m
+                            Price = 999m,
+                            RegistrationFee = 0m
                         },
                         new
                         {
                             Id = new Guid("b2c3d4e5-0003-0000-0000-000000000000"),
                             Code = 3,
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(5274),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(473),
                             Currency = "INR",
                             Description = "Our most popular plan — save versus monthly billing.",
                             DisplayOrder = 3,
                             DurationDays = 90,
                             IsActive = true,
                             IsPopular = true,
+                            IsPublic = true,
                             IsTrial = false,
                             Name = "Quarterly",
-                            Price = 2499m
+                            Price = 2499m,
+                            RegistrationFee = 0m
                         },
                         new
                         {
                             Id = new Guid("b2c3d4e5-0004-0000-0000-000000000000"),
                             Code = 4,
-                            CreatedAt = new DateTime(2026, 9, 13, 23, 41, 50, 749, DateTimeKind.Utc).AddTicks(5276),
+                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(477),
                             Currency = "INR",
                             Description = "The best value — a full year of every feature.",
                             DisplayOrder = 4,
                             DurationDays = 365,
                             IsActive = true,
                             IsPopular = false,
+                            IsPublic = true,
                             IsTrial = false,
                             Name = "Yearly",
-                            Price = 8999m
+                            Price = 8999m,
+                            RegistrationFee = 0m
                         });
                 });
 
@@ -3314,6 +4226,87 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("Wards", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.WorkflowTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AggregateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AggregateType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("LockedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("LockedUntil")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("NextAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TaskType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("AggregateType", "AggregateId");
+
+                    b.HasIndex("Status", "NextAttemptAt");
+
+                    b.ToTable("WorkflowTasks", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.AmountHandover", b =>
                 {
                     b.HasOne("TenantCore.Domain.Entities.CounterSession", null)
@@ -3370,6 +4363,17 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Navigation("City");
 
                     b.Navigation("State");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.ClinicPlanOffer", b =>
+                {
+                    b.HasOne("TenantCore.Domain.Entities.SubscriptionPlan", "Plan")
+                        .WithMany()
+                        .HasForeignKey("SubscriptionPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Plan");
                 });
 
             modelBuilder.Entity("TenantCore.Domain.Entities.ClinicSubscription", b =>

@@ -2,11 +2,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TenantCore.Application.Common;
+using TenantCore.Application.Common.Workflow;
+using TenantCore.Application.Features.Onboarding.Tasks;
 using TenantCore.Application.Services;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Infrastructure.Logging;
+using TenantCore.Infrastructure.BackgroundJobs;
+using TenantCore.Application.Features.UsageBilling.Services;
 using TenantCore.Infrastructure.Caching;
 using TenantCore.Infrastructure.ExternalServices;
+using TenantCore.Infrastructure.ExternalServices.Razorpay;
 using TenantCore.Infrastructure.Persistence;
 using TenantCore.Infrastructure.Repositories;
 using TenantCore.Infrastructure.Services;
@@ -30,6 +36,14 @@ public static class DependencyInjection
         services.AddScoped<IOpdRegistrationRepository, OpdRegistrationRepository>();
         services.AddScoped<IIpdRegistrationRepository, IpdRegistrationRepository>();
         services.AddScoped<IClinicFeeConfigRepository, ClinicFeeConfigRepository>();
+
+        // Pay-as-you-go metering (Phase 2). The options carry safe defaults, so the feature runs with
+        // no UsageBilling section present at all.
+        services.Configure<UsageBillingOptions>(configuration.GetSection(UsageBillingOptions.SectionName));
+        services.AddScoped<IClinicWalletRepository, ClinicWalletRepository>();
+        services.AddScoped<IClinicWalletTransactionRepository, ClinicWalletTransactionRepository>();
+        services.AddScoped<IClinicUsageRateRepository, ClinicUsageRateRepository>();
+        services.AddScoped<IClinicUsageRecordRepository, ClinicUsageRecordRepository>();
 
         // Medicines, medicine types and dosage forms are served through caching decorators backed
         // by RefreshableCache<T> snapshots that a background hosted service keeps warm (initial
@@ -68,7 +82,9 @@ public static class DependencyInjection
         services.AddScoped<ICounterSessionRepository, CounterSessionRepository>();
         services.AddScoped<IAmountHandoverRepository, AmountHandoverRepository>();
         services.AddScoped<IClinicFeatureFlagsRepository, ClinicFeatureFlagsRepository>();
+        services.AddScoped<IClinicAccountRepository, ClinicAccountRepository>();
         services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+        services.AddScoped<IClinicPlanOfferRepository, ClinicPlanOfferRepository>();
         services.AddScoped<IClinicSubscriptionRepository, ClinicSubscriptionRepository>();
         services.AddScoped<ISubscriptionAlertSettingRepository, SubscriptionAlertSettingRepository>();
         services.AddScoped<IHistoryLookupItemRepository, HistoryLookupItemRepository>();
@@ -77,21 +93,78 @@ public static class DependencyInjection
         services.AddScoped<ICityRepository, CityRepository>();
         services.AddScoped<IClinicLocationRepository, ClinicLocationRepository>();
 
+        // Clinic onboarding + durable workflow (see plan/clinic-trial-razorpay-subscriptions/PLAN.md)
+        services.AddScoped<IClinicOnboardingRequestRepository, ClinicOnboardingRequestRepository>();
+        services.AddScoped<ISubscriptionPaymentRepository, SubscriptionPaymentRepository>();
+        services.AddScoped<IWorkflowTaskRepository, WorkflowTaskRepository>();
+        services.AddScoped<IPaymentWebhookEventRepository, PaymentWebhookEventRepository>();
+
+        services.Configure<RazorpayOptions>(configuration.GetSection("Razorpay"));
+        services.Configure<AuthInternalApiOptions>(configuration.GetSection("AuthInternalApi"));
+
+        // Missing Razorpay keys must never fail startup — IPaymentGateway.IsConfigured governs
+        // whether payment operations are attempted; the app still runs with payments disabled.
+        services.AddHttpClient("RazorpayApi", (sp, client) =>
+        {
+            var razorpayOptions = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<RazorpayOptions>>().Value;
+            client.BaseAddress = new Uri(razorpayOptions.ApiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).AddStandardResilienceHandler();
+
+        services.AddHttpClient("AuthInternalApi", (sp, client) =>
+        {
+            var authInternalOptions = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthInternalApiOptions>>().Value;
+            var baseUrl = string.IsNullOrWhiteSpace(authInternalOptions.BaseUrl)
+                ? configuration["AuthApi:BaseUrl"] ?? "https://localhost:7136/"
+                : authInternalOptions.BaseUrl;
+            client.BaseAddress = new Uri(baseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).AddStandardResilienceHandler();
+
+        services.AddScoped<IPaymentGateway, RazorpayPaymentGateway>();
+        services.AddScoped<IAuthProvisioningService, AuthProvisioningService>();
+
+        services.AddHostedService<WorkflowTaskProcessor>();
+        services.AddHostedService<PaymentReconciliationService>();
+
+        // Every IWorkflowTaskHandler implementation — dispatched by TaskType at runtime.
+        services.AddScoped<IWorkflowTaskHandler, CreatePaymentLinkTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, CancelPaymentLinkTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, SendEmailTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, ConfirmPaymentTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, ProvisionClinicTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, ActivateSubscriptionTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, ProcessWebhookEventTaskHandler>();
+        // Phase 2 — the two new purposes ride the same durable-outbox pipeline as the seven above.
+        services.AddScoped<IWorkflowTaskHandler, CreditWalletTaskHandler>();
+        services.AddScoped<IWorkflowTaskHandler, RecordRegistrationFeeTaskHandler>();
+
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<IBlobStorageService, AzureBlobStorageService>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddSingleton<INotificationPublisher, ServiceBusNotificationPublisher>();
         services.AddScoped<IPdfConversionService, PdfConversionService>();
         services.AddScoped<IPrescriptionPdfGenerator, PrescriptionPdfGenerator>();
 
         services.AddAppLogging(configuration);
+
+        // Every IHttpClientFactory client — present and future — logs its outbound calls (ADR-011).
+        // (IHttpContextAccessor is registered by the Api host.)
+        services.AddTransient<OutboundCallLoggingHandler>();
+        services.ConfigureHttpClientDefaults(http => http.AddHttpMessageHandler<OutboundCallLoggingHandler>());
         services.AddScoped<IErrorLogger, ErrorLoggingService>();
         services.AddScoped<IActionLogger, ActionLoggingService>();
         services.AddScoped<ICurrentUserContext, CurrentUserContext>();
+        services.AddScoped<IWorkflowCorrelationContext, WorkflowCorrelationContext>();
 
         services.AddScoped<IAuthApplicationService, AuthApplicationService>();
         services.AddScoped<IAuthClinicService, AuthClinicService>();
 
         services.AddScoped<IApplicationAccessValidator, ApplicationAccessValidator>();
+
+        // Dummy data manager — the Admin portal's Test Data tool. Bulk EF over ten tables in one
+        // transaction, so it sits behind an Application-layer abstraction rather than in a handler.
+        services.AddScoped<IDummyDataStore, DummyDataStore>();
 
         return services;
     }

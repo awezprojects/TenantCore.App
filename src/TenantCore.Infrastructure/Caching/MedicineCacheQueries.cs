@@ -17,7 +17,7 @@ internal static class MedicineCacheQueries
             .AsNoTracking()
             .Include(m => m.MedicineType)
             .Include(m => m.DosageForm)
-            .Where(m => m.ApplicationId == null)
+            .Where(m => m.ApplicationId == null && m.IsActive)
             .ToListAsync(ct);
 
     public static Task<List<MedicineType>> LoadMedicineTypesAsync(ClinicDbContext dbContext, CancellationToken ct) =>

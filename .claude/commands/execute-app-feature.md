@@ -7,7 +7,9 @@ You are implementing a planned feature for **TenantCore.App**. $ARGUMENTS is the
 Read only this:
 
 1. `plan/$ARGUMENTS/PLAN.md` — the approved implementation blueprint
-2. `.clinerules` — **already auto-loaded** and self-contained (patterns, rules, validation, testing, tenancy, UI theme, middleware order)
+2. `.clinerules` (repo root) — self-contained (patterns, rules, validation, testing, tenancy, UI theme, middleware order). Claude Code does **not** auto-load it — read it once now if it is not already in context.
+
+> All paths in this command are relative to the `TenantCore.App/` repo root. If running from the workspace root (via `/execute-feature`), prefix them with `TenantCore.App/`.
 
 `.clinerules` is sufficient for every layer below. Open a single ADR **section** only for an undocumented edge case:
 
@@ -136,6 +138,12 @@ Standard order for TenantCore.App features:
 - Action methods are 3–5 lines: build the command, call `sender.Send()`, return `ActionResult<T>`
 - Decorate actions with `[ProducesResponseType]` for each possible response
 - Apply `[Authorize(Policy = AuthPolicies.X)]` at class level with the minimum policy; override per-action where a stricter policy is needed
+
+### Logging rules (ADR-011 — mandatory, verify before Step 5)
+- Implement the PLAN.md "Logging" section exactly. Every new command's type name ends in `Command`, which makes it action-logged automatically. Add `IActionLogContext` where the plan lists searchable ids.
+- External calls use `IHttpClientFactory` (logged by the outbound handler). Webhooks go through a `…Command` with `IActionLogContext`. A background job logs each run that did work via `IActionLogger`.
+- Failure paths throw or return ≥ 400. Never return HTTP 200 with an error body, because it would be logged as success.
+- Never log bodies, patient or personal data, secrets, tokens, signatures or query strings. `ISkipActionLog` only with the reason written in the plan.
 
 ---
 

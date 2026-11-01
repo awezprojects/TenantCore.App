@@ -4,7 +4,9 @@ You are performing a security and code quality review of a feature implemented i
 
 ## Step 1 — Load the feature context
 
-1. `.clinerules` — **already auto-loaded**: §6 is the security/quality checklist plus the S1–S12 / V1–V7 list, §3 has the hard rules (including the frozen middleware order)
+> All paths in this command are relative to the `TenantCore.App/` repo root. If running from the workspace root (via `/feature-security-analysis`), prefix them with `TenantCore.App/`.
+
+1. `.clinerules` (repo root — Claude Code does **not** auto-load it; read it once if not already in context): §6 is the security/quality checklist plus the S1–S12 / V1–V7 list, §3 has the hard rules (including the frozen middleware order)
 2. `docs/adr/ADR-010-security.md` — the full long-form catalogue. Open it when you need exact wording to score a specific finding, or the §11 safe-fix rules verbatim. (ADRs live in `docs/adr/`, **not** `.claude/docs/adr/`.)
 3. `CLAUDE.md` — no need to read routinely; it duplicates `.clinerules` §2–§3
 
@@ -85,6 +87,12 @@ Work through every section of ADR-010 against the actual file contents you read.
 - [ ] A01: every data resource checks `applicationId` or auth policy
 - [ ] A03: parameterized queries only
 - [ ] A07: JWT validation config is correct
+
+### Logging & Observability (ADR-011)
+- [ ] Every new command is action-logged: name ends in `Command`, and no undocumented `ISkipActionLog`
+- [ ] Failure paths throw or return ≥ 400 (never HTTP 200 with an error body, which would log as success)
+- [ ] New external calls go through `IHttpClientFactory` (outbound logging); webhooks and jobs log per the ADR
+- [ ] A09: no sensitive data in any log field. No bodies, patient or personal data, secrets, tokens, signatures or query strings, and nothing in `IActionLogContext` beyond identifiers
 
 ---
 

@@ -1,0 +1,161 @@
+@using TenantCore.Shared.Dtos.UsageBilling
+@using TenantCore.Shared.Enums
+@inject IUsageBillingApiClient UsageBillingApi
+@inject IToastService Toast
+
+@* The one-time registration fee: amount, state (due / waived / charged at), and
+   I've paid — check now. The payment link is created by the CloudClinic admin — clinics
+   cannot self-serve it. Auto-loads any existing open/expired payment link on mount.
+   Raises OnChanged so the host screen reloads the billing summary once a check has run.
+   Usage:
+     <RegistrationFeeCard Summary="_summary" OnChanged="LoadAsync" />
+*@
+
+<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:10px;">One-time registration fee</div>
+
+    @if (Summary is null)
+    {
+        <div style="font-size:13px;color:#64748B;">The fee state could not be loaded.</div>
+    }
+    else if (Summary.RegistrationFeeWaived)
+    {
+        <div style="display:flex;align-items:center;gap:10px;">
+            <AppBadge Text="Waived" Variant="info" />
+            <span style="font-size:13px;color:#475569;">CloudClinic waived this clinic's registration fee.</span>
+        </div>
+    }
+    else if (!Summary.RegistrationFeeDue)
+    {
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <AppBadge Text="Paid" Variant="success" />
+            @if (Summary.RegistrationFee > 0m)
+            {
+                <span style="font-size:13px;font-weight:700;color:#166534;">@Money(Summary.RegistrationFee)</span>
+            }
+            <span style="font-size:13px;color:#475569;">
+                Settled on @(Summary.RegistrationFeeChargedAt?.ToString("dd MMM yyyy HH:mm") ?? "record").
+            </span>
+        </div>
+    }
+    else
+    {
+        <div style="font-size:13px;color:#475569;margin-bottom:10px;">
+            Amount due: <strong>@Money(Summary.RegistrationFee)</strong> — the amount is set by
+            CloudClinic, so it cannot be changed here.
+        </div>
+
+        @if (_payment is null)
+        {
+            <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 16px;">
+                <div style="font-size:13px;color:#166534;">
+                    Your payment link will be sent to you by the CloudClinic team. Check back here once you receive it.
+                </div>
+            </div>
+        }
+        else if (_payment.IsExpired)
+        {
+            <div style="background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;padding:14px 16px;">
+                <div style="font-size:13px;font-weight:700;color:#713F12;margin-bottom:4px;">Payment link expired</div>
+                <div style="font-size:13px;color:#92400E;">
+                    The previous link expired
+                    @if (_payment.LinkExpiresAt.HasValue)
+                    {<text> on @_payment.LinkExpiresAt.Value.ToString("dd MMM yyyy")</text>}.
+                    Please contact CloudClinic to get a new payment link.
+                </div>
+            </div>
+        }
+        else if (_payment.Status == SubscriptionPaymentStatus.LinkCreated)
+        {
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 16px;">
+                <div style="font-size:13px;color:#1E293B;margin-bottom:10px;">
+                    Your payment link is ready. Click the button below to complete the payment securely.
+                </div>
+                @if (_payment.LinkExpiresAt.HasValue)
+                {
+                    <div style="font-size:12px;color:#64748B;margin-bottom:10px;">
+                        Link expires @_payment.LinkExpiresAt.Value.ToString("dd MMM yyyy HH:mm") UTC
+                    </div>
+                }
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                    <a href="@_payment.PaymentLinkUrl" target="_blank" rel="noopener" class="btn btn-success">
+                        Pay @Money(Summary!.RegistrationFee) now
+                    </a>
+                    <button class="btn btn-outline-primary" @onclick="CheckAsync" disabled="@_busy">
+                        I've paid — check now
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 16px;">
+                <div style="font-size:13px;color:#DC2626;">
+                    There was a problem preparing your payment link. Please contact CloudClinic for assistance.
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public ClinicBillingSummaryDto? Summary { get; set; }
+
+    /// <summary>Raised after a check has run, so the host reloads the billing summary.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private RegistrationFeePaymentDto? _payment;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Summary?.RegistrationFeeDue == true)
+            await LoadExistingPaymentAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // When Summary changes from null to loaded (or from paid to due) re-check.
+        if (Summary?.RegistrationFeeDue == true && _payment is null)
+            await LoadExistingPaymentAsync();
+    }
+
+    private async Task LoadExistingPaymentAsync()
+    {
+        var response = await UsageBillingApi.GetActiveRegistrationFeePaymentAsync();
+        if (response.Success)
+            _payment = response.Data;
+    }
+
+    private async Task CheckAsync()
+    {
+        if (_payment is null) return;
+        _busy = true;
+
+        var response = await UsageBillingApi.CheckRegistrationFeePaymentAsync(_payment.PaymentId);
+        if (response.Success)
+        {
+            Toast.ShowSuccess("Checking with the payment provider…");
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await OnChanged.InvokeAsync();
+
+            if (Summary?.RegistrationFeeDue == false)
+            {
+                _payment = null;
+                Toast.ShowSuccess("Registration fee received — thank you.");
+            }
+        }
+        else
+        {
+            Toast.ShowError(response.Message ?? "Could not check the payment. Please try again shortly.");
+        }
+
+        _busy = false;
+    }
+
+    private string Money(decimal value)
+    {
+        var currency = string.IsNullOrEmpty(Summary?.Currency) ? "INR" : Summary!.Currency;
+        return (currency == "INR" ? "₹" : currency + " ") + value.ToString("N2");
+    }
+}

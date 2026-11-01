@@ -20,12 +20,17 @@ public sealed class GetClinicDoctorsHandler(
         logger.LogInformation("Fetching doctors for application {ApplicationId}", request.ApplicationId);
 
         // Minimal staff directory, not the Admin/Clinic Admin-only full roster — Reception must be
-        // able to load this to populate the OPD doctor dropdown (DEF-AUTH-OPD-01).
-        var doctorUsers = await authService.GetClinicStaffDirectoryAsync(request.ApplicationId, [AppRoles.Doctor], cancellationToken);
+        // able to load this to populate the OPD doctor dropdown (DEF-AUTH-OPD-01). Unfiltered (no
+        // ?roles=) to preserve the DoctorProfile fallback below for users without an explicit Doctor role.
+        var staff = await authService.GetClinicStaffDirectoryAsync(request.ApplicationId, roles: null, cancellationToken);
 
-        var doctorUserIds = doctorUsers.Select(u => u.UserId);
-        var profiles = await doctorProfileRepository.GetByUserIdsAsync(doctorUserIds, cancellationToken);
+        var allUserIds = staff.Select(u => u.UserId);
+        var profiles = await doctorProfileRepository.GetByUserIdsAsync(allUserIds, cancellationToken);
         var profileByUserId = profiles.ToDictionary(p => p.UserId, p => p.Id);
+
+        var doctorUsers = staff
+            .Where(u => HasDoctorRole(u) || profileByUserId.ContainsKey(u.UserId))
+            .ToList();
 
         return doctorUsers.Select(u => new DoctorDto
         {
@@ -34,4 +39,8 @@ public sealed class GetClinicDoctorsHandler(
             ProfileId = profileByUserId.GetValueOrDefault(u.UserId)
         });
     }
+
+    private static bool HasDoctorRole(Shared.Dtos.Auth.ClinicStaffDirectoryDto user) =>
+        user.RoleNames.Exists(r => string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(user.RoleName, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase);
 }
