@@ -213,6 +213,22 @@ public class AuthApiClient(HttpClient httpClient, AuthStateService authState) : 
         }
     }
 
+    public async Task<ApiResponse<InvitationInfoDto>> GetInvitationInfoAsync(string token)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/invitation/{Uri.EscapeDataString(token)}");
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleResponse<InvitationInfoDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<InvitationInfoDto>($"Invitation lookup failed: {ex.Message}");
+        }
+    }
+
     public async Task<ApiResponse<UserProfileDto>> GetUserByIdAsync(Guid userId)
     {
         try

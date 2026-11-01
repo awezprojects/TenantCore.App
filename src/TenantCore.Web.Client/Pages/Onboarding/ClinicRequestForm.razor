@@ -131,7 +131,7 @@
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label">Expected Staff Count *</label>
-                        <input class="form-input" type="number" min="1" max="500" @bind="_model.ExpectedStaffCount" disabled="@_submitting" />
+                        <input class="form-input" type="number" min="1" max="500" step="1" @bind="_model.ExpectedStaffCount" disabled="@_submitting" />
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label">Referral Source</label>
@@ -144,6 +144,25 @@
                     <textarea class="form-input" rows="3" maxlength="1000" @bind="_model.Notes" disabled="@_submitting" style="resize:none;"></textarea>
                 </div>
 
+                @if (_errors.Count > 0)
+                {
+                    <div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px;padding:10px 14px;
+                                font-size:12px;color:#991B1B;font-weight:600;margin-bottom:14px;">
+                        @if (_errors.Count == 1)
+                        {
+                            @_errors[0]
+                        }
+                        else
+                        {
+                            <ul style="margin:0;padding-left:18px;">
+                                @foreach (var err in _errors)
+                                {
+                                    <li style="margin-bottom:2px;">@err</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
                 @if (!string.IsNullOrWhiteSpace(_error))
                 {
                     <div style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px;padding:10px 14px;
@@ -174,6 +193,7 @@
     private bool _blockedByOpenRequest;
     private bool _submitting;
     private string? _error;
+    private List<string> _errors = [];
     private readonly FormModel _model = new();
 
     // SubmitClinicOnboardingRequest is an immutable record (init-only) — a mutable shadow model
@@ -193,7 +213,11 @@
         public string DoctorName { get; set; } = string.Empty;
         public string MedicalRegistrationNumber { get; set; } = string.Empty;
         public string MedicalCouncil { get; set; } = string.Empty;
-        public int ExpectedStaffCount { get; set; } = 1;
+        // String-backed (not int): a bound int input silently coerces "2.5" to the previous valid
+        // value before validation ever runs, so the whole-number check below could never fire for
+        // the real decimal-entry repro. Keeping the raw text lets Validate() see exactly what the
+        // user typed (DEF-CR-04).
+        public string ExpectedStaffCount { get; set; } = "1";
         public string? ReferralSource { get; set; }
         public string? Notes { get; set; }
     }
@@ -229,27 +253,28 @@
 
     private async Task SubmitAsync()
     {
-        _error = Validate();
-        if (_error is not null) return;
+        _errors = Validate();
+        _error = null;
+        if (_errors.Count > 0) return;
 
         var request = new SubmitClinicOnboardingRequest
         {
-            ClinicName = _model.ClinicName,
+            ClinicName = _model.ClinicName.Trim(),
             PreferredClinicCode = _model.PreferredClinicCode.Trim().ToUpperInvariant(),
-            Address = _model.Address,
-            City = _model.City,
-            State = _model.State,
-            Pincode = _model.Pincode,
-            ClinicContactNumber = _model.ClinicContactNumber,
-            OfficialEmail = _model.OfficialEmail,
-            Website = _model.Website,
-            RequesterPhone = _model.RequesterPhone,
-            DoctorName = _model.DoctorName,
-            MedicalRegistrationNumber = _model.MedicalRegistrationNumber,
-            MedicalCouncil = _model.MedicalCouncil,
-            ExpectedStaffCount = _model.ExpectedStaffCount,
-            ReferralSource = _model.ReferralSource,
-            Notes = _model.Notes
+            Address = _model.Address.Trim(),
+            City = _model.City.Trim(),
+            State = _model.State.Trim(),
+            Pincode = _model.Pincode.Trim(),
+            ClinicContactNumber = _model.ClinicContactNumber?.Trim(),
+            OfficialEmail = _model.OfficialEmail?.Trim(),
+            Website = _model.Website?.Trim(),
+            RequesterPhone = _model.RequesterPhone.Trim(),
+            DoctorName = _model.DoctorName.Trim(),
+            MedicalRegistrationNumber = _model.MedicalRegistrationNumber.Trim(),
+            MedicalCouncil = _model.MedicalCouncil.Trim(),
+            ExpectedStaffCount = int.Parse(_model.ExpectedStaffCount.Trim()),
+            ReferralSource = _model.ReferralSource?.Trim(),
+            Notes = _model.Notes?.Trim()
         };
 
         _submitting = true;
@@ -267,23 +292,74 @@
         }
     }
 
-    private string? Validate()
+    private static readonly System.Text.RegularExpressions.Regex PhoneRegex = new(@"^[0-9+\-\s]+$");
+    private static readonly System.Text.RegularExpressions.Regex ClinicCodeRegex = new("^[A-Za-z0-9-]+$");
+    private static readonly System.Text.RegularExpressions.Regex PincodeRegex = new("^[0-9]{6}$");
+
+    private List<string> Validate()
     {
-        if (string.IsNullOrWhiteSpace(_model.ClinicName)) return "Clinic name is required.";
-        if (string.IsNullOrWhiteSpace(_model.PreferredClinicCode) ||
-            _model.PreferredClinicCode.Trim().Length < 3 ||
-            !System.Text.RegularExpressions.Regex.IsMatch(_model.PreferredClinicCode.Trim(), "^[A-Za-z0-9-]+$"))
-            return "Clinic code must be 3-20 letters, digits or hyphens.";
-        if (string.IsNullOrWhiteSpace(_model.Address)) return "Address is required.";
-        if (string.IsNullOrWhiteSpace(_model.City)) return "City is required.";
-        if (string.IsNullOrWhiteSpace(_model.State)) return "State is required.";
-        if (!System.Text.RegularExpressions.Regex.IsMatch(_model.Pincode?.Trim() ?? "", "^[0-9]{6}$"))
-            return "Pincode must be exactly 6 digits.";
-        if (string.IsNullOrWhiteSpace(_model.RequesterPhone)) return "Your phone number is required.";
-        if (string.IsNullOrWhiteSpace(_model.DoctorName)) return "Doctor name is required.";
-        if (string.IsNullOrWhiteSpace(_model.MedicalRegistrationNumber)) return "Medical registration number is required.";
-        if (string.IsNullOrWhiteSpace(_model.MedicalCouncil)) return "Medical council is required.";
-        if (_model.ExpectedStaffCount is < 1 or > 500) return "Expected staff count must be between 1 and 500.";
-        return null;
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(_model.ClinicName))
+            errors.Add("Clinic name is required.");
+        else if (_model.ClinicName.Contains('<') || _model.ClinicName.Contains('>'))
+            errors.Add("Clinic name must not contain '<' or '>' characters.");
+
+        var code = _model.PreferredClinicCode?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(code))
+            errors.Add("Clinic code is required.");
+        else if (code.Length < 3 || !ClinicCodeRegex.IsMatch(code))
+            errors.Add("Clinic code must be 3-20 letters, digits or hyphens.");
+
+        if (string.IsNullOrWhiteSpace(_model.Address))
+            errors.Add("Address is required.");
+        if (string.IsNullOrWhiteSpace(_model.City))
+            errors.Add("City is required.");
+        if (string.IsNullOrWhiteSpace(_model.State))
+            errors.Add("State is required.");
+        if (!PincodeRegex.IsMatch(_model.Pincode?.Trim() ?? ""))
+            errors.Add("Pincode must be exactly 6 digits.");
+
+        if (string.IsNullOrWhiteSpace(_model.RequesterPhone))
+            errors.Add("Phone number is required.");
+        else if (!PhoneRegex.IsMatch(_model.RequesterPhone))
+            errors.Add("Phone number contains invalid characters.");
+        else if (_model.RequesterPhone.Trim().Length < 10)
+            errors.Add("Enter a valid phone number (at least 10 digits).");
+
+        if (!string.IsNullOrWhiteSpace(_model.ClinicContactNumber))
+        {
+            if (!PhoneRegex.IsMatch(_model.ClinicContactNumber))
+                errors.Add("Contact number contains invalid characters.");
+            else if (_model.ClinicContactNumber.Trim().Length < 10)
+                errors.Add("Enter a valid contact number (at least 10 digits).");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_model.OfficialEmail) &&
+            !_model.OfficialEmail.Contains('@'))
+            errors.Add("Official email is not a valid email address.");
+
+        if (!string.IsNullOrWhiteSpace(_model.Website) &&
+            !(Uri.TryCreate(_model.Website.Trim(), UriKind.Absolute, out var uri) &&
+              (uri.Scheme == "http" || uri.Scheme == "https")))
+            errors.Add("Website must be a valid URL (e.g. https://example.com).");
+
+        if (string.IsNullOrWhiteSpace(_model.DoctorName))
+            errors.Add("Doctor name is required.");
+        if (string.IsNullOrWhiteSpace(_model.MedicalRegistrationNumber))
+            errors.Add("Medical registration number is required.");
+        if (string.IsNullOrWhiteSpace(_model.MedicalCouncil))
+            errors.Add("Medical council is required.");
+        var staffCountText = _model.ExpectedStaffCount.Trim();
+        if (string.IsNullOrWhiteSpace(staffCountText))
+            errors.Add("Expected staff count is required.");
+        else if (!int.TryParse(staffCountText, out var staffCount))
+            errors.Add(double.TryParse(staffCountText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)
+                ? "Staff count must be a whole number."
+                : "Staff count must be a valid number.");
+        else if (staffCount is < 1 or > 500)
+            errors.Add("Staff count must be between 1 and 500.");
+
+        return errors;
     }
 }

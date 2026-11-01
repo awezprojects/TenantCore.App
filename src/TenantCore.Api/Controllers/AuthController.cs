@@ -83,6 +83,12 @@ public class AuthController(IHttpClientFactory httpClientFactory) : ControllerBa
     [HttpGet("accept-existing-invitation")]
     public Task<IActionResult> AcceptExistingInvitationAsync() => ForwardAsync(HttpMethod.Get, "api/auth/accept-existing-invitation", includeBody: false);
 
+    // Public/unauthenticated lookup so the accept-invitation page can show who/what the invite is
+    // for (email, role, application) before the user has any credentials — see DEF-UM-07.
+    [HttpGet("invitation/{token}")]
+    public Task<IActionResult> GetInvitationInfoAsync(string token) =>
+        ForwardAsync(HttpMethod.Get, $"api/auth/invitation/{Uri.EscapeDataString(token)}", includeBody: false);
+
     private async Task<IActionResult> ForwardAsync(HttpMethod method, string downstreamPath, bool includeBody = true)
     {
         var cancellationToken = HttpContext.RequestAborted;

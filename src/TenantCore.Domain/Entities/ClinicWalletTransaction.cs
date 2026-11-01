@@ -91,6 +91,13 @@ public class ClinicWalletTransaction : AuditableEntity
         => Create(applicationId, WalletTransactionType.Credit, amount, balanceAfter,
             WalletReferenceType.AdminCredit, idempotencyKey, description, occurredAt, null, adminEmail);
 
+    /// <summary>A credit reversing a metered usage charge after a refund/cancellation.</summary>
+    public static ClinicWalletTransaction CreateUsageRefundCredit(
+        Guid applicationId, decimal amount, decimal balanceAfter, Guid usageRecordId,
+        string description, DateTime occurredAt, Guid? createdByUserId = null)
+        => Create(applicationId, WalletTransactionType.Credit, amount, balanceAfter,
+            WalletReferenceType.UsageRefund, usageRecordId, description, occurredAt, createdByUserId, null);
+
     /// <summary>
     /// A manual correction. Never edits an earlier row — it is a new movement that references it.
     /// </summary>

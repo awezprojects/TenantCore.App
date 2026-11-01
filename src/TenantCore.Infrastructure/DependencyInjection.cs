@@ -162,6 +162,10 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationAccessValidator, ApplicationAccessValidator>();
 
+        // Dummy data manager — the Admin portal's Test Data tool. Bulk EF over ten tables in one
+        // transaction, so it sits behind an Application-layer abstraction rather than in a handler.
+        services.AddScoped<IDummyDataStore, DummyDataStore>();
+
         return services;
     }
 }

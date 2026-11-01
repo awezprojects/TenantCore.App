@@ -7,6 +7,7 @@
 @inject NavigationManager Nav
 @using TenantCore.Shared.Dtos.Onboarding
 @using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Helpers
 
 <PageTitle>My Clinic Requests - CloudClinic</PageTitle>
 
@@ -71,7 +72,7 @@ else if (!_loading)
                     <div>
                         <div style="font-size:15px;font-weight:800;color:#1E293B;">@r.ClinicName</div>
                         <div style="font-size:12px;color:#94A3B8;margin-top:2px;">
-                            @r.PreferredClinicCode &middot; Requested @r.CreatedAt.ToString("dd MMM yyyy")
+                            @r.PreferredClinicCode &middot; Requested @DateTimeHelper.ToLocalDate(r.CreatedAt)
                         </div>
                     </div>
                     <span style="background:@bg;color:@fg;border:1px solid @border;border-radius:12px;

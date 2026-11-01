@@ -31,6 +31,10 @@ public static class DependencyInjection
         services.Configure<WorkflowOptions>(configuration.GetSection("Workflow"));
         services.Configure<OnboardingOptions>(configuration.GetSection("Onboarding"));
 
+        // Dummy data manager — default false, so the internal seed/purge routes refuse with 403
+        // until an environment explicitly turns them on (never Production).
+        services.Configure<DummyDataOptions>(configuration.GetSection(DummyDataOptions.SectionName));
+
         services.AddScoped<IWorkflowEnqueuer, WorkflowEnqueuer>();
         services.AddScoped<IOnboardingSelfHealer, OnboardingSelfHealer>();
         services.AddScoped<IClinicPlanCatalog, ClinicPlanCatalog>();

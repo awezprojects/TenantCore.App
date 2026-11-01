@@ -49,6 +49,7 @@ public class InternalClinicsRouteContractTests
     [InlineData("POST", "wallet/credit")]
     [InlineData("POST", "registration-fee/send-link")]
     [InlineData("POST", "registration-fee/waive")]
+    [InlineData("POST", "registration-fee/check-payment")]
     // ---- clinic-subscription-admin-controls ----
     [InlineData("POST", "suspend")]
     [InlineData("POST", "reactivate")]
@@ -66,8 +67,9 @@ public class InternalClinicsRouteContractTests
     [Fact]
     public void TheSurfaceHasExactlyTheRoutesThePortalKnows()
     {
-        // 15 actions today. Adding one is fine, but it must be a deliberate change to the portal
-        // contract as well — so this count is bumped consciously, never silently.
-        DeclaredActions().Should().HaveCount(15);
+        // 16 actions today (registration-fee/check-payment was added after this test was written).
+        // Adding one is fine, but it must be a deliberate change to the portal contract as well —
+        // so this count is bumped consciously, never silently.
+        DeclaredActions().Should().HaveCount(16);
     }
 }

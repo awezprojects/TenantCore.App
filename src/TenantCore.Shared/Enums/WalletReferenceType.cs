@@ -19,5 +19,8 @@ public enum WalletReferenceType
     AdminCredit = 3,
 
     /// <summary>A manual correction — ReferenceId is free-form.</summary>
-    Adjustment = 4
+    Adjustment = 4,
+
+    /// <summary>A credit reversing a metered usage charge — ReferenceId is the ClinicUsageRecord.Id that was refunded.</summary>
+    UsageRefund = 5
 }

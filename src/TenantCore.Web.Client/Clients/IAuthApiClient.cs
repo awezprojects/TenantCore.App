@@ -17,6 +17,7 @@ public interface IAuthApiClient
     Task<ApiResponse> ResendEmailVerificationAsync(ResendEmailVerificationRequestDto request);
     Task<ApiResponse> ResetPasswordAsync(Guid userId, ResetPasswordRequestDto request);
     Task<ApiResponse<UserProfileDto>> AcceptInvitationAsync(AcceptInvitationRequestDto request);
+    Task<ApiResponse<InvitationInfoDto>> GetInvitationInfoAsync(string token);
     Task<ApiResponse<UserProfileDto>> GetUserByIdAsync(Guid userId);
     Task<ApiResponse> ForgotPasswordAsync(ForgotPasswordRequestDto request);
     Task<ApiResponse> ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request);

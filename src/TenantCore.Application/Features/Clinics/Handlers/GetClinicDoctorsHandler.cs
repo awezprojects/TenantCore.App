@@ -20,13 +20,15 @@ public sealed class GetClinicDoctorsHandler(
         logger.LogInformation("Fetching doctors for application {ApplicationId}", request.ApplicationId);
 
         var users = await authService.GetApplicationUsersAsync(request.ApplicationId, cancellationToken);
-        var doctorUsers = users
-            .Where(u => string.Equals(u.RoleName, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase) && u.IsActive)
-            .ToList();
+        var activeUsers = users.Where(u => u.IsActive).ToList();
 
-        var doctorUserIds = doctorUsers.Select(u => u.UserId);
-        var profiles = await doctorProfileRepository.GetByUserIdsAsync(doctorUserIds, cancellationToken);
+        var allUserIds = activeUsers.Select(u => u.UserId);
+        var profiles = await doctorProfileRepository.GetByUserIdsAsync(allUserIds, cancellationToken);
         var profileByUserId = profiles.ToDictionary(p => p.UserId, p => p.Id);
+
+        var doctorUsers = activeUsers
+            .Where(u => HasDoctorRole(u) || profileByUserId.ContainsKey(u.UserId))
+            .ToList();
 
         return doctorUsers.Select(u => new DoctorDto
         {
@@ -36,4 +38,8 @@ public sealed class GetClinicDoctorsHandler(
             ProfileId = profileByUserId.GetValueOrDefault(u.UserId)
         });
     }
+
+    private static bool HasDoctorRole(Shared.Dtos.Auth.ApplicationUserResponseDto user) =>
+        user.RoleNames.Exists(r => string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase))
+        || string.Equals(user.RoleName, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase);
 }

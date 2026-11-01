@@ -55,6 +55,12 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             // the exception (403/409) rather than being fixed at 400.
             ErrorCodeException ece  => ((HttpStatusCode)ece.StatusCode,     "Request Refused", ece.Message),
 
+            // The Auth API rejected a proxied call (bad role, cross-app access, spoofed actor id,
+            // etc). Preserve its actual status instead of collapsing everything to 409, and never
+            // surface the raw upstream body here — AuthApplicationService already logged it
+            // (DEF-UM-02 / DEF-UM-03).
+            AuthApiException aae    => ((HttpStatusCode)aae.StatusCode,     "Request Refused", aae.Message),
+
             DomainException de      => (HttpStatusCode.BadRequest,          "Request Error", de.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized,    "Unauthorized",  UserMessages.Unauthorized),
             TooManyRequestsException tmr => ((HttpStatusCode)429,           "Too Many Requests", tmr.Message),

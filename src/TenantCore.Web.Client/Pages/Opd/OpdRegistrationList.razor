@@ -174,7 +174,9 @@
                     }
                     else
                     {
-                        @foreach (var reg in _result!.Items)
+                        @foreach (var reg in _isDoctor
+                            ? _result!.Items.Where(r => r.Status != OpdStatus.Cancelled)
+                            : _result!.Items)
                         {
                             var notVisited = IsNotVisited(reg);
                             <tr>
@@ -208,7 +210,31 @@
                                         @(string.IsNullOrWhiteSpace(reg.Notes) ? "—" : reg.Notes)
                                     </td>
                                 }
-                                <td style="font-weight:700;color:#059669;">@(FeatureFlagsContext.IsBillingEnabled ? $"₹{reg.Fee:N0}" : "—")</td>
+                                <td style="font-weight:700;color:#059669;">
+                                    @if (!FeatureFlagsContext.IsBillingEnabled)
+                                    {
+                                        <span>—</span>
+                                    }
+                                    else if (reg.Status == OpdStatus.Cancelled && reg.PaymentStatus == PaymentStatus.Received && reg.RefundStatus != RefundStatus.Refunded)
+                                    {
+                                        <span>₹@reg.Fee.ToString("N0")</span>
+                                        <div style="font-size:10px;color:#DC2626;font-weight:600;">Paid · Refund due</div>
+                                    }
+                                    else if (reg.Status == OpdStatus.Cancelled && reg.RefundStatus == RefundStatus.Refunded)
+                                    {
+                                        <span style="color:#64748B;text-decoration:line-through;">₹@reg.Fee.ToString("N0")</span>
+                                        <div style="font-size:10px;color:#16A34A;font-weight:600;">Refunded</div>
+                                    }
+                                    else if (reg.Status == OpdStatus.Cancelled && (reg.PaymentStatus == null || reg.PaymentStatus == PaymentStatus.Pending))
+                                    {
+                                        <span style="color:#94A3B8;">₹@reg.Fee.ToString("N0")</span>
+                                        <div style="font-size:10px;color:#94A3B8;font-weight:600;">Not collected</div>
+                                    }
+                                    else
+                                    {
+                                        <span>₹@reg.Fee.ToString("N0")</span>
+                                    }
+                                </td>
                                 <td>
                                     @if (notVisited)
                                     {
@@ -265,14 +291,14 @@
                                             {
                                                 <button class="opd-btn cancelled" @onclick="() => CancelAsync(reg)" disabled="@_updating">Cancel</button>
                                             }
-                                            @if (FeatureFlagsContext.IsBillingEnabled && reg.Status == OpdStatus.Cancelled && NeedsRefund(reg))
-                                            {
-                                                <button class="opd-btn done-btn" @onclick="() => OpenDiscountDialog(reg)">Refund</button>
-                                            }
-                                            @if (reg.Status == OpdStatus.Cancelled && CanDelete(reg))
-                                            {
-                                                <button class="opd-btn delete-btn" @onclick="() => ConfirmDeleteOpd(reg)" disabled="@_updating">Delete</button>
-                                            }
+                                        }
+                                        @if (FeatureFlagsContext.IsBillingEnabled && reg.Status == OpdStatus.Cancelled && NeedsRefund(reg))
+                                        {
+                                            <button class="opd-btn done-btn" @onclick="() => OpenDiscountDialog(reg)">Refund</button>
+                                        }
+                                        @if (reg.Status == OpdStatus.Cancelled && CanDelete(reg))
+                                        {
+                                            <button class="opd-btn delete-btn" @onclick="() => ConfirmDeleteOpd(reg)" disabled="@_updating">Delete</button>
                                         }
                                         @if (_isDoctor)
                                         {
@@ -969,11 +995,22 @@
         _updating = false;
     }
 
-    private static bool CanDelete(OpdRegistrationDto reg) =>
-        reg.PaymentStatus is null or PaymentStatus.Pending || reg.RefundStatus == RefundStatus.Refunded;
+    private static bool NeedsRefund(OpdRegistrationDto reg)
+    {
+        if (reg.PaymentStatus != PaymentStatus.Received) return false;
+        if (reg.RefundStatus == RefundStatus.Refunded) return false;
+        var amount = reg.FinalAmount ?? reg.Fee;
+        return amount > 0;
+    }
 
-    private static bool NeedsRefund(OpdRegistrationDto reg) =>
-        reg.PaymentStatus == PaymentStatus.Received && reg.RefundStatus != RefundStatus.Refunded;
+    private static bool CanDelete(OpdRegistrationDto reg)
+    {
+        if (NeedsRefund(reg)) return false;
+        if (reg.PaymentStatus == null || reg.PaymentStatus == PaymentStatus.Pending) return true;
+        if (reg.RefundStatus == RefundStatus.Refunded) return true;
+        var amount = reg.FinalAmount ?? reg.Fee;
+        return reg.PaymentStatus == PaymentStatus.Received && amount == 0;
+    }
 
     private void ConfirmDeleteOpd(OpdRegistrationDto reg)
     {

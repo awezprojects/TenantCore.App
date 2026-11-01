@@ -29,6 +29,8 @@ public class RegisterRequestDto
     public string Password { get; set; } = string.Empty;
 
     [MaxLength(20, ErrorMessage = "Mobile number cannot exceed 20 characters")]
+    [RegularExpression(@"^[0-9+\-\s]+$", ErrorMessage = "Mobile number must contain only digits, spaces, + and -.")]
+    [MinLength(10, ErrorMessage = "Mobile number must be at least 10 characters.")]
     public string? MobileNo { get; set; }
 }
 
@@ -87,6 +89,17 @@ public class AcceptInvitationRequestDto
     [Required(ErrorMessage = "Confirm password is required")]
     [Compare(nameof(Password), ErrorMessage = "Passwords do not match")]
     public string ConfirmPassword { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Public, unauthenticated lookup result for an invitation token — just enough identity context
+/// (who/what/role) for the accept-invitation page to display before the user has any credentials.
+/// </summary>
+public class InvitationInfoDto
+{
+    public string Email { get; set; } = string.Empty;
+    public string RoleName { get; set; } = string.Empty;
+    public string ApplicationName { get; set; } = string.Empty;
 }
 
 /// <summary>
