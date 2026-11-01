@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TenantCore.Application\TenantCore.Application.csproj" />
+    <ProjectReference Include="..\TenantCore.Infrastructure\TenantCore.Infrastructure.csproj" />
     <ProjectReference Include="..\TenantCore.Shared\TenantCore.Shared.csproj" />
     <ProjectReference Include="..\TenantCore.Web.Client\TenantCore.Web.Client.csproj" />
   </ItemGroup>
