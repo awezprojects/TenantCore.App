@@ -294,7 +294,7 @@
 
     private List<AmountHandoverSummaryDto> _all = [];
     private List<AmountHandoverSummaryDto> _forMe = [];
-    private List<ApplicationUserResponseDto> _handoverUsers = [];
+    private List<ClinicStaffDirectoryDto> _handoverUsers = [];
     private List<CounterSessionSummaryDto> _activeSessions = [];
     private CounterSessionDto? _activeSession;
     private Guid? _disputingId;
@@ -307,7 +307,7 @@
                || string.Equals(r, AppRoles.ClinicManager, StringComparison.OrdinalIgnoreCase));
 
     // Create dialog
-    private ApplicationUserResponseDto? _selectedHandoverUser;
+    private ClinicStaffDirectoryDto? _selectedHandoverUser;
     private string? _selectedHandoverUserId;
     private decimal _amount;
     private string? _notes;
@@ -429,11 +429,10 @@
         _usersLoading = true;
         StateHasChanged();
         var currentUserId = AuthState.CurrentUser?.UserId;
-        var response = await AppClient.GetApplicationUsersAsync(ClinicContext.SelectedApplicationId);
+        var response = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, HandoverTargetRoles);
         _handoverUsers = response.Success && response.Data is not null
             ? response.Data
-                .Where(u => u.IsActive
-                    && u.UserId != currentUserId
+                .Where(u => u.UserId != currentUserId
                     && u.RoleName is not null
                     && HandoverTargetRoles.Contains(u.RoleName))
                 .OrderBy(u => u.RoleName)

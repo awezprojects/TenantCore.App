@@ -150,6 +150,26 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
+    // GET /api/Application/{applicationId}/staff-directory?roles=Doctor,Clinic Admin
+    // Minimal roster (userId/fullName/roleName — no email/phone) that any clinic member can read,
+    // unlike GetApplicationUsersAsync above which is Admin/Clinic Admin only at the Auth layer.
+    [HttpGet("{applicationId:guid}/staff-directory")]
+    [ProducesResponseType(typeof(List<ClinicStaffDirectoryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetClinicStaffDirectoryAsync(Guid applicationId, [FromQuery] string? roles, CancellationToken cancellationToken)
+    {
+        var roleList = string.IsNullOrWhiteSpace(roles)
+            ? null
+            : roles.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
+
+        var result = await sender.Send(new GetClinicStaffDirectoryQuery(applicationId, roleList), cancellationToken);
+        var response = new ApiResponse<List<ClinicStaffDirectoryDto>>
+        {
+            Success = true,
+            Data = result
+        };
+        return Ok(response);
+    }
+
     // POST /api/Application/invite-user?invitedBy={guid}
     [HttpPost("invite-user")]
     [ProducesResponseType(typeof(InvitationResponseDto), StatusCodes.Status200OK)]

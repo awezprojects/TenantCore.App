@@ -19,10 +19,9 @@ public sealed class GetClinicDoctorsHandler(
     {
         logger.LogInformation("Fetching doctors for application {ApplicationId}", request.ApplicationId);
 
-        var users = await authService.GetApplicationUsersAsync(request.ApplicationId, cancellationToken);
-        var doctorUsers = users
-            .Where(u => string.Equals(u.RoleName, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase) && u.IsActive)
-            .ToList();
+        // Minimal staff directory, not the Admin/Clinic Admin-only full roster — Reception must be
+        // able to load this to populate the OPD doctor dropdown (DEF-AUTH-OPD-01).
+        var doctorUsers = await authService.GetClinicStaffDirectoryAsync(request.ApplicationId, [AppRoles.Doctor], cancellationToken);
 
         var doctorUserIds = doctorUsers.Select(u => u.UserId);
         var profiles = await doctorProfileRepository.GetByUserIdsAsync(doctorUserIds, cancellationToken);
@@ -32,7 +31,6 @@ public sealed class GetClinicDoctorsHandler(
         {
             UserId = u.UserId,
             FullName = u.FullName,
-            Email = u.EmailId,
             ProfileId = profileByUserId.GetValueOrDefault(u.UserId)
         });
     }

@@ -315,9 +315,9 @@
     private bool _handoverVisible;
     private decimal _handoverAmount;
     private string? _handoverNotes;
-    private ApplicationUserResponseDto? _handoverRecipient;
+    private ClinicStaffDirectoryDto? _handoverRecipient;
     private string? _handoverRecipientId;
-    private List<ApplicationUserResponseDto> _handoverUsers = [];
+    private List<ClinicStaffDirectoryDto> _handoverUsers = [];
 
     private static readonly string[] HandoverTargetRoles = [AppRoles.ClinicAdmin, AppRoles.ClinicManager, AppRoles.Doctor];
 
@@ -397,10 +397,10 @@
         _handoverVisible = true;
 
         var currentUserId = AuthState.CurrentUser?.UserId;
-        var response = await AppClient.GetApplicationUsersAsync(ClinicContext.SelectedApplicationId);
+        var response = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, HandoverTargetRoles);
         _handoverUsers = response.Success && response.Data is not null
             ? response.Data
-                .Where(u => u.IsActive && u.UserId != currentUserId && u.RoleName is not null && HandoverTargetRoles.Contains(u.RoleName))
+                .Where(u => u.UserId != currentUserId && u.RoleName is not null && HandoverTargetRoles.Contains(u.RoleName))
                 .OrderBy(u => u.RoleName).ThenBy(u => u.FullName)
                 .ToList()
             : [];
