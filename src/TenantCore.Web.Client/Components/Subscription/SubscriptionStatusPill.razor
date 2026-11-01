@@ -6,12 +6,18 @@
 
 @if (status is { HasActiveSubscription: true })
 {
-    var isCritical = status.DaysRemaining <= 5;
+    @* Counts down to COVERAGE end so a queued next term is reflected here too. *@
+    var nextTerm = status.Upcoming.FirstOrDefault();
+    var isCritical = status.CoverageDaysRemaining <= 5;
     var bg = isCritical ? "#FEE2E2" : status.IsExpiringSoon ? "#FEF3C7" : "#DCFCE7";
     var fg = isCritical ? "#991B1B" : status.IsExpiringSoon ? "#92400E" : "#166534";
-    var label = status.DaysRemaining == 0 ? "Expires today" : $"{status.DaysRemaining}d left";
+    var label = status.CoverageDaysRemaining == 0 ? "Expires today" : $"{status.CoverageDaysRemaining}d left";
 
-    <div title="@status.PlanName — expires @status.EndDate?.ToString("dd MMM yyyy")"
+    var tooltip = nextTerm is null
+        ? $"{status.PlanName} — expires {status.EndDate?.ToString("dd MMM yyyy")}"
+        : $"{status.PlanName} until {status.EndDate?.ToString("dd MMM yyyy")}, then {nextTerm.PlanName} until {nextTerm.EndDate:dd MMM yyyy}";
+
+    <div title="@tooltip"
          style="padding:5px 12px;background:@bg;color:@fg;border-radius:20px;
                 font-size:11px;font-weight:700;white-space:nowrap;">
         ⏳ @label

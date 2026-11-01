@@ -14,4 +14,9 @@ public interface ISubscriptionApiClient
     Task<ApiResponse<IEnumerable<SubscriptionHistoryItemDto>>> GetHistoryAsync();
     Task<ApiResponse<ClinicSubscriptionDto>> SubscribeAsync(SubscribeRequest request);
     Task<ApiResponse> CancelAsync(Guid subscriptionId);
+    Task<ApiResponse<SubscriptionPaymentDto>> CreateRenewalPaymentLinkAsync(CreateRenewalPaymentLinkRequest request);
+    Task<ApiResponse<IEnumerable<SubscriptionPaymentDto>>> GetPaymentsAsync();
+
+    /// <summary>"I've paid — check now". Throttled server-side to once per 30 seconds per payment.</summary>
+    Task<ApiResponse> CheckPaymentAsync(Guid paymentId);
 }

@@ -4,6 +4,7 @@
     <Project Path="src/TenantCore.Application/TenantCore.Application.csproj" />
     <Project Path="src/TenantCore.Domain/TenantCore.Domain.csproj" />
     <Project Path="src/TenantCore.Infrastructure/TenantCore.Infrastructure.csproj" />
+    <Project Path="src/TenantCore.Logging/TenantCore.Logging.csproj" />
     <Project Path="src/TenantCore.Shared/TenantCore.Shared.csproj" />
     <Project Path="src/TenantCore.Web.Client/TenantCore.Web.Client.csproj" />
   </Folder>
@@ -11,6 +12,7 @@
     <Project Path="tests/TenantCore.Api.Tests/TenantCore.Api.Tests.csproj" />
     <Project Path="tests/TenantCore.Application.Tests/TenantCore.Application.Tests.csproj" />
     <Project Path="tests/TenantCore.Domain.Tests/TenantCore.Domain.Tests.csproj" />
+    <Project Path="tests/TenantCore.Infrastructure.Tests/TenantCore.Infrastructure.Tests.csproj" />
     <Project Path="tests/TenantCore.Web.Client.Tests/TenantCore.Web.Client.Tests.csproj" />
   </Folder>
 </Solution>

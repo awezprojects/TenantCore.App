@@ -1,0 +1,104 @@
+@page "/billing"
+@layout AuthorizedLayout
+@inject UsageBillingContextService UsageBillingContext
+@inject NavigationManager NavigationManager
+@inject ClinicContextService ClinicContext
+@using TenantCore.Shared.Enums
+@using TenantCore.Shared.Dtos.UsageBilling
+
+<PageTitle>Billing - CloudClinic</PageTitle>
+
+<div class="opd-page">
+
+    <AppPageHeader Title="Billing" Subtitle="@ClinicContext.SelectedApplicationName">
+        <Actions>
+            <BillingModeBadge Summary="_summary" />
+            <a href="/billing/wallet" class="btn btn-outline-primary">💳 Wallet</a>
+            <a href="/billing/usage" class="btn btn-outline-primary">📊 Usage</a>
+            <button class="btn btn-outline-primary" @onclick="LoadAsync" disabled="@_loading">🔄 Refresh</button>
+        </Actions>
+    </AppPageHeader>
+
+    <AppLoadingBar Loading="_loading" />
+
+    @if (_summary is null)
+    {
+        @if (!_loading)
+        {
+            <AppEmptyState Icon="💳" Title="Billing details are unavailable"
+                           Message="@(_error ?? "Please try again in a moment.")" />
+        }
+    }
+    else
+    {
+        @* Balance, threshold, the low warning and the top-up route — one component, shared with the wallet
+           screen, so the same figures always read the same way. *@
+        <WalletBalanceCard Balance="@(_summary.WalletBalance ?? 0m)"
+                           LowBalanceThreshold="@(_summary.LowBalanceThreshold ?? 0m)"
+                           IsLow="_summary.WalletIsLow"
+                           Currency="@_summary.Currency"
+                           TopUpHref="/billing/wallet" />
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">
+            <AppStatCard Icon="🧾" Label="Billing mode"
+                         Value="@BillingModeBadge.Label(_summary.EffectiveBillingMode)"
+                         Sub="@(_summary.EffectiveBillingMode == _summary.BillingMode ? "In force now" : $"Stored: {BillingModeBadge.Label(_summary.BillingMode)}")"
+                         Color="@(_summary.EffectiveBillingMode == BillingMode.PayAsYouGo ? "purple" : "blue")" />
+            <AppStatCard Icon="📅" Label="Covered until"
+                         Value="@(_summary.CoverageEnd?.ToString("dd MMM yyyy") ?? "—")"
+                         Sub="@(_summary.CoverageEnd.HasValue ? "Counting terms not yet started" : "No subscription coverage")" />
+        </div>
+
+        @if (_summary.PendingBillingMode is { } pending)
+        {
+            <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:14px 18px;margin-bottom:18px;
+                        display:flex;align-items:flex-start;gap:10px;">
+                <span style="font-size:18px;">⏳</span>
+                <div style="font-size:13px;color:#92400E;font-weight:600;">
+                    A change to @BillingModeBadge.Label(pending) is queued and starts on
+                    @(_summary.PendingBillingModeEffectiveFrom?.ToString("dd MMM yyyy HH:mm") ?? "the end of current coverage").
+                    Until then this clinic keeps its current terms — nothing already paid for is lost.
+                </div>
+            </div>
+        }
+
+        @* The one-time fee: amount, state (due / waived / charged at), Pay now and I've paid — check now. *@
+        <RegistrationFeeCard Summary="_summary" OnChanged="LoadAsync" />
+
+        <UsageRatesTable Rates="_summary.Rates" Currency="@_summary.Currency" />
+    }
+</div>
+
+@code {
+    private ClinicBillingSummaryDto? _summary;
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The layout loads billing context before rendering, so IsLoaded is true here.
+        // Subscription clinics have no billing/wallet/usage data — redirect them away.
+        if (UsageBillingContext.IsLoaded && !UsageBillingContext.IsPayAsYouGo)
+        {
+            NavigationManager.NavigateTo("/subscription", replace: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Reads the shared billing context rather than the API directly, so this hub, the header chip and
+    /// the create flows all read one cached summary (workspace rule 7).
+    /// </summary>
+    private async Task LoadAsync()
+    {
+        _loading = true;
+
+        await UsageBillingContext.RefreshAsync();
+        _summary = UsageBillingContext.Summary;
+        _error = UsageBillingContext.LastError;
+
+        _loading = false;
+    }
+}

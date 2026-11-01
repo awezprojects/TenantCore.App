@@ -140,8 +140,10 @@ public class AuthApiClient(HttpClient httpClient, AuthStateService authState) : 
     {
         try
         {
+            // GET: TenantCore.Auth only exposes verify-email as a GET (the App forwards it as-is). A POST
+            // here would be forwarded to that GET-only endpoint and always fail with 405.
             using var requestMessage = new HttpRequestMessage(
-                HttpMethod.Post,
+                HttpMethod.Get,
                 $"{BaseRoute}/verify-email?userId={userId}&verificationCode={Uri.EscapeDataString(verificationCode)}");
             IncludeCookies(requestMessage);
 
@@ -208,6 +210,22 @@ public class AuthApiClient(HttpClient httpClient, AuthStateService authState) : 
         catch (Exception ex)
         {
             return CreateErrorResponse<UserProfileDto>($"Accept invitation failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<InvitationInfoDto>> GetInvitationInfoAsync(string token)
+    {
+        try
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, $"{BaseRoute}/invitation/{Uri.EscapeDataString(token)}");
+            IncludeCookies(requestMessage);
+
+            var response = await httpClient.SendAsync(requestMessage);
+            return await HandleResponse<InvitationInfoDto>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<InvitationInfoDto>($"Invitation lookup failed: {ex.Message}");
         }
     }
 

@@ -22,7 +22,10 @@ internal static class ApiResponseReader
     internal static async Task<ApiResponse<T>> ReadAsync<T>(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
-            return new ApiResponse<T> { Success = false, Message = await ExtractMessageAsync(response) };
+        {
+            var (message, errorCode) = await ReadFailureAsync(response);
+            return new ApiResponse<T> { Success = false, Message = message, ErrorCode = errorCode };
+        }
 
         var data = await response.Content.ReadFromJsonAsync<T>(JsonOptions);
         return new ApiResponse<T> { Success = true, Data = data };
@@ -32,9 +35,41 @@ internal static class ApiResponseReader
     internal static async Task<ApiResponse> ReadAsync(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
-            return new ApiResponse { Success = false, Message = await ExtractMessageAsync(response) };
+        {
+            var (message, errorCode) = await ReadFailureAsync(response);
+            return new ApiResponse { Success = false, Message = message, ErrorCode = errorCode };
+        }
 
         return new ApiResponse { Success = true };
+    }
+
+    /// <summary>
+    /// One pass over a failed response: the readable message plus the machine-readable
+    /// <c>errorCode</c> the API puts on the ProblemDetails (e.g. <c>insufficient_wallet_balance</c>),
+    /// so a screen can react to the specific refusal. Same parser as <see cref="ExtractMessageAsync"/>,
+    /// deliberately not a second one.
+    /// </summary>
+    private static async Task<(string Message, string? ErrorCode)> ReadFailureAsync(HttpResponseMessage response)
+    {
+        string? errorCode = null;
+
+        try
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object
+                    && doc.RootElement.TryGetProperty("errorCode", out var code)
+                    && code.ValueKind == JsonValueKind.String)
+                {
+                    errorCode = code.GetString();
+                }
+            }
+        }
+        catch { /* no code readable — the message alone still tells the user what happened */ }
+
+        return (await ExtractMessageAsync(response), errorCode);
     }
 
     internal static async Task<string> ExtractMessageAsync(HttpResponseMessage response)

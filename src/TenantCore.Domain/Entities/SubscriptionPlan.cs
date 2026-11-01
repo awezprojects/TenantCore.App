@@ -1,12 +1,14 @@
 using TenantCore.Domain.Common;
+using TenantCore.Domain.Exceptions;
 using TenantCore.Shared.Enums;
 
 namespace TenantCore.Domain.Entities;
 
 /// <summary>
-/// Global subscription plan catalogue — NOT tenant-scoped. Every clinic reads
-/// the same four seeded rows (Trial, Monthly, Quarterly, Yearly). Do not add
-/// an ApplicationId here; per-clinic purchases live on ClinicSubscription.
+/// Global subscription plan catalogue — NOT tenant-scoped. It starts as the four seeded rows
+/// (Trial, Monthly, Quarterly, Yearly) and internal admins add their own packages on top
+/// (Code = Custom). Do not add an ApplicationId here: per-clinic purchases live on
+/// ClinicSubscription, and per-clinic visibility/pricing on ClinicPlanOffer.
 /// </summary>
 public class SubscriptionPlan : AuditableEntity
 {
@@ -21,6 +23,25 @@ public class SubscriptionPlan : AuditableEntity
     public int DisplayOrder { get; private set; }
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// False keeps the plan out of every clinic's self-serve list — it is then reachable only by a
+    /// clinic that has a live ClinicPlanOffer for it, or by an admin assigning it directly.
+    /// </summary>
+    public bool IsPublic { get; private set; }
+
+    /// <summary>
+    /// One-time registration fee this package carries, charged once ever per clinic. Zero means the
+    /// package has no fee. A clinic may override it on its own <c>ClinicAccount</c>, and an admin may
+    /// waive it there — this is only the catalogue default.
+    /// </summary>
+    public decimal RegistrationFee { get; private set; }
+
+    /// <summary>
+    /// Default length of the free trial this package grants (30–90 when set). A clinic with no
+    /// per-clinic override gets this. The Trial plan keeps price 0 and uses this as its length.
+    /// </summary>
+    public int? FreeTestDays { get; private set; }
+
     private SubscriptionPlan() { }
 
     /// <summary>Used only by SubscriptionPlanConfiguration's HasData seed — fixed GUIDs, ValueGeneratedNever.</summary>
@@ -34,7 +55,9 @@ public class SubscriptionPlan : AuditableEntity
         string currency,
         bool isTrial,
         bool isPopular,
-        int displayOrder) => new()
+        int displayOrder,
+        decimal registrationFee = 0m,
+        int? freeTestDays = null) => new()
         {
             Id = id,
             Code = code,
@@ -46,7 +69,95 @@ public class SubscriptionPlan : AuditableEntity
             IsTrial = isTrial,
             IsPopular = isPopular,
             DisplayOrder = displayOrder,
+            RegistrationFee = registrationFee,
+            FreeTestDays = freeTestDays,
             IsActive = true,
+            IsPublic = true,
             CreatedAt = DateTime.UtcNow
         };
+
+    /// <summary>An admin-created package. Always Code = Custom; the seeded four keep their own codes.</summary>
+    public static SubscriptionPlan CreateCustom(
+        string name,
+        string description,
+        int durationDays,
+        decimal price,
+        bool isPopular,
+        int displayOrder,
+        bool isPublic,
+        decimal registrationFee = 0m,
+        int? freeTestDays = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            Code = SubscriptionPlanCode.Custom,
+            Name = name,
+            Description = description,
+            DurationDays = durationDays,
+            Price = price,
+            Currency = "INR",
+            IsTrial = false,
+            IsPopular = isPopular,
+            DisplayOrder = displayOrder,
+            IsActive = true,
+            IsPublic = isPublic,
+            RegistrationFee = registrationFee,
+            FreeTestDays = freeTestDays,
+            CreatedAt = DateTime.UtcNow
+        };
+
+    /// <summary>
+    /// Edits the catalogue entry. Existing subscriptions and open payment links are unaffected —
+    /// both snapshot name, price and duration at purchase time. Code is immutable.
+    ///
+    /// The two Phase-2 parameters are additive and preserve today's behaviour when omitted: a null
+    /// <paramref name="registrationFee"/> leaves the fee untouched, and a null
+    /// <paramref name="freeTestDays"/> leaves the trial length untouched.
+    /// </summary>
+    public void UpdateDetails(
+        string name, string description, int durationDays, decimal price,
+        bool isPopular, int displayOrder, bool isPublic,
+        decimal? registrationFee = null, int? freeTestDays = null)
+    {
+        if (IsTrial && price != 0m)
+            throw new InvalidOperationException("The Trial plan must stay free.");
+
+        Name = name;
+        Description = description;
+        DurationDays = durationDays;
+        Price = price;
+        IsPopular = isPopular;
+        DisplayOrder = displayOrder;
+        IsPublic = isPublic;
+
+        if (registrationFee is { } fee)
+            RegistrationFee = fee;
+
+        if (freeTestDays is { } days)
+        {
+            ValidateFreeTestDays(days);
+            FreeTestDays = days;
+        }
+
+        SetUpdatedAt();
+    }
+
+    /// <summary>Free test days are a package default and must stay inside the band the domain allows.</summary>
+    private static void ValidateFreeTestDays(int days)
+    {
+        if (days is < 30 or > 90)
+            throw new DomainException("Free test days must be between 30 and 90.");
+    }
+
+    public void Activate()
+    {
+        IsActive = true;
+        SetUpdatedAt();
+    }
+
+    /// <summary>Hides the plan from clinics, new offers and new links. Existing terms keep running.</summary>
+    public void Deactivate()
+    {
+        IsActive = false;
+        SetUpdatedAt();
+    }
 }

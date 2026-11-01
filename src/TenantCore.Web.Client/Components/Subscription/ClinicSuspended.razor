@@ -1,0 +1,37 @@
+@inject ClinicContextService ClinicContext
+@inject SubscriptionContextService SubscriptionContext
+
+@* Shown to EVERY role, including Clinic Admin: a suspension is a platform decision and cannot be
+   lifted from inside the clinic, so no plan picker is offered here. *@
+
+<PageTitle>Clinic Suspended - CloudClinic</PageTitle>
+
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+            min-height:calc(100vh - 68px);text-align:center;padding:40px 20px;">
+    <div style="width:64px;height:64px;border-radius:18px;background:#FEE2E2;
+                display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:20px;">
+        ⛔
+    </div>
+    <div style="font-size:18px;font-weight:800;color:#1E293B;">This clinic has been suspended</div>
+
+    <div style="font-size:13px;color:#64748B;margin-top:8px;max-width:420px;line-height:1.6;">
+        @(string.IsNullOrWhiteSpace(ClinicContext.SelectedApplicationName)
+            ? "This clinic"
+            : ClinicContext.SelectedApplicationName)
+        has been suspended by CloudClinic. No clinic features are available until it is reactivated.
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(SubscriptionContext.Status?.SuspensionMessage))
+    {
+        @* Plain text, never MarkupString — this message is entered by an internal admin. *@
+        <div style="margin-top:18px;max-width:420px;background:#FEF3C7;border:1px solid #FDE68A;
+                    border-radius:10px;padding:14px 18px;font-size:13px;color:#92400E;
+                    font-weight:600;line-height:1.6;text-align:left;">
+            @SubscriptionContext.Status!.SuspensionMessage
+        </div>
+    }
+
+    <div style="font-size:12px;color:#94A3B8;margin-top:20px;">
+        Please contact CloudClinic support to resolve this.
+    </div>
+</div>

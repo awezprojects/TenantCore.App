@@ -4,6 +4,7 @@
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject SubscriptionContextService SubscriptionContext
+@inject UsageBillingContextService UsageBillingContext
 @inject FeatureFlagsContextService FeatureFlagsContext
 @inject NavigationManager NavigationManager
 @inject IToastService Toast
@@ -119,6 +120,7 @@ else
                 // session/account so it can't be auto-attached as a stale X-Application-Id
                 // and 403 the new user's first request.
                 SubscriptionContext.Clear();
+        UsageBillingContext.Clear();
                 FeatureFlagsContext.Clear();
                 await ClinicContext.ClearClinicAsync();
 

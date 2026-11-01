@@ -32,6 +32,14 @@ internal sealed class ClinicSubscriptionConfiguration : IEntityTypeConfiguration
         builder.Property(s => s.BillingContactEmail).IsRequired().HasMaxLength(256);
         builder.Property(s => s.BillingContactName).IsRequired().HasMaxLength(200);
 
+        builder.Property(s => s.SubscriptionPaymentId);
+        builder.Property(s => s.OnboardingRequestId);
+        builder.Property(s => s.PurchasedByUserId);
+
+        builder.Property(s => s.GrantedByAdminEmail).HasMaxLength(256);
+        builder.Property(s => s.GrantReason).HasMaxLength(500);
+        builder.Property(s => s.CancellationReason).HasMaxLength(500);
+
         builder.Property(s => s.CreatedAt).IsRequired();
         builder.Property(s => s.CreatedBy).HasMaxLength(256);
         builder.Property(s => s.UpdatedBy).HasMaxLength(256);
@@ -40,6 +48,15 @@ internal sealed class ClinicSubscriptionConfiguration : IEntityTypeConfiguration
         // Serves the guard's per-request lookup (ApplicationId + Status) and the
         // EndDate-ordered reads used to find the latest/active subscription.
         builder.HasIndex(s => new { s.ApplicationId, s.Status, s.EndDate });
+
+        // The timeline reads (current term, upcoming terms, coverage end) all filter on
+        // ApplicationId + Status and order/compare by StartDate.
+        builder.HasIndex(s => new { s.ApplicationId, s.Status, s.StartDate });
+
+        // Idempotency guards for the durable workflow's activation step — at most one
+        // subscription per payment, and at most one per onboarding request (trial grants).
+        builder.HasIndex(s => s.SubscriptionPaymentId).IsUnique().HasFilter("[SubscriptionPaymentId] IS NOT NULL");
+        builder.HasIndex(s => s.OnboardingRequestId).IsUnique().HasFilter("[OnboardingRequestId] IS NOT NULL");
 
         builder.HasOne<SubscriptionPlan>()
                .WithMany()

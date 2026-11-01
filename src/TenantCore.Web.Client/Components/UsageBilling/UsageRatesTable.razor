@@ -1,0 +1,70 @@
+@using TenantCore.Shared.Dtos.UsageBilling
+@using TenantCore.Shared.Enums
+
+@* What each operation costs this clinic: the item, its live rate and "Not priced" where no row exists.
+   Usage:
+     <UsageRatesTable Rates="UsageBillingContext.Summary?.Rates ?? []" Currency="UsageBillingContext.Summary?.Currency ?? "INR"" />
+*@
+
+<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:4px;">Metered rates</div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:12px;">
+        What each operation costs this clinic. An operation with no price is recorded free — usage is never blocked.
+    </div>
+
+    @if (Rates.Count == 0)
+    {
+        <AppEmptyState Icon="🧮" Title="No metered rates set" Message="Nothing is charged for usage today." />
+    }
+    else
+    {
+        <table class="opd-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;">Operation</th>
+                    <th style="text-align:right;">Rate</th>
+                    <th style="text-align:left;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rate in Rates)
+                {
+                    <tr>
+                        <td>@Label(rate.BillingItem)</td>
+                        <td style="text-align:right;">@(rate.IsPriced ? Money(rate.Rate) : "—")</td>
+                        <td>
+                            @if (!rate.IsPriced)
+                            {
+                                <AppBadge Text="Not priced (free)" Variant="neutral" />
+                            }
+                            else if (rate.Rate == 0m)
+                            {
+                                <AppBadge Text="Free on purpose" Variant="info" />
+                            }
+                            else
+                            {
+                                <AppBadge Text="Charged" Variant="success" />
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<UsageRateDto> Rates { get; set; } = [];
+    [Parameter] public string Currency { get; set; } = "INR";
+
+    private string Money(decimal value)
+        => (Currency == "INR" ? "₹" : Currency + " ") + value.ToString("N2");
+
+    private static string Label(BillingItem item) => item switch
+    {
+        BillingItem.OpdRegistration => "OPD registration",
+        BillingItem.IpdAdmission => "IPD admission",
+        BillingItem.IpdDischarge => "IPD discharge",
+        _ => item.ToString()
+    };
+}

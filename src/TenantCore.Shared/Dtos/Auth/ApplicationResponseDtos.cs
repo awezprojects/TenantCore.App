@@ -39,6 +39,7 @@ public class ApplicationUserResponseDto
     public bool IsOwner { get; set; }
     public Guid? RoleId { get; set; }
     public string? RoleName { get; set; }
+    public List<string> RoleNames { get; set; } = [];
     public DateTime JoinedDate { get; set; }
     public DateTime ModifiedDate { get; set; }
 }

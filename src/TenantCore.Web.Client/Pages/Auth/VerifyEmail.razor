@@ -10,102 +10,160 @@
     <span style="font-weight:700;color:#1a56db;font-size:15px;">ClinicCore</span>
 </div>
 
-@if (_verifying)
-{
-    <div style="display:flex;justify-content:center;margin-bottom:24px;">
-        <div class="auth-spinner" style="width:64px;height:64px;border-width:5px;"></div>
-    </div>
-    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Verifying Email…</h2>
-    <p style="color:#6B7280;font-size:14px;">Please wait while we verify your email address.</p>
-}
-else if (_verified)
-{
-    <div style="text-align:center;margin-bottom:20px;"><span style="font-size:80px;">✅</span></div>
-    <h2 style="font-size:22px;font-weight:700;color:#22C55E;margin:0 0 4px;">Email Verified!</h2>
-    <p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">
-        Your email is confirmed. You can now sign in to your account.
-    </p>
-    <a href="/auth/login" class="auth-btn-primary"
-       style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
-        Sign In
-    </a>
-}
-else if (_error)
-{
-    <div style="text-align:center;margin-bottom:20px;"><span style="font-size:80px;">❌</span></div>
-    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 12px;">Verification Failed</h2>
-    <div class="auth-error" style="margin-bottom:16px;">@_errorMessage</div>
-    <a href="/auth/login" class="auth-btn-primary"
-       style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:12px;">
-        Back to Login
-    </a>
-    <div style="text-align:center;">
-        <a href="/auth/resend-verification" class="auth-link" style="font-size:13px;">Resend Verification Email</a>
-    </div>
-}
-else
-{
-    <div style="text-align:center;margin-bottom:20px;"><span style="font-size:80px;">🔗</span></div>
-    <h2 style="font-size:22px;font-weight:700;color:#111827;margin:0 0 4px;">Invalid Link</h2>
-    <p style="color:#6B7280;margin:0 0 1.5rem;font-size:14px;">
-        The verification link is invalid or missing required parameters.
-    </p>
-    <a href="/auth/login" class="auth-btn-primary"
-       style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:12px;">
-        Back to Login
-    </a>
-    <div style="text-align:center;">
-        <a href="/auth/resend-verification" class="auth-link" style="font-size:13px;">Resend Verification Email</a>
-    </div>
-}
+@* Every message below is FIXED text chosen from the outcome. The page never shows the server's
+   own message, an email address, an id or any other application detail. *@
+<div role="status" aria-live="polite">
+    @switch (_state)
+    {
+        case ViewState.Verifying:
+            <div style="display:flex;justify-content:center;margin:8px 0 24px;">
+                <div class="auth-spinner" style="width:56px;height:56px;border-width:5px;"></div>
+            </div>
+            <h2 style="@TitleStyle">Verifying your email…</h2>
+            <p style="@BodyStyle">This only takes a moment. Please don't close this page.</p>
+            break;
+
+        case ViewState.Verified:
+            <div style='@IconStyle("#DCFCE7", "#16A34A")'>✓</div>
+            <h2 style="@TitleStyle color:#16A34A;">Email verified</h2>
+            <p style="@BodyStyle">
+                Thank you! Your email address has been confirmed.
+                You can now sign in to your account.
+            </p>
+            <a href="/auth/login" class="auth-btn-primary"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
+                Sign in
+            </a>
+            break;
+
+        case ViewState.AlreadyVerified:
+            <div style='@IconStyle("#DBEAFE", "#1a56db")'>✓</div>
+            <h2 style="@TitleStyle">Already verified</h2>
+            <p style="@BodyStyle">
+                This email address has already been verified — there's nothing more to do.
+                You can go ahead and sign in.
+            </p>
+            <a href="/auth/login" class="auth-btn-primary"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
+                Sign in
+            </a>
+            break;
+
+        case ViewState.Expired:
+            <div style='@IconStyle("#FEF3C7", "#D97706")'>⏱</div>
+            <h2 style="@TitleStyle">This link has expired</h2>
+            <p style="@BodyStyle">
+                For your security, verification links are only valid for a limited time.
+                Request a new one and we'll email it to you right away.
+            </p>
+            <a href="/auth/resend-verification" class="auth-btn-primary"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:12px;">
+                Send me a new link
+            </a>
+            <a href="/auth/login" class="auth-btn-secondary"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
+                Back to sign in
+            </a>
+            break;
+
+        case ViewState.Failed:
+            <div style='@IconStyle("#FEF3C7", "#D97706")'>!</div>
+            <h2 style="@TitleStyle">We couldn't complete the verification</h2>
+            <p style="@BodyStyle">
+                Something went wrong on our side, or your connection dropped.
+                Please try again in a moment.
+            </p>
+            <button type="button" class="auth-btn-primary" style="margin-bottom:12px;" @onclick="VerifyAsync">
+                Try again
+            </button>
+            <a href="/auth/login" class="auth-btn-secondary"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
+                Back to sign in
+            </a>
+            break;
+
+        default:
+            <div style='@IconStyle("#FEE2E2", "#DC2626")'>✕</div>
+            <h2 style="@TitleStyle">This link isn't valid</h2>
+            <p style="@BodyStyle">
+                The link may have already been used, replaced by a newer email, or copied incompletely.
+                Request a new verification email to continue.
+            </p>
+            <a href="/auth/resend-verification" class="auth-btn-primary"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:12px;">
+                Send me a new link
+            </a>
+            <a href="/auth/login" class="auth-btn-secondary"
+               style="display:flex;align-items:center;justify-content:center;text-decoration:none;">
+                Back to sign in
+            </a>
+            break;
+    }
+</div>
 
 @code {
+    // Stable reasons returned by TenantCore.Auth in the response's Errors list.
+    private const string CodeAlreadyVerified = "EMAIL_ALREADY_VERIFIED";
+    private const string CodeLinkExpired = "LINK_EXPIRED";
+    private const string CodeLinkInvalid = "LINK_INVALID";
+
+    private const string TitleStyle = "font-size:22px;font-weight:700;color:#111827;margin:0 0 8px;text-align:center;";
+    private const string BodyStyle = "color:#6B7280;margin:0 0 1.5rem;font-size:14px;line-height:1.6;text-align:center;";
+
+    private static string IconStyle(string bg, string fg) =>
+        $"width:72px;height:72px;border-radius:50%;background:{bg};color:{fg};display:flex;align-items:center;" +
+        "justify-content:center;font-size:34px;font-weight:700;margin:4px auto 20px;";
+
+    private enum ViewState { Verifying, Verified, AlreadyVerified, Expired, Invalid, Failed }
+
     [SupplyParameterFromQuery]
     public Guid? UserId { get; set; }
 
     [SupplyParameterFromQuery]
     public string? VerificationCode { get; set; }
 
-    private bool _verifying;
-    private bool _verified;
-    private bool _error;
-    private string? _errorMessage;
+    private ViewState _state = ViewState.Verifying;
+    private Guid _userId;
+    private string _code = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
-        if (UserId.HasValue && !string.IsNullOrEmpty(VerificationCode))
+        if (UserId is null || UserId == Guid.Empty || string.IsNullOrWhiteSpace(VerificationCode))
         {
-            await VerifyEmailAsync();
+            _state = ViewState.Invalid;
+            return;
         }
+
+        // Keep our own copy: once the outcome is known the query string is removed from the address bar.
+        _userId = UserId.Value;
+        _code = VerificationCode;
+
+        await VerifyAsync();
     }
 
-    private async Task VerifyEmailAsync()
+    private async Task VerifyAsync()
     {
-        _verifying = true;
-        StateHasChanged();
+        _state = ViewState.Verifying;
 
         try
         {
-            var response = await AuthClient.VerifyEmailAsync(UserId!.Value, VerificationCode!);
+            var response = await AuthClient.VerifyEmailAsync(_userId, _code);
 
-            if (response.Success)
-            {
-                _verified = true;
-            }
-            else
-            {
-                _error = true;
-                _errorMessage = response.Message ?? "Email verification failed. The link may have expired.";
-            }
+            // A structured refusal from Auth carries one of the codes above. An answer with NO code is a
+            // network or server fault, not a bad link — that stays "Failed" so the user can simply retry.
+            _state = response.Success ? ViewState.Verified
+                : response.Errors.Contains(CodeAlreadyVerified) ? ViewState.AlreadyVerified
+                : response.Errors.Contains(CodeLinkExpired) ? ViewState.Expired
+                : response.Errors.Contains(CodeLinkInvalid) ? ViewState.Invalid
+                : ViewState.Failed;
         }
         catch (Exception)
         {
-            _error = true;
-            _errorMessage = "An unexpected error occurred during verification. Please try again.";
+            _state = ViewState.Failed;
         }
-        finally
-        {
-            _verifying = false;
-        }
+
+        // Any conclusive answer: take the one-time code out of the address bar and browser history.
+        if (_state != ViewState.Failed)
+            NavigationManager.NavigateTo("/auth/verify-email", replace: true);
     }
 }

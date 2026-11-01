@@ -1,0 +1,126 @@
+using Microsoft.Extensions.Configuration;
+using TenantCore.Application.Common.Workflow;
+using TenantCore.Application.Features.Onboarding.Emails;
+using TenantCore.Application.Services;
+using TenantCore.Domain.Entities;
+using TenantCore.Domain.Enums;
+using TenantCore.Domain.Exceptions;
+using TenantCore.Domain.Interfaces;
+using TenantCore.Shared.Enums;
+
+namespace TenantCore.Application.Features.Onboarding.Tasks;
+
+public sealed class CreatePaymentLinkTaskHandler(
+    ISubscriptionPaymentRepository paymentRepository,
+    IClinicOnboardingRequestRepository requestRepository,
+    IPaymentGateway paymentGateway,
+    IWorkflowEnqueuer workflowEnqueuer,
+    IConfiguration configuration)
+    : IWorkflowTaskHandler
+{
+    public WorkflowTaskType TaskType => WorkflowTaskType.CreatePaymentLink;
+
+    public async Task HandleAsync(Domain.Entities.WorkflowTask task, CancellationToken ct)
+    {
+        var payment = await paymentRepository.GetByIdAsync(task.AggregateId, ct);
+        if (payment == null)
+            throw new PermanentWorkflowException($"SubscriptionPayment {task.AggregateId} not found.");
+
+        // Idempotent — already done, or no longer relevant (superseded/cancelled/expired).
+        if (payment.Status is SubscriptionPaymentStatus.LinkCreated or SubscriptionPaymentStatus.Paid
+            or SubscriptionPaymentStatus.Superseded or SubscriptionPaymentStatus.Cancelled or SubscriptionPaymentStatus.Expired)
+            return;
+
+        if (!paymentGateway.IsConfigured)
+            throw new InvalidOperationException("Razorpay is not configured.");
+
+        var request = payment.OnboardingRequestId.HasValue
+            ? await requestRepository.GetByIdAsync(payment.OnboardingRequestId.Value, ct)
+            : null;
+
+        var expiryDays = configuration.GetValue("Razorpay:PaymentLinkExpiryDays", 7);
+        var callbackUrl = configuration["Razorpay:CallbackUrl"] ?? string.Empty;
+        var expireBy = DateTime.UtcNow.AddDays(expiryDays);
+        // Phase 2 made the plan columns nullable: a wallet top-up and a registration fee carry no
+        // plan at all, so the Razorpay description is derived from the purpose. Reading PlanName
+        // here would render a top-up as " subscription". Plan: "<Clinic> — wallet top-up ₹X".
+        var description = payment.Purpose switch
+        {
+            PaymentPurpose.WalletTopUp => $"{payment.ClinicName ?? "Clinic"} — wallet top-up ₹{payment.Amount:N2}",
+            PaymentPurpose.RegistrationFee => $"{payment.ClinicName ?? "Clinic"} — registration fee ₹{payment.Amount:N2}",
+            _ => $"{payment.PlanName} subscription"
+        };
+
+        var (result, link) = await paymentGateway.CreatePaymentLinkAsync(
+            payment.Id.ToString("N"), payment.AmountInMinorUnits, payment.Currency, description,
+            payment.PayerName, payment.PayerEmail, payment.PayerPhone, expireBy, callbackUrl, ct);
+
+        if (!result.Success)
+        {
+            if (result.ErrorMessage == "DUPLICATE_REFERENCE")
+            {
+                // The earlier attempt's response was lost, but the link was actually created —
+                // adopt it instead of creating a second one.
+                var (findResult, existingLink) = await paymentGateway.FindPaymentLinkByReferenceAsync(payment.Id.ToString("N"), ct);
+                if (!findResult.Success || existingLink == null)
+                    throw new InvalidOperationException("Razorpay reports a duplicate reference but the existing link could not be found.");
+                link = existingLink;
+            }
+            else if (result.IsTransient)
+            {
+                throw new InvalidOperationException(result.ErrorMessage ?? "Razorpay create payment link failed.");
+            }
+            else
+            {
+                throw new PermanentWorkflowException(result.ErrorMessage ?? "Razorpay create payment link failed permanently.");
+            }
+        }
+
+        if (link == null)
+            throw new InvalidOperationException("Razorpay did not return a payment link.");
+
+        payment.SetLink(link.Id, link.ShortUrl, link.ExpireBy);
+        request?.MarkAwaitingPayment();
+
+        // Falls back through the request, then the name snapshotted on the payment. It must never
+        // be empty: SendEmailTaskHandler derives RecipientName from it, and the notification
+        // consumer dead-letters a message with a blank name without attempting delivery.
+        var clinicNameForEmail = request?.ClinicName ?? payment.ClinicName ?? "your clinic";
+
+        var emailTemplate = payment.Purpose switch
+        {
+            PaymentPurpose.Onboarding => "PaymentLink",
+            PaymentPurpose.AdminAssigned => "AssignedPaymentLink",
+            _ => "RenewalPaymentLink"
+        };
+        var emailAggregateType = request != null ? nameof(ClinicOnboardingRequest) : nameof(SubscriptionPayment);
+        var emailAggregateId = request?.Id ?? payment.Id;
+
+        await workflowEnqueuer.EnqueueAsync(
+            WorkflowTaskType.SendEmail, $"email:payment-link:{payment.Id}", emailAggregateType, emailAggregateId,
+            OnboardingEmailTemplates.BuildPayload(emailTemplate, payment.PayerEmail, new
+            {
+                ClinicName = clinicNameForEmail,
+                PlanName = payment.PlanName ?? PurposeLabel(payment.Purpose),
+                Amount = payment.Amount.ToString("N2"),
+                Currency = payment.Currency,
+                PaymentLinkUrl = payment.PaymentLinkUrl,
+                ExpiresAt = payment.LinkExpiresAt?.ToString("dd MMM yyyy") ?? string.Empty
+            }),
+            ct);
+
+        await paymentRepository.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// A human name for the two planless Phase-2 purposes, so the payment-link payload never renders
+    /// a blank where a plan name would otherwise be. Plan-carrying purposes keep their snapshotted
+    /// plan name; "Subscription" is only a last-resort fallback.
+    /// </summary>
+    private static string PurposeLabel(PaymentPurpose purpose) => purpose switch
+    {
+        PaymentPurpose.WalletTopUp => "Wallet top-up",
+        PaymentPurpose.RegistrationFee => "Registration fee",
+        _ => "Subscription"
+    };
+}

@@ -15,55 +15,74 @@
     </div>
 
     <h2 style="font-size:20px;font-weight:700;color:#111827;margin:0 0 8px;">Accept Invitation</h2>
-    <div class="auth-info" style="margin-bottom:20px;">
-        Please set your password to activate your account.
-    </div>
 
-    <EditForm Model="_model" OnValidSubmit="AcceptInvitationAsync">
-        <DataAnnotationsValidator />
+    @if (_loadingInvite)
+    {
+        <div class="auth-info" style="margin-bottom:20px;">Loading invitation details...</div>
+    }
+    else if (_inviteInvalid)
+    {
+        <div class="auth-error" style="margin-bottom:20px;">
+            This invitation link is invalid or has expired. Please ask for a new invitation.
+        </div>
+    }
+    else
+    {
+        <div class="auth-info" style="margin-bottom:20px;">
+            @if (_inviteInfo is not null)
+            {
+                <text>You've been invited to join <strong>@_inviteInfo.ApplicationName</strong> as
+                <strong>@_inviteInfo.RoleName</strong> (@_inviteInfo.Email). </text>
+            }
+            Please set your password to activate your account.
+        </div>
 
-        <div class="auth-input-wrap">
-            <label class="auth-label">Password</label>
-            <div class="auth-input-with-toggle">
+        <EditForm Model="_model" OnValidSubmit="AcceptInvitationAsync">
+            <DataAnnotationsValidator />
+
+            <div class="auth-input-wrap">
+                <label class="auth-label">Password</label>
+                <div class="auth-input-with-toggle">
+                    <input class="auth-input" type="@(_showPassword ? "text" : "password")"
+                           @bind="_model.Password" disabled="@(_loading || _success)" />
+                    <button type="button" class="auth-input-toggle" @onclick="@(() => _showPassword = !_showPassword)">
+                        @(_showPassword ? "Hide" : "Show")
+                    </button>
+                </div>
+            </div>
+
+            <div class="auth-input-wrap">
+                <label class="auth-label">Confirm Password</label>
                 <input class="auth-input" type="@(_showPassword ? "text" : "password")"
-                       @bind="_model.Password" disabled="@(_loading || _success)" />
-                <button type="button" class="auth-input-toggle" @onclick="@(() => _showPassword = !_showPassword)">
-                    @(_showPassword ? "Hide" : "Show")
-                </button>
+                       @bind="_model.ConfirmPassword" disabled="@(_loading || _success)" />
             </div>
-        </div>
 
-        <div class="auth-input-wrap">
-            <label class="auth-label">Confirm Password</label>
-            <input class="auth-input" type="@(_showPassword ? "text" : "password")"
-                   @bind="_model.ConfirmPassword" disabled="@(_loading || _success)" />
-        </div>
-
-        @if (!string.IsNullOrEmpty(_error))
-        {
-            <div class="auth-error">@_error</div>
-        }
-
-        @if (_success)
-        {
-            <div class="auth-success-msg" style="margin-bottom:16px;">
-                Invitation accepted! You can now <a href="/auth/login" class="auth-link">sign in</a>.
-            </div>
-        }
-
-        <button type="submit" class="auth-btn-primary" disabled="@(_loading || _success)"
-                style="display:flex;align-items:center;justify-content:center;gap:8px;">
-            @if (_loading)
+            @if (!string.IsNullOrEmpty(_error))
             {
-                <span class="auth-spinner"></span>
-                <span>Submitting...</span>
+                <div class="auth-error">@_error</div>
             }
-            else
+
+            @if (_success)
             {
-                <span>Accept Invitation</span>
+                <div class="auth-success-msg" style="margin-bottom:16px;">
+                    Invitation accepted! You can now <a href="/auth/login" class="auth-link">sign in</a>.
+                </div>
             }
-        </button>
-    </EditForm>
+
+            <button type="submit" class="auth-btn-primary" disabled="@(_loading || _success)"
+                    style="display:flex;align-items:center;justify-content:center;gap:8px;">
+                @if (_loading)
+                {
+                    <span class="auth-spinner"></span>
+                    <span>Submitting...</span>
+                }
+                else
+                {
+                    <span>Accept Invitation</span>
+                }
+            </button>
+        </EditForm>
+    }
 </div>
 
 @code {
@@ -74,10 +93,24 @@
     private bool _success;
     private bool _showPassword;
     private string _error = string.Empty;
+    private bool _loadingInvite = true;
+    private bool _inviteInvalid;
+    private InvitationInfoDto? _inviteInfo;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         _model.Token = Token;
+
+        var info = await AuthApi.GetInvitationInfoAsync(Token);
+        if (info.Success && info.Data is not null)
+        {
+            _inviteInfo = info.Data;
+        }
+        else
+        {
+            _inviteInvalid = true;
+        }
+        _loadingInvite = false;
     }
 
     private async Task AcceptInvitationAsync()

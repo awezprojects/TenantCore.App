@@ -24,8 +24,14 @@ public class EmailService(IConfiguration configuration, ILogger<EmailService> lo
 
         if (string.IsNullOrEmpty(host) || string.IsNullOrEmpty(from))
         {
-            logger.LogWarning("Email not configured. Skipping send to {To}", to);
-            return;
+            // Must throw rather than silently return: callers (SendEmailTaskHandler,
+            // SubmitPrescriptionHandler) treat a normal return as "email sent" and record
+            // success accordingly — a silent no-op here previously made every send look
+            // successful in the workflow task status and the Admin portal even though no
+            // email was ever delivered.
+            logger.LogError("Email not configured (Email:Host/Email:From missing). Cannot send to {To}", to);
+            throw new InvalidOperationException(
+                "Email is not configured (Email:Host / Email:From missing in configuration).");
         }
 
         using var client = new SmtpClient(host, port)

@@ -157,6 +157,22 @@ builder.Services.AddHttpClient<ISubscriptionApiClient, SubscriptionApiClient>(cl
 }).AddHttpMessageHandler<ClinicAuthorizationHandler>();
 builder.Services.AddScoped<SubscriptionContextService>();
 builder.Services.AddScoped<FeatureFlagsContextService>();
+builder.Services.AddScoped<UsageBillingContextService>();
+
+// Register Usage Billing API Client — the clinic's own wallet, metered usage and registration fee.
+// Clinic-scoped: every read on the API derives the clinic from X-Application-Id, so the handler has to
+// attach that header, exactly like the subscription client above.
+builder.Services.AddHttpClient<IUsageBillingApiClient, UsageBillingApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+}).AddHttpMessageHandler<ClinicAuthorizationHandler>();
+
+// Register Onboarding API Client — user-scoped only (no clinic exists yet for a request),
+// so no ClinicAuthorizationHandler.
+builder.Services.AddHttpClient<IOnboardingApiClient, OnboardingApiClient>(client =>
+{
+    client.BaseAddress = new Uri(tenantApiBaseUrl);
+});
 
 // Register Logging API Client — no ClinicAuthorizationHandler: the endpoint is
 // anonymous-allowed so pre-login frontend crashes are still captured.

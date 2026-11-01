@@ -20,7 +20,13 @@ internal sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<S
         builder.Property(p => p.Id).ValueGeneratedNever();
 
         builder.Property(p => p.Code).IsRequired().HasConversion<int>();
-        builder.HasIndex(p => p.Code).IsUnique();
+
+        // Unique for the four seeded codes only. Admin-created packages all share
+        // Code = Custom (5) and are excluded, so GetByCodeAsync(Trial) stays unambiguous
+        // while any number of Custom plans exist side by side.
+        builder.HasIndex(p => p.Code)
+               .IsUnique()
+               .HasFilter($"[Code] <> {(int)SubscriptionPlanCode.Custom}");
 
         builder.Property(p => p.Name).IsRequired().HasMaxLength(60);
         builder.Property(p => p.Description).HasMaxLength(250);
@@ -31,6 +37,13 @@ internal sealed class SubscriptionPlanConfiguration : IEntityTypeConfiguration<S
         builder.Property(p => p.IsPopular).IsRequired().HasDefaultValue(false);
         builder.Property(p => p.DisplayOrder).IsRequired();
         builder.Property(p => p.IsActive).IsRequired().HasDefaultValue(true);
+        builder.Property(p => p.IsPublic).IsRequired().HasDefaultValue(true);
+
+        // Phase 2 — catalogue defaults for the one-time registration fee and the package-granted
+        // free trial length. Both default to "no fee / no override" so the existing four seeded rows
+        // are correct without a data update: this plan adds no seeding of any kind.
+        builder.Property(p => p.RegistrationFee).IsRequired().HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Property(p => p.FreeTestDays);
 
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.CreatedBy).HasMaxLength(256);

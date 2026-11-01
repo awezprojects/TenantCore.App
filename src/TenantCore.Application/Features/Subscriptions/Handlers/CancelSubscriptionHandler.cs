@@ -1,30 +1,18 @@
 using MediatR;
 using TenantCore.Application.Features.Subscriptions.Commands;
-using TenantCore.Domain.Entities;
-using TenantCore.Domain.Exceptions;
-using TenantCore.Domain.Interfaces;
-using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Features.Subscriptions.Handlers;
 
-public sealed class CancelSubscriptionHandler(IClinicSubscriptionRepository subscriptionRepository)
-    : IRequestHandler<CancelSubscriptionCommand>
+/// <summary>
+/// Retired. This used to set the subscription to Cancelled, which locked the clinic out
+/// immediately — despite its own comment promising access until EndDate — and no screen ever
+/// called it. The route is kept so an old client gets a clear 409 instead of a 404, but a term
+/// can now only be ended by an internal admin, and only before it has started
+/// (CancelUpcomingSubscriptionCommand).
+/// </summary>
+public sealed class CancelSubscriptionHandler : IRequestHandler<CancelSubscriptionCommand>
 {
-    public async Task Handle(CancelSubscriptionCommand request, CancellationToken cancellationToken)
-    {
-        var subscription = await subscriptionRepository.GetByIdAsync(request.SubscriptionId, cancellationToken);
-
-        // Cross-tenant subscription is treated as not found — never leak its existence.
-        if (subscription is null || subscription.ApplicationId != request.ApplicationId)
-            throw new NotFoundException(nameof(ClinicSubscription), request.SubscriptionId);
-
-        if (subscription.Status == SubscriptionStatus.Cancelled)
-            throw new InvalidOperationException("This subscription has already been cancelled.");
-
-        // Cancellation does not refund or shorten the term — EndDate is untouched,
-        // the clinic keeps access until it passes. Only a future renewal is prevented.
-        subscription.Cancel(request.ActingUserId.ToString());
-        subscriptionRepository.Update(subscription);
-        await subscriptionRepository.SaveChangesAsync(cancellationToken);
-    }
+    public Task Handle(CancelSubscriptionCommand request, CancellationToken cancellationToken)
+        => throw new InvalidOperationException(
+            "Subscriptions can't be cancelled from the clinic app — contact CloudClinic support.");
 }

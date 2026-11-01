@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using TenantCore.Application.Common.Exceptions;
 using TenantCore.Application.Services;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Shared.Enums;
@@ -36,14 +37,6 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             ? id
             : (Guid?)null;
 
-        await errorLogger.LogExceptionAsync(
-            LogCategory.Api,
-            "Api.Middleware",
-            exception,
-            applicationId: applicationId,
-            userId: context.User.FindFirst("nameid")?.Value ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
-            additionalContext: $"CorrelationId={correlationId}; RequestPath={context.Request.Path}");
-
         // Detail is the user-facing message shown in the UI.
         // Technical context (exception type, stack trace) stays in the log above.
         var (statusCode, title, detail) = exception switch
@@ -55,13 +48,38 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
 
             NotFoundException       => (HttpStatusCode.NotFound,            "Not Found",    UserMessages.NotFound),
             DomainValidationException dve => (HttpStatusCode.BadRequest,    "Invalid Input", dve.Message),
+
+            // Phase 2 — a business refusal that carries a stable machine-readable code (an empty
+            // wallet, a locked billing mode, an open top-up link). Deliberately placed before the
+            // generic DomainException arm, because it is NOT a DomainException: its status comes from
+            // the exception (403/409) rather than being fixed at 400.
+            ErrorCodeException ece  => ((HttpStatusCode)ece.StatusCode,     "Request Refused", ece.Message),
+
+            // The Auth API rejected a proxied call (bad role, cross-app access, spoofed actor id,
+            // etc). Preserve its actual status instead of collapsing everything to 409, and never
+            // surface the raw upstream body here — AuthApplicationService already logged it
+            // (DEF-UM-02 / DEF-UM-03).
+            AuthApiException aae    => ((HttpStatusCode)aae.StatusCode,     "Request Refused", aae.Message),
+
             DomainException de      => (HttpStatusCode.BadRequest,          "Request Error", de.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized,    "Unauthorized",  UserMessages.Unauthorized),
+            TooManyRequestsException tmr => ((HttpStatusCode)429,           "Too Many Requests", tmr.Message),
             InvalidOperationException ioe => (HttpStatusCode.Conflict,      "Conflict",      ioe.Message),
             DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } } => (
                 HttpStatusCode.Conflict, "Conflict", UserMessages.Conflict),
             _ => (HttpStatusCode.InternalServerError, "Server Error",       UserMessages.ServerError)
         };
+
+        // Status first, then log: the error row records the ACTUAL status the client receives.
+        context.Response.StatusCode = (int)statusCode;
+
+        await errorLogger.LogExceptionAsync(
+            LogCategory.Api,
+            "Api.Middleware",
+            exception,
+            applicationId: applicationId,
+            userId: context.User.FindFirst("nameid")?.Value ?? context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+            additionalContext: $"CorrelationId={correlationId}; RequestPath={context.Request.Path}");
 
         var problemDetails = new ProblemDetails
         {
@@ -79,6 +97,13 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
             problemDetails.Extensions["errors"] = errors;
         }
+
+        // Phase 2 — the machine-readable code the Blazor client keys UI behaviour off (e.g. it opens
+        // the insufficient-balance dialog on insufficient_wallet_balance). Additive: the pre-existing
+        // status mappings and the correlationId extension above are untouched, and the Phase-1 guard
+        // codes keep being written by the two guard middlewares themselves.
+        if (exception is ErrorCodeException errorCodeException)
+            problemDetails.Extensions["errorCode"] = errorCodeException.ErrorCode;
 
         context.Response.StatusCode = (int)statusCode;
         context.Response.ContentType = "application/problem+json";

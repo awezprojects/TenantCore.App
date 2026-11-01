@@ -1,0 +1,93 @@
+@page "/billing/wallet"
+@layout AuthorizedLayout
+@inject IUsageBillingApiClient UsageBillingApi
+@inject UsageBillingContextService UsageBillingContext
+@inject NavigationManager NavigationManager
+@inject ClinicContextService ClinicContext
+@using TenantCore.Shared.Enums
+@using TenantCore.Shared.Dtos.UsageBilling
+
+<PageTitle>Wallet - CloudClinic</PageTitle>
+
+<div class="opd-page">
+
+    <AppPageHeader Title="Wallet" Subtitle="@ClinicContext.SelectedApplicationName">
+        <Actions>
+            <a href="/billing" class="btn btn-outline-primary">🧾 Billing</a>
+            <a href="/billing/usage" class="btn btn-outline-primary">📊 Usage</a>
+            <button class="btn btn-outline-primary" @onclick="LoadAsync" disabled="@_loading">🔄 Refresh</button>
+        </Actions>
+    </AppPageHeader>
+
+    <AppLoadingBar Loading="_loading" />
+
+    @if (_wallet is null)
+    {
+        @if (!_loading)
+        {
+            <AppEmptyState Icon="💳" Title="The wallet could not be loaded"
+                           Message="@(_error ?? "Please try again in a moment.")" />
+        }
+    }
+    else
+    {
+        @* Balance, threshold, low warning and the top-up shortcut. *@
+        <WalletBalanceCard Wallet="_wallet" TopUpHref="#topup-amount" />
+
+        @* What each metered operation costs — read off the shared billing summary, never a second fetch. *@
+        <UsageRatesTable Rates="UsageBillingContext.Summary?.Rates ?? []" Currency="@_wallet.Currency" />
+
+        <TopUpDialog Wallet="_wallet" OnChanged="ReloadAfterTopUpAsync" />
+
+        <WalletLedgerTable Transactions="_wallet.Transactions" Currency="@_wallet.Currency" />
+    }
+</div>
+
+@code {
+    private ClinicWalletDto? _wallet;
+    private bool _loading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UsageBillingContext.IsLoaded)
+            await UsageBillingContext.RefreshAsync();
+
+        // Billing/wallet pages are PAYG-only — redirect subscription clinics.
+        if (!UsageBillingContext.IsPayAsYouGo)
+        {
+            NavigationManager.NavigateTo("/subscription", replace: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+
+        var response = await UsageBillingApi.GetWalletAsync();
+        if (response.Success)
+        {
+            _wallet = response.Data;
+            _error = null;
+        }
+        else
+        {
+            _wallet = null;
+            _error = response.Message;
+        }
+
+        _loading = false;
+    }
+
+    /// <summary>
+    /// A top-up was created or checked — the balance may have moved, so the wallet and the shared
+    /// billing summary are both reloaded. This only ever runs off an explicit top-up action.
+    /// </summary>
+    private async Task ReloadAfterTopUpAsync()
+    {
+        await Task.WhenAll(LoadAsync(), UsageBillingContext.RefreshAsync());
+    }
+}

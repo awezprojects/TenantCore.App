@@ -1,5 +1,6 @@
 using Serilog;
 using Serilog.Events;
+using TenantCore.Api.Authentication;
 using TenantCore.Api.Extensions;
 using TenantCore.Api.Middleware;
 using TenantCore.Application;
@@ -60,14 +61,18 @@ try
         });
     });
 
-    builder.Services.AddApplication();
+    builder.Services.AddApplication(builder.Configuration);
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddJwtAuthentication(builder.Configuration, builder.Environment);
+    builder.Services.Configure<InternalApiOptions>(builder.Configuration.GetSection("InternalApi"));
 
     builder.Services.AddHealthChecks()
         .AddSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!);
 
     builder.Services.AddHttpContextAccessor();
+
+    // Background/hosted-service errors → ApiErrorLogs (ReadFrom.Services picks the sink up). ADR-011.
+    builder.Services.AddSingleton<Serilog.Core.ILogEventSink, TenantCore.Api.Logging.TableStorageErrorSink>();
 
     builder.Services.AddHttpClient("AuthApi", client =>
     {
@@ -87,6 +92,7 @@ try
     var app = builder.Build();
 
     app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseMiddleware<ApiRequestLoggingMiddleware>();   // ApiRequestLogs: failed, slow and data-changing requests (ADR-011)
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseSerilogRequestLogging();
 

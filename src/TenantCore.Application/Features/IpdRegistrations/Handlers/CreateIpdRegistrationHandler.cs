@@ -2,10 +2,12 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using TenantCore.Application.Features.IpdRegistrations.Commands;
 using TenantCore.Application.Features.IpdRegistrations.Translators;
+using TenantCore.Application.Features.UsageBilling.Commands;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Interfaces;
 using TenantCore.Shared.Dtos;
+using TenantCore.Shared.Enums;
 using TenantCore.Shared.Errors;
 
 namespace TenantCore.Application.Features.IpdRegistrations.Handlers;
@@ -14,6 +16,7 @@ public sealed class CreateIpdRegistrationHandler(
     IIpdRegistrationRepository ipdRepository,
     IPatientRepository patientRepository,
     IBedRepository bedRepository,
+    ISender sender,
     ILogger<CreateIpdRegistrationHandler> logger)
     : IRequestHandler<CreateIpdRegistrationCommand, IpdRegistrationDto>
 {
@@ -50,6 +53,15 @@ public sealed class CreateIpdRegistrationHandler(
             request.RoomNumber, request.BedNumber, request.InitialFee, request.AdmissionNotes);
 
         await ipdRepository.AddAsync(registration, cancellationToken);
+
+        // Metered admission. Dispatched BEFORE the SaveChanges so the admission, its usage row and
+        // any wallet debit are one transaction — a refusal commits nothing. The same IpdRegistration
+        // Id later appears again as IpdDischarge, which the unique index
+        // (ApplicationId, BillingItem, SourceEntityId) permits by design.
+        await sender.Send(new ChargeUsageCommand(
+            request.ApplicationId, BillingItem.IpdAdmission, registration.Id,
+            Quantity: 1, UserId: null, OccurredAt: null), cancellationToken);
+
         await ipdRepository.SaveChangesAsync(cancellationToken);
 
         var loaded = await ipdRepository.GetByIdAsync(registration.Id, cancellationToken);

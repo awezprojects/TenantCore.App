@@ -75,9 +75,9 @@ else if (_isAuthenticated)
             <nav style="flex:1;padding:10px 8px;overflow-y:auto;">
                 <DoctorNavItem Href="/select-clinic"  Icon="🏥" Label="My Clinics"       SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
                 <DoctorNavItem Href="/doctor/profile" Icon="👤" Label="My Profile"       SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
-                @if (!_hasOwnClinic && _isDoctor)
+                @if (!_hasOwnClinic && _canRegisterClinic)
                 {
-                    <DoctorNavItem Href="/doctor/register-clinic" Icon="➕" Label="Register Clinic" SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
+                    <DoctorNavItem Href="/clinic-requests" Icon="➕" Label="Request Clinic" SidebarOpen="_sidebarOpen" CurrentPath="_currentPath" />
                 }
             </nav>
 
@@ -129,6 +129,7 @@ else if (_isAuthenticated)
     private bool _sidebarOpen = true;
     private bool _hasOwnClinic;
     private bool _isDoctor;
+    private bool _canRegisterClinic;
     private string _roleLabel = "User";
     private string _initials = "U";
     private string _currentPath = "/select-clinic";
@@ -141,6 +142,8 @@ else if (_isAuthenticated)
         ["/doctor/profile"]          = "My Profile",
         ["/doctor/change-password"]  = "Change Password",
         ["/doctor/register-clinic"]  = "Register Your Clinic",
+        ["/clinic-requests"]         = "My Clinic Requests",
+        ["/clinic-requests/new"]     = "Request a New Clinic",
     };
 
     protected override void OnInitialized()
@@ -172,6 +175,9 @@ else if (_isAuthenticated)
 
             var roles = AuthState.CurrentUser.UserRoles.Where(r => r.IsActive).Select(r => r.RoleName).ToList();
             _isDoctor  = roles.Any(r => r.Equals("Doctor", StringComparison.OrdinalIgnoreCase));
+            // A freshly registered user has no UserRole rows at all yet (roles are assigned at
+            // clinic-creation or invite-acceptance time) — still let them reach clinic registration.
+            _canRegisterClinic = _isDoctor || roles.Count == 0;
             _roleLabel = roles.FirstOrDefault(r =>
                              r.Equals("Clinic Admin", StringComparison.OrdinalIgnoreCase) ||
                              r.Equals("System Admin", StringComparison.OrdinalIgnoreCase))

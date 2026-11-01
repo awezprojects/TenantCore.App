@@ -37,7 +37,9 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<CounterSession> CounterSessions => Set<CounterSession>();
     public DbSet<AmountHandover> AmountHandovers => Set<AmountHandover>();
     public DbSet<ClinicFeatureFlags> ClinicFeatureFlags => Set<ClinicFeatureFlags>();
+    public DbSet<ClinicAccount> ClinicAccounts => Set<ClinicAccount>();
     public DbSet<SubscriptionPlan> SubscriptionPlans => Set<SubscriptionPlan>();
+    public DbSet<ClinicPlanOffer> ClinicPlanOffers => Set<ClinicPlanOffer>();
     public DbSet<ClinicSubscription> ClinicSubscriptions => Set<ClinicSubscription>();
     public DbSet<SubscriptionAlertSetting> SubscriptionAlertSettings => Set<SubscriptionAlertSetting>();
     public DbSet<HistoryLookupItem> HistoryLookupItems => Set<HistoryLookupItem>();
@@ -45,6 +47,14 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
     public DbSet<City> Cities => Set<City>();
     public DbSet<ClinicLocation> ClinicLocations => Set<ClinicLocation>();
     public DbSet<VitalPresetLookupItem> VitalPresetLookupItems => Set<VitalPresetLookupItem>();
+    public DbSet<ClinicOnboardingRequest> ClinicOnboardingRequests => Set<ClinicOnboardingRequest>();
+    public DbSet<SubscriptionPayment> SubscriptionPayments => Set<SubscriptionPayment>();
+    public DbSet<WorkflowTask> WorkflowTasks => Set<WorkflowTask>();
+    public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
+    public DbSet<ClinicWallet> ClinicWallets => Set<ClinicWallet>();
+    public DbSet<ClinicWalletTransaction> ClinicWalletTransactions => Set<ClinicWalletTransaction>();
+    public DbSet<ClinicUsageRate> ClinicUsageRates => Set<ClinicUsageRate>();
+    public DbSet<ClinicUsageRecord> ClinicUsageRecords => Set<ClinicUsageRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

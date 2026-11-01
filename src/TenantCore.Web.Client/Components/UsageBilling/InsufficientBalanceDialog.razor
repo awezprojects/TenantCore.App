@@ -1,0 +1,47 @@
+@* Shown whenever an API call is refused with 403 insufficient_wallet_balance.
+   The create flows (OPD/IPD) and the billing screens open this instead of a bare error toast, so the
+   user is told what happened and is never left at a dead end.
+   Usage:
+     <InsufficientBalanceDialog @bind-Visible="_insufficientBalance" Balance="UsageBillingContext.Summary?.WalletBalance" />
+*@
+
+<AppModal Visible="Visible" VisibleChanged="VisibleChanged" Title="Not enough wallet balance" Size="md">
+    <ChildContent>
+    <div style="font-size:13px;color:#334155;line-height:1.6;">
+        <p style="margin:0 0 10px;">
+            This clinic is on <strong>pay as you go</strong>, so metered operations are charged to the wallet.
+            The wallet does not have enough balance to cover this one, so <strong>nothing was saved and nothing
+            was charged</strong>.
+        </p>
+
+        @if (Balance is { } balance)
+        {
+            <p style="margin:0 0 10px;">
+                Current balance: <strong>@Money(balance)</strong>.
+            </p>
+        }
+
+        <p style="margin:0;">
+            Top up the wallet and repeat the operation. The wallet is credited as soon as the payment gateway
+            confirms the payment, so the credit shows up on the wallet screen without waiting for anything from support.
+        </p>
+    </div>
+    </ChildContent>
+
+    <Footer>
+        <button class="btn btn-outline-primary" @onclick="() => VisibleChanged.InvokeAsync(false)">Close</button>
+        <a href="/billing/wallet" class="btn btn-primary">💳 Top up the wallet</a>
+    </Footer>
+</AppModal>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+
+    /// <summary>Optional: the balance the last billing refresh reported, so the refusal has context.</summary>
+    [Parameter] public decimal? Balance { get; set; }
+    [Parameter] public string Currency { get; set; } = "INR";
+
+    private string Money(decimal value)
+        => (Currency == "INR" ? "₹" : Currency + " ") + value.ToString("N2");
+}

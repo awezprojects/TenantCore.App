@@ -1,12 +1,37 @@
 @inject SubscriptionContextService SubscriptionContext
+@inject UsageBillingContextService UsageBillingContext
 @inject NavigationManager Nav
+@implements IDisposable
 
 @{
     var status = SubscriptionContext.Status;
     var canSubscribe = status?.CanSubscribe == true;
+    var isPayAsYouGo = UsageBillingContext.IsPayAsYouGo;
+    var registrationFeeDue = UsageBillingContext.RegistrationFeeDue;
 }
 
-@if (status is null || !status.HasActiveSubscription)
+@if (!UsageBillingContext.IsLoaded)
+{
+    @* Still loading — render nothing to avoid a subscription-mode flash for PAYG clinics. *@
+}
+else if (isPayAsYouGo)
+{
+    @if (registrationFeeDue)
+    {
+        <div style="background:linear-gradient(135deg,#1E3A5F,#1565C0);border-radius:14px;padding:18px 24px;
+                    box-shadow:0 8px 24px rgba(21,101,192,0.2);margin-bottom:4px;">
+            <div style="color:#fff;font-size:15px;font-weight:800;margin-bottom:4px;">
+                ⚠️ Registration fee required to activate your wallet
+            </div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-bottom:14px;">
+                Pay the one-time fee below to unlock your wallet credit and start using the application.
+            </div>
+            <RegistrationFeeCard Summary="UsageBillingContext.Summary" OnChanged="HandleFeeChangedAsync" />
+        </div>
+    }
+    @* PAYG and fee paid — no banner needed; wallet balance is visible on the Billing page. *@
+}
+else if (status is null || !status.HasActiveSubscription)
 {
     @if (canSubscribe)
     {
@@ -35,7 +60,10 @@
 }
 else
 {
-    var isCritical = status.DaysRemaining <= 5;
+    @* Colour and the renew prompt follow COVERAGE, not this term: a clinic that already bought its
+       next term is covered continuously and must not be told to renew. *@
+    var nextTerm = status.Upcoming.FirstOrDefault();
+    var isCritical = status.CoverageDaysRemaining <= 5;
     var bg = isCritical ? "#FEE2E2" : status.IsExpiringSoon ? "#FEF3C7" : "#DCFCE7";
     var fg = isCritical ? "#991B1B" : status.IsExpiringSoon ? "#92400E" : "#166534";
     var border = isCritical ? "#FCA5A5" : status.IsExpiringSoon ? "#FDE68A" : "#BBF7D0";
@@ -47,8 +75,14 @@ else
                 display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
         <div style="font-size:13px;color:@fg;font-weight:700;">
             @status.PlanName &middot; @daysLabel
+            @if (nextTerm is not null)
+            {
+                <span style="font-weight:600;opacity:0.85;">
+                    &middot; Next: @nextTerm.PlanName from @nextTerm.StartDate.ToString("dd MMM yyyy")
+                </span>
+            }
         </div>
-        @if (status.IsExpiringSoon && canSubscribe)
+        @if (status.IsExpiringSoon && canSubscribe && nextTerm is null)
         {
             <button @onclick="@(() => Nav.NavigateTo("/subscription"))"
                     style="background:@fg;color:#fff;border:none;border-radius:6px;padding:6px 14px;
@@ -57,4 +91,25 @@ else
             </button>
         }
     </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        UsageBillingContext.OnBillingChanged += Rerender;
+        SubscriptionContext.OnSubscriptionChanged += Rerender;
+    }
+
+    private void Rerender() => InvokeAsync(StateHasChanged);
+
+    private async Task HandleFeeChangedAsync()
+    {
+        await UsageBillingContext.RefreshAsync();
+    }
+
+    public void Dispose()
+    {
+        UsageBillingContext.OnBillingChanged -= Rerender;
+        SubscriptionContext.OnSubscriptionChanged -= Rerender;
+    }
 }
