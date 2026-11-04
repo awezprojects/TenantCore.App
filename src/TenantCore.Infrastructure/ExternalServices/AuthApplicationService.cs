@@ -96,6 +96,19 @@ public sealed class AuthApplicationService(
         return await ParseRequiredAsync<List<ApplicationUserResponseDto>>(response, cancellationToken);
     }
 
+    public async Task<List<ClinicStaffDirectoryDto>> GetClinicStaffDirectoryAsync(Guid applicationId, IEnumerable<string>? roles, CancellationToken cancellationToken = default)
+    {
+        using var client = CreateClient();
+        var rolesQuery = roles is null ? string.Empty : string.Join(',', roles);
+        var url = $"api/Application/{applicationId}/staff-directory";
+        if (!string.IsNullOrWhiteSpace(rolesQuery))
+        {
+            url += $"?roles={Uri.EscapeDataString(rolesQuery)}";
+        }
+        var response = await client.GetAsync(url, cancellationToken);
+        return await ParseRequiredAsync<List<ClinicStaffDirectoryDto>>(response, cancellationToken);
+    }
+
     public async Task<InvitationResponseDto> InviteUserAsync(Guid invitedBy, InviteUserRequestDto request, CancellationToken cancellationToken = default)
     {
         using var client = CreateClient();

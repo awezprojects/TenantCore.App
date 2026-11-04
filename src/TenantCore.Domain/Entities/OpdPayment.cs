@@ -86,6 +86,24 @@ public class OpdPayment : AuditableEntity
         SetUpdatedAt();
     }
 
+    // DEF-OPD-05: the visit itself was cancelled, so the patient receives no service at all —
+    // everything collected is now owed back in full. This always re-arms a fresh PendingRefund,
+    // even over an earlier RefundStatus.Refunded left by a partial discount while the visit was
+    // still active (that cycle settled a smaller, now-irrelevant amount; a cancellation never
+    // "already has" a refund for the full collected amount). A no-op when nothing was collected —
+    // callers never need to check first.
+    public void CancelForFullRefund()
+    {
+        if (PaymentStatus != PaymentStatus.Received || CollectedAmount <= 0)
+            return;
+
+        Discount = TotalAmount;
+        FinalAmount = 0;
+        RefundDue = CollectedAmount;
+        RefundStatus = RefundStatus.PendingRefund;
+        SetUpdatedAt();
+    }
+
     // Reception confirms the refund-due amount was physically handed back to the patient.
     public void ProcessRefund(Guid refundedByUserId)
     {

@@ -21,8 +21,12 @@ public sealed class DeleteOpdRegistrationHandler(
         if (registration.Status != OpdStatus.Cancelled)
             throw new InvalidOperationException("Only a cancelled OPD registration can be deleted.");
 
+        // DEF-OPD-09: a ₹0 visit is marked Received (AcceptVisitFee treats "received ₹0" as
+        // collected) but there is nothing to hand back — CollectedAmount, not PaymentStatus
+        // alone, decides whether a refund is actually owed before delete is allowed.
         var payment = await paymentRepository.GetByOpdRegistrationIdAsync(request.Id, request.ApplicationId, cancellationToken);
-        if (payment is not null && payment.PaymentStatus == PaymentStatus.Received && payment.RefundStatus != RefundStatus.Refunded)
+        if (payment is not null && payment.PaymentStatus == PaymentStatus.Received
+            && payment.RefundStatus != RefundStatus.Refunded && payment.CollectedAmount > 0)
             throw new InvalidOperationException("Refund the collected amount before deleting this OPD registration.");
 
         var particulars = await particularRepository.GetByOpdRegistrationIdAsync(request.Id, request.ApplicationId, cancellationToken);

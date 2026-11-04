@@ -16,6 +16,14 @@ public interface IAuthApplicationService
     Task<List<ApplicationResponseDto>> GetAllApplicationsAsync(CancellationToken cancellationToken = default);
     Task<List<ApplicationResponseDto>> GetApplicationsByTypeAsync(int applicationType, CancellationToken cancellationToken = default);
     Task<List<ApplicationUserResponseDto>> GetApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a minimal staff directory (userId/fullName/roleName only — no email/phone) for the application,
+    /// optionally filtered to a set of role names. Unlike <see cref="GetApplicationUsersAsync"/>, Auth allows
+    /// any active member of the application to call this — use it for non-admin-facing pickers
+    /// (OPD doctor dropdown, handover recipients). See DEF-AUTH-OPD-01.
+    /// </summary>
+    Task<List<ClinicStaffDirectoryDto>> GetClinicStaffDirectoryAsync(Guid applicationId, IEnumerable<string>? roles, CancellationToken cancellationToken = default);
     Task<InvitationResponseDto> InviteUserAsync(Guid invitedBy, InviteUserRequestDto request, CancellationToken cancellationToken = default);
     Task AssignUserToApplicationAsync(Guid applicationId, Guid userId, Guid roleId, Guid assignedBy, CancellationToken cancellationToken = default);
     Task AddApplicationUserMappingAsync(Guid applicationId, Guid userId, Guid assignedBy, CancellationToken cancellationToken = default);

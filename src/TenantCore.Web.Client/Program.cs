@@ -13,6 +13,7 @@ builder.Services.AddSingleton<IToastService, ToastService>();
 // Register Auth services
 builder.Services.AddScoped<TokenStorageService>();
 builder.Services.AddScoped<AuthStateService>();
+builder.Services.AddScoped<TokenRefreshTimerService>(); // DEF-OPD-19: proactive refresh before the 60-min access token expires
 builder.Services.AddSingleton<RoleCacheService>();
 
 // Clinic context (persists selected clinic across pages).

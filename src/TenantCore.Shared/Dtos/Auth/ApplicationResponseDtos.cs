@@ -45,6 +45,20 @@ public class ApplicationUserResponseDto
 }
 
 /// <summary>
+/// Minimal staff directory entry for a clinic application (userId/fullName/roleName only — no
+/// email/phone). Returned by Auth's {applicationId}/staff-directory endpoint, which any active
+/// member of the application may call — unlike <see cref="ApplicationUserResponseDto"/>, which
+/// comes from the Admin/Clinic Admin-only full roster endpoint. See DEF-AUTH-OPD-01.
+/// </summary>
+public class ClinicStaffDirectoryDto
+{
+    public Guid UserId { get; set; }
+    public string FullName { get; set; } = string.Empty;
+    public string? RoleName { get; set; }
+    public List<string> RoleNames { get; set; } = [];
+}
+
+/// <summary>
 /// Response model for an invitation.
 /// </summary>
 public class InvitationResponseDto

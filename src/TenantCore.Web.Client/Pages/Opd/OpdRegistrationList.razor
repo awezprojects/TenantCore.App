@@ -179,7 +179,7 @@
                             : _result!.Items)
                         {
                             var notVisited = IsNotVisited(reg);
-                            <tr>
+                            <tr @key="reg.Id">
                                 <td><span class="opd-token">@reg.RegistrationNumber</span></td>
                                 <td>
                                     <div class="opd-patient-name">@reg.PatientName</div>
@@ -215,9 +215,9 @@
                                     {
                                         <span>—</span>
                                     }
-                                    else if (reg.Status == OpdStatus.Cancelled && reg.PaymentStatus == PaymentStatus.Received && reg.RefundStatus != RefundStatus.Refunded)
+                                    else if (reg.Status == OpdStatus.Cancelled && reg.RefundStatus == RefundStatus.PendingRefund)
                                     {
-                                        <span>₹@reg.Fee.ToString("N0")</span>
+                                        <span>₹@reg.RefundDue.ToString("N0")</span>
                                         <div style="font-size:10px;color:#DC2626;font-weight:600;">Paid · Refund due</div>
                                     }
                                     else if (reg.Status == OpdStatus.Cancelled && reg.RefundStatus == RefundStatus.Refunded)
@@ -289,7 +289,7 @@
                                             }
                                             @if (reg.Status != OpdStatus.Cancelled && reg.Status != OpdStatus.Completed)
                                             {
-                                                <button class="opd-btn cancelled" @onclick="() => CancelAsync(reg)" disabled="@_updating">Cancel</button>
+                                                <button class="opd-btn cancelled" @onclick="() => RequestCancel(reg)" disabled="@_updating">Cancel</button>
                                             }
                                         }
                                         @if (FeatureFlagsContext.IsBillingEnabled && reg.Status == OpdStatus.Cancelled && NeedsRefund(reg))
@@ -465,7 +465,7 @@
                     @if (_selected.Status != OpdStatus.Cancelled && _selected.Status != OpdStatus.Completed)
                     {
                         <button class="opd-modal-btn-filled" style="background:#EF4444;"
-                                @onclick="async () => { CloseViewModal(); await CancelAsync(_selected); }"
+                                @onclick="() => { var reg = _selected; CloseViewModal(); RequestCancel(reg!); }"
                                 disabled="@_updating">
                             Cancel Appointment
                         </button>
@@ -492,9 +492,9 @@
             <PatientSearchInput OnPatientSelected="OnOpdPatientSelected"
                                 Placeholder="Type patient name or phone to search…" />
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label">Select Doctor (optional)</label>
+                <label class="form-label">Select Doctor *</label>
                 <select class="form-input" @onchange="OnNewOpdDoctorChanged">
-                    <option value="">— No Doctor —</option>
+                    <option value="">— Select Doctor —</option>
                     @foreach (var d in _doctors)
                     {
                         <option value="@d.UserId" selected="@(_selectedDoctorId == d.UserId)">@d.FullName</option>
@@ -611,6 +611,16 @@
     </div>
 }
 
+<ConfirmDialog Visible="@(_confirmCancelTarget is not null)"
+               Title="Cancel Appointment"
+               ConfirmText="Cancel Appointment"
+               BusyText="Cancelling..."
+               IsBusy="_updating"
+               OnConfirm="ExecuteCancelAsync"
+               OnCancel="() => _confirmCancelTarget = null">
+    Are you sure you want to cancel the appointment for <strong>@_confirmCancelTarget?.PatientName</strong>?
+</ConfirmDialog>
+
 <InsufficientBalanceDialog @bind-Visible="_insufficientBalance"
                           Balance="UsageBillingContext.Summary?.WalletBalance"
                           Currency="@(UsageBillingContext.Summary?.Currency ?? "INR")" />
@@ -620,6 +630,7 @@
     private bool _insufficientBalance;
     private bool _deleteDialogOpen;
     private OpdRegistrationDto? _deleteTarget;
+    private OpdRegistrationDto? _confirmCancelTarget;
 
     private record DatePreset(string Key, string Label, DateTime From, DateTime To);
     private List<DatePreset> _datePresets = [];
@@ -985,31 +996,41 @@
         _updating = false;
     }
 
-    private async Task CancelAsync(OpdRegistrationDto reg)
+    // ADR-007 — Cancel is a destructive action and must confirm first; RequestCancel opens the
+    // dialog, ExecuteCancelAsync runs only after the user confirms.
+    private void RequestCancel(OpdRegistrationDto reg) => _confirmCancelTarget = reg;
+
+    private async Task ExecuteCancelAsync()
     {
+        if (_confirmCancelTarget is null) return;
+        var reg = _confirmCancelTarget;
         _updating = true;
         var dto = new UpdateOpdRegistrationDto(reg.DoctorUserId, reg.DoctorName, reg.Fee, OpdStatus.Cancelled, reg.Notes);
         var result = await ClinicClient.UpdateOpdRegistrationAsync(reg.Id, dto);
-        if (result.Success) { Toast.ShowSuccess("Appointment cancelled."); await ReloadAll(); }
+        if (result.Success)
+        {
+            Toast.ShowSuccess("Appointment cancelled.");
+            _confirmCancelTarget = null;
+            await ReloadAll();
+            await UsageBillingContext.RefreshAsync(); // DEF-OPD-14: cancelling credits the wallet back
+        }
         else Toast.ShowError(result.Message ?? "Failed.");
         _updating = false;
     }
 
+    // DEF-OPD-22: used to decide on FinalAmount, which CancelForFullRefund (server-side) now
+    // deliberately zeroes the moment a visit is cancelled — so this always read "nothing owed"
+    // for exactly the visits that owe the most. RefundDue/RefundStatus are the actual payment
+    // state machine; read those instead.
     private static bool NeedsRefund(OpdRegistrationDto reg)
-    {
-        if (reg.PaymentStatus != PaymentStatus.Received) return false;
-        if (reg.RefundStatus == RefundStatus.Refunded) return false;
-        var amount = reg.FinalAmount ?? reg.Fee;
-        return amount > 0;
-    }
+        => reg.RefundStatus == RefundStatus.PendingRefund && reg.RefundDue > 0;
 
     private static bool CanDelete(OpdRegistrationDto reg)
     {
         if (NeedsRefund(reg)) return false;
         if (reg.PaymentStatus == null || reg.PaymentStatus == PaymentStatus.Pending) return true;
-        if (reg.RefundStatus == RefundStatus.Refunded) return true;
-        var amount = reg.FinalAmount ?? reg.Fee;
-        return reg.PaymentStatus == PaymentStatus.Received && amount == 0;
+        // Received with nothing pending — either never collected (₹0 visit) or already refunded.
+        return reg.PaymentStatus == PaymentStatus.Received;
     }
 
     private void ConfirmDeleteOpd(OpdRegistrationDto reg)
@@ -1095,10 +1116,9 @@
         _selectedPatientId = Guid.Empty; _selectedDoctorId = null;
         _fee = 0; _feeLocked = false; _notes = null;
 
-        // Only Pulse and O2 Sat pre-fill with a typical value — Weight, BP, Temp, RR and
-        // Sugar vary too much patient-to-patient to default, and reception must actually
-        // measure and enter them rather than risk submitting a stale placeholder unchanged.
-        _weight = null; _bloodPressure = null; _pulseRate = 72; _oxygenSaturation = 98;
+        // Every vital starts empty — reception must actually measure and enter it rather
+        // than risk submitting a stale placeholder value unchanged (DEF-OPD-12).
+        _weight = null; _bloodPressure = null; _pulseRate = null; _oxygenSaturation = null;
         _temperature = null; _respiratoryRate = null; _sugar = null;
 
         _newDialogVisible = true;
@@ -1107,7 +1127,9 @@
     private async Task OnDoctorSelectedAsync(Guid? userId)
     {
         _selectedDoctorId = userId;
-        _fee = 0;
+        // Unlock first so a fee reception already typed stays editable and in place — only an
+        // actual active fee config below should override it (DEF-OPD-20: used to reset to 0 on
+        // every doctor change, including doctors with no fee config, wiping the typed fee).
         _feeLocked = false;
         if (userId is null) return;
 
@@ -1125,6 +1147,9 @@
     private async Task CreateOpdAsync()
     {
         if (_selectedPatientId == Guid.Empty) { Toast.ShowWarning("Please select a patient."); return; }
+        // DEF-OPD-07 follow-up: doctor is actually required server-side — catch it client-side
+        // with a readable message instead of letting the raw FluentValidation text reach the user.
+        if (_selectedDoctorId is null || _selectedDoctorId == Guid.Empty) { Toast.ShowWarning("Please select a doctor."); return; }
         _saving = true;
         var doctor = _selectedDoctorId.HasValue ? _doctors.FirstOrDefault(d => d.UserId == _selectedDoctorId) : null;
         var dto = new CreateOpdRegistrationDto(
@@ -1144,6 +1169,7 @@
             Toast.ShowSuccess($"OPD registration {response.Data?.RegistrationNumber} created.");
             _newDialogVisible = false;
             await ReloadAll();
+            await UsageBillingContext.RefreshAsync(); // DEF-OPD-14: registration debits the wallet
         }
         else if (response.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
         {

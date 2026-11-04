@@ -4,8 +4,11 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using TenantCore.Application.Features.OpdRegistrations.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Handlers;
+using TenantCore.Application.Services;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Shared.Authorization;
+using TenantCore.Shared.Dtos.Auth;
 using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Tests.Features.OpdRegistrations.Handlers;
@@ -19,6 +22,7 @@ public class CreateOpdRegistrationHandlerTests
     private readonly Mock<IDoctorProfileRepository> _doctorProfileRepository = new();
     private readonly Mock<ICounterSessionRepository> _counterSessionRepository = new();
     private readonly Mock<IOpdPaymentRepository> _paymentRepository = new();
+    private readonly Mock<IAuthApplicationService> _authApplicationService = new();
     private readonly Mock<ISender> _sender = new();
     private readonly Mock<ILogger<CreateOpdRegistrationHandler>> _logger = new();
 
@@ -26,7 +30,24 @@ public class CreateOpdRegistrationHandlerTests
         _opdRepository.Object, _patientRepository.Object, _feeRepository.Object,
         _featureFlagsRepository.Object, _doctorProfileRepository.Object,
         _counterSessionRepository.Object, _paymentRepository.Object,
-        _sender.Object, _logger.Object);
+        _authApplicationService.Object, _sender.Object, _logger.Object);
+
+    // DEF-OPD-06: the handler now resolves the doctor against the clinic's own staff directory —
+    // every test must register the doctor it uses, or Handle throws "not a member of this clinic".
+    private void SetupDoctor(Guid appId, Guid doctorUserId, string fullName = "Dr. Smith")
+    {
+        _authApplicationService
+            .Setup(s => s.GetClinicStaffDirectoryAsync(appId, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new ClinicStaffDirectoryDto
+                {
+                    UserId = doctorUserId,
+                    FullName = fullName,
+                    RoleName = AppRoles.Doctor,
+                    RoleNames = [AppRoles.Doctor]
+                }
+            ]);
+    }
 
     private void SetupCommonMocks(Guid appId, CounterSession activeSession, Patient patient)
     {
@@ -54,9 +75,11 @@ public class CreateOpdRegistrationHandlerTests
     {
         var appId = Guid.NewGuid();
         var patient = CreatePatient(appId);
+        var doctorUserId = Guid.NewGuid();
         var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
         var receivedBy = Guid.NewGuid();
         SetupCommonMocks(appId, session, patient);
+        SetupDoctor(appId, doctorUserId);
 
         OpdRegistration? added = null;
         _opdRepository.Setup(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()))
@@ -77,7 +100,7 @@ public class CreateOpdRegistrationHandlerTests
 
         var handler = CreateHandler();
         var command = new CreateOpdRegistrationCommand(
-            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, receivedBy);
+            appId, patient.Id, doctorUserId, "Dr. Smith", 500, null, null, null, null, null, null, null, null, receivedBy);
         await handler.Handle(command, CancellationToken.None);
 
         payment.Should().NotBeNull();
@@ -91,8 +114,10 @@ public class CreateOpdRegistrationHandlerTests
     {
         var appId = Guid.NewGuid();
         var patient = CreatePatient(appId);
+        var doctorUserId = Guid.NewGuid();
         var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
         SetupCommonMocks(appId, session, patient);
+        SetupDoctor(appId, doctorUserId);
 
         OpdRegistration? added = null;
         _opdRepository.Setup(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()))
@@ -111,7 +136,7 @@ public class CreateOpdRegistrationHandlerTests
 
         var handler = CreateHandler();
         var command = new CreateOpdRegistrationCommand(
-            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
+            appId, patient.Id, doctorUserId, "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
         await handler.Handle(command, CancellationToken.None);
 
         // Prepaid disabled — handler must not touch the payment at all; it stays Pending.
@@ -142,6 +167,8 @@ public class CreateOpdRegistrationHandlerTests
     {
         var appId = Guid.NewGuid();
         var patient = CreatePatient(appId);
+        var doctorUserId = Guid.NewGuid();
+        SetupDoctor(appId, doctorUserId);
         _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ClinicFeatureFlags.Create(appId, true, false));
         _patientRepository.Setup(r => r.GetByIdAsync(patient.Id, It.IsAny<CancellationToken>()))
@@ -160,7 +187,7 @@ public class CreateOpdRegistrationHandlerTests
 
         var handler = CreateHandler();
         var command = new CreateOpdRegistrationCommand(
-            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
+            appId, patient.Id, doctorUserId, "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
 
         var action = () => handler.Handle(command, CancellationToken.None);
 
@@ -173,6 +200,8 @@ public class CreateOpdRegistrationHandlerTests
     {
         var appId = Guid.NewGuid();
         var patient = CreatePatient(appId);
+        var doctorUserId = Guid.NewGuid();
+        SetupDoctor(appId, doctorUserId);
         _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(ClinicFeatureFlags.Create(appId, true, false));
         _patientRepository.Setup(r => r.GetByIdAsync(patient.Id, It.IsAny<CancellationToken>()))
@@ -191,11 +220,36 @@ public class CreateOpdRegistrationHandlerTests
 
         var handler = CreateHandler();
         var command = new CreateOpdRegistrationCommand(
-            appId, patient.Id, Guid.NewGuid(), "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
+            appId, patient.Id, doctorUserId, "Dr. Smith", 500, null, null, null, null, null, null, null, null, Guid.NewGuid());
 
         await handler.Handle(command, CancellationToken.None);
 
         _sender.Verify(s => s.Send(It.IsAny<IRequest<Guid>>(), It.IsAny<CancellationToken>()), Times.Never);
         _paymentRepository.Verify(r => r.GetByOpdRegistrationIdAsync(It.IsAny<Guid>(), appId, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_DoctorNotInClinic_ThrowsInvalidOperationException()
+    {
+        // DEF-OPD-06: a random doctorUserId with a made-up name must be rejected, not create an
+        // orphan visit no real doctor can ever see.
+        var appId = Guid.NewGuid();
+        var patient = CreatePatient(appId);
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        SetupCommonMocks(appId, session, patient);
+        _authApplicationService
+            .Setup(s => s.GetClinicStaffDirectoryAsync(appId, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeatureFlags.Create(appId, true));
+
+        var handler = CreateHandler();
+        var command = new CreateOpdRegistrationCommand(
+            appId, patient.Id, Guid.NewGuid(), "Dr Fake", 100, null, null, null, null, null, null, null, null, Guid.NewGuid());
+
+        var action = () => handler.Handle(command, CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>();
+        _opdRepository.Verify(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -14,6 +14,7 @@ public interface IApplicationApiClient
     Task<ApiResponse<List<ApplicationResponseDto>>> GetAllApplicationsAsync();
     Task<ApiResponse<List<ApplicationResponseDto>>> GetApplicationsByTypeAsync(int applicationType);
     Task<ApiResponse<List<ApplicationUserResponseDto>>> GetApplicationUsersAsync(Guid applicationId);
+    Task<ApiResponse<List<ClinicStaffDirectoryDto>>> GetClinicStaffDirectoryAsync(Guid applicationId, IEnumerable<string>? roles = null);
     Task<ApiResponse<InvitationResponseDto>> InviteUserAsync(Guid invitedBy, InviteUserRequestDto request);
     Task<ApiResponse> AssignUserToApplicationAsync(Guid applicationId, Guid userId, Guid roleId, Guid assignedBy);
     Task<ApiResponse> AddApplicationUserMappingAsync(Guid applicationId, Guid userId, Guid assignedBy);

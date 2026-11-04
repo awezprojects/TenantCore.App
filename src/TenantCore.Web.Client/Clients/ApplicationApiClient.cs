@@ -129,6 +129,26 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
+    public async Task<ApiResponse<List<ClinicStaffDirectoryDto>>> GetClinicStaffDirectoryAsync(Guid applicationId, IEnumerable<string>? roles = null)
+    {
+        try
+        {
+            SetAuthorizationHeader();
+            var rolesQuery = roles is null ? string.Empty : string.Join(',', roles);
+            var url = $"{BaseRoute}/{applicationId}/staff-directory";
+            if (!string.IsNullOrWhiteSpace(rolesQuery))
+            {
+                url += $"?roles={Uri.EscapeDataString(rolesQuery)}";
+            }
+            var response = await httpClient.GetAsync(url);
+            return await HandleResponse<List<ClinicStaffDirectoryDto>>(response);
+        }
+        catch (Exception ex)
+        {
+            return CreateErrorResponse<List<ClinicStaffDirectoryDto>>($"Get clinic staff directory failed: {ex.Message}");
+        }
+    }
+
     public async Task<ApiResponse<InvitationResponseDto>> InviteUserAsync(Guid invitedBy, InviteUserRequestDto request)
     {
         try

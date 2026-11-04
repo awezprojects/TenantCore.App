@@ -62,5 +62,5 @@ public class OpdPaymentsController(ISender sender) : ClinicControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Refund(Guid id, [FromBody] ProcessOpdRefundRequest request, CancellationToken ct)
-        => Ok(await sender.Send(new ProcessOpdRefundCommand(request, GetCurrentUserId(), GetApplicationId()), ct));
+        => Ok(await sender.Send(new ProcessOpdRefundCommand(id, request, GetCurrentUserId(), GetApplicationId()), ct));
 }
