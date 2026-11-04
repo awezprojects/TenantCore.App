@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging;
 using Moq;
 using TenantCore.Application.Features.OpdPayments.Commands;
 using TenantCore.Application.Features.OpdPayments.Handlers;
@@ -14,14 +13,8 @@ namespace TenantCore.Application.Tests.Features.OpdPayments.Handlers;
 public class ProcessOpdRefundHandlerTests
 {
     private readonly Mock<IOpdPaymentRepository> _repository = new();
-    private readonly Mock<IClinicUsageRecordRepository> _usageRecordRepository = new();
-    private readonly Mock<IClinicWalletRepository> _walletRepository = new();
-    private readonly Mock<IClinicWalletTransactionRepository> _walletTransactionRepository = new();
-    private readonly Mock<ILogger<ProcessOpdRefundHandler>> _logger = new();
 
-    private ProcessOpdRefundHandler CreateHandler() =>
-        new(_repository.Object, _usageRecordRepository.Object, _walletRepository.Object,
-            _walletTransactionRepository.Object, _logger.Object);
+    private ProcessOpdRefundHandler CreateHandler() => new(_repository.Object);
 
     [Fact]
     public async Task Handle_PendingRefund_ReducesCollectedAmountAndMarksRefunded()
@@ -39,7 +32,7 @@ public class ProcessOpdRefundHandlerTests
             .ReturnsAsync(1);
 
         var handler = CreateHandler();
-        var command = new ProcessOpdRefundCommand(new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, refundedBy, appId);
+        var command = new ProcessOpdRefundCommand(payment.Id, new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, refundedBy, appId);
         var result = await handler.Handle(command, CancellationToken.None);
 
         result.RefundStatus.Should().Be(RefundStatus.Refunded);
@@ -60,7 +53,7 @@ public class ProcessOpdRefundHandlerTests
 
         var handler = CreateHandler();
         var action = () => handler.Handle(
-            new ProcessOpdRefundCommand(new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, Guid.NewGuid(), appId),
+            new ProcessOpdRefundCommand(Guid.NewGuid(), new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, Guid.NewGuid(), appId),
             CancellationToken.None);
 
         await action.Should().ThrowAsync<NotFoundException>();
@@ -79,9 +72,30 @@ public class ProcessOpdRefundHandlerTests
 
         var handler = CreateHandler();
         var action = () => handler.Handle(
-            new ProcessOpdRefundCommand(new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, Guid.NewGuid(), appId),
+            new ProcessOpdRefundCommand(payment.Id, new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, Guid.NewGuid(), appId),
             CancellationToken.None);
 
         await action.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Handle_PathIdDoesNotMatchPayment_ThrowsNotFoundException()
+    {
+        // DEF-OPD-16: the route's {id} must be checked against the resolved payment, not ignored.
+        var appId = Guid.NewGuid();
+        var opdId = Guid.NewGuid();
+        var payment = OpdPayment.Create(appId, opdId, 500);
+        payment.AcceptVisitFee(Guid.NewGuid(), null);
+        payment.ApplyDiscount(200);
+
+        _repository.Setup(r => r.GetByOpdRegistrationIdAsync(opdId, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+
+        var handler = CreateHandler();
+        var action = () => handler.Handle(
+            new ProcessOpdRefundCommand(Guid.NewGuid(), new ProcessOpdRefundRequest { OpdRegistrationId = opdId }, Guid.NewGuid(), appId),
+            CancellationToken.None);
+
+        await action.Should().ThrowAsync<NotFoundException>();
     }
 }

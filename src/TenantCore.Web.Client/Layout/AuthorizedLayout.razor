@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 @inject AuthStateService AuthState
+@inject TokenRefreshTimerService TokenRefreshTimer
 @inject ClinicContextService ClinicContext
 @inject SubscriptionContextService SubscriptionContext
 @inject FeatureFlagsContextService FeatureFlagsContext
@@ -280,6 +281,12 @@ else if (_isAuthenticated)
     {
         NavigationManager.LocationChanged += OnLocationChanged;
         UpdateScreenTitle(NavigationManager.Uri);
+
+        // DEF-OPD-14: this layout instance lives for the whole app session, not per-page, so its
+        // own OnInitializedAsync below only ever runs the wallet chip's first load. Without this,
+        // a later UsageBillingContext.RefreshAsync() (e.g. after a register/cancel changes the
+        // wallet) updates the shared Summary but nothing tells this component to re-render it.
+        UsageBillingContext.OnBillingChanged += OnBillingChanged;
     }
 
     protected override async Task OnInitializedAsync()
@@ -294,6 +301,12 @@ else if (_isAuthenticated)
         // ClinicContext.SelectedApplicationId as Guid.Empty even for an authenticated
         // user who does have a clinic selected, incorrectly bouncing to /select-clinic.
         CheckAuthAndRedirect();
+
+        // DEF-OPD-19: this layout instance lives for the whole app session (see the
+        // UsageBillingContext note below), so starting the proactive refresh timer here runs it
+        // exactly once per login, for as long as the tab stays open.
+        if (_isAuthenticated)
+            TokenRefreshTimer.Start();
 
         // Same reasoning applies here: OnAfterRenderAsync(firstRender: true) fires only
         // ONCE per component lifetime, and that one time is the premature render above,
@@ -442,8 +455,11 @@ else if (_isAuthenticated)
         NavigationManager.NavigateTo("/auth/login", forceLoad: true);
     }
 
+    private void OnBillingChanged() => InvokeAsync(StateHasChanged);
+
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        UsageBillingContext.OnBillingChanged -= OnBillingChanged;
     }
 }

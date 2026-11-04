@@ -40,6 +40,19 @@ public class UpdateOpdRegistrationCommandValidatorTests
     }
 
     [Fact]
+    public void Validate_WhenFeeExceedsMax_ReturnsError()
+    {
+        // DEF-OPD-10: no upper bound previously let an absurd fee auto-collect into the session total.
+        var command = new UpdateOpdRegistrationCommand(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Dr. Smith", 100_001, OpdStatus.Pending, null);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.PropertyName == "Fee");
+    }
+
+    [Fact]
     public void Validate_WhenIdIsEmpty_ReturnsError()
     {
         var command = new UpdateOpdRegistrationCommand(

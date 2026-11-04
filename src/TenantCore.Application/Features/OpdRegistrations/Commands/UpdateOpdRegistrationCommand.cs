@@ -11,4 +11,5 @@ public sealed record UpdateOpdRegistrationCommand(
     string DoctorName,
     decimal Fee,
     OpdStatus Status,
-    string? Notes) : IRequest<OpdRegistrationDto>;
+    string? Notes,
+    Guid? ActingUserId = null) : IRequest<OpdRegistrationDto>;

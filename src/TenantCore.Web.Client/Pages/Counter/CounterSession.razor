@@ -89,6 +89,23 @@
                                 <a href="/amount-handovers" style="color:#2563EB;text-decoration:underline;">Go to Handovers →</a>
                             </div>
                         }
+                        else if (!_canClose)
+                        {
+                            <!-- DEF-OPD-18: Close Session was disabled with no reason for the common
+                                 fresh-session case (no handover ever sent) — only the pending-handover
+                                 state above explained itself. -->
+                            <div style="font-size:12px;color:#94A3B8;text-align:right;max-width:240px;">
+                                @if (_activeSession.NetAmount <= 0 && !_sessionHandovers.Any())
+                                {
+                                    <span>Nothing to close yet — collect or hand over cash first.</span>
+                                }
+                                else
+                                {
+                                    <span>⚠ Hand over the collected cash first.</span>
+                                    <a href="/amount-handovers" style="color:#2563EB;text-decoration:underline;">Go to Handovers →</a>
+                                }
+                            </div>
+                        }
                         @if (_staleHandover is not null)
                         {
                             <div style="font-size:12px;color:#B91C1C;text-align:right;max-width:280px;">

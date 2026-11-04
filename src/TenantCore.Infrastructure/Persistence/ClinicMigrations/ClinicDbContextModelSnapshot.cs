@@ -2770,6 +2770,39 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("OpdRegistrations", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.OpdRegistrationNumberCounter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CounterDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LastSequence")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "CounterDate")
+                        .IsUnique();
+
+                    b.ToTable("OpdRegistrationNumberCounters", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.Particular", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3489,7 +3522,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0001-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription is set to expire on {ExpiryDate}. Renew now to avoid any interruption to your clinic's access.",
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2898),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6205),
                             DaysBeforeExpiry = 10,
                             DisplayOrder = 1,
                             Headline = "Time to renew soon",
@@ -3501,7 +3534,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0002-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Only a few days left. Renew before {ExpiryDate} to keep your clinic running without interruption.",
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2903),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6212),
                             DaysBeforeExpiry = 5,
                             DisplayOrder = 2,
                             Headline = "Your subscription expires soon",
@@ -3513,7 +3546,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0003-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription expires on {ExpiryDate}. Renew today to avoid losing access to your clinic.",
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2907),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6242),
                             DaysBeforeExpiry = 2,
                             DisplayOrder = 3,
                             Headline = "Final reminder — act now",
@@ -3525,7 +3558,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0004-0000-0000-000000000000"),
                             AlertType = 2,
                             BodyMessage = "Your subscription expired on {ExpiryDate}. Choose a plan to restore access to your clinic.",
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 992, DateTimeKind.Utc).AddTicks(2935),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6246),
                             DaysBeforeExpiry = 0,
                             DisplayOrder = 4,
                             Headline = "Subscription expired",
@@ -3781,7 +3814,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0001-0000-0000-000000000000"),
                             Code = 1,
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(461),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(171),
                             Currency = "INR",
                             Description = "Try every feature free for 14 days.",
                             DisplayOrder = 1,
@@ -3798,7 +3831,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0002-0000-0000-000000000000"),
                             Code = 2,
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(469),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(182),
                             Currency = "INR",
                             Description = "Billed every 30 days. Cancel anytime.",
                             DisplayOrder = 2,
@@ -3815,7 +3848,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0003-0000-0000-000000000000"),
                             Code = 3,
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(473),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(186),
                             Currency = "INR",
                             Description = "Our most popular plan — save versus monthly billing.",
                             DisplayOrder = 3,
@@ -3832,7 +3865,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0004-0000-0000-000000000000"),
                             Code = 4,
-                            CreatedAt = new DateTime(2026, 10, 2, 7, 25, 3, 995, DateTimeKind.Utc).AddTicks(477),
+                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(189),
                             Currency = "INR",
                             Description = "The best value — a full year of every feature.",
                             DisplayOrder = 4,

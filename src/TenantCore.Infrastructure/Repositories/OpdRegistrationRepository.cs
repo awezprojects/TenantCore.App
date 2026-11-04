@@ -79,24 +79,43 @@ public class OpdRegistrationRepository(ClinicDbContext dbContext)
         return (items, total);
     }
 
+    // DEF-OPD-13: deriving the next number from the highest *existing* row for the day reused a
+    // token once its registration was hard-deleted. A dedicated counter, never decremented, fixes
+    // that — staged here, not saved; it travels in the parent handler's own SaveChangesAsync so the
+    // registration and its number commit together.
     public async Task<string> GetNextRegistrationNumberAsync(Guid applicationId, CancellationToken ct = default)
     {
         var today = DateTime.Now.Date;
         var prefix = $"OPD-{today:yyyyMMdd}-";
 
-        var lastNumber = await DbSet
-            .Where(o => o.ApplicationId == applicationId && o.RegistrationDate.Date == today)
-            .OrderByDescending(o => o.RegistrationNumber)
-            .Select(o => o.RegistrationNumber)
-            .FirstOrDefaultAsync(ct);
+        var counters = DbContext.Set<OpdRegistrationNumberCounter>();
+        var counter = await counters.FirstOrDefaultAsync(
+            c => c.ApplicationId == applicationId && c.CounterDate == today, ct);
 
-        var nextSequence = 1;
-        if (lastNumber is not null && lastNumber.Length > prefix.Length &&
-            int.TryParse(lastNumber[prefix.Length..], out var lastSequence))
+        if (counter is null)
         {
-            nextSequence = lastSequence + 1;
+            // DEF-OPD-23: seed from today's highest existing registration number (not just rows
+            // deleted since this table existed — any registration already on record for the day,
+            // deleted or not, since the sequence portion is all that matters here) so a counter
+            // created on a day that already has registrations cannot reissue a number.
+            var lastExisting = await DbSet
+                .Where(o => o.ApplicationId == applicationId && o.RegistrationDate.Date == today)
+                .OrderByDescending(o => o.RegistrationNumber)
+                .Select(o => o.RegistrationNumber)
+                .FirstOrDefaultAsync(ct);
+
+            var seedSequence = 0;
+            if (lastExisting is not null && lastExisting.Length > prefix.Length &&
+                int.TryParse(lastExisting[prefix.Length..], out var lastSequence))
+            {
+                seedSequence = lastSequence;
+            }
+
+            counter = OpdRegistrationNumberCounter.CreateSeeded(applicationId, today, seedSequence);
+            await counters.AddAsync(counter, ct);
         }
 
+        var nextSequence = counter.Next();
         return $"{prefix}{nextSequence:D4}";
     }
 

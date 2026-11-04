@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using Serilog.Events;
 using TenantCore.Api.Authentication;
@@ -129,6 +130,22 @@ try
     app.UseAuthorization();
     app.MapControllers();
     app.MapHealthChecks("/health");
+
+    // DEF-OPD-17: an unmatched /api/* route used to fall through to the SPA's index.html (200
+    // text/html) instead of a 404. More specific than the bare index.html fallback below, so
+    // routing prefers this one for anything under /api.
+    app.MapFallback("/api/{**path}", context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        context.Response.ContentType = "application/problem+json";
+        return context.Response.WriteAsJsonAsync(new ProblemDetails
+        {
+            Status = StatusCodes.Status404NotFound,
+            Title = "Not Found",
+            Detail = "The requested API route does not exist.",
+            Instance = context.Request.Path
+        });
+    });
     app.MapFallbackToFile("index.html");
 
     app.Run();

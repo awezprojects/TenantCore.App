@@ -7,6 +7,7 @@ public class ClinicDbContext(DbContextOptions<ClinicDbContext> options) : DbCont
 {
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<OpdRegistration> OpdRegistrations => Set<OpdRegistration>();
+    public DbSet<OpdRegistrationNumberCounter> OpdRegistrationNumberCounters => Set<OpdRegistrationNumberCounter>();
     public DbSet<IpdRegistration> IpdRegistrations => Set<IpdRegistration>();
     public DbSet<ClinicFeeConfig> ClinicFeeConfigs => Set<ClinicFeeConfig>();
     public DbSet<MedicineType> MedicineTypes => Set<MedicineType>();

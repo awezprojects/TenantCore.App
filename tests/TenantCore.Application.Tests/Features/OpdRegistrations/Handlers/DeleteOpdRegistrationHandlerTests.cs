@@ -138,6 +138,32 @@ public class DeleteOpdRegistrationHandlerTests
     }
 
     [Fact]
+    public async Task Handle_CollectedZeroAmountPayment_DeletesSuccessfully()
+    {
+        // DEF-OPD-09: a ₹0 visit is marked Received (AcceptVisitFee treats "received ₹0" as
+        // collected) but there is nothing to hand back, so delete must not be blocked.
+        var appId = Guid.NewGuid();
+        var registration = CreateCancelledRegistration(appId);
+        var payment = OpdPayment.Create(appId, registration.Id, 0);
+        payment.AcceptVisitFee(Guid.NewGuid(), null);
+
+        _opdRepository.Setup(r => r.GetByIdAsync(registration.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(registration);
+        _paymentRepository.Setup(r => r.GetByOpdRegistrationIdAsync(registration.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payment);
+        _particularRepository.Setup(r => r.GetByOpdRegistrationIdAsync(registration.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OpdParticular>());
+        _opdRepository.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var handler = CreateHandler();
+        await handler.Handle(new DeleteOpdRegistrationCommand(registration.Id, appId), CancellationToken.None);
+
+        _paymentRepository.Verify(r => r.Delete(payment), Times.Once);
+        _opdRepository.Verify(r => r.Delete(registration), Times.Once);
+    }
+
+    [Fact]
     public async Task Handle_IndividuallyCollectedParticularNotRefunded_ThrowsInvalidOperationException()
     {
         var appId = Guid.NewGuid();

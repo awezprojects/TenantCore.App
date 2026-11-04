@@ -71,7 +71,7 @@ public class OpdRegistrationsController(ISender sender) : ClinicControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateOpdRegistrationDto dto, CancellationToken ct)
         => Ok(await sender.Send(new UpdateOpdRegistrationCommand(
             id, GetApplicationId(), dto.DoctorUserId, dto.DoctorName,
-            dto.Fee, dto.Status, dto.Notes), ct));
+            dto.Fee, dto.Status, dto.Notes, GetCurrentUserId()), ct));
 
     [HttpGet("doctor-count")]
     [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]

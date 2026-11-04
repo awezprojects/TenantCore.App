@@ -4,9 +4,11 @@ using TenantCore.Application.Features.OpdPayments.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Commands;
 using TenantCore.Application.Features.OpdRegistrations.Translators;
 using TenantCore.Application.Features.UsageBilling.Commands;
+using TenantCore.Application.Services;
 using TenantCore.Domain.Entities;
 using TenantCore.Domain.Exceptions;
 using TenantCore.Domain.Interfaces;
+using TenantCore.Shared.Authorization;
 using TenantCore.Shared.Dtos;
 using TenantCore.Shared.Enums;
 
@@ -20,6 +22,7 @@ public sealed class CreateOpdRegistrationHandler(
     IDoctorProfileRepository doctorProfileRepository,
     ICounterSessionRepository counterSessionRepository,
     IOpdPaymentRepository paymentRepository,
+    IAuthApplicationService authApplicationService,
     ISender sender,
     ILogger<CreateOpdRegistrationHandler> logger)
     : IRequestHandler<CreateOpdRegistrationCommand, OpdRegistrationDto>
@@ -43,11 +46,26 @@ public sealed class CreateOpdRegistrationHandler(
         var patient = await patientRepository.GetByIdAsync(request.PatientId, cancellationToken)
             ?? throw new NotFoundException(nameof(Patient), request.PatientId);
 
+        // DEF-OPD-06: the client-sent DoctorUserId/DoctorName were never checked against the
+        // clinic's own staff, so a random id and a made-up name created an orphan visit no real
+        // doctor could ever see. Resolve the doctor server-side and take the name from there.
+        var doctorProfile = await doctorProfileRepository.GetByUserIdAsync(request.DoctorUserId, cancellationToken);
+        var staff = await authApplicationService.GetClinicStaffDirectoryAsync(request.ApplicationId, roles: null, cancellationToken);
+        var doctorEntry = staff.FirstOrDefault(u => u.UserId == request.DoctorUserId);
+        var isClinicDoctor = doctorEntry is not null &&
+            (doctorProfile is not null
+             || doctorEntry.RoleNames.Exists(r => string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase))
+             || string.Equals(doctorEntry.RoleName, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase));
+        if (!isClinicDoctor)
+            throw new InvalidOperationException("The selected doctor is not a member of this clinic.");
+
+        var doctorName = doctorEntry!.FullName;
+
         var alreadyRegisteredToday = await opdRepository.ExistsForPatientDoctorOnDateAsync(
             request.ApplicationId, request.PatientId, request.DoctorUserId, DateTime.Now, cancellationToken);
         if (alreadyRegisteredToday)
             throw new InvalidOperationException(
-                $"{patient.FirstName} {patient.LastName} already has an OPD appointment with {request.DoctorName} today.");
+                $"{patient.FirstName} {patient.LastName} already has an OPD appointment with {doctorName} today.");
 
         var fee = request.Fee;
         if (fee is null)
@@ -60,7 +78,7 @@ public sealed class CreateOpdRegistrationHandler(
 
         var registration = OpdRegistration.Create(
             request.ApplicationId, request.PatientId, request.DoctorUserId,
-            request.DoctorName, registrationNumber, fee.Value, request.Notes,
+            doctorName, registrationNumber, fee.Value, request.Notes,
             request.Weight, request.BloodPressure, request.PulseRate, request.OxygenSaturation,
             request.Temperature, request.RespiratoryRate, request.Sugar);
 
@@ -79,7 +97,6 @@ public sealed class CreateOpdRegistrationHandler(
 
         if (billingEnabled)
         {
-            var doctorProfile = await doctorProfileRepository.GetByUserIdAsync(request.DoctorUserId, cancellationToken);
             var doctorProfileId = doctorProfile?.Id ?? Guid.Empty;
             await sender.Send(new EnsureOpdPaymentCommand(registration.Id, doctorProfileId, request.ApplicationId), cancellationToken);
 

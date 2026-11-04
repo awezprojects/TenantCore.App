@@ -99,6 +99,11 @@ public class AuthController(IHttpClientFactory httpClientFactory) : ControllerBa
 
         CopyHeaderIfPresent(requestMessage, "Authorization");
         CopyHeaderIfPresent(requestMessage, "X-ClinicApp-Id");
+        // DEF-OPD-19: Auth's refresh/logout commands read the refresh_token cookie directly off the
+        // request — Set-Cookie from Auth's response was already relayed back to the browser below,
+        // but the browser's own Cookie header was never relayed forward, so Auth never saw it and
+        // every refresh failed with "Invalid or expired refresh token" right after login.
+        CopyHeaderIfPresent(requestMessage, "Cookie");
         // Always propagate a correlation ID — use the client's if provided, otherwise use the server-generated trace ID
         var correlationId = Request.Headers.TryGetValue("X-Correlation-Id", out var incomingCorrId)
             ? incomingCorrId.ToString()
