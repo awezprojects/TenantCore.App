@@ -11,4 +11,8 @@ public class SessionCollectionDto
     public decimal TotalCollected { get; init; }
     public bool HasItems { get; init; }
     public DateTime? CollectedAt { get; init; }
+
+    // DEF-MR-01: with two receptionists sharing one clinic-wide session, the Counter page had no
+    // way to show who actually took a given patient's cash.
+    public Guid? CollectedByUserId { get; init; }
 }

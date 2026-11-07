@@ -296,8 +296,8 @@
                         <div style="font-size:18px;font-weight:700;color:#E11D48;">Rs. @_handoverDisputed.ToString("N0")</div>
                     </div>
                     <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 16px;flex:1;min-width:120px;text-align:center;">
-                        <div style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.4px;">Total</div>
-                        <div style="font-size:18px;font-weight:700;color:#2563EB;">Rs. @_handovers.Sum(h => h.Amount).ToString("N0")</div>
+                        <div style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.4px;">Total (Accepted + Pending)</div>
+                        <div style="font-size:18px;font-weight:700;color:#2563EB;">Rs. @_handoverTotal.ToString("N0")</div>
                     </div>
                 </div>
             </div>
@@ -381,6 +381,10 @@
     private decimal _pendingHandovers  => _handovers.Where(h => h.Status == HandoverStatus.Pending).Sum(h => h.Amount);
     private decimal _handoverAccepted  => _handovers.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount);
     private decimal _handoverDisputed  => _handovers.Where(h => h.Status == HandoverStatus.Disputed).Sum(h => h.Amount);
+    // DEF-MR-04: used to sum every handover regardless of status, so a disputed amount (whose
+    // money may never actually change hands) inflated this above total income. Disputed money
+    // has its own card above; it no longer counts toward this total.
+    private decimal _handoverTotal     => _handovers.Where(h => h.Status != HandoverStatus.Disputed).Sum(h => h.Amount);
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 

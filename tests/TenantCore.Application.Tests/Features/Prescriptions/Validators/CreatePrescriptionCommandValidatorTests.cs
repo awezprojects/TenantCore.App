@@ -111,31 +111,61 @@ public class CreatePrescriptionCommandValidatorTests
         result.Errors.Should().Contain(x => x.PropertyName.Contains("Lmp"));
     }
 
+    // DEF-MR-06: items=[] used to be rejected unconditionally — a counselling-only, scan-only or
+    // follow-up visit could never be finalised at all. It's only an error when there is also no
+    // other clinical content (diagnosis, investigations or notes) to justify the visit.
     [Fact]
-    public void Validate_WhenItemsIsEmpty_ReturnsError()
+    public void Validate_WhenItemsIsEmptyAndNoOtherClinicalContent_ReturnsError()
     {
-        var command = CreateCommand(items: []);
+        var command = CreateCommand(items: [], diagnosis: null, investigations: [], notes: null);
 
         var result = _validator.Validate(command);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(x => x.ErrorMessage.Contains("At least one medicine is required"));
+        result.Errors.Should().Contain(x => x.ErrorMessage.Contains("Add at least one medicine"));
+    }
+
+    [Fact]
+    public void Validate_WhenItemsIsEmptyButDiagnosisIsPresent_ReturnsValid()
+    {
+        var command = CreateCommand(items: [], diagnosis: "Common cold — counselled, no medicine needed");
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_WhenItemsIsEmptyButInvestigationsOrdered_ReturnsValid()
+    {
+        var command = CreateCommand(items: [], diagnosis: null, investigations: ["USG Pelvic"]);
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Validate_WhenItemsIsEmptyButNotesPresent_ReturnsValid()
+    {
+        var command = CreateCommand(items: [], diagnosis: null, investigations: [], notes: "Follow-up visit, stable");
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
     }
 
     private static CreatePrescriptionCommand CreateCommand(
         DateTime? nextVisitDate = null,
         int? vitalPulse = null,
         UpsertObstetricPrescriptionDataDto? obstetricData = null,
-        IReadOnlyList<CreatePrescriptionItemDto>? items = null)
+        IReadOnlyList<CreatePrescriptionItemDto>? items = null,
+        string? diagnosis = "Diagnosis",
+        IReadOnlyList<string>? investigations = null,
+        string? notes = null)
         => new(
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Dr. Smith",
             nextVisitDate,
-            "Diagnosis",
-            [],
-            null,
+            diagnosis,
+            investigations ?? [],
+            notes,
             null,
             vitalPulse,
             null,

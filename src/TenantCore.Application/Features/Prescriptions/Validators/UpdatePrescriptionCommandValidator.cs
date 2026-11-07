@@ -9,7 +9,13 @@ public sealed class UpdatePrescriptionCommandValidator : AbstractValidator<Updat
     public UpdatePrescriptionCommandValidator()
     {
         RuleFor(x => x.Id).NotEmpty();
-        RuleFor(x => x.Items).NotEmpty().WithMessage("At least one medicine is required.");
+        // DEF-MR-06: mirrors CreatePrescriptionCommandValidator — see its comment.
+        RuleFor(x => x.Items)
+            .Must((command, items) => items.Count > 0
+                || !string.IsNullOrWhiteSpace(command.Diagnosis)
+                || command.Investigations.Count > 0
+                || !string.IsNullOrWhiteSpace(command.Notes))
+            .WithMessage("Add at least one medicine, or record a diagnosis, investigation or note for this visit.");
         RuleForEach(x => x.Items).ChildRules(item =>
         {
             item.RuleFor(i => i.MedicineId).NotEmpty();

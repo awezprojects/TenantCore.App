@@ -64,18 +64,42 @@ public class UpdatePrescriptionCommandValidatorTests
         result.Errors.Should().Contain(x => x.PropertyName == "Id");
     }
 
+    // DEF-MR-06: mirrors CreatePrescriptionCommandValidatorTests — see its comment.
+    [Fact]
+    public void Validate_WhenItemsIsEmptyAndNoOtherClinicalContent_ReturnsError()
+    {
+        var command = CreateCommand(items: [], diagnosis: null, investigations: [], notes: null);
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(x => x.ErrorMessage.Contains("Add at least one medicine"));
+    }
+
+    [Fact]
+    public void Validate_WhenItemsIsEmptyButDiagnosisIsPresent_ReturnsValid()
+    {
+        var command = CreateCommand(items: [], diagnosis: "Common cold — counselled, no medicine needed");
+
+        _validator.Validate(command).IsValid.Should().BeTrue();
+    }
+
     private static UpdatePrescriptionCommand CreateCommand(
         Guid? id = null,
         DateTime? nextVisitDate = null,
         decimal? vitalSugar = null,
-        UpsertObstetricPrescriptionDataDto? obstetricData = null)
+        UpsertObstetricPrescriptionDataDto? obstetricData = null,
+        IReadOnlyList<CreatePrescriptionItemDto>? items = null,
+        string? diagnosis = "Diagnosis",
+        IReadOnlyList<string>? investigations = null,
+        string? notes = null)
         => new(
             id ?? Guid.NewGuid(),
             Guid.NewGuid(),
             nextVisitDate,
-            "Diagnosis",
-            [],
-            null,
+            diagnosis,
+            investigations ?? [],
+            notes,
             null,
             null,
             null,
@@ -83,7 +107,7 @@ public class UpdatePrescriptionCommandValidatorTests
             null,
             null,
             vitalSugar,
-            [DefaultItem()],
+            items ?? [DefaultItem()],
             obstetricData);
 
     private static CreatePrescriptionItemDto DefaultItem() => new(

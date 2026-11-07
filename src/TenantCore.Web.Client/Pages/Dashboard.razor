@@ -426,7 +426,10 @@ else
 
         if (_isDoctor)
         {
-            _doctorFirstName = fullName.Split(' ').FirstOrDefault() ?? fullName;
+            // DEF-MR-13: "Dr. <first name>" (e.g. "Dr. Doctor" for a user named "Doctor One")
+            // reads oddly with the honorific — the surname is what belongs after "Dr.".
+            var nameParts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            _doctorFirstName = nameParts.Length > 1 ? nameParts[^1] : fullName;
             var userId = AuthState.CurrentUser?.UserId ?? Guid.Empty;
             await LoadDoctorDashboardAsync(userId);
         }

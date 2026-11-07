@@ -32,6 +32,7 @@ public static class OpdRegistrationTranslator
         FinalAmount = payment?.FinalAmount,
         HasDiscount = payment?.Discount > 0,
         RefundStatus = payment?.RefundStatus,
-        RefundDue = payment?.RefundDue ?? 0
+        RefundDue = payment?.RefundDue ?? 0,
+        ReceivedByUserId = payment?.ReceivedByUserId
     };
 }

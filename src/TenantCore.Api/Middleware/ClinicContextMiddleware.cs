@@ -92,7 +92,15 @@ public class ClinicContextMiddleware(RequestDelegate next, ILogger<ClinicContext
     // it never calls GetApplicationId(), since no clinic exists yet for a pending onboarding
     // request. It is explicitly excluded here so callers can submit/check onboarding requests
     // without ever selecting a clinic first.
-    private static readonly HashSet<Type> ExemptControllerTypes = [typeof(ClinicOnboardingController)];
+    //
+    // DEF-MR-11: DoctorProfileController has the exact same shape — it also only inherits
+    // ClinicControllerBase for GetCurrentUserId(), and every action on it (registration number,
+    // speciality, qualifications, print template) is the doctor's own global profile, not
+    // clinic-scoped data; none of them call GetApplicationId(). Without this exemption, opening
+    // My Profile with no clinic selected (e.g. straight after login) surfaced this middleware's
+    // raw "requires the X-Application-Id header" text on a save that never needed a clinic.
+    private static readonly HashSet<Type> ExemptControllerTypes =
+        [typeof(ClinicOnboardingController), typeof(DoctorProfileController)];
 
     private static bool IsClinicScopedEndpoint(HttpContext context)
     {
