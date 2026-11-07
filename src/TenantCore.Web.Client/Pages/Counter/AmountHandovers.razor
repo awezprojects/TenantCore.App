@@ -403,8 +403,26 @@
     {
         _selectedHandoverUser = null;
         _selectedHandoverUserId = null;
-        _amount = _activeSession?.NetAmount ?? 0;
         _notes = null;
+
+        // DEF-MR-02 (QA re-test): NetAmount is the session's cumulative collected total and never
+        // shrinks once a handover is accepted — prefilling it as-is overstated what's actually
+        // still owed once an earlier handover for this same (still open) session had already been
+        // accepted. Fetch this session's own handovers (not the date-filtered _all list, which may
+        // not cover it) and subtract what's already Accepted.
+        if (_activeSession is not null)
+        {
+            var sessionHandovers = await HandoverClient.GetBySessionAsync(_activeSession.Id);
+            var alreadyAccepted = sessionHandovers.Success && sessionHandovers.Data is not null
+                ? sessionHandovers.Data.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount)
+                : 0;
+            _amount = _activeSession.NetAmount - alreadyAccepted;
+        }
+        else
+        {
+            _amount = 0;
+        }
+
         _createVisible = true;
         await LoadHandoverUsersAsync();
     }

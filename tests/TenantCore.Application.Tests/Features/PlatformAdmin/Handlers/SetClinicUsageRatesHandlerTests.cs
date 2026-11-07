@@ -128,7 +128,12 @@ public class SetClinicUsageRatesHandlerTests
     [Fact]
     public void Command_AuditContextNamesTheItemsAndNeverTheirPrices()
     {
-        var command = Command(Guid.NewGuid(),
+        // A fixed, non-random applicationId — ActionLogContext embeds it verbatim, and
+        // Guid.NewGuid() made this test flaky: a random hex GUID contains the substring "15"
+        // roughly 1 in 8 runs, which the NotContain("15") check below couldn't tell apart from
+        // an actual (bugged) rate leak. "22222222-..." provably never contains "15".
+        var applicationId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var command = Command(applicationId,
             new UsageRateSetting(BillingItem.OpdRegistration, 15m),
             new UsageRateSetting(BillingItem.IpdAdmission, 40m));
 

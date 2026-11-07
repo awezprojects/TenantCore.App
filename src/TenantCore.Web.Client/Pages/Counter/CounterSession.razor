@@ -274,7 +274,8 @@
         </div>
         <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
             <div class="auth-info" style="font-size:13px;">
-                Net amount after expenses: <strong>Rs. @(_activeSession?.NetAmount.ToString("N2") ?? "0.00")</strong>
+                Outstanding balance (session total minus amounts already handed over and accepted):
+                <strong>Rs. @_outstandingBalance.ToString("N2")</strong>
             </div>
             <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label">Amount to Handover (Rs.) *</label>
@@ -422,9 +423,15 @@
         _saving = false;
     }
 
+    // DEF-MR-02 (QA re-test): NetAmount is the session's cumulative collected total and never
+    // shrinks once a handover is accepted — prefilling it as-is overstated what's actually still
+    // owed once an earlier handover for this same (still open) session had already been accepted.
+    private decimal _outstandingBalance => (_activeSession?.NetAmount ?? 0)
+        - _sessionHandovers.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount);
+
     private async Task OpenHandoverDialog()
     {
-        _handoverAmount = _activeSession?.NetAmount ?? 0;
+        _handoverAmount = _outstandingBalance;
         _handoverNotes  = null;
         _handoverRecipient = null;
         _handoverRecipientId = null;

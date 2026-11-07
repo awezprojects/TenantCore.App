@@ -131,10 +131,19 @@
                 <button class="opd-tab @(_statusFilter == "done"       ? "active" : "")" @onclick='() => ApplyStatus("done")'>
                     Completed (@_completedCount)
                 </button>
-                <button class="opd-tab @(_statusFilter == "notvisited" ? "active" : "")" @onclick='() => ApplyStatus("notvisited")'>
+                <button class="opd-tab @(_statusFilter == "notvisited" ? "active" : "")" @onclick='() => ApplyStatus("notvisited")'
+                        title="@_notVisitedBreakdownText">
                     Not Visited (@_notVisitedCount)
                 </button>
             </div>
+            @if (!_isDoctor && _filterDoctorId is null && !string.IsNullOrEmpty(_notVisitedBreakdownText))
+            {
+                <!-- DEF-MR-15: reception's "Not Visited" count is clinic-wide (every doctor), while
+                     each doctor's own queue only counts their own — the two numbers legitimately
+                     differ by scope, not by a bug, but reception had no way to see WHICH doctor a
+                     stale visit belonged to without opening the tab and scanning rows. -->
+                <span style="font-size:11px;color:#94A3B8;">@_notVisitedBreakdownText</span>
+            }
         </div>
     </div>
 
@@ -692,6 +701,9 @@
     private int _inProgressCount = 0;
     private int _completedCount  = 0;
     private int _notVisitedCount = 0;
+    // DEF-MR-15: which doctor(s) a clinic-wide Not Visited count belongs to — see ApplyStatus's
+    // sibling comment near the tab markup.
+    private string _notVisitedBreakdownText = string.Empty;
 
     // Modal
     private bool _viewModalOpen;
@@ -883,6 +895,29 @@
         _inProgressCount = results[2];
         _completedCount  = results[3];
         _notVisitedCount = results[4];
+
+        // DEF-MR-15: reception's Not Visited count above is clinic-wide (no doctor filter), while
+        // each doctor's own queue only counts their own — the two numbers can legitimately differ
+        // by scope. QA couldn't confirm that from the UI alone ("the reception screen has no
+        // doctor-wise breakdown"), so fetch which doctor(s) the stale visit(s) belong to — one
+        // extra call, made once as part of this same primary counts load, not per click.
+        _notVisitedBreakdownText = string.Empty;
+        if (!_isDoctor && _filterDoctorId is null && _notVisitedCount > 0)
+        {
+            var r = await ClinicClient.GetOpdRegistrationsAsync(
+                page: 1, pageSize: Math.Min(_notVisitedCount, 100),
+                search: search, doctorUserId: null,
+                fromDate: from, toDate: to,
+                status: null, notVisited: true,
+                applicationId: _clinicAppId);
+            if (r.Success && r.Data?.Items is not null)
+            {
+                var byDoctor = r.Data.Items
+                    .GroupBy(x => string.IsNullOrWhiteSpace(x.DoctorName) ? "Unassigned" : x.DoctorName)
+                    .Select(g => $"{g.Count()} for {g.Key}");
+                _notVisitedBreakdownText = string.Join(", ", byDoctor);
+            }
+        }
     }
 
     // Full reload — counts + page

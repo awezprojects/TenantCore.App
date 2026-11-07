@@ -23,6 +23,9 @@ public class AcceptAmountHandoverHandlerTests
             .ReturnsAsync([]);
         _particularRepository.Setup(r => r.GetCollectedBySessionIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        // Default: no other handovers exist for the session yet.
+        _repository.Setup(r => r.GetBySessionIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
     }
 
     private AcceptAmountHandoverHandler CreateHandler() =>
@@ -120,7 +123,7 @@ public class AcceptAmountHandoverHandlerTests
         var action = () => handler.Handle(new AcceptAmountHandoverCommand(handover.Id, appId), CancellationToken.None);
 
         await action.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*counter session balance*");
+            .WithMessage("*outstanding balance*");
         handover.Status.Should().Be(HandoverStatus.Pending);
     }
 
@@ -181,5 +184,64 @@ public class AcceptAmountHandoverHandlerTests
         var result = await handler.Handle(new AcceptAmountHandoverCommand(handover.Id, appId), CancellationToken.None);
 
         result.Status.Should().Be(HandoverStatus.Accepted);
+    }
+
+    // ── DEF-MR-02 (QA re-test): a second handover for a session that already had money accepted ──
+
+    [Fact]
+    public async Task Handle_WhenPartOfTheBalanceAlreadyAccepted_AcceptsOnlyTheOutstandingAmount()
+    {
+        // Session collected 3,900, already handed over and accepted. A further 100 was collected
+        // afterwards (session still open) and a new handover for exactly that 100 is pending.
+        var appId = Guid.NewGuid();
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        var payment = OpdPayment.Create(appId, Guid.NewGuid(), 4000);
+        payment.AcceptVisitFee(Guid.NewGuid(), session.Id);
+
+        var alreadyAccepted = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Doctor", 3900, null);
+        alreadyAccepted.Accept();
+        var newHandover = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Doctor", 100, null);
+
+        _repository.Setup(r => r.GetByIdAsync(newHandover.Id, It.IsAny<CancellationToken>())).ReturnsAsync(newHandover);
+        _repository.Setup(r => r.GetBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([alreadyAccepted]);
+        _sessionRepository.Setup(r => r.GetByIdAsync(session.Id, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _paymentRepository.Setup(r => r.GetBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([payment]);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(new AcceptAmountHandoverCommand(newHandover.Id, appId), CancellationToken.None);
+
+        result.Status.Should().Be(HandoverStatus.Accepted);
+    }
+
+    [Fact]
+    public async Task Handle_WhenHandoverAmountIgnoresAlreadyAcceptedPortion_ThrowsInvalidOperationException()
+    {
+        // Same setup as above, but the new handover was (wrongly) raised for the FULL cumulative
+        // total (4,000) instead of just the 100 still outstanding — must be rejected, not double
+        // counted on top of the 3,900 already accepted.
+        var appId = Guid.NewGuid();
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        var payment = OpdPayment.Create(appId, Guid.NewGuid(), 4000);
+        payment.AcceptVisitFee(Guid.NewGuid(), session.Id);
+
+        var alreadyAccepted = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Doctor", 3900, null);
+        alreadyAccepted.Accept();
+        var newHandover = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Doctor", 4000, null);
+
+        _repository.Setup(r => r.GetByIdAsync(newHandover.Id, It.IsAny<CancellationToken>())).ReturnsAsync(newHandover);
+        _repository.Setup(r => r.GetBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([alreadyAccepted]);
+        _sessionRepository.Setup(r => r.GetByIdAsync(session.Id, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _paymentRepository.Setup(r => r.GetBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([payment]);
+
+        var handler = CreateHandler();
+        var action = () => handler.Handle(new AcceptAmountHandoverCommand(newHandover.Id, appId), CancellationToken.None);
+
+        await action.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*outstanding balance*");
+        newHandover.Status.Should().Be(HandoverStatus.Pending);
     }
 }

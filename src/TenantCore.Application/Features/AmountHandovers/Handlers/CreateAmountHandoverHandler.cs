@@ -28,12 +28,31 @@ public sealed class CreateAmountHandoverHandler(
         // AcceptAmountHandoverHandler.EnsureHandoverMatchesSessionBalanceAsync.
         if (session.Status == CounterSessionStatus.Open)
         {
+            var existingHandovers = (await handoverRepository.GetBySessionIdAsync(session.Id, request.ApplicationId, cancellationToken)).ToList();
+
+            // DEF-MR-02 (QA re-test): a second handover could be raised for this session while an
+            // earlier one was still Pending, letting two handovers compete for the same cash.
+            if (existingHandovers.Any(h => h.Status == HandoverStatus.Pending))
+                throw new InvalidOperationException(
+                    "A handover for this session is already pending. Wait for it to be accepted or disputed first.");
+
             var netAmount = await ComputeSessionNetAmountAsync(session.Id, request.ApplicationId, cancellationToken);
-            if (request.Request.Amount != netAmount)
+
+            // DEF-MR-02 (QA re-test): netAmount is the session's cumulative collected total and
+            // never shrinks once a handover is accepted. More cash collected into an open session
+            // after an earlier handover was accepted was letting a new handover be raised against
+            // the FULL cumulative total again, double-counting the cash already handed over. Only
+            // what's still outstanding — collected minus already accepted for this session — can
+            // be handed over now.
+            var alreadyAccepted = existingHandovers.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount);
+            var outstanding = netAmount - alreadyAccepted;
+
+            if (request.Request.Amount != outstanding)
                 throw new InvalidOperationException(
                     $"Handover amount Rs. {request.Request.Amount:N2} does not match the counter session's " +
-                    $"current balance of Rs. {netAmount:N2}. A handover must cover the whole session balance — " +
-                    "per-receptionist partial handovers are not supported.");
+                    $"outstanding balance (Rs. {netAmount:N2} collected minus Rs. {alreadyAccepted:N2} already " +
+                    $"handed over and accepted) of Rs. {outstanding:N2}. A handover must cover the whole " +
+                    "outstanding balance — per-receptionist partial handovers are not supported.");
         }
 
         var handover = AmountHandoverTranslator.ToEntity(request);

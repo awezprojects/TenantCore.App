@@ -24,8 +24,13 @@ public class DoctorProfileController(ISender sender) : ClinicControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 
+    // DEF-MR-11: this is the doctor's own global profile (registration number, speciality,
+    // qualifications) — not any one clinic's data — so it must not require a clinic to be
+    // selected. RequireClinical checks the role for the CURRENTLY SELECTED clinic (via
+    // X-Application-Id), which doesn't exist yet right after login; RequireAnyClinical checks
+    // the same roles across every clinic the user belongs to instead.
     [HttpPut]
-    [Authorize(Policy = AuthPolicies.RequireClinical)]
+    [Authorize(Policy = AuthPolicies.RequireAnyClinical)]
     [ProducesResponseType(typeof(DoctorProfileDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -52,8 +57,10 @@ public class DoctorProfileController(ISender sender) : ClinicControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 
+    // DEF-MR-11: same reasoning as UpsertMyProfile above — this is the doctor's own print
+    // preference, not clinic data.
     [HttpPut("template")]
-    [Authorize(Policy = AuthPolicies.RequireClinical)]
+    [Authorize(Policy = AuthPolicies.RequireAnyClinical)]
     [ProducesResponseType(typeof(DoctorProfileDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> SetMyPrescriptionTemplate([FromBody] SetPrescriptionTemplateDto dto, CancellationToken ct)
