@@ -1,12 +1,14 @@
 using System.Security.Claims;
 using FluentAssertions;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using TenantCore.Api.Controllers;
 using TenantCore.Application.Features.DoctorProfiles.Commands;
 using TenantCore.Application.Features.DoctorProfiles.Queries;
+using TenantCore.Shared.Authorization;
 using TenantCore.Shared.Dtos;
 
 namespace TenantCore.Api.Tests.Controllers;
@@ -98,6 +100,22 @@ public class DoctorProfileControllerTests
         _sender.Verify(s => s.Send(
             It.Is<UpsertDoctorProfileCommand>(c => c.UserId == _userId),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // DEF-MR-11: these two actions are the doctor's own global profile, not clinic-scoped data —
+    // they must authorize across any of the user's clinics, not the currently selected one
+    // (RequireClinical would 403 whenever no clinic is selected at all).
+    [Theory]
+    [InlineData(nameof(DoctorProfileController.UpsertMyProfile))]
+    [InlineData(nameof(DoctorProfileController.SetMyPrescriptionTemplate))]
+    public void Action_RequiresAnyClinicalPolicy_NotClinicScoped(string actionName)
+    {
+        var method = typeof(DoctorProfileController).GetMethod(actionName);
+        var attribute = method!.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
+            .Cast<AuthorizeAttribute>().SingleOrDefault();
+
+        attribute.Should().NotBeNull();
+        attribute!.Policy.Should().Be(AuthPolicies.RequireAnyClinical);
     }
 
     // ?? Helpers ?????????????????????????????????????????????????????????????

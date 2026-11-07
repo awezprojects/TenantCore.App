@@ -11,7 +11,16 @@ public sealed class CreatePrescriptionCommandValidator : AbstractValidator<Creat
         RuleFor(x => x.OpdRegistrationId).NotEmpty();
         RuleFor(x => x.DoctorUserId).NotEmpty();
         RuleFor(x => x.DoctorName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.Items).NotEmpty().WithMessage("At least one medicine is required.");
+        // DEF-MR-06: a counselling-only, scan-only or follow-up visit can legitimately end with
+        // no medicine at all — this used to block Save & Finalise outright with no way through.
+        // A medicine is required only when there is no other clinical content to justify the
+        // visit (diagnosis, investigations ordered, or notes).
+        RuleFor(x => x.Items)
+            .Must((command, items) => items.Count > 0
+                || !string.IsNullOrWhiteSpace(command.Diagnosis)
+                || command.Investigations.Count > 0
+                || !string.IsNullOrWhiteSpace(command.Notes))
+            .WithMessage("Add at least one medicine, or record a diagnosis, investigation or note for this visit.");
         RuleForEach(x => x.Items).ChildRules(item =>
         {
             item.RuleFor(i => i.MedicineId).NotEmpty();

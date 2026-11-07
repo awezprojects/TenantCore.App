@@ -66,16 +66,17 @@
             <div class="opd-table-card" style="padding:0;margin-bottom:20px;">
                 <table class="opd-table">
                     <thead>
-                        <tr><th>Amount</th><th>Sent To Role</th><th>Status</th><th>Sent At</th><th style="white-space:nowrap;">Actions</th></tr>
+                        <tr><th>Amount</th><th>From</th><th>Sent To</th><th>Status</th><th>Sent At</th><th style="white-space:nowrap;">Actions</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var item in _forMe)
                         {
                             <tr>
                                 <td><strong style="font-size:15px;">Rs. @item.Amount.ToString("N2")</strong></td>
+                                <td style="font-size:12px;color:#374151;">@StaffName(item.HandedOverByUserId)</td>
                                 <td>
                                     <span style="background:#EFF6FF;color:#1D4ED8;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;">
-                                        @item.HandedOverToRoleName
+                                        @StaffName(item.HandedOverToUserId) (@item.HandedOverToRoleName)
                                     </span>
                                 </td>
                                 <td>@StatusBadge(item.Status)</td>
@@ -102,26 +103,33 @@
             </div>
         }
 
-        <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">All Handovers</div>
+        <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px;">
+            All Handovers
+            @if (!_canSeeAllHandovers)
+            {
+                <span style="font-size:12px;font-weight:400;color:#64748B;margin-left:6px;">(sent or received by you)</span>
+            }
+        </div>
         <div class="opd-table-card" style="padding:0;">
             <table class="opd-table">
                 <thead>
-                    <tr><th>Amount</th><th>Sent To Role</th><th>Status</th><th>Sent At</th></tr>
+                    <tr><th>Amount</th><th>From</th><th>Sent To</th><th>Status</th><th>Sent At</th></tr>
                 </thead>
                 <tbody>
-                    @if (!_all.Any())
+                    @if (!_visibleAll.Any())
                     {
-                        <tr><td colspan="4" class="opd-empty">No handovers found for the selected period.</td></tr>
+                        <tr><td colspan="5" class="opd-empty">No handovers found for the selected period.</td></tr>
                     }
                     else
                     {
-                        @foreach (var item in _all)
+                        @foreach (var item in _visibleAll)
                         {
                             <tr>
                                 <td><strong>Rs. @item.Amount.ToString("N2")</strong></td>
+                                <td style="font-size:12px;color:#374151;">@StaffName(item.HandedOverByUserId)</td>
                                 <td>
                                     <span style="background:#EFF6FF;color:#1D4ED8;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:600;">
-                                        @item.HandedOverToRoleName
+                                        @StaffName(item.HandedOverToUserId) (@item.HandedOverToRoleName)
                                     </span>
                                 </td>
                                 <td>@StatusBadge(item.Status)</td>
@@ -320,10 +328,26 @@
 
     private string? _resolutionNotes;
 
+    // DEF-MR-03: resolved once per page view and reused to show sender/recipient names
+    // (the table only carried user ids and the recipient's role).
+    private List<ClinicStaffDirectoryDto> _clinicStaff = [];
+    private string StaffName(Guid userId) => _clinicStaff.FirstOrDefault(u => u.UserId == userId)?.FullName ?? "Unknown";
+
+    // DEF-MR-03: a ClinicAdmin/ClinicManager has oversight over every reception and doctor, so
+    // they keep the clinic-wide view; a Doctor or Receptionist only sees handovers that involve
+    // them (previously every role saw every handover in the clinic, including other doctors').
+    private bool _canSeeAllHandovers => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
+        .Any(r => string.Equals(r, AppRoles.ClinicAdmin, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(r, AppRoles.ClinicManager, StringComparison.OrdinalIgnoreCase));
+
+    private List<AmountHandoverSummaryDto> _visibleAll = [];
+
     protected override async Task OnInitializedAsync()
     {
         var session = await CounterSessionClient.GetActiveAsync();
         _activeSession = session.Success && session.Data is not null ? session.Data : null;
+        var staff = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, roles: null);
+        _clinicStaff = staff.Success && staff.Data is not null ? staff.Data : [];
         await LoadAsync();
     }
 
@@ -338,16 +362,23 @@
         if (response.Success && response.Data is not null)
         {
             _all = response.Data.ToList();
+            // DEF-MR-14: a disputed/accepted handover has no action left to take here — leaving
+            // it in "pending your action" misled the doctor into thinking something was still due.
             _forMe = currentUserId.HasValue
                 ? _all.Where(h =>
+                    h.Status == HandoverStatus.Pending &&
                     h.HandedOverToUserId == currentUserId.Value &&
                     currentRoles.Contains(h.HandedOverToRoleName)).ToList()
                 : [];
+            _visibleAll = _canSeeAllHandovers || !currentUserId.HasValue
+                ? _all
+                : _all.Where(h => h.HandedOverByUserId == currentUserId.Value || h.HandedOverToUserId == currentUserId.Value).ToList();
         }
         else
         {
             _all = [];
             _forMe = [];
+            _visibleAll = [];
         }
         _loading = false;
     }
@@ -372,8 +403,26 @@
     {
         _selectedHandoverUser = null;
         _selectedHandoverUserId = null;
-        _amount = _activeSession?.NetAmount ?? 0;
         _notes = null;
+
+        // DEF-MR-02 (QA re-test): NetAmount is the session's cumulative collected total and never
+        // shrinks once a handover is accepted — prefilling it as-is overstated what's actually
+        // still owed once an earlier handover for this same (still open) session had already been
+        // accepted. Fetch this session's own handovers (not the date-filtered _all list, which may
+        // not cover it) and subtract what's already Accepted.
+        if (_activeSession is not null)
+        {
+            var sessionHandovers = await HandoverClient.GetBySessionAsync(_activeSession.Id);
+            var alreadyAccepted = sessionHandovers.Success && sessionHandovers.Data is not null
+                ? sessionHandovers.Data.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount)
+                : 0;
+            _amount = _activeSession.NetAmount - alreadyAccepted;
+        }
+        else
+        {
+            _amount = 0;
+        }
+
         _createVisible = true;
         await LoadHandoverUsersAsync();
     }

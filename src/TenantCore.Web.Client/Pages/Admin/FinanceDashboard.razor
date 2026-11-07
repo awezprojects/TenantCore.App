@@ -7,6 +7,7 @@
 @inject IFinanceReportApiClient ReportClient
 @inject ICounterSessionApiClient SessionClient
 @inject IAmountHandoverApiClient HandoverClient
+@inject IApplicationApiClient AppClient
 @inject ClinicContextService ClinicContext
 @inject AuthStateService AuthState
 @inject IToastService Toast
@@ -239,6 +240,7 @@
                         <tr>
                             <th>Session Date</th>
                             <th>Opened At</th>
+                            <th>Opened By</th>
                             <th style="text-align:right;">Collected</th>
                             <th style="text-align:right;">Expenses</th>
                             <th style="text-align:right;">Net</th>
@@ -251,6 +253,7 @@
                             <tr>
                                 <td style="font-weight:600;">@s.SessionDate.ToString("dd MMM yyyy")</td>
                                 <td style="font-size:12px;color:#64748B;">@DateTimeHelper.ToLocalString(s.OpenedAt, "HH:mm")</td>
+                                <td style="font-size:12px;color:#64748B;">@StaffName(s.OpenedByUserId)</td>
                                 <td style="text-align:right;color:#16A34A;font-weight:600;">Rs. @s.TotalCollected.ToString("N2")</td>
                                 <td style="text-align:right;color:#DC2626;font-weight:600;">Rs. @s.TotalExpenses.ToString("N2")</td>
                                 <td style="text-align:right;font-weight:700;color:@(s.NetAmount >= 0 ? "#1D4ED8" : "#DC2626");">Rs. @s.NetAmount.ToString("N2")</td>
@@ -258,7 +261,7 @@
                             </tr>
                         }
                         <tr style="background:#F1F5F9;font-weight:700;">
-                            <td colspan="2">Total</td>
+                            <td colspan="3">Total</td>
                             <td style="text-align:right;color:#16A34A;">Rs. @_sessions.Sum(s => s.TotalCollected).ToString("N2")</td>
                             <td style="text-align:right;color:#DC2626;">Rs. @_sessions.Sum(s => s.TotalExpenses).ToString("N2")</td>
                             <td style="text-align:right;color:#1D4ED8;">Rs. @_sessions.Sum(s => s.NetAmount).ToString("N2")</td>
@@ -296,8 +299,8 @@
                         <div style="font-size:18px;font-weight:700;color:#E11D48;">Rs. @_handoverDisputed.ToString("N0")</div>
                     </div>
                     <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 16px;flex:1;min-width:120px;text-align:center;">
-                        <div style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.4px;">Total</div>
-                        <div style="font-size:18px;font-weight:700;color:#2563EB;">Rs. @_handovers.Sum(h => h.Amount).ToString("N0")</div>
+                        <div style="font-size:10px;font-weight:700;color:#1D4ED8;text-transform:uppercase;letter-spacing:.4px;">Total (Accepted + Pending)</div>
+                        <div style="font-size:18px;font-weight:700;color:#2563EB;">Rs. @_handoverTotal.ToString("N0")</div>
                     </div>
                 </div>
             </div>
@@ -307,6 +310,7 @@
                     <thead>
                         <tr>
                             <th style="text-align:right;">Amount</th>
+                            <th>From</th>
                             <th>Handed To</th>
                             <th>Status</th>
                             <th>Date &amp; Time</th>
@@ -317,7 +321,8 @@
                         {
                             <tr>
                                 <td style="text-align:right;font-weight:700;color:#1E293B;font-size:15px;">Rs. @h.Amount.ToString("N2")</td>
-                                <td style="font-size:12px;color:#64748B;">@(h.HandedOverToRoleName ?? "—")</td>
+                                <td style="font-size:12px;color:#64748B;">@StaffName(h.HandedOverByUserId)</td>
+                                <td style="font-size:12px;color:#64748B;">@StaffName(h.HandedOverToUserId) (@(h.HandedOverToRoleName ?? "—"))</td>
                                 <td>@HandoverStatusBadge(h.Status)</td>
                                 <td style="font-size:12px;color:#64748B;">@DateTimeHelper.ToLocalString(h.HandedOverAt, "dd MMM yyyy HH:mm")</td>
                             </tr>
@@ -381,8 +386,25 @@
     private decimal _pendingHandovers  => _handovers.Where(h => h.Status == HandoverStatus.Pending).Sum(h => h.Amount);
     private decimal _handoverAccepted  => _handovers.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount);
     private decimal _handoverDisputed  => _handovers.Where(h => h.Status == HandoverStatus.Disputed).Sum(h => h.Amount);
+    // DEF-MR-04: used to sum every handover regardless of status, so a disputed amount (whose
+    // money may never actually change hands) inflated this above total income. Disputed money
+    // has its own card above; it no longer counts toward this total.
+    private decimal _handoverTotal     => _handovers.Where(h => h.Status != HandoverStatus.Disputed).Sum(h => h.Amount);
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    // DEF-MR-03 (follow-up): resolved once per page view, reused for the handovers table's
+    // "From" / "Handed To" names below — not tied to the date range, so loaded independently
+    // of LoadAsync rather than re-fetched on every preset/date change.
+    private List<ClinicStaffDirectoryDto> _clinicStaff = [];
+    private string StaffName(Guid? userId) => userId is null
+        ? "—"
+        : _clinicStaff.FirstOrDefault(u => u.UserId == userId)?.FullName ?? "Unknown";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var staff = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, roles: null);
+        _clinicStaff = staff.Success && staff.Data is not null ? staff.Data : [];
+        await LoadAsync();
+    }
 
     private async Task ApplyPreset(string preset)
     {

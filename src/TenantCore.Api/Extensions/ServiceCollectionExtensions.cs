@@ -53,6 +53,8 @@ public static class ServiceCollectionExtensions
 
         // Register the handler that enforces per-clinic role checks via the app_roles JWT claim.
         services.AddSingleton<IAuthorizationHandler, ClinicRoleAuthorizationHandler>();
+        // DEF-MR-11: same claim, checked across every clinic instead of one specific clinic.
+        services.AddSingleton<IAuthorizationHandler, AnyClinicRoleAuthorizationHandler>();
 
         services.AddAuthorizationBuilder()
             // Any authenticated clinic user — no clinic-role check needed
@@ -70,6 +72,11 @@ public static class ServiceCollectionExtensions
             .AddPolicy(AuthPolicies.RequireClinical, policy =>
                 policy.RequireAuthenticatedUser()
                       .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicalRoles)))
+            // DEF-MR-11: same clinical roles, but across any of the user's clinics — for the
+            // doctor's own global profile, which isn't scoped to one clinic.
+            .AddPolicy(AuthPolicies.RequireAnyClinical, policy =>
+                policy.RequireAuthenticatedUser()
+                      .AddRequirements(new AnyClinicRoleRequirement(AppRoles.ClinicalRoles)))
             // All clinic staff: reception + clinical combined (e.g. OPD status updates)
             .AddPolicy(AuthPolicies.RequireClinicStaff, policy =>
                 policy.RequireAuthenticatedUser()

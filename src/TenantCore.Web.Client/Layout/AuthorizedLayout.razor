@@ -253,6 +253,7 @@ else if (_isAuthenticated)
     private bool _isAdmin;
     private bool _userMenuOpen;
     private string _currentTime = DateTime.Now.ToString("hh:mm tt");
+    private System.Threading.Timer? _clockTimer;
     private string _roleLabel = string.Empty;
     private string _screenTitle = "Dashboard";
 
@@ -287,6 +288,15 @@ else if (_isAuthenticated)
         // a later UsageBillingContext.RefreshAsync() (e.g. after a register/cancel changes the
         // wallet) updates the shared Summary but nothing tells this component to re-render it.
         UsageBillingContext.OnBillingChanged += OnBillingChanged;
+
+        // DEF-MR-16: _currentTime was only ever set once, at field initialization — the header
+        // clock never advanced again on its own for however long the tab stayed open, only
+        // changing value if some unrelated state change happened to force a re-render.
+        _clockTimer = new System.Threading.Timer(_ =>
+        {
+            _currentTime = DateTime.Now.ToString("hh:mm tt");
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     protected override async Task OnInitializedAsync()
@@ -461,5 +471,6 @@ else if (_isAuthenticated)
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
         UsageBillingContext.OnBillingChanged -= OnBillingChanged;
+        _clockTimer?.Dispose();
     }
 }

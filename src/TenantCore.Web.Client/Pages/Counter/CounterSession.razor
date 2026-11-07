@@ -79,6 +79,13 @@
                         <div style="font-size:13px;color:#64748B;line-height:1.8;">
                             <div>Opened: <strong>@DateTimeHelper.ToLocalString(_activeSession.OpenedAt)</strong></div>
                             <div>Session Date: <strong>@_activeSession.SessionDate.ToString("dd MMM yyyy")</strong></div>
+                            <div>
+                                Opened by: <strong>@StaffName(_activeSession.OpenedByUserId)</strong>
+                                @if (_activeSession.OpenedByUserId != AuthState.CurrentUser?.UserId)
+                                {
+                                    <span style="color:#D97706;font-weight:600;"> — not your session</span>
+                                }
+                            </div>
                         </div>
                     </div>
                     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
@@ -216,12 +223,12 @@
             <div class="opd-table-card" style="padding:0;">
                 <table class="opd-table">
                     <thead>
-                        <tr><th>Patient</th><th>Token</th><th>Doctor</th><th>Consultation Fee</th><th>Items Total</th><th>Total Collected</th><th>Collected At</th><th>Actions</th></tr>
+                        <tr><th>Patient</th><th>Token</th><th>Doctor</th><th>Consultation Fee</th><th>Items Total</th><th>Total Collected</th><th>Collected By</th><th>Collected At</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
                         @if (!_sessionCollections.Any())
                         {
-                            <tr><td colspan="8" class="opd-empty">No collections recorded in this session yet.</td></tr>
+                            <tr><td colspan="9" class="opd-empty">No collections recorded in this session yet.</td></tr>
                         }
                         else
                         {
@@ -234,6 +241,7 @@
                                     <td>Rs. @c.ConsultationFee.ToString("N2")</td>
                                     <td>Rs. @c.ItemsTotal.ToString("N2")</td>
                                     <td style="color:#16A34A;font-weight:700;">Rs. @c.TotalCollected.ToString("N2")</td>
+                                    <td style="font-size:12px;color:#64748B;">@StaffName(c.CollectedByUserId)</td>
                                     <td style="font-size:12px;color:#64748B;">@(c.CollectedAt.HasValue ? DateTimeHelper.ToLocalString(c.CollectedAt.Value, "HH:mm") : "—")</td>
                                     <td>
                                         @if (c.HasItems)
@@ -266,7 +274,8 @@
         </div>
         <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;">
             <div class="auth-info" style="font-size:13px;">
-                Net amount after expenses: <strong>Rs. @(_activeSession?.NetAmount.ToString("N2") ?? "0.00")</strong>
+                Outstanding balance (session total minus amounts already handed over and accepted):
+                <strong>Rs. @_outstandingBalance.ToString("N2")</strong>
             </div>
             <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label">Amount to Handover (Rs.) *</label>
@@ -341,10 +350,19 @@
     private bool _itemsVisible;
     private Guid _itemsOpdId;
 
+    // DEF-MR-01: resolved once per page view (not re-fetched per row/click) and reused for the
+    // "Opened by"/"Collected By" labels above and the handover recipient picker below.
+    private List<ClinicStaffDirectoryDto> _clinicStaff = [];
+    private string StaffName(Guid? userId) => userId is null
+        ? "—"
+        : _clinicStaff.FirstOrDefault(u => u.UserId == userId)?.FullName ?? "Unknown";
+
     protected override async Task OnInitializedAsync()
     {
         await AuthState.InitializeAsync();
         await ClinicContext.InitializeAsync();
+        var staff = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, roles: null);
+        _clinicStaff = staff.Success && staff.Data is not null ? staff.Data : [];
         await LoadAsync();
     }
 
@@ -405,22 +423,25 @@
         _saving = false;
     }
 
+    // DEF-MR-02 (QA re-test): NetAmount is the session's cumulative collected total and never
+    // shrinks once a handover is accepted — prefilling it as-is overstated what's actually still
+    // owed once an earlier handover for this same (still open) session had already been accepted.
+    private decimal _outstandingBalance => (_activeSession?.NetAmount ?? 0)
+        - _sessionHandovers.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount);
+
     private async Task OpenHandoverDialog()
     {
-        _handoverAmount = _activeSession?.NetAmount ?? 0;
+        _handoverAmount = _outstandingBalance;
         _handoverNotes  = null;
         _handoverRecipient = null;
         _handoverRecipientId = null;
         _handoverVisible = true;
 
         var currentUserId = AuthState.CurrentUser?.UserId;
-        var response = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, HandoverTargetRoles);
-        _handoverUsers = response.Success && response.Data is not null
-            ? response.Data
-                .Where(u => u.UserId != currentUserId && u.RoleName is not null && HandoverTargetRoles.Contains(u.RoleName))
-                .OrderBy(u => u.RoleName).ThenBy(u => u.FullName)
-                .ToList()
-            : [];
+        _handoverUsers = _clinicStaff
+            .Where(u => u.UserId != currentUserId && u.RoleName is not null && HandoverTargetRoles.Contains(u.RoleName))
+            .OrderBy(u => u.RoleName).ThenBy(u => u.FullName)
+            .ToList();
     }
 
     private void OnRecipientChanged(ChangeEventArgs e)

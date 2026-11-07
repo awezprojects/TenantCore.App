@@ -41,6 +41,12 @@ public static class AuthPolicies
     // Doctor + Clinic Admin + Clinic Manager (clinical decisions e.g. discharge)
     public const string RequireClinical = "RequireClinical";
 
+    // DEF-MR-11: same clinical roles as RequireClinical, but checked across ALL of the user's
+    // clinics rather than only the currently selected one (no X-Application-Id/route clinic id
+    // needed). For actions on the user's own global profile — not any one clinic's data — that a
+    // doctor should be able to perform without first selecting a clinic.
+    public const string RequireAnyClinical = "RequireAnyClinical";
+
     // All clinic staff — reception + clinical (e.g. OPD status updates by any staff)
     public const string RequireClinicStaff = "RequireClinicStaff";
 }

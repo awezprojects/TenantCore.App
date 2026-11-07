@@ -30,6 +30,11 @@ public class OpdRegistrationDto
     public bool HasDiscount { get; init; }
     public RefundStatus? RefundStatus { get; init; }
     public decimal RefundDue { get; init; }
+
+    // DEF-MR-05: with two receptionists sharing a clinic, nothing on the registration or the OPD
+    // list said who actually registered it. Sourced from the payment row's ReceivedByUserId,
+    // which is set to the registering receptionist at create time (see CreateOpdRegistrationHandler).
+    public Guid? ReceivedByUserId { get; init; }
 }
 
 public sealed record CreateOpdRegistrationDto(

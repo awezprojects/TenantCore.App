@@ -95,6 +95,11 @@ public sealed class CreateOpdRegistrationHandler(
 
         await opdRepository.SaveChangesAsync(cancellationToken);
 
+        // DEF-MR-05: carried through to the DTO below so the create response (and therefore the
+        // just-created row shown in the OPD list before any reload) reports who registered the
+        // visit. Stays null when prepaid is disabled — nothing was collected, so there is no
+        // "received by" yet.
+        OpdPayment? payment = null;
         if (billingEnabled)
         {
             var doctorProfileId = doctorProfile?.Id ?? Guid.Empty;
@@ -102,7 +107,7 @@ public sealed class CreateOpdRegistrationHandler(
 
             if (flags?.PrepaidOpdEnabled ?? true)
             {
-                var payment = await paymentRepository.GetByOpdRegistrationIdAsync(registration.Id, request.ApplicationId, cancellationToken);
+                payment = await paymentRepository.GetByOpdRegistrationIdAsync(registration.Id, request.ApplicationId, cancellationToken);
                 if (payment is not null && payment.PaymentStatus == PaymentStatus.Pending)
                 {
                     payment.AcceptVisitFee(request.ReceivedByUserId, activeSession!.Id);
@@ -113,6 +118,6 @@ public sealed class CreateOpdRegistrationHandler(
         }
 
         var loaded = await opdRepository.GetByIdAsync(registration.Id, cancellationToken);
-        return OpdRegistrationTranslator.ToDto(loaded!);
+        return OpdRegistrationTranslator.ToDto(loaded!, payment);
     }
 }

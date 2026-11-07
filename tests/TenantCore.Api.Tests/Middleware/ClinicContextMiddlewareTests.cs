@@ -88,6 +88,23 @@ public class ClinicContextMiddlewareTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
     }
 
+    // DEF-MR-11: DoctorProfileController inherits ClinicControllerBase (for GetCurrentUserId
+    // reuse) but every action on it is the doctor's own global profile, not clinic-scoped data —
+    // saving it with no clinic selected used to surface this middleware's raw header-required
+    // text on a save that never needed a clinic at all.
+    [Fact]
+    public async Task InvokeAsync_DoctorProfileRouteWithoutHeader_PassesThrough()
+    {
+        var context = CreateContext(authenticated: true, appIdHeader: null, typeof(DoctorProfileController));
+        var nextCalled = false;
+        var middleware = CreateMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+
+        await middleware.InvokeAsync(context);
+
+        nextCalled.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
     [Fact]
     public async Task InvokeAsync_NoEndpointResolvedWithoutHeader_PassesThrough()
     {

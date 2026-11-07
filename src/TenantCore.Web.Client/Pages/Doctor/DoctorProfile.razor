@@ -117,7 +117,10 @@ else
                                     margin-bottom:14px;">
                             <span>✅</span>
                             <div>
-                                <div style="font-size:12px;font-weight:700;color:#16A34A;">Registration Verified</div>
+                                <!-- DEF-MR-09: nothing here actually checks the registration number against a
+                                     medical council registry — this only confirms the profile record was saved.
+                                     "Verified" overstated that; "Saved" is what's actually true. -->
+                                <div style="font-size:12px;font-weight:700;color:#16A34A;">Registration Saved</div>
                                 <div style="font-size:11px;color:#64748B;">
                                     Profile created @_profProfile.CreatedAt.ToString("dd MMM yyyy")
                                 </div>

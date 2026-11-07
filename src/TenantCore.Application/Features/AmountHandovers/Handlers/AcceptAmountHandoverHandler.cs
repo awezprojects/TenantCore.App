@@ -59,9 +59,21 @@ public sealed class AcceptAmountHandoverHandler(
         var itemsCollectedHere = (await opdParticularRepository.GetCollectedBySessionIdAsync(session.Id, applicationId, cancellationToken)).Sum(i => i.Amount);
         var netAmount = baseCollected + itemsCollectedHere - expenses.Sum(e => e.PaidAmount);
 
-        if (handover.Amount != netAmount)
+        // DEF-MR-02 (QA re-test): netAmount above is the session's cumulative collected total —
+        // it never shrinks when a handover is accepted. A session that stays open after an
+        // accepted handover (e.g. more cash collected afterwards) was letting a second handover
+        // be raised and accepted against the FULL cumulative total again, double-counting the
+        // cash already handed over. Only the amount still outstanding — net collected minus what
+        // was already accepted for this same session — is available to hand over.
+        var alreadyAccepted = (await repository.GetBySessionIdAsync(session.Id, applicationId, cancellationToken))
+            .Where(h => h.Id != handover.Id && h.Status == HandoverStatus.Accepted)
+            .Sum(h => h.Amount);
+        var outstanding = netAmount - alreadyAccepted;
+
+        if (handover.Amount != outstanding)
             throw new InvalidOperationException(
-                $"This handover is for Rs. {handover.Amount:N2} but the counter session balance is now " +
-                $"Rs. {netAmount:N2}. Dispute it so Reception can send the corrected amount.");
+                $"This handover is for Rs. {handover.Amount:N2} but the counter session's outstanding balance " +
+                $"(Rs. {netAmount:N2} collected minus Rs. {alreadyAccepted:N2} already handed over and accepted) " +
+                $"is now Rs. {outstanding:N2}. Dispute it so Reception can send the corrected amount.");
     }
 }

@@ -8,6 +8,7 @@
 @inject IDoctorFeeConfigApiClient DoctorFeeConfigClient
 @inject ICounterSessionApiClient CounterSessionClient
 @inject IVitalPresetApiClient VitalPresetClient
+@inject IApplicationApiClient AppClient
 @inject AuthStateService AuthState
 @inject ClinicContextService ClinicContext
 @inject FeatureFlagsContextService FeatureFlagsContext
@@ -130,10 +131,19 @@
                 <button class="opd-tab @(_statusFilter == "done"       ? "active" : "")" @onclick='() => ApplyStatus("done")'>
                     Completed (@_completedCount)
                 </button>
-                <button class="opd-tab @(_statusFilter == "notvisited" ? "active" : "")" @onclick='() => ApplyStatus("notvisited")'>
+                <button class="opd-tab @(_statusFilter == "notvisited" ? "active" : "")" @onclick='() => ApplyStatus("notvisited")'
+                        title="@_notVisitedBreakdownText">
                     Not Visited (@_notVisitedCount)
                 </button>
             </div>
+            @if (!_isDoctor && _filterDoctorId is null && !string.IsNullOrEmpty(_notVisitedBreakdownText))
+            {
+                <!-- DEF-MR-15: reception's "Not Visited" count is clinic-wide (every doctor), while
+                     each doctor's own queue only counts their own — the two numbers legitimately
+                     differ by scope, not by a bug, but reception had no way to see WHICH doctor a
+                     stale visit belonged to without opening the tab and scanning rows. -->
+                <span style="font-size:11px;color:#94A3B8;">@_notVisitedBreakdownText</span>
+            }
         </div>
     </div>
 
@@ -161,6 +171,7 @@
                         else
                         {
                             <th>Reason / Notes</th>
+                            <th>Registered By</th>
                         }
                         <th>Fee</th>
                         <th>Status</th>
@@ -170,7 +181,7 @@
                 <tbody>
                     @if (!(_result?.Items.Any() ?? false))
                     {
-                        <tr><td colspan="8" class="opd-empty">No OPD registrations found.</td></tr>
+                        <tr><td colspan="9" class="opd-empty">No OPD registrations found.</td></tr>
                     }
                     else
                     {
@@ -209,6 +220,7 @@
                                     <td style="font-size:12px;color:#64748B;max-width:150px;">
                                         @(string.IsNullOrWhiteSpace(reg.Notes) ? "—" : reg.Notes)
                                     </td>
+                                    <td style="font-size:12px;color:#64748B;">@StaffName(reg.ReceivedByUserId)</td>
                                 }
                                 <td style="font-weight:700;color:#059669;">
                                     @if (!FeatureFlagsContext.IsBillingEnabled)
@@ -256,7 +268,7 @@
                                             @if (reg.Status == OpdStatus.InProgress)
                                             {
                                                 <button class="opd-btn rx" @onclick="() => OpenPrescription(reg)">Rx</button>
-                                                <button class="opd-btn done-btn" @onclick="() => MarkDoneAsync(reg)" disabled="@_updating">Done</button>
+                                                <button class="opd-btn done-btn" @onclick="() => RequestMarkDone(reg)" disabled="@_updating">Done</button>
                                             }
                                         }
                                         else
@@ -621,6 +633,16 @@
     Are you sure you want to cancel the appointment for <strong>@_confirmCancelTarget?.PatientName</strong>?
 </ConfirmDialog>
 
+<ConfirmDialog Visible="@(_confirmDoneNoRxTarget is not null)"
+               Title="Complete Without Prescription"
+               ConfirmText="Complete Visit"
+               BusyText="Completing..."
+               IsBusy="_updating"
+               OnConfirm="ExecuteMarkDoneNoRxAsync"
+               OnCancel="() => _confirmDoneNoRxTarget = null">
+    No prescription was recorded for <strong>@_confirmDoneNoRxTarget?.PatientName</strong>. Mark this visit as completed anyway?
+</ConfirmDialog>
+
 <InsufficientBalanceDialog @bind-Visible="_insufficientBalance"
                           Balance="UsageBillingContext.Summary?.WalletBalance"
                           Currency="@(UsageBillingContext.Summary?.Currency ?? "INR")" />
@@ -641,6 +663,12 @@
 
     // ── Counter session (reception only) ─────────────────────────────────────
     private Guid? _activeSessionId;
+
+    // DEF-MR-05: resolved once per page view, reused for the "Registered By" column.
+    private List<ClinicStaffDirectoryDto> _clinicStaff = [];
+    private string StaffName(Guid? userId) => userId is null
+        ? "—"
+        : _clinicStaff.FirstOrDefault(u => u.UserId == userId)?.FullName ?? "Unknown";
 
     // ── Particulars popup (reception) ─────────────────────────────────────────
     private bool _particularsVisible;
@@ -673,6 +701,9 @@
     private int _inProgressCount = 0;
     private int _completedCount  = 0;
     private int _notVisitedCount = 0;
+    // DEF-MR-15: which doctor(s) a clinic-wide Not Visited count belongs to — see ApplyStatus's
+    // sibling comment near the tab markup.
+    private string _notVisitedBreakdownText = string.Empty;
 
     // Modal
     private bool _viewModalOpen;
@@ -790,9 +821,9 @@
         if (!_isDoctor)
         {
             if (FeatureFlagsContext.IsBillingEnabled)
-                await Task.WhenAll(LoadDoctorsAsync(), LoadActiveSessionAsync());
+                await Task.WhenAll(LoadDoctorsAsync(), LoadActiveSessionAsync(), LoadClinicStaffAsync());
             else
-                await LoadDoctorsAsync();
+                await Task.WhenAll(LoadDoctorsAsync(), LoadClinicStaffAsync());
         }
         if (Navigation.Uri.EndsWith("/opd/new", StringComparison.OrdinalIgnoreCase) && !_isDoctor)
             OpenNewDialog();
@@ -864,6 +895,29 @@
         _inProgressCount = results[2];
         _completedCount  = results[3];
         _notVisitedCount = results[4];
+
+        // DEF-MR-15: reception's Not Visited count above is clinic-wide (no doctor filter), while
+        // each doctor's own queue only counts their own — the two numbers can legitimately differ
+        // by scope. QA couldn't confirm that from the UI alone ("the reception screen has no
+        // doctor-wise breakdown"), so fetch which doctor(s) the stale visit(s) belong to — one
+        // extra call, made once as part of this same primary counts load, not per click.
+        _notVisitedBreakdownText = string.Empty;
+        if (!_isDoctor && _filterDoctorId is null && _notVisitedCount > 0)
+        {
+            var r = await ClinicClient.GetOpdRegistrationsAsync(
+                page: 1, pageSize: Math.Min(_notVisitedCount, 100),
+                search: search, doctorUserId: null,
+                fromDate: from, toDate: to,
+                status: null, notVisited: true,
+                applicationId: _clinicAppId);
+            if (r.Success && r.Data?.Items is not null)
+            {
+                var byDoctor = r.Data.Items
+                    .GroupBy(x => string.IsNullOrWhiteSpace(x.DoctorName) ? "Unassigned" : x.DoctorName)
+                    .Select(g => $"{g.Count()} for {g.Key}");
+                _notVisitedBreakdownText = string.Join(", ", byDoctor);
+            }
+        }
     }
 
     // Full reload — counts + page
@@ -883,6 +937,12 @@
     {
         var r = await CounterSessionClient.GetActiveAsync();
         _activeSessionId = r.Success && r.Data is not null ? r.Data.Id : null;
+    }
+
+    private async Task LoadClinicStaffAsync()
+    {
+        var r = await AppClient.GetClinicStaffDirectoryAsync(_clinicAppId ?? ClinicContext.SelectedApplicationId, roles: null);
+        _clinicStaff = r.Success && r.Data is not null ? r.Data : [];
     }
 
     private (DateTime From, DateTime To) GetDateRange()
@@ -984,6 +1044,32 @@
         if (result.Success) { Toast.ShowSuccess("Consultation started."); await ReloadAll(); }
         else Toast.ShowError(result.Message ?? "Failed.");
         _updating = false;
+    }
+
+    // DEF-MR-07: the queue's "Done" button used to complete a visit outright even with no
+    // prescription at all, while Rx's own Save & Finalise enforces a minimum of clinical content
+    // (see CreatePrescriptionCommandValidator). Rather than force every visit through that same
+    // hard rule here too — this is also the only way to close a visit the doctor genuinely
+    // skipped Rx for — confirm first so "no prescription" is a deliberate choice, not a silent one.
+    private OpdRegistrationDto? _confirmDoneNoRxTarget;
+
+    private async Task RequestMarkDone(OpdRegistrationDto reg)
+    {
+        _updating = true;
+        var existing = await PrescriptionClient.GetPrescriptionByOpdIdAsync(reg.Id);
+        _updating = false;
+        if (existing.Success && existing.Data is not null)
+            await MarkDoneAsync(reg);
+        else
+            _confirmDoneNoRxTarget = reg;
+    }
+
+    private async Task ExecuteMarkDoneNoRxAsync()
+    {
+        if (_confirmDoneNoRxTarget is null) return;
+        var reg = _confirmDoneNoRxTarget;
+        _confirmDoneNoRxTarget = null;
+        await MarkDoneAsync(reg);
     }
 
     private async Task MarkDoneAsync(OpdRegistrationDto reg)

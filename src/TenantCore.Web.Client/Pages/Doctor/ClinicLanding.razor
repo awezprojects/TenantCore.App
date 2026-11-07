@@ -182,7 +182,7 @@ else
                         {
                             <div style="padding-top:8px;">
                                 <div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">
-                                    Joined @item.Clinic.CreatedDate.ToString("dd MMM yyyy")
+                                    Joined @item.Clinic.JoinedDate.ToString("dd MMM yyyy")
                                 </div>
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                                     <button @onclick:stopPropagation="true"
@@ -208,7 +208,7 @@ else
                         {
                             <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;">
                                 <div style="font-size:11px;color:#94A3B8;">
-                                    Joined @item.Clinic.CreatedDate.ToString("dd MMM yyyy")
+                                    Joined @item.Clinic.JoinedDate.ToString("dd MMM yyyy")
                                 </div>
                                 @if (!isClinicAdminOnly)
                                 {

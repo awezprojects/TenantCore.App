@@ -13,11 +13,19 @@ public class PatientRepository(ClinicDbContext dbContext)
     {
         var query = DbSet.Where(p => p.ApplicationId == applicationId && p.IsActive);
 
+        // DEF-MR-10: a single-field Contains() never matches a multi-word query that spans both
+        // FirstName and LastName (e.g. "Dummy Patient 001" when FirstName="Dummy",
+        // LastName="Patient 001") — each word must independently match somewhere across the full
+        // name or the phone number.
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(p =>
-                p.FirstName.Contains(search) ||
-                p.LastName.Contains(search) ||
-                p.PhoneNumber.Contains(search));
+        {
+            var words = search.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var word in words)
+                query = query.Where(p =>
+                    p.FirstName.Contains(word) ||
+                    p.LastName.Contains(word) ||
+                    p.PhoneNumber.Contains(word));
+        }
 
         var total = await query.CountAsync(ct);
         var items = await query

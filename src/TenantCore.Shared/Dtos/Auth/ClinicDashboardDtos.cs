@@ -25,4 +25,9 @@ public class ClinicDashboardItemDto
     public bool IsOwner { get; set; }
     public List<string> UserRoles { get; set; } = [];
     public DateTime CreatedDate { get; set; }
+
+    // DEF-MR-12: CreatedDate above is the CLINIC's own creation date. This is the per-user
+    // membership date from Auth (UserApplication.CreatedDate) — when THIS user joined THIS
+    // clinic — added so a card showing "Joined" can use the member's own date, not the clinic's.
+    public DateTime JoinedDate { get; set; }
 }

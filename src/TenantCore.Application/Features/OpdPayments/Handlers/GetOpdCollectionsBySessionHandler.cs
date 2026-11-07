@@ -75,7 +75,8 @@ public sealed class GetOpdCollectionsBySessionHandler(
                 ItemsTotal = payment?.ParticularsTotal ?? 0m,
                 TotalCollected = collectedThisSession,
                 HasItems = (payment?.ParticularsTotal ?? 0m) > 0,
-                CollectedAt = sessionPayment?.AmountReceivedAt ?? lastItemCollectedAtByOpd.GetValueOrDefault(opdId)
+                CollectedAt = sessionPayment?.AmountReceivedAt ?? lastItemCollectedAtByOpd.GetValueOrDefault(opdId),
+                CollectedByUserId = sessionPayment?.ReceivedByUserId
             });
         }
 

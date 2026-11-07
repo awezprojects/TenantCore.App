@@ -20,7 +20,7 @@
 @using TenantCore.Web.Client.Services
 @using TenantCore.Web.Client.Components
 
-<PageTitle>Prescription - TenantCore</PageTitle>
+<PageTitle>Prescription - CloudClinic</PageTitle>
 
 @if (_loading)
 {
@@ -2048,12 +2048,10 @@ else
                 }
             }
 
-            // New consultation only — pre-fill any vital the OPD intake didn't capture
-            // with its normal/typical value so the doctor only has to touch abnormal
-            // readings. Editing an existing prescription never applies defaults, so
-            // its historical values (including intentionally blank ones) stay as-is.
-            if (PrescriptionId == Guid.Empty)
-                ApplyDefaultVitals();
+            // DEF-MR-08: this used to pre-fill BP/Pulse/SpO2 with a "typical" value whenever the
+            // OPD intake left them blank, so the Rx screen showed readings (e.g. "120/80") the
+            // doctor never actually took — they could be saved or printed as if measured. Vitals
+            // now stay exactly as the OPD intake recorded them: blank stays blank.
 
             var cfgR = await PrescriptionClient.GetPrescriptionConfigAsync();
             if (cfgR.Success && cfgR.Data is not null)
@@ -2233,21 +2231,6 @@ else
         RecalcQuantity(item);
         _items.Add(item);
         return true;
-    }
-
-    // Only BP, Pulse and SpO2 are routinely checked at every visit, so only those get a
-    // "typical" default when the OPD intake didn't capture them. Temp, Weight, RR and Sugar
-    // aren't measured every visit — defaulting them would show a reading the doctor never
-    // actually took, so those are left blank until entered.
-    private static readonly string[] _vitalKeysWithDefault = ["bp", "pulse", "spo2"];
-
-    private void ApplyDefaultVitals()
-    {
-        foreach (var f in _vitalFields)
-        {
-            if (_vitalKeysWithDefault.Contains(f.Key) && string.IsNullOrWhiteSpace(GetVital(f.Key)))
-                SetVital(f.Key, f.Placeholder);
-        }
     }
 
     private string GetVital(string key) => key switch
