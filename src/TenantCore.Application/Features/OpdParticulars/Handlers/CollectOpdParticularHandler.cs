@@ -25,6 +25,13 @@ public sealed class CollectOpdParticularHandler(
 
         item.Collect(request.CollectedByUserId, request.CounterSessionId);
         repository.Update(item);
+
+        if (payment is not null)
+        {
+            payment.RecordItemCollection(item.Amount, request.CollectedByUserId, request.CounterSessionId);
+            paymentRepository.Update(payment);
+        }
+
         await repository.SaveChangesAsync(cancellationToken);
     }
 }

@@ -17,9 +17,18 @@ public sealed class GetActiveCounterSessionHandler(
         var session = await repository.GetActiveSessionAsync(request.ApplicationId, cancellationToken);
         if (session is null) return null;
 
+        // DEF-E2E-08/11: payment.CollectedAmount is a running total across every collection event
+        // for that registration, however many sessions apart — attributing it whole to this
+        // session's payments would miss items collected in other sessions, or double-count items
+        // collected here for a payment homed elsewhere. Back the item portion out of each payment
+        // ("base" = fee/full-bill only), then add items by the session they were actually collected
+        // in instead.
         var payments = await paymentRepository.GetBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
-        var particulars = await particularRepository.GetCollectedBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
-        var liveCollected = payments.Sum(p => p.CollectedAmount) + particulars.Sum(p => p.Amount);
+        var itemTotals = await particularRepository.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+            payments.Select(p => p.OpdRegistrationId), session.ApplicationId, cancellationToken);
+        var baseCollected = payments.Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId));
+        var itemsCollectedHere = (await particularRepository.GetCollectedBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken)).Sum(i => i.Amount);
+        var liveCollected = baseCollected + itemsCollectedHere;
 
         var expenses = await expenseRecordRepository.GetBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
         var liveExpenses = expenses.Sum(e => e.PaidAmount);

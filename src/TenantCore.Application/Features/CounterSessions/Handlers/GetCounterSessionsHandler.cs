@@ -24,14 +24,18 @@ public sealed class GetCounterSessionsHandler(
             .OrderByDescending(s => s.SessionDate)
             .ToList();
 
-        // For any open session, compute live collected total:
-        // OpdPayment.CollectedAmount (visit fee or full-bill) + OpdParticular.Amount (individual items).
+        // DEF-E2E-08/11: back each payment down to its fee/full-bill "base" (CollectedAmount minus
+        // every individually collected item for that registration, wherever collected), then add
+        // items by the session they were actually collected in instead of the payment's own.
         var liveBySessionId = new Dictionary<Guid, decimal>();
         foreach (var open in sessions.Where(s => s.Status == CounterSessionStatus.Open))
         {
             var payments = await paymentRepository.GetBySessionIdAsync(open.Id, open.ApplicationId, cancellationToken);
-            var particulars = await particularRepository.GetCollectedBySessionIdAsync(open.Id, open.ApplicationId, cancellationToken);
-            liveBySessionId[open.Id] = payments.Sum(p => p.CollectedAmount) + particulars.Sum(p => p.Amount);
+            var itemTotals = await particularRepository.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+                payments.Select(p => p.OpdRegistrationId), open.ApplicationId, cancellationToken);
+            var baseCollected = payments.Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId));
+            var itemsCollectedHere = (await particularRepository.GetCollectedBySessionIdAsync(open.Id, open.ApplicationId, cancellationToken)).Sum(i => i.Amount);
+            liveBySessionId[open.Id] = baseCollected + itemsCollectedHere;
         }
 
         return sessions.Select(s =>

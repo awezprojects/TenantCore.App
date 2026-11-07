@@ -97,4 +97,55 @@ public class OpdPaymentTests
         payment.RefundStatus.Should().Be(RefundStatus.PendingRefund);
         payment.RefundDue.Should().Be(100);
     }
+
+    [Fact]
+    public void RecordItemCollection_WhenVisitFeeAlreadyCollected_AddsToCollectedAmount()
+    {
+        var sessionId = Guid.NewGuid();
+        var payment = CreateCollectedVisitFee(200, sessionId, out _);
+        payment.UpdateParticularsTotal(500);
+
+        payment.RecordItemCollection(500, Guid.NewGuid(), Guid.NewGuid());
+
+        payment.CollectedAmount.Should().Be(700);
+        payment.PaymentStatus.Should().Be(PaymentStatus.Received);
+        // The session that already credited the visit fee must keep the payment.
+        payment.CounterSessionId.Should().Be(sessionId);
+    }
+
+    [Fact]
+    public void RecordItemCollection_WhenNothingCollectedYet_SetsStatusReceivedAndSession()
+    {
+        var applicationId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var receivedBy = Guid.NewGuid();
+        var payment = OpdPayment.Create(applicationId, Guid.NewGuid(), 200);
+        payment.UpdateParticularsTotal(300);
+
+        payment.RecordItemCollection(300, receivedBy, sessionId);
+
+        payment.PaymentStatus.Should().Be(PaymentStatus.Received);
+        payment.CollectedAmount.Should().Be(300);
+        payment.ReceivedByUserId.Should().Be(receivedBy);
+        payment.CounterSessionId.Should().Be(sessionId);
+    }
+
+    [Fact]
+    public void ApplyDiscount_AfterItemsCollectedIndividually_ComputesRefundOverTheFullCollectedAmount()
+    {
+        // DEF-E2E-03 regression: before the fix, CollectedAmount never learned about individually
+        // collected items, so a discount applied afterwards silently ignored that money and
+        // under-calculated (or missed) the refund actually owed.
+        var sessionId = Guid.NewGuid();
+        var payment = CreateCollectedVisitFee(200, sessionId, out _);
+        payment.UpdateParticularsTotal(500); // USG 500 added, final amount 700
+        payment.RecordItemCollection(500, Guid.NewGuid(), sessionId); // item collected -> CollectedAmount 700
+
+        payment.ApplyDiscount(150); // FinalAmount 550 < CollectedAmount 700 -> refund due
+
+        payment.CollectedAmount.Should().Be(700);
+        payment.FinalAmount.Should().Be(550);
+        payment.RefundStatus.Should().Be(RefundStatus.PendingRefund);
+        payment.RefundDue.Should().Be(150);
+    }
 }

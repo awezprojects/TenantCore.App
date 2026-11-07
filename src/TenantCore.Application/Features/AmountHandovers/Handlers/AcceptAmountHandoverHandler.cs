@@ -48,12 +48,16 @@ public sealed class AcceptAmountHandoverHandler(
             return;
 
         var payments = await opdPaymentRepository.GetBySessionIdAsync(session.Id, applicationId, cancellationToken);
-        var particulars = await opdParticularRepository.GetCollectedBySessionIdAsync(session.Id, applicationId, cancellationToken);
         var expenses = await expenseRecordRepository.GetBySessionIdAsync(session.Id, applicationId, cancellationToken);
 
-        var netAmount = payments.Sum(p => p.CollectedAmount)
-                      + particulars.Sum(p => p.Amount)
-                      - expenses.Sum(e => e.PaidAmount);
+        // DEF-E2E-08/11: back each payment down to its fee/full-bill "base" (CollectedAmount minus
+        // every individually collected item for that registration, wherever collected), then add
+        // items by the session they were actually collected in instead of the payment's own.
+        var itemTotals = await opdParticularRepository.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+            payments.Select(p => p.OpdRegistrationId), applicationId, cancellationToken);
+        var baseCollected = payments.Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId));
+        var itemsCollectedHere = (await opdParticularRepository.GetCollectedBySessionIdAsync(session.Id, applicationId, cancellationToken)).Sum(i => i.Amount);
+        var netAmount = baseCollected + itemsCollectedHere - expenses.Sum(e => e.PaidAmount);
 
         if (handover.Amount != netAmount)
             throw new InvalidOperationException(

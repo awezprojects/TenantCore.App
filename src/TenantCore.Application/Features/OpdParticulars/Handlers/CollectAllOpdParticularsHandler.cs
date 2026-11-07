@@ -30,6 +30,13 @@ public sealed class CollectAllOpdParticularsHandler(
             item.Collect(request.CollectedByUserId, request.CounterSessionId);
             repository.Update(item);
         }
+
+        if (payment is not null)
+        {
+            payment.RecordItemCollection(pending.Sum(i => i.Amount), request.CollectedByUserId, request.CounterSessionId);
+            paymentRepository.Update(payment);
+        }
+
         await repository.SaveChangesAsync(cancellationToken);
     }
 }
