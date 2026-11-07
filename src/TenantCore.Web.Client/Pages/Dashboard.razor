@@ -494,8 +494,9 @@ else
     {
         var appId = ClinicContext.SelectedApplicationId;
         Guid? explicitApp = appId != Guid.Empty ? appId : null;
+        var today = DateTime.Today;
         var opdResult = await ClinicApi.GetOpdRegistrationsAsync(
-            page: 1, pageSize: 50, todayOnly: true,
+            page: 1, pageSize: 50, fromDate: today, toDate: today,
             applicationId: explicitApp);
 
         if (opdResult.Success && opdResult.Data != null)

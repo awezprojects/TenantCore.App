@@ -31,11 +31,15 @@ public sealed class CloseCounterSessionHandler(
         if (!handovers.Any(h => h.Status == HandoverStatus.Accepted))
             throw new InvalidOperationException("Cannot close session: the cash must be handed over and accepted before closing.");
 
-        // Total = OpdPayment.CollectedAmount (visit fee or discounted full-bill)
-        //       + OpdParticular.Amount (individually collected service items)
+        // DEF-E2E-08/11: back each payment down to its fee/full-bill "base" (CollectedAmount minus
+        // every individually collected item for that registration, wherever collected), then add
+        // items by the session they were actually collected in instead of the payment's own.
         var payments = await opdPaymentRepository.GetBySessionIdAsync(request.Id, request.ApplicationId, cancellationToken);
-        var particulars = await opdParticularRepository.GetCollectedBySessionIdAsync(request.Id, request.ApplicationId, cancellationToken);
-        var totalCollected = payments.Sum(p => p.CollectedAmount) + particulars.Sum(p => p.Amount);
+        var itemTotals = await opdParticularRepository.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+            payments.Select(p => p.OpdRegistrationId), request.ApplicationId, cancellationToken);
+        var baseCollected = payments.Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId));
+        var itemsCollectedHere = (await opdParticularRepository.GetCollectedBySessionIdAsync(request.Id, request.ApplicationId, cancellationToken)).Sum(i => i.Amount);
+        var totalCollected = baseCollected + itemsCollectedHere;
 
         var expenses = await expenseRecordRepository.GetBySessionIdAsync(request.Id, request.ApplicationId, cancellationToken);
         var totalExpenses = expenses.Sum(e => e.PaidAmount);

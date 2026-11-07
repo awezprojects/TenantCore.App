@@ -156,6 +156,25 @@ public class OpdPayment : AuditableEntity
     public void Accept(Guid receivedByUserId, Guid? counterSessionId)
         => AcceptVisitFee(receivedByUserId, counterSessionId);
 
+    // DEF-E2E-03: individual service items collected after (or instead of) the visit fee
+    // were only ever recorded on the OpdParticular row — CollectedAmount never learned about
+    // them, so refund/discount math (which reads CollectedAmount) silently ignored money the
+    // patient had actually paid. Folds the item's amount into the payment-level running total.
+    // Keeps the earliest CounterSessionId, same rule AcceptFull already uses, so the money stays
+    // attributed to whichever session first touched this payment.
+    public void RecordItemCollection(decimal amount, Guid receivedByUserId, Guid? counterSessionId)
+    {
+        CollectedAmount += amount;
+        if (PaymentStatus != PaymentStatus.Received)
+        {
+            PaymentStatus = PaymentStatus.Received;
+            AmountReceivedAt = DateTime.UtcNow;
+            ReceivedByUserId = receivedByUserId;
+        }
+        CounterSessionId ??= counterSessionId;
+        SetUpdatedAt();
+    }
+
     public void RevertToPending()
     {
         PaymentStatus = PaymentStatus.Pending;

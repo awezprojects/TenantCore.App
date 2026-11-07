@@ -14,6 +14,12 @@ public class GetOpdCollectionsBySessionHandlerTests
     private readonly Mock<IOpdParticularRepository> _particularRepository = new();
     private readonly Mock<IOpdRegistrationRepository> _opdRepository = new();
 
+    public GetOpdCollectionsBySessionHandlerTests()
+    {
+        _particularRepository.Setup(r => r.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+    }
+
     private GetOpdCollectionsBySessionHandler CreateHandler() =>
         new(_paymentRepository.Object, _particularRepository.Object, _opdRepository.Object);
 
@@ -83,11 +89,17 @@ public class GetOpdCollectionsBySessionHandlerTests
 
         var particular = OpdParticular.Create(appId, registration.Id, Guid.NewGuid(), "Dressing", 100);
         particular.Collect(Guid.NewGuid(), sessionId);
+        // Collecting an item also folds its amount into the payment (RecordItemCollection),
+        // so the payment itself now shows up for this session too.
+        payment.RecordItemCollection(100, Guid.NewGuid(), sessionId);
 
         _paymentRepository.Setup(r => r.GetBySessionIdAsync(sessionId, appId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<OpdPayment>());
+            .ReturnsAsync(new List<OpdPayment> { payment });
         _particularRepository.Setup(r => r.GetCollectedBySessionIdAsync(sessionId, appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OpdParticular> { particular });
+        _particularRepository.Setup(r => r.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+                It.Is<IEnumerable<Guid>>(ids => ids.Contains(registration.Id)), appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, decimal> { [registration.Id] = 100m });
         _paymentRepository.Setup(r => r.GetByOpdRegistrationIdsAsync(
                 It.Is<IEnumerable<Guid>>(ids => ids.Contains(registration.Id)), appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OpdPayment> { payment });

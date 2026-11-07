@@ -38,7 +38,7 @@ public class OpdPaymentRepository(ClinicDbContext dbContext) : ClinicRepository<
     public async Task<IEnumerable<(Guid DoctorUserId, string DoctorName, decimal Total)>> GetDoctorWiseTotalsAsync(
         DateTime from, DateTime to, Guid applicationId, Guid? doctorUserId, CancellationToken ct = default)
     {
-        var query = dbContext.Set<OpdPayment>()
+        var paymentsQuery = dbContext.Set<OpdPayment>()
             .AsNoTracking()
             .Where(o => o.ApplicationId == applicationId
                      && o.PaymentStatus == PaymentStatus.Received
@@ -47,17 +47,57 @@ public class OpdPaymentRepository(ClinicDbContext dbContext) : ClinicRepository<
             .Join(dbContext.Set<OpdRegistration>(),
                   p => p.OpdRegistrationId,
                   r => r.Id,
-                  (p, r) => new { p.FinalAmount, r.DoctorUserId, r.DoctorName });
+                  (p, r) => new { p.OpdRegistrationId, p.CollectedAmount, r.DoctorUserId, r.DoctorName });
 
         if (doctorUserId.HasValue)
-            query = query.Where(x => x.DoctorUserId == doctorUserId.Value);
+            paymentsQuery = paymentsQuery.Where(x => x.DoctorUserId == doctorUserId.Value);
 
-        var grouped = await query
-            .GroupBy(x => new { x.DoctorUserId, x.DoctorName })
-            .Select(g => new { g.Key.DoctorUserId, g.Key.DoctorName, Total = g.Sum(x => x.FinalAmount) })
+        var payments = await paymentsQuery.ToListAsync(ct);
+
+        // DEF-E2E-12: a payment's CollectedAmount is a running total across every collection event
+        // for that registration, however many days apart — crediting it whole to the day the visit
+        // fee was first received would also carry in items collected on a later day. Back the item
+        // portion out ("base" = fee/full-bill only) and credit items by the day they were actually
+        // collected instead.
+        var registrationIds = payments.Select(p => p.OpdRegistrationId).ToList();
+        var itemTotals = registrationIds.Count == 0
+            ? []
+            : await dbContext.Set<OpdParticular>()
+                .AsNoTracking()
+                .Where(o => o.ApplicationId == applicationId
+                         && o.PaymentStatus == PaymentStatus.Received
+                         && o.CounterSessionId != null
+                         && registrationIds.Contains(o.OpdRegistrationId))
+                .GroupBy(o => o.OpdRegistrationId)
+                .ToDictionaryAsync(g => g.Key, g => g.Sum(o => o.Amount), ct);
+
+        var itemsInRangeQuery = dbContext.Set<OpdParticular>()
+            .AsNoTracking()
+            .Where(o => o.ApplicationId == applicationId
+                     && o.PaymentStatus == PaymentStatus.Received
+                     && o.CounterSessionId != null
+                     && o.CollectedAt >= from
+                     && o.CollectedAt < to)
+            .Join(dbContext.Set<OpdRegistration>(),
+                  i => i.OpdRegistrationId,
+                  r => r.Id,
+                  (i, r) => new { i.Amount, r.DoctorUserId, r.DoctorName });
+
+        if (doctorUserId.HasValue)
+            itemsInRangeQuery = itemsInRangeQuery.Where(x => x.DoctorUserId == doctorUserId.Value);
+
+        var itemsInRange = await itemsInRangeQuery.ToListAsync(ct);
+
+        var baseByDoctor = payments
+            .GroupBy(p => new { p.DoctorUserId, p.DoctorName })
+            .ToDictionary(g => g.Key, g => g.Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId)));
+        var itemsByDoctor = itemsInRange
+            .GroupBy(i => new { i.DoctorUserId, i.DoctorName })
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Amount));
+
+        return baseByDoctor.Keys.Union(itemsByDoctor.Keys)
+            .Select(k => (k.DoctorUserId, k.DoctorName, Total: baseByDoctor.GetValueOrDefault(k) + itemsByDoctor.GetValueOrDefault(k)))
             .OrderByDescending(x => x.Total)
-            .ToListAsync(ct);
-
-        return grouped.Select(x => (x.DoctorUserId, x.DoctorName, x.Total));
+            .ToList();
     }
 }

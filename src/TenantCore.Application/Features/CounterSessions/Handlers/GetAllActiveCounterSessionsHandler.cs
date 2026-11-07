@@ -22,11 +22,18 @@ public sealed class GetAllActiveCounterSessionsHandler(
         var result = new List<CounterSessionSummaryDto>(sessions.Count);
         foreach (var session in sessions)
         {
-            var payments    = await paymentRepository.GetBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
-            var particulars = await particularRepository.GetCollectedBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
-            var expenses    = await expenseRecordRepository.GetBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
+            var payments = await paymentRepository.GetBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
+            var expenses = await expenseRecordRepository.GetBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken);
 
-            var collected = payments.Sum(p => p.CollectedAmount) + particulars.Sum(p => p.Amount);
+            // DEF-E2E-08/11: back each payment down to its fee/full-bill "base" (CollectedAmount
+            // minus every individually collected item for that registration, wherever collected),
+            // then add items by the session they were actually collected in instead of the
+            // payment's own.
+            var itemTotals = await particularRepository.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+                payments.Select(p => p.OpdRegistrationId), session.ApplicationId, cancellationToken);
+            var baseCollected = payments.Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId));
+            var itemsCollectedHere = (await particularRepository.GetCollectedBySessionIdAsync(session.Id, session.ApplicationId, cancellationToken)).Sum(i => i.Amount);
+            var collected = baseCollected + itemsCollectedHere;
             var exp       = expenses.Sum(e => e.PaidAmount);
 
             result.Add(CounterSessionTranslator.ToSummaryDto(session, collected, exp));

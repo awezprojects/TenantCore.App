@@ -17,9 +17,16 @@ public class AcceptAmountHandoverHandlerTests
     private readonly Mock<IOpdParticularRepository> _particularRepository = new();
     private readonly Mock<IExpenseRecordRepository> _expenseRepository = new();
 
+    public AcceptAmountHandoverHandlerTests()
+    {
+        _particularRepository.Setup(r => r.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _particularRepository.Setup(r => r.GetCollectedBySessionIdAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+    }
+
     private AcceptAmountHandoverHandler CreateHandler() =>
-        new(_repository.Object, _sessionRepository.Object, _paymentRepository.Object,
-            _particularRepository.Object, _expenseRepository.Object);
+        new(_repository.Object, _sessionRepository.Object, _paymentRepository.Object, _particularRepository.Object, _expenseRepository.Object);
 
     [Fact]
     public async Task Handle_WhenPending_AcceptsHandover()
@@ -115,5 +122,64 @@ public class AcceptAmountHandoverHandlerTests
         await action.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*counter session balance*");
         handover.Status.Should().Be(HandoverStatus.Pending);
+    }
+
+    [Fact]
+    public async Task Handle_WhenSessionIncludesIndividuallyCollectedItems_DoesNotDoubleCountTheirAmount()
+    {
+        // DEF-E2E-06 regression: CollectedAmount now folds in individually collected items
+        // (RecordItemCollection). The guard backs the item amount out of the payment's base and
+        // adds it back via items collected in this same session, landing on the same total.
+        var appId = Guid.NewGuid();
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        var payment = OpdPayment.Create(appId, Guid.NewGuid(), 200);
+        payment.UpdateParticularsTotal(500);
+        payment.AcceptVisitFee(Guid.NewGuid(), session.Id);
+        payment.RecordItemCollection(500, Guid.NewGuid(), session.Id);
+        var item = OpdParticular.Create(appId, payment.OpdRegistrationId, Guid.NewGuid(), "USG", 500);
+        item.Collect(Guid.NewGuid(), session.Id);
+
+        var handover = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Doctor", 700, null);
+
+        _repository.Setup(r => r.GetByIdAsync(handover.Id, It.IsAny<CancellationToken>())).ReturnsAsync(handover);
+        _sessionRepository.Setup(r => r.GetByIdAsync(session.Id, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _paymentRepository.Setup(r => r.GetBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([payment]);
+        _particularRepository.Setup(r => r.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+                It.Is<IEnumerable<Guid>>(ids => ids.Contains(payment.OpdRegistrationId)), appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, decimal> { [payment.OpdRegistrationId] = 500m });
+        _particularRepository.Setup(r => r.GetCollectedBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([item]);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(new AcceptAmountHandoverCommand(handover.Id, appId), CancellationToken.None);
+
+        result.Status.Should().Be(HandoverStatus.Accepted);
+    }
+
+    [Fact]
+    public async Task Handle_WhenSessionHasAnItemCollectedForAForeignPayment_CreditsItsAmount()
+    {
+        // DEF-E2E-08: an item billed under session A's payment but individually collected in THIS
+        // session isn't inside this session's payments.Sum(CollectedAmount) — the guard must credit
+        // it via items collected in this session, or a correct handover gets rejected as a mismatch.
+        var appId = Guid.NewGuid();
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        var foreignRegistrationId = Guid.NewGuid();
+        var item = OpdParticular.Create(appId, foreignRegistrationId, Guid.NewGuid(), "Nursing", 400);
+        item.Collect(Guid.NewGuid(), session.Id);
+        var handover = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Doctor", 400, null);
+
+        _repository.Setup(r => r.GetByIdAsync(handover.Id, It.IsAny<CancellationToken>())).ReturnsAsync(handover);
+        _sessionRepository.Setup(r => r.GetByIdAsync(session.Id, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _paymentRepository.Setup(r => r.GetBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        _particularRepository.Setup(r => r.GetCollectedBySessionIdAsync(session.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([item]);
+
+        var handler = CreateHandler();
+        var result = await handler.Handle(new AcceptAmountHandoverCommand(handover.Id, appId), CancellationToken.None);
+
+        result.Status.Should().Be(HandoverStatus.Accepted);
     }
 }
