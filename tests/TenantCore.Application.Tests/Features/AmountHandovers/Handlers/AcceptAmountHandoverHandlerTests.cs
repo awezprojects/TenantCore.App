@@ -109,7 +109,7 @@ public class AcceptAmountHandoverHandlerTests
         // the handover still reads 1400.
         var payment = OpdPayment.Create(appId, Guid.NewGuid(), 1400);
         payment.AcceptVisitFee(Guid.NewGuid(), session.Id);
-        payment.ApplyDiscount(350);
+        payment.ApplyDiscount(350, Guid.NewGuid());
         payment.ProcessRefund(Guid.NewGuid());
 
         var handover = AmountHandover.Create(appId, session.Id, Guid.NewGuid(), Guid.NewGuid(), "Doctor", 1400, null);

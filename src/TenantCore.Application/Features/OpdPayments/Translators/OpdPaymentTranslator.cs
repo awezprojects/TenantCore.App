@@ -15,6 +15,10 @@ public static class OpdPaymentTranslator
         TotalAmount = entity.TotalAmount,
         Discount = entity.Discount,
         FinalAmount = entity.FinalAmount,
+        DiscountedByUserId = entity.DiscountedByUserId,
+        DiscountedAt = entity.DiscountedAt.HasValue
+            ? DateTime.SpecifyKind(entity.DiscountedAt.Value, DateTimeKind.Utc)
+            : null,
         PaymentStatus = entity.PaymentStatus,
         AmountReceivedAt = entity.AmountReceivedAt,
         ReceivedByUserId = entity.ReceivedByUserId,

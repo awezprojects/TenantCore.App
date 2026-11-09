@@ -54,7 +54,7 @@ public class CollectOpdParticularHandlerTests
         var opdId = Guid.NewGuid();
         var particular = OpdParticular.Create(appId, opdId, Guid.NewGuid(), "USG", 500);
         var payment = OpdPayment.Create(appId, opdId, 200);
-        payment.ApplyDiscount(50);
+        payment.ApplyDiscount(50, Guid.NewGuid());
 
         _opdParticularRepo.Setup(r => r.GetByIdAsync(particular.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(particular);

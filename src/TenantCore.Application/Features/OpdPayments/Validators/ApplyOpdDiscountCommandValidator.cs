@@ -9,6 +9,7 @@ public sealed class ApplyOpdDiscountCommandValidator : AbstractValidator<ApplyOp
     {
         RuleFor(x => x.Request.OpdRegistrationId).NotEmpty();
         RuleFor(x => x.Request.Discount).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.DiscountedByUserId).NotEmpty();
         RuleFor(x => x.ApplicationId).NotEmpty();
     }
 }

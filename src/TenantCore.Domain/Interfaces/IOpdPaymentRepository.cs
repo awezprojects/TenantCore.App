@@ -9,4 +9,7 @@ public interface IOpdPaymentRepository : IClinicRepository<OpdPayment>
     Task<IEnumerable<OpdPayment>> GetByDateRangeAsync(DateTime from, DateTime to, Guid applicationId, CancellationToken ct = default);
     Task<IEnumerable<OpdPayment>> GetByOpdRegistrationIdsAsync(IEnumerable<Guid> opdRegistrationIds, Guid applicationId, CancellationToken ct = default);
     Task<IEnumerable<(Guid DoctorUserId, string DoctorName, decimal Total)>> GetDoctorWiseTotalsAsync(DateTime from, DateTime to, Guid applicationId, Guid? doctorUserId, CancellationToken ct = default);
+
+    Task<IEnumerable<(Guid OpdRegistrationId, string RegistrationNumber, string PatientName, string DoctorName, decimal DiscountAmount, Guid? DiscountedByUserId, DateTime? DiscountedAt)>> GetDiscountsAsync(
+        DateTime fromUtc, DateTime toUtc, Guid applicationId, CancellationToken ct = default);
 }

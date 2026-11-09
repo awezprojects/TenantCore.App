@@ -100,4 +100,37 @@ public class OpdPaymentRepository(ClinicDbContext dbContext) : ClinicRepository<
             .OrderByDescending(x => x.Total)
             .ToList();
     }
+
+    public async Task<IEnumerable<(Guid OpdRegistrationId, string RegistrationNumber, string PatientName, string DoctorName, decimal DiscountAmount, Guid? DiscountedByUserId, DateTime? DiscountedAt)>> GetDiscountsAsync(
+        DateTime fromUtc, DateTime toUtc, Guid applicationId, CancellationToken ct = default)
+    {
+        var rows = await (
+            from p in dbContext.Set<OpdPayment>().AsNoTracking()
+            join r in dbContext.Set<OpdRegistration>().AsNoTracking() on p.OpdRegistrationId equals r.Id
+            join pt in dbContext.Set<Patient>().AsNoTracking() on r.PatientId equals pt.Id
+            where p.ApplicationId == applicationId
+                && p.Discount > 0
+                && p.DiscountedAt != null
+                && p.DiscountedAt >= fromUtc && p.DiscountedAt < toUtc
+            select new
+            {
+                p.OpdRegistrationId,
+                r.RegistrationNumber,
+                pt.FirstName,
+                pt.LastName,
+                r.DoctorName,
+                p.Discount,
+                p.DiscountedByUserId,
+                p.DiscountedAt
+            }).ToListAsync(ct);
+
+        return rows.Select(x => (
+            x.OpdRegistrationId,
+            x.RegistrationNumber,
+            $"{x.FirstName} {x.LastName}",
+            x.DoctorName,
+            x.Discount,
+            x.DiscountedByUserId,
+            x.DiscountedAt));
+    }
 }

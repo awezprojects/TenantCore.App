@@ -19,7 +19,7 @@ public sealed class ApplyOpdDiscountHandler(IOpdPaymentRepository repository) : 
         if (request.Request.Discount > payment.TotalAmount)
             throw new InvalidOperationException("Discount cannot exceed the total amount.");
 
-        payment.ApplyDiscount(request.Request.Discount);
+        payment.ApplyDiscount(request.Request.Discount, request.DiscountedByUserId);
         repository.Update(payment);
         await repository.SaveChangesAsync(cancellationToken);
         return OpdPaymentTranslator.ToDto(payment);

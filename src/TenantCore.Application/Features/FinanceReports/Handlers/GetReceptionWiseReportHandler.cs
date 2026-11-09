@@ -2,6 +2,7 @@ using MediatR;
 using TenantCore.Application.Features.FinanceReports.Queries;
 using TenantCore.Domain.Interfaces;
 using TenantCore.Shared.Dtos;
+using TenantCore.Shared.Enums;
 
 namespace TenantCore.Application.Features.FinanceReports.Handlers;
 
@@ -17,43 +18,47 @@ public sealed class GetReceptionWiseReportHandler(
         var fromUtc = request.From.Date.AddMinutes(-offset);
         var toUtc   = request.To.Date.AddDays(1).AddMinutes(-offset);
 
-        var sessions = await counterSessionRepository.GetAllAsync(cancellationToken);
-        var filteredSessions = sessions
-            .Where(s => s.ApplicationId == request.ApplicationId
-                     && s.OpenedAt >= fromUtc
-                     && s.OpenedAt < toUtc)
-            .ToList();
+        var filteredSessions = (await counterSessionRepository.GetByOpenedDateRangeAsync(
+            fromUtc, toUtc, request.ApplicationId, cancellationToken)).ToList();
 
-        var payments = (await opdPaymentRepository.GetByDateRangeAsync(fromUtc, toUtc, request.ApplicationId, cancellationToken)).ToList();
         var expenses = await expenseRecordRepository.GetByDateRangeAsync(fromUtc, toUtc, request.ApplicationId, cancellationToken);
 
-        // DEF-E2E-12: a payment's CollectedAmount is a running total across every collection event
-        // for that registration, however many sessions apart — crediting it whole to its home
-        // session would also carry in items collected in a later session owned by this group's
-        // sessions. Back the item portion out ("base" = fee/full-bill only) and credit items by
-        // the session they were actually collected in instead.
-        var itemTotals = await opdParticularRepository.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
-            payments.Select(p => p.OpdRegistrationId), request.ApplicationId, cancellationToken);
-        var allSessionIds = filteredSessions.Select(s => s.Id).ToList();
-        var itemsBySessionId = (await opdParticularRepository.GetCollectedBySessionIdsAsync(allSessionIds, request.ApplicationId, cancellationToken))
-            .GroupBy(i => i.CounterSessionId!.Value)
-            .ToDictionary(g => g.Key, g => g.Sum(i => i.Amount));
+        // DEF-FB-02: this used to pre-filter payments by AmountReceivedAt and then match them to a
+        // session's id — a different predicate than the one that decides a session's own collected
+        // total (CloseCounterSessionHandler / GetCounterSessionsHandler, which scope purely by
+        // CounterSessionId, no date filter on the payment). Same session set, different totals —
+        // "Collection by Staff" didn't reconcile with "Counter Sessions" for the same range. Compute
+        // each session's collected total the exact same way those two already do: the stored
+        // TotalCollected for a closed session (fixed at close time), computed live only for a still-
+        // open one.
+        var collectedBySessionId = new Dictionary<Guid, decimal>();
+        foreach (var session in filteredSessions)
+        {
+            if (session.Status != CounterSessionStatus.Open)
+            {
+                collectedBySessionId[session.Id] = session.TotalCollected;
+                continue;
+            }
+
+            var sessionPayments = await opdPaymentRepository.GetBySessionIdAsync(session.Id, request.ApplicationId, cancellationToken);
+            var itemTotals = await opdParticularRepository.GetIndividuallyCollectedTotalsByRegistrationIdsAsync(
+                sessionPayments.Select(p => p.OpdRegistrationId), request.ApplicationId, cancellationToken);
+            var baseCollected = sessionPayments.Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId));
+            var itemsCollectedHere = (await opdParticularRepository.GetCollectedBySessionIdAsync(session.Id, request.ApplicationId, cancellationToken)).Sum(i => i.Amount);
+            collectedBySessionId[session.Id] = baseCollected + itemsCollectedHere;
+        }
 
         return filteredSessions
             .GroupBy(s => s.OpenedByUserId)
             .Select(g =>
             {
                 var sessionIds = g.Select(s => s.Id).ToHashSet();
-                var baseCollected = payments
-                    .Where(p => p.CounterSessionId.HasValue && sessionIds.Contains(p.CounterSessionId.Value))
-                    .Sum(p => p.CollectedAmount - itemTotals.GetValueOrDefault(p.OpdRegistrationId));
-                var itemsCollected = sessionIds.Sum(id => itemsBySessionId.GetValueOrDefault(id));
                 var expensed = expenses.Where(e => e.CounterSessionId.HasValue && sessionIds.Contains(e.CounterSessionId.Value)).Sum(e => e.Amount);
                 return new ReceptionWiseReportDto
                 {
                     UserId = g.Key,
                     TotalSessions = g.Count(),
-                    TotalCollected = baseCollected + itemsCollected,
+                    TotalCollected = sessionIds.Sum(id => collectedBySessionId.GetValueOrDefault(id)),
                     TotalExpenses = expensed
                 };
             });

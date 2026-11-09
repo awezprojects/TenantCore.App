@@ -24,4 +24,10 @@ public class CounterSessionRepository(ClinicDbContext dbContext) : ClinicReposit
         => await DbSet
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.ApplicationId == applicationId && s.SessionDate.Date == date.Date, ct);
+
+    public async Task<IReadOnlyList<CounterSession>> GetByOpenedDateRangeAsync(DateTime fromUtc, DateTime toUtc, Guid applicationId, CancellationToken ct = default)
+        => await DbSet
+            .AsNoTracking()
+            .Where(s => s.ApplicationId == applicationId && s.OpenedAt >= fromUtc && s.OpenedAt < toUtc)
+            .ToListAsync(ct);
 }

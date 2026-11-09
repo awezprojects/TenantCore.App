@@ -27,7 +27,7 @@ public class OpdPaymentTests
         var sessionId = Guid.NewGuid();
         var payment = OpdPayment.Create(applicationId, Guid.NewGuid(), 350);
         payment.UpdateParticularsTotal(350);
-        payment.ApplyDiscount(100);
+        payment.ApplyDiscount(100, Guid.NewGuid());
 
         payment.AcceptFull(Guid.NewGuid(), sessionId);
 
@@ -44,7 +44,7 @@ public class OpdPaymentTests
 
         // Two service items were added after the fee was collected, then a discount applied.
         payment.UpdateParticularsTotal(350);
-        payment.ApplyDiscount(100);
+        payment.ApplyDiscount(100, Guid.NewGuid());
 
         payment.CollectedAmount.Should().Be(350);
         payment.FinalAmount.Should().Be(600);
@@ -75,7 +75,7 @@ public class OpdPaymentTests
     public void UpdateParticularsTotal_WhenBillGrowsPastQueuedRefund_ClearsTheRefund()
     {
         var payment = CreateCollectedVisitFee(350, Guid.NewGuid(), out _);
-        payment.ApplyDiscount(100); // FinalAmount 250 < Collected 350 -> refund due
+        payment.ApplyDiscount(100, Guid.NewGuid()); // FinalAmount 250 < Collected 350 -> refund due
         payment.RefundStatus.Should().Be(RefundStatus.PendingRefund);
         payment.RefundDue.Should().Be(100);
 
@@ -91,7 +91,7 @@ public class OpdPaymentTests
     public void UpdateParticularsTotal_WhenBillStillBelowCollectedAmount_KeepsRefundDue()
     {
         var payment = CreateCollectedVisitFee(350, Guid.NewGuid(), out _);
-        payment.ApplyDiscount(100); // FinalAmount 250 -> RefundDue 100
+        payment.ApplyDiscount(100, Guid.NewGuid()); // FinalAmount 250 -> RefundDue 100
         payment.UpdateParticularsTotal(0);
 
         payment.RefundStatus.Should().Be(RefundStatus.PendingRefund);
@@ -141,11 +141,25 @@ public class OpdPaymentTests
         payment.UpdateParticularsTotal(500); // USG 500 added, final amount 700
         payment.RecordItemCollection(500, Guid.NewGuid(), sessionId); // item collected -> CollectedAmount 700
 
-        payment.ApplyDiscount(150); // FinalAmount 550 < CollectedAmount 700 -> refund due
+        payment.ApplyDiscount(150, Guid.NewGuid()); // FinalAmount 550 < CollectedAmount 700 -> refund due
 
         payment.CollectedAmount.Should().Be(700);
         payment.FinalAmount.Should().Be(550);
         payment.RefundStatus.Should().Be(RefundStatus.PendingRefund);
         payment.RefundDue.Should().Be(150);
+    }
+
+    [Fact]
+    public void ApplyDiscount_RecordsWhoGaveTheDiscountAndWhen()
+    {
+        // A doctor and a receptionist can both apply a discount — admin needs to know which one
+        // actually did it for any given visit, not just that a discount exists.
+        var payment = OpdPayment.Create(Guid.NewGuid(), Guid.NewGuid(), 500);
+        var discountedBy = Guid.NewGuid();
+
+        payment.ApplyDiscount(100, discountedBy);
+
+        payment.DiscountedByUserId.Should().Be(discountedBy);
+        payment.DiscountedAt.Should().NotBeNull();
     }
 }

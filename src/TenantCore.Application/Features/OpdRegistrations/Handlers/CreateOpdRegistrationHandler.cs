@@ -18,6 +18,7 @@ public sealed class CreateOpdRegistrationHandler(
     IOpdRegistrationRepository opdRepository,
     IPatientRepository patientRepository,
     IClinicFeeConfigRepository feeRepository,
+    IDoctorFeeConfigRepository doctorFeeConfigRepository,
     IClinicFeatureFlagsRepository featureFlagsRepository,
     IDoctorProfileRepository doctorProfileRepository,
     ICounterSessionRepository counterSessionRepository,
@@ -67,7 +68,19 @@ public sealed class CreateOpdRegistrationHandler(
             throw new InvalidOperationException(
                 $"{patient.FirstName} {patient.LastName} already has an OPD appointment with {doctorName} today.");
 
+        // Fee resolution order: an explicit per-visit fee from reception always wins (deliberate
+        // override); otherwise this doctor's own configured rate (DoctorFeeConfig) applies; only
+        // when neither exists does the clinic-wide default (ClinicFeeConfig.OpdFee) apply.
+        // DoctorFeeConfig used to be set here but never read anywhere — admins configuring a
+        // per-doctor rate had no effect on what was actually charged.
         var fee = request.Fee;
+        if (fee is null && doctorProfile is not null)
+        {
+            var doctorFeeConfig = await doctorFeeConfigRepository.GetByDoctorProfileIdAsync(
+                doctorProfile.Id, request.ApplicationId, cancellationToken);
+            if (doctorFeeConfig is { IsActive: true })
+                fee = doctorFeeConfig.VisitFee;
+        }
         if (fee is null)
         {
             var config = await feeRepository.GetByApplicationAsync(request.ApplicationId, cancellationToken);

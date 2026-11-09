@@ -24,7 +24,7 @@ public class ProcessOpdRefundHandlerTests
         var refundedBy = Guid.NewGuid();
         var payment = OpdPayment.Create(appId, opdId, 500);
         payment.AcceptVisitFee(Guid.NewGuid(), null);
-        payment.ApplyDiscount(200); // FinalAmount(300) < CollectedAmount(500) -> RefundDue 200
+        payment.ApplyDiscount(200, Guid.NewGuid()); // FinalAmount(300) < CollectedAmount(500) -> RefundDue 200
 
         _repository.Setup(r => r.GetByOpdRegistrationIdAsync(opdId, appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
@@ -86,7 +86,7 @@ public class ProcessOpdRefundHandlerTests
         var opdId = Guid.NewGuid();
         var payment = OpdPayment.Create(appId, opdId, 500);
         payment.AcceptVisitFee(Guid.NewGuid(), null);
-        payment.ApplyDiscount(200);
+        payment.ApplyDiscount(200, Guid.NewGuid());
 
         _repository.Setup(r => r.GetByOpdRegistrationIdAsync(opdId, appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);
