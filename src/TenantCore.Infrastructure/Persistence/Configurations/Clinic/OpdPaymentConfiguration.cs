@@ -33,6 +33,8 @@ internal sealed class OpdPaymentConfiguration : IEntityTypeConfiguration<OpdPaym
         builder.Property(o => o.TotalAmount).IsRequired().HasPrecision(18, 2);
         builder.Property(o => o.Discount).IsRequired().HasPrecision(18, 2);
         builder.Property(o => o.FinalAmount).IsRequired().HasPrecision(18, 2);
+        builder.Property(o => o.DiscountedByUserId);
+        builder.Property(o => o.DiscountedAt);
         builder.Property(o => o.CollectedAmount).IsRequired().HasPrecision(18, 2);
 
         builder.Property(o => o.PaymentStatus)

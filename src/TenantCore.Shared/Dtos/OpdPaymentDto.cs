@@ -12,6 +12,8 @@ public class OpdPaymentDto
     public decimal TotalAmount { get; init; }
     public decimal Discount { get; init; }
     public decimal FinalAmount { get; init; }
+    public Guid? DiscountedByUserId { get; init; }
+    public DateTime? DiscountedAt { get; init; }
     public PaymentStatus PaymentStatus { get; init; }
     public DateTime? AmountReceivedAt { get; init; }
     public Guid? ReceivedByUserId { get; init; }

@@ -7,4 +7,5 @@ public interface ICounterSessionRepository : IClinicRepository<CounterSession>
     Task<CounterSession?> GetActiveSessionAsync(Guid applicationId, CancellationToken ct = default);
     Task<IReadOnlyList<CounterSession>> GetAllActiveAsync(Guid applicationId, CancellationToken ct = default);
     Task<CounterSession?> GetByDateAsync(DateTime date, Guid applicationId, CancellationToken ct = default);
+    Task<IReadOnlyList<CounterSession>> GetByOpenedDateRangeAsync(DateTime fromUtc, DateTime toUtc, Guid applicationId, CancellationToken ct = default);
 }

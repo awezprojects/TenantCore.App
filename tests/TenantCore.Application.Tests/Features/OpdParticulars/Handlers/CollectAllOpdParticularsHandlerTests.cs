@@ -79,7 +79,7 @@ public class CollectAllOpdParticularsHandlerTests
         var appId = Guid.NewGuid();
         var opdId = Guid.NewGuid();
         var payment = OpdPayment.Create(appId, opdId, 200);
-        payment.ApplyDiscount(50);
+        payment.ApplyDiscount(50, Guid.NewGuid());
 
         _paymentRepo.Setup(r => r.GetByOpdRegistrationIdAsync(opdId, appId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(payment);

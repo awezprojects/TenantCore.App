@@ -43,7 +43,7 @@ public class UpdateOpdRegistrationHandlerTests
         var reg = CreateActiveRegistration(appId);
         var payment = OpdPayment.Create(appId, reg.Id, 500);
         payment.AcceptVisitFee(Guid.NewGuid(), null);
-        payment.ApplyDiscount(50);
+        payment.ApplyDiscount(50, Guid.NewGuid());
         payment.ProcessRefund(Guid.NewGuid()); // earlier partial refund already settled -> RefundStatus.Refunded
 
         _paymentRepository.Setup(r => r.GetByOpdRegistrationIdAsync(reg.Id, appId, It.IsAny<CancellationToken>()))

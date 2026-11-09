@@ -14,13 +14,22 @@ namespace TenantCore.Api.Controllers;
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
 public class CounterSessionsController(ISender sender) : ClinicControllerBase
 {
+    // Reception/admin only — this is the clinic-wide cash-session report (used by the Finance
+    // Dashboard); it is not needed by any doctor-facing page (doctors use GetActive/GetAllActive
+    // to check the live session before collecting a fee). DEF-FB-03: also forbidden while the
+    // caller has explicitly chosen to view as "Doctor" this session, even if their role would
+    // otherwise allow it — see ClinicControllerBase.IsDoctorPanelView().
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
     [ProducesResponseType(typeof(IEnumerable<CounterSessionSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
         CancellationToken ct = default)
-        => Ok(await sender.Send(new GetCounterSessionsQuery(GetApplicationId(), from, to), ct));
+    {
+        if (IsDoctorPanelView()) return Forbid();
+        return Ok(await sender.Send(new GetCounterSessionsQuery(GetApplicationId(), from, to), ct));
+    }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(CounterSessionDto), StatusCodes.Status200OK)]

@@ -12,6 +12,13 @@ public class OpdPayment : AuditableEntity
     public decimal TotalAmount { get; private set; }
     public decimal Discount { get; private set; }
     public decimal FinalAmount { get; private set; }
+
+    // Who decided this discount — a doctor and a receptionist can both apply one (see
+    // AuthPolicies.RequireClinicStaff on OpdPaymentsController's discount endpoint), so admin
+    // needs to see which role actually gave it, not just that "someone" did.
+    public Guid? DiscountedByUserId { get; private set; }
+    public DateTime? DiscountedAt { get; private set; }
+
     public PaymentStatus PaymentStatus { get; private set; }
     public DateTime? AmountReceivedAt { get; private set; }
     public Guid? ReceivedByUserId { get; private set; }
@@ -71,10 +78,12 @@ public class OpdPayment : AuditableEntity
         SetUpdatedAt();
     }
 
-    public void ApplyDiscount(decimal discount)
+    public void ApplyDiscount(decimal discount, Guid discountedByUserId)
     {
         Discount = discount;
         FinalAmount = TotalAmount - discount;
+        DiscountedByUserId = discountedByUserId;
+        DiscountedAt = DateTime.UtcNow;
 
         // If the fee was already collected, a lower FinalAmount means cash is now owed back to the patient.
         if (PaymentStatus == PaymentStatus.Received && FinalAmount < CollectedAmount)

@@ -18,6 +18,7 @@ public class CreateOpdRegistrationHandlerTests
     private readonly Mock<IOpdRegistrationRepository> _opdRepository = new();
     private readonly Mock<IPatientRepository> _patientRepository = new();
     private readonly Mock<IClinicFeeConfigRepository> _feeRepository = new();
+    private readonly Mock<IDoctorFeeConfigRepository> _doctorFeeConfigRepository = new();
     private readonly Mock<IClinicFeatureFlagsRepository> _featureFlagsRepository = new();
     private readonly Mock<IDoctorProfileRepository> _doctorProfileRepository = new();
     private readonly Mock<ICounterSessionRepository> _counterSessionRepository = new();
@@ -28,7 +29,7 @@ public class CreateOpdRegistrationHandlerTests
 
     private CreateOpdRegistrationHandler CreateHandler() => new(
         _opdRepository.Object, _patientRepository.Object, _feeRepository.Object,
-        _featureFlagsRepository.Object, _doctorProfileRepository.Object,
+        _doctorFeeConfigRepository.Object, _featureFlagsRepository.Object, _doctorProfileRepository.Object,
         _counterSessionRepository.Object, _paymentRepository.Object,
         _authApplicationService.Object, _sender.Object, _logger.Object);
 
@@ -251,5 +252,79 @@ public class CreateOpdRegistrationHandlerTests
 
         await action.Should().ThrowAsync<InvalidOperationException>();
         _opdRepository.Verify(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_NoExplicitFee_UsesActiveDoctorFeeConfig()
+    {
+        // The per-doctor rate (DoctorFeeConfig) must win over the clinic-wide default when
+        // reception doesn't type an explicit fee — this used to be dead configuration.
+        var appId = Guid.NewGuid();
+        var patient = CreatePatient(appId);
+        var doctorUserId = Guid.NewGuid();
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        SetupCommonMocks(appId, session, patient);
+        SetupDoctor(appId, doctorUserId);
+
+        var doctorProfile = DoctorProfile.Create(doctorUserId, "REG-1", Guid.NewGuid(), null);
+        _doctorProfileRepository.Setup(r => r.GetByUserIdAsync(doctorUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(doctorProfile);
+        _doctorFeeConfigRepository
+            .Setup(r => r.GetByDoctorProfileIdAsync(doctorProfile.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(DoctorFeeConfig.Create(appId, doctorProfile.Id, 750m));
+        _feeRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeeConfig.Create(appId, 300m));
+        _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeatureFlags.Create(appId, false));
+
+        OpdRegistration? added = null;
+        _opdRepository.Setup(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()))
+            .Callback<OpdRegistration, CancellationToken>((r, _) => added = r)
+            .Returns(Task.CompletedTask);
+        _opdRepository.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(added));
+
+        var handler = CreateHandler();
+        var command = new CreateOpdRegistrationCommand(
+            appId, patient.Id, doctorUserId, "Dr. Smith", null, null, null, null, null, null, null, null, null, Guid.NewGuid());
+        await handler.Handle(command, CancellationToken.None);
+
+        added!.Fee.Should().Be(750m);
+    }
+
+    [Fact]
+    public async Task Handle_NoExplicitFeeAndNoDoctorFeeConfig_FallsBackToClinicDefault()
+    {
+        var appId = Guid.NewGuid();
+        var patient = CreatePatient(appId);
+        var doctorUserId = Guid.NewGuid();
+        var session = CounterSession.Create(appId, Guid.NewGuid(), DateTime.Today);
+        SetupCommonMocks(appId, session, patient);
+        SetupDoctor(appId, doctorUserId);
+
+        var doctorProfile = DoctorProfile.Create(doctorUserId, "REG-2", Guid.NewGuid(), null);
+        _doctorProfileRepository.Setup(r => r.GetByUserIdAsync(doctorUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(doctorProfile);
+        _doctorFeeConfigRepository
+            .Setup(r => r.GetByDoctorProfileIdAsync(doctorProfile.Id, appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((DoctorFeeConfig?)null);
+        _feeRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeeConfig.Create(appId, 300m));
+        _featureFlagsRepository.Setup(r => r.GetByApplicationAsync(appId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ClinicFeatureFlags.Create(appId, false));
+
+        OpdRegistration? added = null;
+        _opdRepository.Setup(r => r.AddAsync(It.IsAny<OpdRegistration>(), It.IsAny<CancellationToken>()))
+            .Callback<OpdRegistration, CancellationToken>((r, _) => added = r)
+            .Returns(Task.CompletedTask);
+        _opdRepository.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(added));
+
+        var handler = CreateHandler();
+        var command = new CreateOpdRegistrationCommand(
+            appId, patient.Id, doctorUserId, "Dr. Smith", null, null, null, null, null, null, null, null, null, Guid.NewGuid());
+        await handler.Handle(command, CancellationToken.None);
+
+        added!.Fee.Should().Be(300m);
     }
 }

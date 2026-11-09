@@ -303,6 +303,10 @@
                                             {
                                                 <button class="opd-btn cancelled" @onclick="() => RequestCancel(reg)" disabled="@_updating">Cancel</button>
                                             }
+                                            @if (FeatureFlagsContext.IsBillingEnabled && reg.Status != OpdStatus.Cancelled)
+                                            {
+                                                <button class="opd-btn rx" @onclick="() => OpenDiscountDialog(reg)">Disc</button>
+                                            }
                                         }
                                         @if (FeatureFlagsContext.IsBillingEnabled && reg.Status == OpdStatus.Cancelled && NeedsRefund(reg))
                                         {
@@ -524,7 +528,13 @@
                         @if (_feeLocked)
                         {
                             <div style="font-size:11px;color:#64748B;margin-top:3px;">
-                                🔒 From the selected doctor's fee config. Clear the doctor to enter a custom fee.
+                                🔒 From the selected doctor's fee config.
+                                <button type="button" @onclick="OverrideLockedFee"
+                                        style="background:none;border:none;padding:0;margin-left:2px;
+                                               color:#D97706;font-size:11px;font-weight:700;cursor:pointer;
+                                               text-decoration:underline;">
+                                    Override
+                                </button>
                             </div>
                         }
                     </div>
@@ -1229,6 +1239,12 @@
             _feeLocked = true;
         }
     }
+
+    // DEF-FB-05: the lock defaults the fee to the doctor's configured rate (so reception doesn't
+    // have to remember/type it every time), but the API has always honored an explicit fee when
+    // one is sent — this just gives reception a deliberate way to reach that path from the UI
+    // too, instead of having to clear the doctor selection first.
+    private void OverrideLockedFee() => _feeLocked = false;
 
     private async Task CreateOpdAsync()
     {

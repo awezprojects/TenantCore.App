@@ -2600,6 +2600,12 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<DateTime?>("DiscountedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DiscountedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<decimal>("FinalAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");

@@ -83,7 +83,9 @@ public class FinanceReportApiClient(HttpClient httpClient, AuthStateService auth
         try
         {
             SetAuth();
-            return await Read<IEnumerable<ReceptionWiseReportDto>>(await httpClient.GetAsync($"api/finance-reports/reception-wise?from={from:O}&to={to:O}"));
+            var utcOffset = (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes;
+            return await Read<IEnumerable<ReceptionWiseReportDto>>(await httpClient.GetAsync(
+                $"api/finance-reports/reception-wise?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&utcOffset={utcOffset}"));
         }
         catch (Exception ex) { return new ApiResponse<IEnumerable<ReceptionWiseReportDto>> { Success = false, Message = ex.Message }; }
     }
@@ -111,5 +113,17 @@ public class FinanceReportApiClient(HttpClient httpClient, AuthStateService auth
             return await Read<DoctorWiseCollectionDto>(await httpClient.GetAsync(url));
         }
         catch (Exception ex) { return new ApiResponse<DoctorWiseCollectionDto> { Success = false, Message = ex.Message }; }
+    }
+
+    public async Task<ApiResponse<OpdDiscountReportDto>> GetDiscountsAsync(DateTime from, DateTime to)
+    {
+        try
+        {
+            SetAuth();
+            var utcOffset = (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.Now).TotalMinutes;
+            return await Read<OpdDiscountReportDto>(await httpClient.GetAsync(
+                $"api/finance-reports/discounts?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&utcOffset={utcOffset}"));
+        }
+        catch (Exception ex) { return new ApiResponse<OpdDiscountReportDto> { Success = false, Message = ex.Message }; }
     }
 }

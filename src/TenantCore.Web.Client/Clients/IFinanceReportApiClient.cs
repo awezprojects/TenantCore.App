@@ -13,4 +13,5 @@ public interface IFinanceReportApiClient
     Task<ApiResponse<IEnumerable<ReceptionWiseReportDto>>> GetReceptionWiseAsync(DateTime from, DateTime to);
     Task<ApiResponse<ExpenseSummaryReportDto>> GetExpenseSummaryAsync(DateTime from, DateTime to);
     Task<ApiResponse<DoctorWiseCollectionDto>> GetDoctorWiseAsync(DateTime from, DateTime to, Guid? doctorUserId = null);
+    Task<ApiResponse<OpdDiscountReportDto>> GetDiscountsAsync(DateTime from, DateTime to);
 }

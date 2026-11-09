@@ -18,6 +18,13 @@ public class ClinicAuthorizationHandler(ClinicContextService clinicContext) : De
                     "X-Application-Name", clinicContext.SelectedApplicationName);
         }
 
+        // DEF-FB-03: tells the API the user explicitly chose to view this clinic as "Doctor"
+        // this session (e.g. a user who is both Doctor and Clinic Admin, via "🩺 Doctor Panel"
+        // on the clinic picker) so endpoints that would otherwise honor their admin-level role
+        // can scope down to just their own data instead — see ClinicControllerBase.IsDoctorPanelView().
+        if (!request.Headers.Contains("X-View-Scope") && clinicContext.ActivePanel == "Doctor")
+            request.Headers.TryAddWithoutValidation("X-View-Scope", "Doctor");
+
         return base.SendAsync(request, cancellationToken);
     }
 }

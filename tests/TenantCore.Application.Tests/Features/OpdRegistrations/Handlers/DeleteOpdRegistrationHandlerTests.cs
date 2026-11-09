@@ -54,7 +54,7 @@ public class DeleteOpdRegistrationHandlerTests
         var registration = CreateCancelledRegistration(appId);
         var payment = OpdPayment.Create(appId, registration.Id, 500);
         payment.AcceptVisitFee(Guid.NewGuid(), null);
-        payment.ApplyDiscount(500); // fully discounted after collection -> refund due
+        payment.ApplyDiscount(500, Guid.NewGuid()); // fully discounted after collection -> refund due
         payment.ProcessRefund(Guid.NewGuid());
 
         _opdRepository.Setup(r => r.GetByIdAsync(registration.Id, It.IsAny<CancellationToken>()))

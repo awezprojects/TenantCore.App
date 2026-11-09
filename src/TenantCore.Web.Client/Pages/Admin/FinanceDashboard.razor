@@ -18,7 +18,7 @@
 
     <div class="opd-header">
         <div>
-            <div class="opd-title">Finance Dashboard</div>
+            <div class="opd-title">@(_isDoctorView ? "My Finance" : "Finance Dashboard")</div>
             <div class="opd-subtitle">Finance &middot; @DateTime.Now.ToString("dddd, dd MMMM yyyy")</div>
         </div>
     </div>
@@ -46,6 +46,32 @@
         <div style="display:flex;justify-content:center;padding:32px 0;">
         <div class="auth-spinner" style="width:32px;height:32px;border-width:3px;"></div>
     </div>
+    }
+    else if (_isDoctorView)
+    {
+        <!-- Doctor view: own collection only — no clinic-wide income, expenses, counter
+             sessions or handovers. Those remain clinic-management data, not "my" data. -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+            <div class="opd-stat-card" style="border-top:4px solid #7C3AED;flex:1;min-width:160px;">
+                <div style="font-size:11px;font-weight:700;color:#5B21B6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">My OPD Collection</div>
+                <div style="font-size:24px;font-weight:700;color:#5B21B6;">Rs. @_myCollection.ToString("N0")</div>
+                <div style="font-size:11px;color:#6B7280;margin-top:2px;">Visit fees + other items, this doctor only</div>
+            </div>
+        </div>
+
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;">🩺 My OPD Collection</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">Day-range total for the selected period — visit fees and other items (injections, procedures, etc.)</div>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#7C3AED;">Rs. @_myCollection.ToString("N0")</div>
+            </div>
+            @if (_myCollection <= 0)
+            {
+                <div class="opd-empty">No collection recorded for the selected period.</div>
+            }
+        </div>
     }
     else
     {
@@ -167,6 +193,85 @@
             else
             {
                 <div class="opd-empty">No OPD collection data for the selected period.</div>
+            }
+        </div>
+
+        <!-- Section 1c: Collection by Staff (reception-wise) -->
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;">🧾 Collection by Staff</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">Counter sessions, cash collected and expensed per staff member who opened them</div>
+                </div>
+            </div>
+            @if (_receptionData.Any())
+            {
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Staff</th>
+                            <th style="text-align:right;">Sessions</th>
+                            <th style="text-align:right;">Collected (Rs.)</th>
+                            <th style="text-align:right;">Expensed (Rs.)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in _receptionData.OrderByDescending(r => r.TotalCollected))
+                        {
+                            <tr>
+                                <td><strong>@StaffName(r.UserId)</strong></td>
+                                <td style="text-align:right;">@r.TotalSessions</td>
+                                <td style="text-align:right;font-weight:600;color:#16A34A;">@r.TotalCollected.ToString("N2")</td>
+                                <td style="text-align:right;font-weight:600;color:#DC2626;">@r.TotalExpenses.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="opd-empty">No counter sessions for the selected period.</div>
+            }
+        </div>
+
+        <!-- Section 1d: Discounts (who gave the discount — doctor or reception) -->
+        <div class="opd-table-card" style="margin-bottom:20px;">
+            <div style="padding:14px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#1E293B;">🏷️ Discounts</div>
+                    <div style="font-size:11px;color:#64748B;margin-top:2px;">Every discount given in this period, and who gave it (doctor or reception)</div>
+                </div>
+                <div style="font-size:18px;font-weight:700;color:#DC2626;">Rs. @(_discountData?.GrandTotal.ToString("N0") ?? "0")</div>
+            </div>
+            @if (_discountData?.Discounts?.Any() == true)
+            {
+                <table class="opd-table">
+                    <thead>
+                        <tr>
+                            <th>Patient</th>
+                            <th>Doctor</th>
+                            <th style="text-align:right;">Discount (Rs.)</th>
+                            <th>Discounted By</th>
+                            <th>Date &amp; Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in _discountData.Discounts)
+                        {
+                            <tr>
+                                <td><strong>@d.PatientName</strong></td>
+                                <td style="font-size:12px;color:#64748B;">@d.DoctorName</td>
+                                <td style="text-align:right;font-weight:600;color:#DC2626;">@d.DiscountAmount.ToString("N2")</td>
+                                <td style="font-size:12px;color:#64748B;">@StaffNameWithRole(d.DiscountedByUserId)</td>
+                                <td style="font-size:12px;color:#64748B;">@(d.DiscountedAt.HasValue ? DateTimeHelper.ToLocalString(d.DiscountedAt.Value, "dd MMM yyyy HH:mm") : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="opd-empty">No discounts given in the selected period.</div>
             }
         </div>
 
@@ -372,17 +477,40 @@
     private DateRangeCollectionReportDto? _range;
     private ExpenseSummaryReportDto? _expSummary;
     private DoctorWiseCollectionDto? _doctorData;
+    private OpdDiscountReportDto? _discountData;
+    private List<ReceptionWiseReportDto> _receptionData = [];
     private List<CounterSessionSummaryDto> _sessions = [];
     private List<AmountHandoverSummaryDto> _handovers = [];
 
-    private bool _isAdmin  => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
-        .Any(r => string.Equals(r, AppRoles.ClinicAdmin, StringComparison.OrdinalIgnoreCase));
-    private bool _isDoctor => AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId)
-        .Any(r => string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase));
+    // DEF-MR-13 (follow-up): an explicit panel choice ("Enter as Doctor" / "Enter as Admin" on
+    // ClinicLanding) always wins — a Doctor + Clinic Admin user who chose "Doctor" must see only
+    // their own collection even though they also hold the admin role (the previous behavior kept
+    // showing them every doctor's data because it checked raw role membership instead). When no
+    // explicit admin/doctor panel choice was made for this session (ClinicLanding only sets
+    // ActivePanel="Doctor" for a clinic the user owns — an ordinary employed doctor who isn't
+    // also that clinic's admin lands on ActivePanel="Other"), fall back to role membership: a
+    // Doctor who holds no finance-manager role is still a doctor-only view.
+    private bool _isDoctorView
+    {
+        get
+        {
+            if (ClinicContext.ActivePanel == "Admin") return false;
+            if (ClinicContext.ActivePanel == "Doctor") return true;
+
+            var roles = AuthState.GetRolesForApplication(ClinicContext.SelectedApplicationId);
+            var isDoctor = roles.Any(r => string.Equals(r, AppRoles.Doctor, StringComparison.OrdinalIgnoreCase));
+            var isFinanceManager = roles.Any(r =>
+                string.Equals(r, AppRoles.ClinicAdmin, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(r, AppRoles.ClinicManager, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(r, AppRoles.SystemAdmin, StringComparison.OrdinalIgnoreCase));
+            return isDoctor && !isFinanceManager;
+        }
+    }
 
     private decimal _totalIncome   => _range?.GrandTotal ?? 0;
     private decimal _totalExpenses => _expSummary?.GrandTotal ?? 0;
     private decimal _netBalance    => _totalIncome - _totalExpenses;
+    private decimal _myCollection  => _doctorData?.GrandTotal ?? 0;
     private decimal _pendingHandovers  => _handovers.Where(h => h.Status == HandoverStatus.Pending).Sum(h => h.Amount);
     private decimal _handoverAccepted  => _handovers.Where(h => h.Status == HandoverStatus.Accepted).Sum(h => h.Amount);
     private decimal _handoverDisputed  => _handovers.Where(h => h.Status == HandoverStatus.Disputed).Sum(h => h.Amount);
@@ -399,10 +527,23 @@
         ? "—"
         : _clinicStaff.FirstOrDefault(u => u.UserId == userId)?.FullName ?? "Unknown";
 
+    // "Dr. Mehta (Doctor)" / "Priya (Receptionist)" — so admin sees who gave a discount without
+    // having to cross-reference a separate staff/role list.
+    private string StaffNameWithRole(Guid? userId)
+    {
+        if (userId is null) return "—";
+        var staff = _clinicStaff.FirstOrDefault(u => u.UserId == userId);
+        if (staff is null) return "Unknown";
+        return string.IsNullOrWhiteSpace(staff.RoleName) ? staff.FullName : $"{staff.FullName} ({staff.RoleName})";
+    }
+
     protected override async Task OnInitializedAsync()
     {
-        var staff = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, roles: null);
-        _clinicStaff = staff.Success && staff.Data is not null ? staff.Data : [];
+        if (!_isDoctorView)
+        {
+            var staff = await AppClient.GetClinicStaffDirectoryAsync(ClinicContext.SelectedApplicationId, roles: null);
+            _clinicStaff = staff.Success && staff.Data is not null ? staff.Data : [];
+        }
         await LoadAsync();
     }
 
@@ -433,24 +574,34 @@
         var from = _fromDate.Value;
         var to   = _toDate.Value;
 
-        // Doctor-only: auto-filter to current user; admin: see all doctors
-        Guid? doctorFilter = _isDoctor && !_isAdmin
-            ? AuthState.CurrentUser?.UserId
-            : null;
+        if (_isDoctorView)
+        {
+            // Doctor view only ever asks for this doctor's own collection — the server also
+            // enforces this independently (FinanceReportsController.GetDoctorWise), so this is
+            // a rendering choice on top of an API that already refuses to honor a different id.
+            var doctorResult = await ReportClient.GetDoctorWiseAsync(from, to, AuthState.CurrentUser?.UserId);
+            _doctorData = doctorResult.Success ? doctorResult.Data : null;
+            _loading = false;
+            return;
+        }
 
-        var rangeTask     = ReportClient.GetDateRangeAsync(from, to);
-        var expTask       = ReportClient.GetExpenseSummaryAsync(from, to);
-        var sessionsTask  = SessionClient.GetAllAsync(from, to);
-        var handoversTask = HandoverClient.GetAllAsync(from, to);
-        var doctorTask    = ReportClient.GetDoctorWiseAsync(from, to, doctorFilter);
+        var rangeTask      = ReportClient.GetDateRangeAsync(from, to);
+        var expTask        = ReportClient.GetExpenseSummaryAsync(from, to);
+        var sessionsTask   = SessionClient.GetAllAsync(from, to);
+        var handoversTask  = HandoverClient.GetAllAsync(from, to);
+        var doctorTask     = ReportClient.GetDoctorWiseAsync(from, to, null);
+        var receptionTask  = ReportClient.GetReceptionWiseAsync(from, to);
+        var discountTask   = ReportClient.GetDiscountsAsync(from, to);
 
-        await Task.WhenAll(rangeTask, expTask, sessionsTask, handoversTask, doctorTask);
+        await Task.WhenAll(rangeTask, expTask, sessionsTask, handoversTask, doctorTask, receptionTask, discountTask);
 
-        _range      = rangeTask.Result.Success    ? rangeTask.Result.Data    : null;
-        _expSummary = expTask.Result.Success       ? expTask.Result.Data     : null;
-        _doctorData = doctorTask.Result.Success    ? doctorTask.Result.Data  : null;
-        _sessions   = sessionsTask.Result.Success  && sessionsTask.Result.Data  is not null ? sessionsTask.Result.Data.ToList()  : [];
-        _handovers  = handoversTask.Result.Success && handoversTask.Result.Data is not null ? handoversTask.Result.Data.ToList() : [];
+        _range        = rangeTask.Result.Success       ? rangeTask.Result.Data       : null;
+        _expSummary   = expTask.Result.Success          ? expTask.Result.Data        : null;
+        _doctorData   = doctorTask.Result.Success       ? doctorTask.Result.Data     : null;
+        _discountData = discountTask.Result.Success     ? discountTask.Result.Data   : null;
+        _sessions     = sessionsTask.Result.Success     && sessionsTask.Result.Data     is not null ? sessionsTask.Result.Data.ToList()     : [];
+        _handovers    = handoversTask.Result.Success    && handoversTask.Result.Data    is not null ? handoversTask.Result.Data.ToList()    : [];
+        _receptionData = receptionTask.Result.Success   && receptionTask.Result.Data    is not null ? receptionTask.Result.Data.ToList()    : [];
 
         _loading = false;
     }

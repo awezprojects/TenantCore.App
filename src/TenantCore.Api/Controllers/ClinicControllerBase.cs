@@ -18,6 +18,17 @@ public abstract class ClinicControllerBase : ControllerBase
         return Guid.Empty;
     }
 
+    // DEF-FB-03: a user who holds both Doctor and Clinic Admin (or Manager/SystemAdmin) on the
+    // same clinic has always had real admin rights server-side — that part is correct, not a
+    // bug. The gap was that choosing "Doctor Panel" in the UI (ClinicContextService.ActivePanel)
+    // was a purely client-side display preference with no effect on what the API would hand back
+    // if called directly during that same session. The client now declares that choice via the
+    // X-View-Scope header (ClinicAuthorizationHandler), the same way it already declares the
+    // selected clinic via X-Application-Id — this lets an endpoint honor "I'm viewing as Doctor
+    // right now" and scope down accordingly, without needing a new Auth-issued token claim.
+    protected bool IsDoctorPanelView() =>
+        string.Equals(Request.Headers["X-View-Scope"].ToString(), "Doctor", StringComparison.OrdinalIgnoreCase);
+
     protected Guid GetCurrentUserId()
     {
         var claim = User.FindFirst("nameid")

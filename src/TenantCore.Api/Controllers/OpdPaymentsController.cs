@@ -15,12 +15,14 @@ namespace TenantCore.Api.Controllers;
 public class OpdPaymentsController(ISender sender) : ClinicControllerBase
 {
     [HttpGet("by-opd/{opdRegistrationId:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireClinicStaff)]
     [ProducesResponseType(typeof(OpdPaymentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByOpd(Guid opdRegistrationId, CancellationToken ct)
         => Ok(await sender.Send(new GetOpdPaymentByOpdIdQuery(opdRegistrationId, GetApplicationId()), ct));
 
     [HttpGet("by-session/{sessionId:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireClinicStaff)]
     [ProducesResponseType(typeof(IEnumerable<SessionCollectionDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetBySession(Guid sessionId, CancellationToken ct)
         => Ok(await sender.Send(new GetOpdCollectionsBySessionQuery(sessionId, GetApplicationId()), ct));
@@ -46,7 +48,7 @@ public class OpdPaymentsController(ISender sender) : ClinicControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ApplyDiscount(Guid id, [FromBody] ApplyOpdDiscountRequest request, CancellationToken ct)
-        => Ok(await sender.Send(new ApplyOpdDiscountCommand(request, GetApplicationId()), ct));
+        => Ok(await sender.Send(new ApplyOpdDiscountCommand(request, GetCurrentUserId(), GetApplicationId()), ct));
 
     [HttpPost("{id:guid}/accept-full")]
     [Authorize(Policy = AuthPolicies.RequireReception)]
