@@ -18,11 +18,18 @@ public sealed class UpdateClinicFeatureFlagsHandler(IClinicFeatureFlagsRepositor
         if (flags is null)
         {
             flags = ClinicFeatureFlags.Create(request.ApplicationId, request.PrepaidOpdEnabled, request.BillingEnabled);
+            flags.Update(request.PrepaidOpdEnabled, request.BillingEnabled, request.IpdRoomBillingCycle, request.IpdMidStayChargeMode);
+            flags.UpdateShiftChargingSettings(
+                request.IpdShiftGraceWindowMinutes, request.IpdShiftGraceRule, request.IpdManualShiftChargeMode, request.IpdFullDayShiftRateRule);
+            flags.UpdateCancelWindow(request.IpdCancelWindowMinutes);
             await repository.AddAsync(flags, cancellationToken);
         }
         else
         {
-            flags.Update(request.PrepaidOpdEnabled, request.BillingEnabled);
+            flags.Update(request.PrepaidOpdEnabled, request.BillingEnabled, request.IpdRoomBillingCycle, request.IpdMidStayChargeMode);
+            flags.UpdateShiftChargingSettings(
+                request.IpdShiftGraceWindowMinutes, request.IpdShiftGraceRule, request.IpdManualShiftChargeMode, request.IpdFullDayShiftRateRule);
+            flags.UpdateCancelWindow(request.IpdCancelWindowMinutes);
             repository.Update(flags);
         }
 

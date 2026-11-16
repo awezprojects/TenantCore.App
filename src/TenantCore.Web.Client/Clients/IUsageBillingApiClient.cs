@@ -19,6 +19,18 @@ public interface IUsageBillingApiClient
 
     Task<ApiResponse<WalletTopUpPaymentDto>> CreateTopUpAsync(decimal amount);
 
+    /// <summary>
+    /// The clinic's currently open top-up, or null when none is open. The link itself is created by
+    /// an async background task, so the caller polls this after Create until the URL appears.
+    /// </summary>
+    Task<ApiResponse<WalletTopUpPaymentDto?>> GetActiveTopUpAsync();
+
+    /// <summary>
+    /// One specific top-up's current status, including Paid — unlike <see cref="GetActiveTopUpAsync"/>,
+    /// which stops returning a payment the moment it is no longer open.
+    /// </summary>
+    Task<ApiResponse<WalletTopUpPaymentDto>> GetTopUpStatusAsync(Guid paymentId);
+
     /// <summary>"I've paid — check now". Throttled server-side to once per 30 seconds per payment.</summary>
     Task<ApiResponse> CheckTopUpAsync(Guid paymentId);
 

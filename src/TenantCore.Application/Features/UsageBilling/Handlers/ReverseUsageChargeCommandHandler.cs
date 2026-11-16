@@ -45,7 +45,8 @@ public sealed class ReverseUsageChargeCommandHandler(
             return new UsageChargeDto(false, record.Amount, null, false);
 
         var utcNow = command.OccurredAt ?? DateTime.UtcNow;
-        wallet.Credit(record.Amount, utcNow);
+        // DEF-IPD-23: this is undoing an earlier debit, not a top-up — must not touch LastTopUpAt.
+        wallet.Credit(record.Amount, utcNow, isTopUp: false);
 
         var ledgerRow = ClinicWalletTransaction.CreateUsageRefundCredit(
             command.ApplicationId, record.Amount, wallet.Balance, record.Id,

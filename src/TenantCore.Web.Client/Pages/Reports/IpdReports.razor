@@ -1,0 +1,164 @@
+@page "/reports/ipd"
+@layout AuthorizedLayout
+@inject IClinicApiClient ClinicClient
+@inject IToastService Toast
+
+<PageTitle>IPD Reports - CloudClinic</PageTitle>
+
+@* Cross-Repo Rule 7: Revenue/Discharge Summary are fetched once per "Generate" click and cached
+   here — switching tabs or re-reading the cached data never re-queries the backend. *@
+
+<div class="opd-page">
+    <div class="opd-header">
+        <div>
+            <div class="opd-title">IPD Reports</div>
+            <div class="opd-subtitle">Census, revenue and discharge summary</div>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="opd-tab @(_tab == "census" ? "active" : "")" @onclick='() => _tab = "census"'>Census</button>
+        <button class="opd-tab @(_tab == "revenue" ? "active" : "")" @onclick='() => _tab = "revenue"'>Revenue</button>
+        <button class="opd-tab @(_tab == "discharge" ? "active" : "")" @onclick='() => _tab = "discharge"'>Discharge Summary</button>
+    </div>
+
+    @if (_tab is "revenue" or "discharge")
+    {
+        <div class="opd-filter-bar" style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+            <input type="date" class="opd-search-input" @bind="_from" />
+            <span>to</span>
+            <input type="date" class="opd-search-input" @bind="_to" />
+            <button class="opd-btn-primary" disabled="@_loading" @onclick="GenerateAsync">Generate</button>
+        </div>
+    }
+
+    @if (_tab == "census")
+    {
+        @if (_censusLoading)
+        {
+            <div style="padding:30px 0;text-align:center;color:#64748B;">Loading census…</div>
+        }
+        else if (_census is not null)
+        {
+            <div class="opd-stats">
+                <div class="opd-stat-card"><div class="opd-stat-label">Total Beds</div><div class="opd-stat-value">@_census.TotalBeds</div></div>
+                <div class="opd-stat-card done"><div class="opd-stat-label">Occupied</div><div class="opd-stat-value">@_census.OccupiedBeds</div></div>
+                <div class="opd-stat-card waiting"><div class="opd-stat-label">Available</div><div class="opd-stat-value">@_census.AvailableBeds</div></div>
+            </div>
+            <div class="opd-table-card">
+                <table class="opd-table">
+                    <thead><tr><th>Ward</th><th>Total</th><th>Occupied</th><th>Available</th></tr></thead>
+                    <tbody>
+                        @if (_census.Wards.Count == 0)
+                        {
+                            <tr><td colspan="4" class="opd-empty">No wards configured.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var w in _census.Wards)
+                            {
+                                <tr><td>@w.WardName</td><td>@w.TotalBeds</td><td>@w.OccupiedBeds</td><td>@w.AvailableBeds</td></tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+    else if (_tab == "revenue")
+    {
+        @if (_revenue is not null)
+        {
+            <div class="opd-stats">
+                <div class="opd-stat-card"><div class="opd-stat-label">Deposits</div><div class="opd-stat-value">₹@_revenue.TotalDeposits.ToString("N0")</div></div>
+                <div class="opd-stat-card done"><div class="opd-stat-label">Balance Collected</div><div class="opd-stat-value">₹@_revenue.TotalBalanceCollected.ToString("N0")</div></div>
+                <div class="opd-stat-card waiting"><div class="opd-stat-label">Refunded</div><div class="opd-stat-value">₹@_revenue.TotalRefunded.ToString("N0")</div></div>
+                <div class="opd-stat-card"><div class="opd-stat-label">Net Revenue</div><div class="opd-stat-value">₹@_revenue.NetRevenue.ToString("N0")</div></div>
+            </div>
+        }
+        else
+        {
+            <div style="padding:30px 0;text-align:center;color:#64748B;">Pick a date range and click Generate.</div>
+        }
+    }
+    else if (_tab == "discharge")
+    {
+        @if (_dischargeSummary is not null)
+        {
+            <div class="opd-table-card">
+                <table class="opd-table">
+                    <thead><tr><th>Admission</th><th>Patient</th><th>Admitted</th><th>Discharged</th><th>Final Amount</th><th>Balance</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @if (_dischargeSummary.Discharges.Count == 0)
+                        {
+                            <tr><td colspan="7" class="opd-empty">No discharges in this range.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in _dischargeSummary.Discharges)
+                            {
+                                <tr>
+                                    <td>@row.AdmissionNumber</td>
+                                    <td>@row.PatientName</td>
+                                    <td>@row.AdmissionDate.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                    <td>@row.DischargeDate.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                    <td>@(row.HasBill ? "₹" + row.FinalAmount!.Value.ToString("N2") : "—")</td>
+                                    <td>@(row.HasBill ? "₹" + row.BalanceDue!.Value.ToString("N2") : "—")</td>
+                                    <td>@(!row.HasBill ? "No bill" : row.Settled ? "Settled" : "Outstanding")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div style="padding:30px 0;text-align:center;color:#64748B;">Pick a date range and click Generate.</div>
+        }
+    }
+</div>
+
+@code {
+    private string _tab = "census";
+    private bool _loading, _censusLoading = true;
+    private DateTime _from = DateTime.Today.AddDays(-29);
+    private DateTime _to = DateTime.Today;
+
+    private IpdCensusReportDto? _census;
+    private IpdRevenueReportDto? _revenue;
+    private IpdDischargeSummaryReportDto? _dischargeSummary;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var r = await ClinicClient.GetIpdCensusReportAsync();
+        if (r.Success) _census = r.Data;
+        else Toast.ShowError(r.Message ?? "Failed to load census.");
+        _censusLoading = false;
+    }
+
+    // Single fetch for the selected range — both Revenue and Discharge Summary reuse it; the
+    // user clicks Generate once, not once per tab (Cross-Repo Rule 7).
+    private async Task GenerateAsync()
+    {
+        if (_to < _from) { Toast.ShowWarning("The end date must be on or after the start date."); return; }
+        _loading = true;
+
+        var fromUtc = _from.ToUniversalTime();
+        var toUtc = _to.AddDays(1).ToUniversalTime();
+
+        var revenueTask = ClinicClient.GetIpdRevenueReportAsync(fromUtc, toUtc);
+        var dischargeTask = ClinicClient.GetIpdDischargeSummaryReportAsync(fromUtc, toUtc);
+        await Task.WhenAll(revenueTask, dischargeTask);
+
+        var revenueResponse = await revenueTask;
+        if (revenueResponse.Success) _revenue = revenueResponse.Data;
+        else Toast.ShowError(revenueResponse.Message ?? "Failed to load revenue.");
+
+        var dischargeResponse = await dischargeTask;
+        if (dischargeResponse.Success) _dischargeSummary = dischargeResponse.Data;
+        else Toast.ShowError(dischargeResponse.Message ?? "Failed to load discharge summary.");
+
+        _loading = false;
+    }
+}

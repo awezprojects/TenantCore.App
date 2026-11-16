@@ -1076,6 +1076,8 @@ html, body {
 .btn-secondary:hover:not(:disabled) { background: #DBEAFE; }
 .btn-outline   { background: #fff; color: #64748B; border-color: #E2E8F0; }
 .btn-outline:hover:not(:disabled)  { background: #F8FAFC; color: #334155; border-color: #CBD5E1; }
+.btn-outline-primary { background: #fff; color: #1565C0; border-color: #1565C0; }
+.btn-outline-primary:hover:not(:disabled) { background: #EFF6FF; }
 .btn-danger    { background: #EF4444; color: #fff; border-color: #EF4444; }
 .btn-danger:hover:not(:disabled)   { background: #DC2626; }
 .btn-success   { background: #059669; color: #fff; border-color: #059669; }

@@ -8,8 +8,6 @@ public sealed record CreateIpdRegistrationCommand(
     Guid PatientId,
     Guid DoctorUserId,
     string DoctorName,
-    string? WardName,
-    string? RoomNumber,
-    string? BedNumber,
+    Guid? BedId,
     decimal InitialFee,
     string? AdmissionNotes) : IRequest<IpdRegistrationDto>;

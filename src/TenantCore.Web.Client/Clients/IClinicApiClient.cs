@@ -24,6 +24,27 @@ public interface IClinicApiClient
     Task<ApiResponse<IpdRegistrationDto>> CreateIpdRegistrationAsync(CreateIpdRegistrationDto dto);
     Task<ApiResponse<IpdRegistrationDto>> UpdateIpdRegistrationAsync(Guid id, UpdateIpdRegistrationDto dto);
     Task<ApiResponse<IpdRegistrationDto>> DischargePatientAsync(Guid id, DischargePatientDto dto);
+    Task<ApiResponse<IpdRegistrationDto>> TransferBedAsync(Guid id, TransferBedRequest request);
+    Task<ApiResponse<TransferBedPreviewDto>> PreviewTransferBedAsync(Guid id, Guid newBedId);
+    Task<ApiResponse<IpdRegistrationDto>> CancelIpdRegistrationAsync(Guid id, CancelIpdRegistrationRequest request);
+    Task<ApiResponse<IEnumerable<IpdBedTransferHistoryDto>>> GetIpdBedHistoryAsync(Guid id);
+
+    Task<ApiResponse<IEnumerable<IpdDepositDto>>> GetIpdDepositsAsync(Guid ipdRegistrationId);
+    Task<ApiResponse<IpdDepositDto>> CollectIpdDepositAsync(Guid ipdRegistrationId, CollectIpdDepositRequest request);
+
+    Task<ApiResponse<IEnumerable<IpdParticularDto>>> GetIpdParticularsAsync(Guid ipdRegistrationId);
+    Task<ApiResponse<IpdParticularDto>> AddIpdParticularAsync(Guid ipdRegistrationId, AddIpdParticularRequest request);
+    Task<ApiResponse<bool>> RemoveIpdParticularAsync(Guid id);
+
+    Task<ApiResponse<IpdProvisionalBillDto>> ApplyIpdDiscountAsync(Guid ipdRegistrationId, ApplyIpdDiscountRequest request);
+    Task<ApiResponse<IpdProvisionalBillDto>> GetIpdProvisionalBillAsync(Guid ipdRegistrationId);
+    Task<ApiResponse<IpdFinalBillDto>> GetIpdFinalBillAsync(Guid ipdRegistrationId);
+    Task<ApiResponse<IpdFinalBillDto>> CollectIpdBalanceAsync(Guid ipdRegistrationId);
+    Task<ApiResponse<IpdFinalBillDto>> ProcessIpdRefundAsync(Guid ipdRegistrationId);
+
+    Task<ApiResponse<IpdCensusReportDto>> GetIpdCensusReportAsync();
+    Task<ApiResponse<IpdRevenueReportDto>> GetIpdRevenueReportAsync(DateTime fromUtc, DateTime toUtc);
+    Task<ApiResponse<IpdDischargeSummaryReportDto>> GetIpdDischargeSummaryReportAsync(DateTime fromUtc, DateTime toUtc);
 
     Task<ApiResponse<ClinicFeeConfigDto>> GetFeesAsync();
     Task<ApiResponse<ClinicFeeConfigDto>> UpdateFeesAsync(UpdateClinicFeeConfigDto dto);

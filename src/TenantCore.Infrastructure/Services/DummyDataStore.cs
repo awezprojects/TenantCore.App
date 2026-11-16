@@ -76,12 +76,15 @@ public sealed class DummyDataStore(ClinicDbContext db) : IDummyDataStore
     /// </summary>
     private static readonly (string WardName, string RoomNumber, string RoomType, decimal PricePerDay, int Beds)[] RoomTemplates =
     [
-        ($"{DummyNamePrefix}General Ward", "DUMMY-G-101", "General", 300m, 3),
-        ($"{DummyNamePrefix}General Ward", "DUMMY-G-102", "General", 300m, 3),
-        ($"{DummyNamePrefix}General Ward", "DUMMY-G-103", "General", 300m, 3),
-        ($"{DummyNamePrefix}General Ward", "DUMMY-G-104", "General", 300m, 3),
-        ($"{DummyNamePrefix}General Ward", "DUMMY-G-105", "General", 300m, 3),
-        ($"{DummyNamePrefix}General Ward", "DUMMY-G-106", "General", 300m, 3),
+        // OBS-3 fix: "General" wasn't one of the room-type dropdown's actual options
+        // (WardManagement.razor offers "General (4-bed)" / "General (6-bed)"), so a seeded room
+        // displayed a type no admin could ever pick again from the list.
+        ($"{DummyNamePrefix}General Ward", "DUMMY-G-101", "General (4-bed)", 300m, 3),
+        ($"{DummyNamePrefix}General Ward", "DUMMY-G-102", "General (4-bed)", 300m, 3),
+        ($"{DummyNamePrefix}General Ward", "DUMMY-G-103", "General (4-bed)", 300m, 3),
+        ($"{DummyNamePrefix}General Ward", "DUMMY-G-104", "General (4-bed)", 300m, 3),
+        ($"{DummyNamePrefix}General Ward", "DUMMY-G-105", "General (4-bed)", 300m, 3),
+        ($"{DummyNamePrefix}General Ward", "DUMMY-G-106", "General (4-bed)", 300m, 3),
         ($"{DummyNamePrefix}Private Ward", "DUMMY-P-201", "Semi-Private", 600m, 2),
         ($"{DummyNamePrefix}Private Ward", "DUMMY-P-202", "Semi-Private", 600m, 2),
         ($"{DummyNamePrefix}Private Ward", "DUMMY-P-203", "Semi-Private", 600m, 2),

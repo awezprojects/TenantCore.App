@@ -1,4 +1,5 @@
 using FluentValidation;
+using TenantCore.Application.Common;
 using TenantCore.Application.Features.IpdRegistrations.Commands;
 
 namespace TenantCore.Application.Features.IpdRegistrations.Validators;
@@ -8,6 +9,10 @@ public sealed class DischargePatientCommandValidator : AbstractValidator<Dischar
     public DischargePatientCommandValidator()
     {
         RuleFor(x => x.Id).NotEmpty();
-        RuleFor(x => x.DischargeNotes).MaximumLength(1000).When(x => !string.IsNullOrEmpty(x.DischargeNotes));
+        RuleFor(x => x.DischargeNotes)
+            .MaximumLength(1000)
+            .Must(HtmlSanitizationRules.HasNoScriptInjection).WithMessage("Discharge notes must not contain script or HTML markup.")
+            .Must(HtmlSanitizationRules.HasNoLinks).WithMessage("Discharge notes must not contain links.")
+            .When(x => !string.IsNullOrEmpty(x.DischargeNotes));
     }
 }

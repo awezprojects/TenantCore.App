@@ -30,7 +30,7 @@ Do not read them wholesale, and do not read them at session start.
 | `docs/adr/ADR-007-blazor-client.md` | the **full** CSS class list / hex palette | §7 |
 | `docs/adr/ADR-008-multi-tenancy.md` | JWT claim internals, per-tenant role mapping | §4 |
 | `docs/adr/ADR-009-unit-testing.md` | a test-file template to copy verbatim | §5 |
-| `docs/adr/ADR-010-security.md` | the **S1–S12 / V1–V7 catalogue** when scoring a finding | §6 |
+| `docs/adr/ADR-010-security.md` | the **S1–S13 / V1–V8 catalogue** when scoring a finding, or the full input-validation rationale (§3) | §6 |
 | `plan/REGISTRY.md` | checking a new feature against **everything already built** | §12 |
 | `.claude/context/current-state.md` | the **full 40-row DbSet table + DI list** | §11 |
 | `.claude/commands/*.md` | the canonical plan/execute/security workflow text | read-only |
@@ -122,6 +122,18 @@ public sealed class CreatePatientHandler(IPatientRepository repository, ILogger<
 
 ### Validator — `Features/{Area}/Validators/`
 `AbstractValidator<T>` (FluentValidation), auto-registered by assembly scan. Every string: `NotEmpty()` + `MaximumLength(N)`. Validate `Guid.Empty` for IDs; `Enum.IsDefined` before enum use.
+
+**Mandatory for every string field, every new feature (ADR-010 §3, added 2026-11-12) — use the shared `TenantCore.Application.Common` helpers, never a new inline `Regex`:**
+| Field is a… | Call |
+|---|---|
+| Person name | `NameValidationRules.IsValidName` |
+| Mobile/phone number | `PhoneValidationRules.IsValidPhoneNumber` (10-digit) |
+| Short structured text (reason, label, ward/room/bed name) | `SafeTextValidationRules.IsSafeText` (allow-list) |
+| Longer free text (notes, address) | `HtmlSanitizationRules.HasNoScriptInjection` + `HasNoLinks` (unless a URL is legitimately expected) — stacks on top of `NotEmpty`/`MaximumLength`, doesn't replace them |
+| String that must be digits-only (Aadhaar, PIN) | `NumericValidationRules.IsDigitsOnly` |
+| Email | FluentValidation `.EmailAddress().MaximumLength(256)` — never a custom regex |
+
+A true numeric field (amount, count, id) is typed `decimal`/`int`/`Guid` on the DTO, not `string` — malformed input is then a 400 before the validator runs.
 
 ### Translator — `Features/{Area}/Translators/`
 `static class` with `static` methods (`ToEntity`, `ToDto`, `ToSummaryDto`). **Never AutoMapper.**
@@ -224,7 +236,7 @@ Naming: `MethodName_Scenario_ExpectedResult` (e.g. `Handle_PatientNotFound_Throw
 
 Per-feature required coverage:
 - **Handlers** — happy path (`AddAsync` + `SaveChangesAsync` called, correct data captured), `ApplicationId` set on entity, all fields mapped, `EntityNotFoundException` on not-found, cross-tenant entity treated as not-found, empty list returns empty (not exception).
-- **Validators** — fully valid passes; each required field fails on null/empty (`[Theory]` + `[InlineData]`); `MaximumLength` boundary (over fails, at passes); empty `ApplicationId` fails.
+- **Validators** — fully valid passes; each required field fails on null/empty (`[Theory]` + `[InlineData]`); `MaximumLength` boundary (over fails, at passes); empty `ApplicationId` fails. For any field using a Section-3 input-safety helper (see §2/§6), add `[InlineData]` cases that must fail: `<script>alert(1)</script>`, `javascript:alert(1)`, `<img src=x onerror=alert(1)>`, a bare `http://` URL where links aren't legitimate, and (for digits-only fields) a value with letters mixed in.
 - **Translators** — `ToEntity` maps all properties + generates non-empty `Id` + sets `ApplicationId`; `ToDto` / `ToSummaryDto` map all fields.
 
 Do **NOT** test EF Core internals, DTO setters, or `Program.cs` wiring.
@@ -240,7 +252,9 @@ dotnet test tests/TenantCore.Application.Tests/
 
 **Checklist:** every controller/action has explicit `[Authorize(...)]` or `[AllowAnonymous]` (with a comment); destructive ops ≥ `RequireClinicAdmin`; string inputs `NotEmpty()` + `MaximumLength()`; route IDs typed `Guid`; enums checked with `Enum.IsDefined`; `pageSize` capped (≤100); no `ExecuteSqlRaw` with user input; `AsNoTracking()` on read queries; no `IQueryable<T>` returned from repositories; no secrets/passwords in logs; errors flow through middleware; CorrelationId forwarded on AuthApi calls.
 
-**Code smells (S1–S12) & architectural violations (V1–V7) to detect:** wrong dependency direction (Application→Infrastructure, Domain→anything), controller not inheriting `ClinicControllerBase`, feature files outside `Features/`, non-`record` commands/queries, repository exposing `DbContext`, duplicate repository methods, generic `catch (Exception)`, handler returning null instead of throwing.
+**Input safety (ADR-010 §3, mandatory for every new field — not optional, not just for security review):** every string field uses the matching `TenantCore.Application.Common` helper (see §2 Validator table above) instead of an inline regex; this is both a code-quality smell (S13) and a security violation if skipped. Client-side (Blazor) mirrors with the right `type`/`maxlength` but is never the only check. Never build a `MarkupString` from user/request data (V8) — all current `MarkupString` usages in this repo are hardcoded status badges, which is fine; a new one from a DTO field is not.
+
+**Code smells (S1–S13) & architectural violations (V1–V8) to detect:** wrong dependency direction (Application→Infrastructure, Domain→anything), controller not inheriting `ClinicControllerBase`, feature files outside `Features/`, non-`record` commands/queries, repository exposing `DbContext`, duplicate repository methods, generic `catch (Exception)`, handler returning null instead of throwing, ad hoc validation regex instead of the shared helper (S13), unsanitized `MarkupString` render (V8).
 
 **Safe-fix rules (ADR-010 §11):** read the file first; find all callers before changing a signature; preserve observable behavior; one logical fix per edit; do not refactor surrounding code.
 **Never change without explicit user instruction:** migration files, `RowVersion` concurrency config, middleware pipeline order, JWT validation parameters, `GetApplicationId()` implementation.

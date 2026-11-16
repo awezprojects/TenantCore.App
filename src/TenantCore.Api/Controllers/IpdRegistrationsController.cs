@@ -38,22 +38,51 @@ public class IpdRegistrationsController(ISender sender) : ClinicControllerBase
     {
         var result = await sender.Send(new CreateIpdRegistrationCommand(
             GetApplicationId(), dto.PatientId, dto.DoctorUserId, dto.DoctorName,
-            dto.WardName, dto.RoomNumber, dto.BedNumber,
-            dto.InitialFee, dto.AdmissionNotes), ct);
+            dto.BedId, dto.InitialFee, dto.AdmissionNotes), ct);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
+    // Doctor/notes only — status and bed move through their own dedicated actions below.
     [HttpPut("{id:guid}")]
     [Authorize(Policy = AuthPolicies.RequireReception)]
     [ProducesResponseType(typeof(IpdRegistrationDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateIpdRegistrationDto dto, CancellationToken ct)
         => Ok(await sender.Send(new UpdateIpdRegistrationCommand(
-            id, GetApplicationId(), dto.DoctorUserId, dto.DoctorName,
-            dto.WardName, dto.RoomNumber, dto.BedNumber,
-            dto.Status, dto.AdmissionNotes), ct));
+            id, GetApplicationId(), dto.DoctorUserId, dto.DoctorName, dto.AdmissionNotes), ct));
 
+    [HttpPatch("{id:guid}/transfer-bed")]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [ProducesResponseType(typeof(IpdRegistrationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> TransferBed(Guid id, [FromBody] TransferBedRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new TransferBedCommand(
+            id, GetApplicationId(), request.NewBedId, GetCurrentUserId(), request.Notes,
+            request.ManualChargeAmount, request.ManualChargeReason), ct));
+
+    // DEF-IPD-16: lets the Shift dialog show real numbers before the user commits.
+    [HttpGet("{id:guid}/transfer-bed/preview")]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [ProducesResponseType(typeof(TransferBedPreviewDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> PreviewTransferBed(Guid id, [FromQuery] Guid newBedId, CancellationToken ct)
+        => Ok(await sender.Send(new PreviewTransferBedQuery(id, GetApplicationId(), newBedId), ct));
+
+    [HttpPatch("{id:guid}/cancel")]
+    [Authorize(Policy = AuthPolicies.RequireReception)]
+    [ProducesResponseType(typeof(IpdRegistrationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelIpdRegistrationRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new CancelIpdRegistrationCommand(id, GetApplicationId(), request.Reason, GetCurrentUserId()), ct));
+
+    [HttpGet("{id:guid}/bed-history")]
+    [ProducesResponseType(typeof(IEnumerable<IpdBedTransferHistoryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBedHistory(Guid id, CancellationToken ct)
+        => Ok(await sender.Send(new GetIpdBedTransferHistoryQuery(id, GetApplicationId()), ct));
+
+    // Reception can now discharge end-to-end (confirmed) — was RequireClinical, which excluded
+    // Receptionist and left the report's "reception likely cannot discharge" gap open.
     [HttpPatch("{id:guid}/discharge")]
-    [Authorize(Policy = AuthPolicies.RequireClinical)]
+    [Authorize(Policy = AuthPolicies.RequireClinicStaff)]
     [ProducesResponseType(typeof(IpdRegistrationDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Discharge(Guid id, [FromBody] DischargePatientDto dto, CancellationToken ct)

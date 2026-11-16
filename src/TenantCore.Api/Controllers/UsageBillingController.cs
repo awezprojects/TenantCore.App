@@ -70,6 +70,35 @@ public class UsageBillingController(ISender sender, IOptions<UsageBillingOptions
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    /// <summary>
+    /// The clinic's currently open top-up, if any — lets the client poll for the link once Create
+    /// has returned, since the Razorpay link itself is created by an async background task.
+    /// </summary>
+    [HttpGet("wallet/top-up/active")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
+    [ProducesResponseType(typeof(WalletTopUpPaymentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> GetActiveTopUp(CancellationToken ct)
+    {
+        var result = await sender.Send(new GetActiveWalletTopUpQuery(GetApplicationId()), ct);
+        return result is null ? NoContent() : Ok(result);
+    }
+
+    /// <summary>
+    /// One specific top-up's current status, including Paid — unlike the "active" read above, which
+    /// stops returning a payment the moment it is no longer open. Lets the client keep tracking the
+    /// one it created all the way through to payment confirmation, not just until a link exists.
+    /// </summary>
+    [HttpGet("wallet/top-up/{paymentId:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
+    [ProducesResponseType(typeof(WalletTopUpPaymentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetTopUpStatus(Guid paymentId, CancellationToken ct)
+    {
+        var result = await sender.Send(new GetWalletTopUpStatusQuery(GetApplicationId(), paymentId), ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpPost("wallet/top-up/{paymentId:guid}/check")]
     [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

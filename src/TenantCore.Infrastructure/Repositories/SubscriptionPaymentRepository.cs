@@ -26,10 +26,17 @@ public class SubscriptionPaymentRepository(ClinicDbContext dbContext)
             .Take(100)
             .ToListAsync(ct);
 
+    // Must cover every IsClinicLink purpose (Renewal, AdminAssigned, WalletTopUp, RegistrationFee) —
+    // this is the single query all six "create a link" handlers share to enforce "at most one open
+    // clinic link at a time". Previously only matched Renewal/AdminAssigned, so a wallet top-up or
+    // registration fee link was never found as "already open": every repeat click created a brand
+    // new SubscriptionPayment row and a brand new Razorpay link instead of returning the existing
+    // one, and the cross-purpose "one open link" invariant didn't actually hold for those two.
     public async Task<SubscriptionPayment?> GetOpenLinkForClinicAsync(Guid applicationId, CancellationToken ct = default)
         => await DbSet
             .Where(p => p.ApplicationId == applicationId
-                     && (p.Purpose == PaymentPurpose.Renewal || p.Purpose == PaymentPurpose.AdminAssigned)
+                     && (p.Purpose == PaymentPurpose.Renewal || p.Purpose == PaymentPurpose.AdminAssigned
+                      || p.Purpose == PaymentPurpose.WalletTopUp || p.Purpose == PaymentPurpose.RegistrationFee)
                      && (p.Status == SubscriptionPaymentStatus.Pending || p.Status == SubscriptionPaymentStatus.LinkCreated))
             .OrderByDescending(p => p.CreatedAt)
             .FirstOrDefaultAsync(ct);

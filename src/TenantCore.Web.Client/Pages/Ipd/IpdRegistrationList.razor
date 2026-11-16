@@ -2,11 +2,13 @@
 @page "/ipd/new"
 @layout AuthorizedLayout
 @inject IClinicApiClient ClinicClient
+@inject IParticularApiClient ParticularClient
 @inject AuthStateService AuthState
 @inject IToastService Toast
 @inject NavigationManager Navigation
 @inject FeatureFlagsContextService FeatureFlagsContext
 @inject UsageBillingContextService UsageBillingContext
+@inject IJSRuntime JS
 @using TenantCore.Web.Client.Services
 @using TenantCore.Shared.Enums
 @implements IDisposable
@@ -183,6 +185,8 @@ else if (_isAdmin)
                                             <button class="cc-btn-light cc-btn-sm" @onclick="@(() => OpenViewDialog(reg))">View</button>
                                             @if (reg.Status == IpdStatus.Admitted)
                                             {
+                                                <button class="cc-btn-light cc-btn-sm" style="color:#DC2626;"
+                                                        @onclick="@(() => OpenCancelDialog(reg))">Cancel</button>
                                                 <button class="cc-btn-light cc-btn-sm" style="color:#D97706;"
                                                         @onclick="@(() => OpenDischargeDialog(reg))">Discharge</button>
                                             }
@@ -243,15 +247,139 @@ else
                 </div>
             </div>
             <div style="display:flex;gap:2px;background:#F1F5F9;border-radius:8px;padding:3px;">
-                <div style="padding:6px 14px;border-radius:6px;background:#fff;
-                             font-size:12px;font-weight:600;color:#1565C0;
-                             box-shadow:0 1px 3px rgba(0,0,0,0.08);">⊞ Grid</div>
-                <div style="padding:6px 14px;border-radius:6px;
-                             font-size:12px;font-weight:600;color:#94A3B8;">≡ List</div>
+                <button style="padding:6px 14px;border-radius:6px;border:none;cursor:pointer;
+                             font-size:12px;font-weight:600;
+                             background:@(_viewMode == "grid" ? "#fff" : "transparent");
+                             color:@(_viewMode == "grid" ? "#1565C0" : "#94A3B8");
+                             box-shadow:@(_viewMode == "grid" ? "0 1px 3px rgba(0,0,0,0.08)" : "none");"
+                        @onclick="@(() => SetViewModeAsync("grid"))">⊞ Grid</button>
+                <button style="padding:6px 14px;border-radius:6px;border:none;cursor:pointer;
+                             font-size:12px;font-weight:600;
+                             background:@(_viewMode == "list" ? "#fff" : "transparent");
+                             color:@(_viewMode == "list" ? "#1565C0" : "#94A3B8");
+                             box-shadow:@(_viewMode == "list" ? "0 1px 3px rgba(0,0,0,0.08)" : "none");"
+                        @onclick="@(() => SetViewModeAsync("list"))">≡ List</button>
             </div>
         </div>
 
-        @if (!_wards.Any())
+        @if (_viewMode == "list")
+        {
+            <!-- DEF-IPD-18: reception had no path to a discharged/cancelled stay (the toggle did
+                 nothing), so there was no way to print a Final Bill or confirm a refund outside the
+                 bed map's Admitted-only tiles. Reuses the exact same admissions table + View dialog
+                 the admin panel already has — same data (GetAll is RequireAuthenticated), same
+                 "fetch once on Refresh/search, not per click" pattern (Cross-Repo Rule 7). -->
+            <div class="cc-card">
+                <div class="cc-card-header">
+                    <div class="cc-card-title">🛏 IPD Admissions</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input class="cc-search" placeholder="Search patient or admission no..."
+                               value="@_search" @oninput="OnSearchInput" @onkeyup="OnSearchKeyUp"
+                               style="width:240px;" />
+                        <button class="cc-btn-light" @onclick="LoadAdmissionsAsync">↻ Refresh</button>
+                    </div>
+                </div>
+                @if (_admissionsLoading)
+                {
+                    <div style="height:4px;background:linear-gradient(90deg,#1565C0 0%,#42A5F5 50%,#1565C0 100%);
+                                background-size:200% 100%;animation:ipdload 1.2s ease infinite;border-radius:0;">
+                    </div>
+                }
+                else if (_result != null && _result.Items.Any())
+                {
+                    <div style="overflow-x:auto;">
+                        <table class="cc-table">
+                            <thead>
+                                <tr>
+                                    <th>Admission No.</th>
+                                    <th>Patient</th>
+                                    <th>Doctor</th>
+                                    <th>Ward / Room / Bed</th>
+                                    <th>Admitted</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var reg in _result.Items)
+                                {
+                                    <tr class="cc-table-row">
+                                        <td>
+                                            <span class="cc-badge" style="color:#1565C0;background:#EFF6FF;font-family:monospace;">
+                                                @reg.AdmissionNumber
+                                            </span>
+                                        </td>
+                                        <td style="font-weight:600;color:#1E293B;">@reg.PatientName</td>
+                                        <td style="color:#64748B;">@(reg.DoctorName ?? "—")</td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(reg.WardName))
+                                            {
+                                                <div style="font-size:12px;">
+                                                    <span style="font-weight:600;">@reg.WardName</span>
+                                                    @if (!string.IsNullOrEmpty(reg.RoomNumber))
+                                                    {<span style="color:#64748B;"> / Rm @reg.RoomNumber</span>}
+                                                    @if (!string.IsNullOrEmpty(reg.BedNumber))
+                                                    {<span style="color:#64748B;"> / Bed @reg.BedNumber</span>}
+                                                </div>
+                                            }
+                                            else
+                                            {<span style="color:#94A3B8;">—</span>}
+                                        </td>
+                                        <td style="color:#64748B;font-size:12px;">@reg.AdmissionDate.ToString("MMM dd, yyyy")</td>
+                                        <td>
+                                            @{ var (bc, bbg) = GetStatusBadge(reg.Status); }
+                                            <span class="cc-badge" style="color:@bc;background:@bbg;">@reg.Status</span>
+                                        </td>
+                                        <td>
+                                            <div style="display:flex;gap:4px;">
+                                                <button class="cc-btn-light cc-btn-sm" @onclick="@(() => OpenViewDialog(reg))">View</button>
+                                                @if (reg.Status == IpdStatus.Admitted)
+                                                {
+                                                    <button class="cc-btn-light cc-btn-sm" style="color:#DC2626;"
+                                                            @onclick="@(() => OpenCancelDialog(reg))">Cancel</button>
+                                                    <button class="cc-btn-light cc-btn-sm" style="color:#D97706;"
+                                                            @onclick="@(() => OpenDischargeDialog(reg))">Discharge</button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;
+                                 padding:12px 18px;border-top:1px solid #E2E8F0;">
+                        <span style="font-size:12px;color:#64748B;">
+                            Showing @_result.Items.Count() of @_result.TotalCount admissions
+                        </span>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                            <button @onclick="() => OnPageChanged(_page - 1)" disabled="@(_page <= 1)"
+                                    style="width:30px;height:30px;border:1.5px solid #E2E8F0;border-radius:7px;background:#fff;
+                                           cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                                           opacity:@(_page <= 1 ? "0.4" : "1");">‹</button>
+                            @for (int pg = Math.Max(1, _page - 2); pg <= Math.Min(TotalPages, _page + 2); pg++)
+                            {
+                                var p = pg;
+                                <button @onclick="() => OnPageChanged(p)"
+                                        style="min-width:30px;height:30px;border:1.5px solid @(p == _page ? "#1565C0" : "#E2E8F0");
+                                               border-radius:7px;background:@(p == _page ? "#1565C0" : "#fff");cursor:pointer;
+                                               font-size:12px;font-weight:@(p == _page ? "700" : "500");
+                                               color:@(p == _page ? "#fff" : "#64748B");padding:0 6px;">@p</button>
+                            }
+                            <button @onclick="() => OnPageChanged(_page + 1)" disabled="@(_page >= TotalPages)"
+                                    style="width:30px;height:30px;border:1.5px solid #E2E8F0;border-radius:7px;background:#fff;
+                                           cursor:pointer;font-size:14px;font-weight:700;color:#64748B;
+                                           opacity:@(_page >= TotalPages ? "0.4" : "1");">›</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="cc-empty">No IPD admissions found.</div>
+                }
+            </div>
+        }
+        else if (!_wards.Any())
         {
             <div class="cc-empty">No wards configured. Contact your administrator.</div>
         }
@@ -444,7 +572,7 @@ else
                                                          align-items:center;justify-content:center;gap:3px;
                                                          transition:box-shadow 0.15s;"
                                                  title="@(occupied ? $"Occupied – {adm?.PatientName}" : "Click to admit")"
-                                                 @onclick="@(() => OnBedClick(bed, room, adm))">
+                                                 @onclick="@(() => OnBedClickAsync(bed, room, adm))">
 
                                                 <div style="font-size:26px;line-height:1;">
                                                     @(occupied ? "👤" : "🛏")
@@ -500,9 +628,9 @@ else
             <PatientSearchInput OnPatientSelected="OnAdminPatientSelected"
                                 Placeholder="Type patient name or phone to search…" />
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label">Attending Doctor (optional)</label>
+                <label class="form-label">Attending Doctor *</label>
                 <select class="form-input" @onchange="e => _selectedDoctorId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null">
-                    <option value="">— No Doctor —</option>
+                    <option value="">— Select Doctor —</option>
                     @foreach (var d in _doctors)
                     {<option value="@d.UserId">@d.FullName</option>}
                 </select>
@@ -609,9 +737,9 @@ else
             <PatientSearchInput OnPatientSelected="OnBedPatientSelected"
                                 Placeholder="Type patient name or phone to search…" />
             <div class="form-group" style="margin-bottom:0;">
-                <label class="form-label">Attending Doctor (optional)</label>
+                <label class="form-label">Attending Doctor *</label>
                 <select class="form-input" @onchange="e => _bedSelectedDoctorId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null">
-                    <option value="">— No Doctor —</option>
+                    <option value="">— Select Doctor —</option>
                     @foreach (var d in _doctors)
                     {<option value="@d.UserId">@d.FullName</option>}
                 </select>
@@ -802,14 +930,244 @@ else
                             <div style="color:#475569;font-size:13px;">@_selected.AdmissionNotes</div>
                         </div>
                     }
+
+                    @if (_selected.Status == IpdStatus.Admitted)
+                    {
+                        <div style="border-top:1px solid #E2E8F0;padding-top:10px;">
+                            <button class="cc-btn-light" @onclick="OpenTransferDialog">↔ Shift Bed</button>
+                        </div>
+                    }
+
+                    @if (FeatureFlagsContext.IsBillingEnabled)
+                    {
+                        <div style="border-top:1px solid #E2E8F0;padding-top:12px;">
+                            <div style="font-size:12px;font-weight:700;color:#1E293B;margin-bottom:8px;">Deposit & Bill</div>
+
+                            @if (_billingLoading)
+                            {
+                                <div style="font-size:12px;color:#64748B;">Loading billing details…</div>
+                            }
+                            else if (_selected.Status == IpdStatus.Admitted && _provisionalBill is not null)
+                            {
+                                <div style="font-size:11px;color:#92400E;background:#FEF3C7;border-radius:6px;padding:6px 10px;margin-bottom:8px;">
+                                    Provisional — amount payable if discharged today
+                                </div>
+                                @if (_provisionalBill.Discount > 0)
+                                {
+                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748B;margin-bottom:4px;">
+                                        <span>Discount applied</span><span>- ₹@_provisionalBill.Discount.ToString("N2")</span>
+                                    </div>
+                                }
+                                @if (_provisionalBill.WriteOffTotal > 0)
+                                {
+                                    @* DEF-IPD-16: a grace- or manually-adjusted shift day wrote off part of the
+                                       standard room charge — show it so the bill isn't a mystery lower number. *@
+                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#16A34A;margin-bottom:4px;">
+                                        <span>Shift charge write-off</span><span>- ₹@_provisionalBill.WriteOffTotal.ToString("N2")</span>
+                                    </div>
+                                }
+                                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+                                    <span>Final amount</span><span style="font-weight:700;">₹@_provisionalBill.FinalAmount.ToString("N2")</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;">
+                                    <span>@(_provisionalBill.BalanceDue >= 0 ? "Balance" : "Refund due")</span>
+                                    <span style="font-weight:700;">₹@Math.Abs(_provisionalBill.BalanceDue).ToString("N2")</span>
+                                </div>
+                                <button class="cc-btn-light" style="margin-bottom:10px;" @onclick="PrintProvisionalBill">🖨️ Print Provisional Bill</button>
+
+                                <div style="display:flex;gap:6px;margin-bottom:8px;">
+                                    <input type="number" min="0" step="0.01" class="cc-input" style="flex:1;" placeholder="Deposit amount"
+                                           value="@_depositAmount" @oninput="e => _depositAmount = ParseDecimal(e.Value)" />
+                                    <button class="cc-btn-primary" disabled="@(_savingBilling || _depositAmount <= 0)" @onclick="CollectDepositAsync">Collect</button>
+                                </div>
+
+                                <div style="display:flex;gap:6px;margin-bottom:8px;">
+                                    <input type="number" min="0" step="0.01" class="cc-input" style="flex:1;" placeholder="Discount amount"
+                                           value="@_discountAmount" @oninput="e => _discountAmount = ParseDecimal(e.Value)" />
+                                    <button class="cc-btn-light" disabled="@_savingBilling" @onclick="ApplyDiscountAsync">Apply discount</button>
+                                </div>
+
+                                <div style="display:flex;gap:6px;margin-bottom:10px;">
+                                    <select class="cc-input" style="flex:1;" @onchange="OnParticularSelected">
+                                        <option value="">Add a service item…</option>
+                                        @foreach (var p in _particularCatalog)
+                                        {
+                                            <option value="@p.Id">@p.Name (₹@p.DefaultAmount.ToString("N0"))</option>
+                                        }
+                                    </select>
+                                    <button class="cc-btn-light" disabled="@(_savingBilling || _selectedParticularId is null)" @onclick="AddParticularAsync">Add</button>
+                                </div>
+
+                                @if (_particulars.Count > 0)
+                                {
+                                    <table style="width:100%;font-size:12px;margin-bottom:6px;">
+                                        @foreach (var item in _particulars)
+                                        {
+                                            <tr>
+                                                <td>@item.ParticularName</td>
+                                                <td style="text-align:right;">₹@item.Amount.ToString("N2")</td>
+                                                <td style="text-align:right;width:30px;">
+                                                    <button class="cc-btn-light" style="padding:2px 6px;" @onclick="() => OpenRemoveParticularConfirm(item)">✕</button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </table>
+                                }
+
+                                @if (_deposits.Count > 0)
+                                {
+                                    <div style="font-size:10px;font-weight:600;color:#94A3B8;margin-top:8px;margin-bottom:2px;">DEPOSITS COLLECTED</div>
+                                    @foreach (var d in _deposits)
+                                    {
+                                        <div style="display:flex;justify-content:space-between;font-size:12px;">
+                                            <span>@d.CollectedAt.ToLocalTime().ToString("dd MMM, HH:mm")</span>
+                                            <span>₹@d.Amount.ToString("N2")</span>
+                                        </div>
+                                    }
+                                }
+                            }
+                            else if (_selected.Status is IpdStatus.Discharged or IpdStatus.Cancelled && _finalBill is not null)
+                            {
+                                @* DEF-IPD-22: without this, a cancelled stay's panel showed only
+                                   "Final amount ₹0.00" with no explanation — reading as if the bill
+                                   just happened to be zero, not that cancelling always waives it. *@
+                                @if (_finalBill.WasCancelled)
+                                {
+                                    <div style="font-size:11px;color:#991B1B;background:#FEF2F2;border-radius:6px;padding:6px 10px;margin-bottom:8px;">
+                                        Cancelled — no charge. All fees waived.
+                                    </div>
+                                }
+                                @if (_finalBill.WriteOffTotal > 0)
+                                {
+                                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#16A34A;margin-bottom:4px;">
+                                        <span>Shift charge write-off</span><span>- ₹@_finalBill.WriteOffTotal.ToString("N2")</span>
+                                    </div>
+                                }
+                                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">
+                                    <span>Final amount</span><span style="font-weight:700;">₹@_finalBill.FinalAmount.ToString("N2")</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;">
+                                    <span>@(_finalBill.BalanceDue >= 0 ? "Balance" : "Refund due")</span>
+                                    <span style="font-weight:700;">₹@Math.Abs(_finalBill.BalanceDue).ToString("N2")</span>
+                                </div>
+                                <button class="cc-btn-light" style="margin-bottom:10px;" @onclick="PrintFinalBill">🖨️ Print Final Bill</button>
+
+                                @if (_finalBill.BalanceDue > 0 && _finalBill.PaymentStatus != TenantCore.Shared.Enums.PaymentStatus.Received)
+                                {
+                                    <button class="cc-btn-primary" disabled="@_savingBilling" @onclick="CollectBalanceAsync">Collect Balance</button>
+                                }
+                                else if (_finalBill.RefundStatus == TenantCore.Shared.Enums.RefundStatus.PendingRefund)
+                                {
+                                    <button class="cc-btn-primary" disabled="@_savingBilling" @onclick="ProcessRefundAsync">Confirm Refund Given</button>
+                                }
+                                else
+                                {
+                                    <div style="font-size:12px;color:#16A34A;font-weight:700;">Fully settled</div>
+                                }
+                            }
+                        </div>
+                    }
                 </div>
             }
         </div>
-        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;">
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            @* DEF-IPD-08: reception's bed click now opens this same dialog instead of the old
+               Discharge-only "Bed Details" one — but discharge itself has always lived outside this
+               dialog, triggered from the admin admissions table row. Added here too so reception
+               (which has no such table) keeps a working discharge path, through the exact same
+               confirm-dialog flow the table's own Discharge button already uses. *@
+            @if (_selected?.Status == IpdStatus.Admitted)
+            {
+                @* DEF-IPD-27 (16-Nov): Cancel existed only as an API endpoint — no UI anywhere could
+                   trigger it, so DEF-IPD-26's whole cancellation-window setting had nothing to test
+                   against in a browser. Same confirm-dialog pattern as Discharge, its sibling action. *@
+                <button class="cc-btn-light" style="color:#DC2626;border-color:#DC2626;"
+                        @onclick="() => OpenCancelDialog(_selected!)">Cancel Admission</button>
+                <button class="cc-btn-light" style="color:#D97706;border-color:#D97706;"
+                        @onclick="() => OpenDischargeDialog(_selected!)">Discharge</button>
+            }
             <button class="cc-btn-light" @onclick="() => _viewDialogVisible = false">Close</button>
         </div>
     </div>
 }
+
+@if (_transferDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:910;" @onclick="() => _transferDialogVisible = false"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:380px;max-width:94vw;max-height:90vh;overflow-y:auto;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:911;" @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:700;color:#1E293B;">Shift Bed — @_selected?.AdmissionNumber</div>
+        </div>
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:10px;">
+            <select class="cc-input" @onchange="OnTransferWardChangedAsync">
+                <option value="">Select ward…</option>
+                @foreach (var w in _wards)
+                {
+                    <option value="@w.Id" selected="@(w.Id == _transferWardId)">@w.Name</option>
+                }
+            </select>
+            <select class="cc-input" @onchange="OnTransferRoomChangedAsync" disabled="@(_transferWardId is null)">
+                <option value="">Select room…</option>
+                @foreach (var r in _transferRooms)
+                {
+                    <option value="@r.Id" selected="@(r.Id == _transferRoomId)">@r.RoomNumber (@r.RoomType)</option>
+                }
+            </select>
+            <select class="cc-input" @onchange="OnTransferBedChangedAsync" disabled="@(_transferRoomId is null)">
+                <option value="">Select bed…</option>
+                @foreach (var b in _transferBeds)
+                {
+                    <option value="@b.Id" selected="@(b.Id == _transferBedId)">@b.BedNumber</option>
+                }
+            </select>
+            <input class="cc-input" placeholder="Notes (optional)" @bind="_transferNotes" />
+
+            @* DEF-IPD-16: preview the standard charge and any grace-window result before the user
+               commits, instead of them finding out only after submitting. *@
+            @if (_transferPreviewLoading)
+            {
+                <div style="font-size:12px;color:#64748B;">Checking the room charge…</div>
+            }
+            else if (_transferPreview is not null)
+            {
+                <div style="font-size:12px;background:#F8FAFC;border-radius:8px;padding:8px 10px;color:#334155;">
+                    <div>Time spent in current room bills at <strong>₹@_transferPreview.StandardAmount.ToString("N2")</strong> standard.</div>
+                    @if (_transferPreview.WithinGraceWindow)
+                    {
+                        <div style="color:#16A34A;font-weight:600;margin-top:2px;">
+                            Within the grace window — suggested charge ₹@_transferPreview.SuggestedAmount.ToString("N2").
+                        </div>
+                    }
+                </div>
+
+                @if (_transferPreview.ManualChargeAllowed)
+                {
+                    <div style="border-top:1px solid #E2E8F0;padding-top:10px;margin-top:4px;">
+                        <div style="font-size:11px;font-weight:700;color:#64748B;margin-bottom:6px;">
+                            MANUAL OVERRIDE (optional, max ₹@_transferPreview.MaxManualAmount.ToString("N2"))
+                        </div>
+                        <input type="number" min="0" max="@_transferPreview.MaxManualAmount" step="0.01" class="cc-input"
+                               placeholder="Manual amount" value="@_transferManualAmount"
+                               @oninput="e => _transferManualAmount = ParseDecimal(e.Value)" />
+                        <input class="cc-input" style="margin-top:6px;" placeholder="Reason (required if entering an amount)"
+                               @bind="_transferManualReason" />
+                    </div>
+                }
+            }
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:8px;">
+            <button class="cc-btn-light" @onclick="() => _transferDialogVisible = false">Cancel</button>
+            <button class="cc-btn-primary" disabled="@(_saving || _transferBedId is null)" @onclick="TransferBedAsync">Shift</button>
+        </div>
+    </div>
+}
+
+<ConfirmDialog Visible="_confirmRemoveParticularVisible" Title="Remove service item?" ConfirmText="Remove" BusyText="Removing..."
+               IsBusy="_savingBilling" OnConfirm="RemoveParticularAsync" OnCancel="() => _confirmRemoveParticularVisible = false">
+    Remove <strong>@(_particularToRemove?.ParticularName)</strong> (₹@(_particularToRemove?.Amount.ToString("N2"))) from this admission's bill?
+</ConfirmDialog>
 
 <!-- ════════════════════════════════════════════════════════
      DIALOG: Admin – Discharge confirmation
@@ -833,6 +1191,38 @@ else
             <button class="cc-btn-light" style="color:#D97706;border-color:#D97706;"
                     @onclick="AdminDischargeAsync" disabled="@_saving">
                 @(_saving ? "Discharging..." : "Confirm Discharge")
+            </button>
+        </div>
+    </div>
+}
+
+<!-- ════════════════════════════════════════════════════════
+     DIALOG: Admin – Cancel admission confirmation (DEF-IPD-27, 16-Nov)
+     ════════════════════════════════════════════════════════ -->
+@if (_cancelDialogVisible)
+{
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:900;"
+         @onclick="() => _cancelDialogVisible = false"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:14px;width:380px;max-width:96vw;
+                box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:901;" @onclick:stopPropagation="true">
+        <div style="padding:18px 24px;border-bottom:1px solid #E2E8F0;">
+            <div style="font-size:16px;font-weight:700;color:#1E293B;">Cancel Admission — @_cancelling?.PatientName</div>
+        </div>
+        <div style="padding:20px 24px;">
+            <div style="font-size:12px;color:#64748B;margin-bottom:12px;line-height:1.5;">
+                Cancelling bills ₹0 and fully refunds any deposit, within the clinic's cancellation
+                window (see Settings). Past that window, this is refused — discharge the patient
+                instead to settle the actual bill.
+            </div>
+            <textarea class="form-input" rows="3" @bind="_cancelReason"
+                      placeholder="Cancellation Reason (optional)" style="resize:vertical;min-height:70px;"></textarea>
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:10px;">
+            <button class="cc-btn-light" @onclick="() => _cancelDialogVisible = false">Back</button>
+            <button class="cc-btn-light" style="color:#DC2626;border-color:#DC2626;"
+                    @onclick="AdminCancelAsync" disabled="@_saving">
+                @(_saving ? "Cancelling..." : "Confirm Cancel")
             </button>
         </div>
     </div>
@@ -879,11 +1269,40 @@ else
     private string? _admissionNotes;
 
     // admin view/discharge dialogs
-    private bool _viewDialogVisible, _dischargeDialogVisible;
-    private IpdRegistrationDto? _selected, _discharging;
+    private bool _viewDialogVisible, _dischargeDialogVisible, _cancelDialogVisible;
+    private IpdRegistrationDto? _selected, _discharging, _cancelling;
+    private string? _cancelReason;
     private string? _dischargeNotes;
 
+    // Deposit & Bill panel (inside the view dialog)
+    private bool _billingLoading, _savingBilling;
+    private IpdProvisionalBillDto? _provisionalBill;
+    private IpdFinalBillDto? _finalBill;
+    private List<IpdDepositDto> _deposits = [];
+    private List<IpdParticularDto> _particulars = [];
+    private List<ParticularSummaryDto> _particularCatalog = [];
+    private decimal _depositAmount;
+    private decimal _discountAmount;
+    private Guid? _selectedParticularId;
+    private bool _confirmRemoveParticularVisible;
+    private IpdParticularDto? _particularToRemove;
+
+    // Shift Bed dialog
+    private bool _transferDialogVisible;
+    private Guid? _transferWardId, _transferRoomId, _transferBedId;
+    private string? _transferNotes;
+    private List<RoomDto> _transferRooms = [];
+    private List<BedDto> _transferBeds = [];
+    private TransferBedPreviewDto? _transferPreview;
+    private bool _transferPreviewLoading;
+    private decimal? _transferManualAmount;
+    private string? _transferManualReason;
+
     // ── reception / bed map view ─────────────────────────────────────────────
+    // DEF-IPD-18: reception's Grid/List toggle. "list" reuses the admin admissions table +
+    // View dialog verbatim, giving reception a path to a discharged/cancelled stay's Final Bill
+    // and refund that the bed map (Admitted-only tiles) never had.
+    private string _viewMode = "grid";
     private WardDto? _selectedWard;
     private List<RoomDto> _selectedWardRooms = [];
     private List<(BedDto Bed, RoomDto Room)> _flatBeds = [];
@@ -988,8 +1407,33 @@ else
         _admissionsLoading = false;
     }
 
-    private void OnSearchInput(ChangeEventArgs e) => _search = e.Value?.ToString();
-    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAdmissionsAsync(); } }
+    // DEF-IPD smaller item: search used to require pressing Enter — now it also searches on its
+    // own a short beat after typing stops, debounced so it doesn't re-query on every keystroke.
+    private CancellationTokenSource? _searchDebounceCts;
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString();
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        _ = DebouncedSearchAsync(_searchDebounceCts.Token);
+    }
+
+    private async Task DebouncedSearchAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(400, ct);
+            if (ct.IsCancellationRequested) return;
+            _page = 1;
+            await LoadAdmissionsAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _searchDebounceCts?.Cancel(); _page = 1; await LoadAdmissionsAsync(); } }
     private async Task OnPageChanged(int page) { _page = page; await LoadAdmissionsAsync(); }
 
     // ── admin: admit dialog ──────────────────────────────────────────────────
@@ -1041,19 +1485,24 @@ else
     {
         if (_selectedPatientId == Guid.Empty)
         { Toast.ShowWarning("Please select a patient."); return; }
+        // DEF-IPD-09: the field was labelled "(optional)" but the server has always required a
+        // doctor — saving without one surfaced the server's raw FluentValidation text instead of
+        // ever reaching this far. Same friendly-toast pattern as the patient check above.
+        if (!_selectedDoctorId.HasValue)
+        { Toast.ShowWarning("Please select an attending doctor."); return; }
         _saving = true;
-        var ward   = _selectedWardId.HasValue ? _wards.FirstOrDefault(w => w.Id == _selectedWardId) : null;
         var bed    = _selectedBedId.HasValue  ? _dialogBeds.FirstOrDefault(b => b.Id == _selectedBedId) : null;
         var doctor = _selectedDoctorId.HasValue ? _doctors.FirstOrDefault(d => d.UserId == _selectedDoctorId) : null;
         var dto = new CreateIpdRegistrationDto(
             _selectedPatientId, _selectedDoctorId ?? Guid.Empty, doctor?.FullName ?? string.Empty,
-            ward?.Name, _selectedRoomDto?.RoomNumber, bed?.BedNumber, _initialFee, _admissionNotes);
+            bed?.Id, _initialFee, _admissionNotes);
         var r = await ClinicClient.CreateIpdRegistrationAsync(dto);
         if (r.Success)
         {
             Toast.ShowSuccess($"Patient admitted — {r.Data?.AdmissionNumber}");
             _adminAdmitVisible = false;
             await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync());
+            await UsageBillingContext.RefreshAsync(); // OBS-14: the ₹10 admission usage charge just moved the wallet
         }
         else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
         {
@@ -1066,7 +1515,230 @@ else
     }
 
     // ── admin: view / discharge ──────────────────────────────────────────────
-    private void OpenViewDialog(IpdRegistrationDto reg) { _selected = reg; _viewDialogVisible = true; }
+    private async Task OpenViewDialog(IpdRegistrationDto reg)
+    {
+        _selected = reg;
+        _viewDialogVisible = true;
+        _provisionalBill = null;
+        _finalBill = null;
+        _deposits = [];
+        _particulars = [];
+        _depositAmount = 0;
+        _discountAmount = 0;
+        _selectedParticularId = null;
+        if (FeatureFlagsContext.IsBillingEnabled)
+            await LoadBillingPanelAsync();
+    }
+
+    // DEF-IPD-05: this used to be called from an `async void` OpenViewDialog, which Blazor's
+    // renderer does not track as a pending render — so the "Loading billing details…" spinner
+    // never cleared until some unrelated event forced a re-render. Every caller now awaits a
+    // Task, and this explicit StateHasChanged is a backstop regardless of caller.
+    private async Task LoadBillingPanelAsync()
+    {
+        if (_selected is null) return;
+        _billingLoading = true;
+
+        if (_selected.Status == IpdStatus.Admitted)
+        {
+            var billTask = ClinicClient.GetIpdProvisionalBillAsync(_selected.Id);
+            var depositsTask = ClinicClient.GetIpdDepositsAsync(_selected.Id);
+            var particularsTask = ClinicClient.GetIpdParticularsAsync(_selected.Id);
+            var catalogTask = ParticularClient.GetAllAsync();
+            await Task.WhenAll(billTask, depositsTask, particularsTask, catalogTask);
+
+            var billResponse = await billTask;
+            if (billResponse.Success) _provisionalBill = billResponse.Data;
+            var depositsResponse = await depositsTask;
+            if (depositsResponse.Success) _deposits = depositsResponse.Data?.ToList() ?? [];
+            var particularsResponse = await particularsTask;
+            if (particularsResponse.Success) _particulars = particularsResponse.Data?.ToList() ?? [];
+            var catalogResponse = await catalogTask;
+            if (catalogResponse.Success) _particularCatalog = catalogResponse.Data?.Where(p => p.IsActive).ToList() ?? [];
+        }
+        else if (_selected.Status is IpdStatus.Discharged or IpdStatus.Cancelled)
+        {
+            // DEF-IPD-07: a Cancelled admission now also gets a locked Final Bill (finalized at
+            // the moment it was cancelled), so Collect Balance / Confirm Refund work here too.
+            var r = await ClinicClient.GetIpdFinalBillAsync(_selected.Id);
+            if (r.Success) _finalBill = r.Data;
+        }
+
+        _billingLoading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static decimal ParseDecimal(object? value) => decimal.TryParse(value?.ToString(), out var d) ? d : 0;
+
+    private void OnParticularSelected(ChangeEventArgs e)
+        => _selectedParticularId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
+
+    private async Task CollectDepositAsync()
+    {
+        if (_selected is null || _depositAmount <= 0) return;
+        _savingBilling = true;
+        var r = await ClinicClient.CollectIpdDepositAsync(_selected.Id, new CollectIpdDepositRequest(_depositAmount, null));
+        if (r.Success)
+        {
+            Toast.ShowSuccess("Deposit collected.");
+            _depositAmount = 0;
+            await LoadBillingPanelAsync();
+        }
+        else Toast.ShowError(r.Message ?? "Failed to collect deposit.");
+        _savingBilling = false;
+    }
+
+    private async Task ApplyDiscountAsync()
+    {
+        if (_selected is null) return;
+        _savingBilling = true;
+        var r = await ClinicClient.ApplyIpdDiscountAsync(_selected.Id, new ApplyIpdDiscountRequest(_discountAmount));
+        if (r.Success)
+        {
+            Toast.ShowSuccess("Discount applied.");
+            _provisionalBill = r.Data;
+            _discountAmount = 0;
+        }
+        else Toast.ShowError(r.Message ?? "Failed to apply discount.");
+        _savingBilling = false;
+    }
+
+    private async Task AddParticularAsync()
+    {
+        if (_selected is null || _selectedParticularId is null) return;
+        var particular = _particularCatalog.FirstOrDefault(p => p.Id == _selectedParticularId);
+        if (particular is null) return;
+        _savingBilling = true;
+        var r = await ClinicClient.AddIpdParticularAsync(_selected.Id, new AddIpdParticularRequest(particular.Id, particular.DefaultAmount));
+        if (r.Success)
+        {
+            Toast.ShowSuccess("Service item added.");
+            _selectedParticularId = null;
+            await LoadBillingPanelAsync();
+        }
+        else Toast.ShowError(r.Message ?? "Failed to add service item.");
+        _savingBilling = false;
+    }
+
+    private void OpenRemoveParticularConfirm(IpdParticularDto particular)
+    {
+        _particularToRemove = particular;
+        _confirmRemoveParticularVisible = true;
+    }
+
+    private async Task RemoveParticularAsync()
+    {
+        if (_particularToRemove is null) return;
+        _savingBilling = true;
+        var r = await ClinicClient.RemoveIpdParticularAsync(_particularToRemove.Id);
+        if (r.Success)
+        {
+            Toast.ShowSuccess("Service item removed.");
+            _confirmRemoveParticularVisible = false;
+            _particularToRemove = null;
+            await LoadBillingPanelAsync();
+        }
+        else Toast.ShowError(r.Message ?? "Failed to remove service item.");
+        _savingBilling = false;
+    }
+
+    private async Task CollectBalanceAsync()
+    {
+        if (_selected is null) return;
+        _savingBilling = true;
+        var r = await ClinicClient.CollectIpdBalanceAsync(_selected.Id);
+        if (r.Success) { Toast.ShowSuccess("Balance collected."); _finalBill = r.Data; }
+        else Toast.ShowError(r.Message ?? "Failed to collect balance.");
+        _savingBilling = false;
+    }
+
+    private async Task ProcessRefundAsync()
+    {
+        if (_selected is null) return;
+        _savingBilling = true;
+        var r = await ClinicClient.ProcessIpdRefundAsync(_selected.Id);
+        if (r.Success) { Toast.ShowSuccess("Refund confirmed."); _finalBill = r.Data; }
+        else Toast.ShowError(r.Message ?? "Failed to confirm refund.");
+        _savingBilling = false;
+    }
+
+    private async Task PrintProvisionalBill()
+    {
+        if (_selected is null) return;
+        await JS.InvokeVoidAsync("window.open", $"/ipd/provisional-bill-print?id={_selected.Id}", "_blank");
+    }
+
+    private async Task PrintFinalBill()
+    {
+        if (_selected is null) return;
+        await JS.InvokeVoidAsync("window.open", $"/ipd/final-bill-print?id={_selected.Id}", "_blank");
+    }
+
+    // ── Shift Bed dialog ─────────────────────────────────────────────────────
+    private void OpenTransferDialog()
+    {
+        _transferWardId = null; _transferRoomId = null; _transferBedId = null;
+        _transferRooms = []; _transferBeds = []; _transferNotes = null;
+        _transferPreview = null; _transferManualAmount = null; _transferManualReason = null;
+        _transferDialogVisible = true;
+    }
+
+    private async Task OnTransferWardChangedAsync(ChangeEventArgs e)
+    {
+        _transferWardId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
+        _transferRoomId = null; _transferBedId = null; _transferBeds = [];
+        _transferRooms = [];
+        if (_transferWardId is null) return;
+        var r = await ClinicClient.GetRoomsByWardAsync(_transferWardId.Value);
+        if (r.Success && r.Data is not null) _transferRooms = r.Data.Where(x => x.IsActive).ToList();
+    }
+
+    private async Task OnTransferRoomChangedAsync(ChangeEventArgs e)
+    {
+        _transferRoomId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
+        _transferBedId = null; _transferBeds = [];
+        if (_transferRoomId is null || _transferWardId is null) return;
+        var r = await ClinicClient.GetAvailableBedsAsync(_transferWardId);
+        if (r.Success && r.Data is not null) _transferBeds = r.Data.Where(b => b.RoomId == _transferRoomId).ToList();
+    }
+
+    private async Task OnTransferBedChangedAsync(ChangeEventArgs e)
+    {
+        _transferBedId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : (Guid?)null;
+        _transferPreview = null; _transferManualAmount = null; _transferManualReason = null;
+        if (_transferBedId is null || _selected is null) return;
+
+        _transferPreviewLoading = true;
+        var r = await ClinicClient.PreviewTransferBedAsync(_selected.Id, _transferBedId.Value);
+        if (r.Success) _transferPreview = r.Data;
+        _transferPreviewLoading = false;
+    }
+
+    private async Task TransferBedAsync()
+    {
+        if (_selected is null || _transferBedId is null) return;
+        if (_transferManualAmount.HasValue && string.IsNullOrWhiteSpace(_transferManualReason))
+        { Toast.ShowWarning("A reason is required when entering a manual charge amount."); return; }
+        _saving = true;
+        var r = await ClinicClient.TransferBedAsync(
+            _selected.Id, new TransferBedRequest(_transferBedId.Value, _transferNotes, _transferManualAmount, _transferManualReason));
+        if (r.Success)
+        {
+            Toast.ShowSuccess("Bed shifted.");
+            _transferDialogVisible = false;
+            _selected = r.Data;
+            // DEF-IPD-14: the View dialog stays open underneath the Shift dialog — reload its
+            // billing panel too, not just the registration pointer, so the Provisional Bill
+            // reflects the new room's rate immediately instead of staying stale until reopened.
+            await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync(), LoadBillingPanelAsync());
+        }
+        else if (r.ErrorCode == "manual_shift_charge_not_allowed")
+        {
+            Toast.ShowError(r.Message ?? "Manual shift charges are not allowed.");
+        }
+        else Toast.ShowError(r.Message ?? "Failed to shift bed.");
+        _saving = false;
+    }
 
     private void OpenDischargeDialog(IpdRegistrationDto reg)
     { _discharging = reg; _dischargeNotes = null; _dischargeDialogVisible = true; }
@@ -1075,12 +1747,23 @@ else
     {
         if (_discharging is null) return;
         _saving = true;
-        var r = await ClinicClient.DischargePatientAsync(_discharging.Id, new DischargePatientDto(_dischargeNotes));
+        var dischargingId = _discharging.Id;
+        var r = await ClinicClient.DischargePatientAsync(dischargingId, new DischargePatientDto(_dischargeNotes));
         if (r.Success)
         {
             Toast.ShowSuccess("Patient discharged.");
             _dischargeDialogVisible = false;
             await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync());
+            await UsageBillingContext.RefreshAsync(); // the ₹100 discharge usage charge just moved the wallet
+            // DEF-IPD-14: Discharge can be triggered from the View dialog's own button (which
+            // stays open underneath this confirm dialog) — refresh its bound registration + bill
+            // instead of leaving it showing a stale "Admitted" status, which is what made a second
+            // discharge attempt look possible from there.
+            if (_viewDialogVisible && _selected?.Id == dischargingId)
+            {
+                _selected = r.Data;
+                await LoadBillingPanelAsync();
+            }
         }
         else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
         {
@@ -1090,6 +1773,43 @@ else
         }
         else Toast.ShowError(r.Message ?? "Failed.");
         _saving = false;
+    }
+
+    private void OpenCancelDialog(IpdRegistrationDto reg)
+    { _cancelling = reg; _cancelReason = null; _cancelDialogVisible = true; }
+
+    private async Task AdminCancelAsync()
+    {
+        if (_cancelling is null) return;
+        _saving = true;
+        var cancellingId = _cancelling.Id;
+        var r = await ClinicClient.CancelIpdRegistrationAsync(cancellingId, new CancelIpdRegistrationRequest(_cancelReason));
+        if (r.Success)
+        {
+            Toast.ShowSuccess("Admission cancelled.");
+            _cancelDialogVisible = false;
+            await Task.WhenAll(LoadAdmissionsAsync(), RefreshWardsAsync());
+            await UsageBillingContext.RefreshAsync(); // the admission usage charge was just reversed
+            // Same stale-dialog risk DEF-IPD-14 fixed for Discharge — the View dialog can stay open
+            // underneath this one on the same registration.
+            if (_viewDialogVisible && _selected?.Id == cancellingId)
+            {
+                _selected = r.Data;
+                await LoadBillingPanelAsync();
+            }
+        }
+        else Toast.ShowError(r.Message ?? "Failed.");
+        _saving = false;
+    }
+
+    // DEF-IPD-18: fetch-once — only the first switch into List (or an explicit Refresh/search)
+    // calls the API; flipping back and forth after that reuses whatever's already loaded
+    // (Cross-Repo Rule 7 — no per-click re-query).
+    private async Task SetViewModeAsync(string mode)
+    {
+        _viewMode = mode;
+        if (mode == "list" && _result is null)
+            await LoadAdmissionsAsync();
     }
 
     // ── reception: ward tab selection ────────────────────────────────────────
@@ -1142,10 +1862,24 @@ else
     }
 
     // ── reception: bed click handler ─────────────────────────────────────────
-    private void OnBedClick(BedDto bed, RoomDto room, IpdRegistrationDto? adm)
+    // DEF-IPD-08: this used to always open the bare "Bed Details" dialog (Discharge Patient only),
+    // even though the API already allows reception to shift beds, collect deposits, apply
+    // discounts, add particulars and settle bills (RequireClinicStaff). That richer dialog already
+    // exists and has no role-gating inside it — it was only ever wired up from the admin
+    // admissions table. Routing reception's bed click through the same OpenViewDialog gives
+    // reception everything admin has, from one dialog, with no duplicated billing UI to maintain.
+    private async Task OnBedClickAsync(BedDto bed, RoomDto room, IpdRegistrationDto? adm)
     {
         if (bed.IsOccupied)
         {
+            if (adm is not null)
+            {
+                await OpenViewDialog(adm);
+                return;
+            }
+
+            // Fallback only: the bed/room-name match behind GetAdmissionForBed found nothing for an
+            // occupied bed — keep the old read-only dialog rather than showing nothing at all.
             _bedDetailBed    = bed;
             _bedDetailRoom   = room;
             _bedDetailAdm    = adm;
@@ -1176,6 +1910,10 @@ else
     {
         if (_bedSelectedPatientId == Guid.Empty)
         { Toast.ShowWarning("Please select a patient."); return; }
+        // DEF-IPD-09: see AdminAdmitAsync — the field was labelled "(optional)" but the server has
+        // always required a doctor; this used to surface the server's raw FluentValidation text.
+        if (!_bedSelectedDoctorId.HasValue)
+        { Toast.ShowWarning("Please select an attending doctor."); return; }
         if (_admitToBed == null || _admitToRoom == null || _selectedWard == null) return;
 
         _saving = true;
@@ -1186,9 +1924,7 @@ else
             _bedSelectedPatientId,
             _bedSelectedDoctorId ?? Guid.Empty,
             doctor?.FullName ?? string.Empty,
-            _selectedWard.Name,
-            _admitToRoom.RoomNumber,
-            _admitToBed.BedNumber,
+            _admitToBed.Id,
             _bedInitialFee,
             _bedAdmissionNotes);
 
@@ -1198,6 +1934,7 @@ else
             Toast.ShowSuccess($"Patient admitted — {r.Data?.AdmissionNumber}");
             _bedAdmitVisible = false;
             await Task.WhenAll(RefreshWardsAsync(), SelectWardAsync(_selectedWard));
+            await UsageBillingContext.RefreshAsync(); // OBS-14
         }
         else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
         {
@@ -1219,6 +1956,7 @@ else
             _bedDetailVisible = false;
             if (_selectedWard != null)
                 await Task.WhenAll(RefreshWardsAsync(), SelectWardAsync(_selectedWard));
+            await UsageBillingContext.RefreshAsync(); // OBS-14
         }
         else if (r.ErrorCode == UsageBillingErrorCodes.InsufficientWalletBalance)
         {
@@ -1295,5 +2033,7 @@ else
     {
         _refreshCts?.Cancel();
         _refreshCts?.Dispose();
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
     }
 }

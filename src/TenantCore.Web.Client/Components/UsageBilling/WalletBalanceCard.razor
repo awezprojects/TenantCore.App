@@ -42,7 +42,20 @@
 @if (ShowTopUp)
 {
     <div style="margin:-4px 0 18px;">
-        <a href="@TopUpHref" class="btn btn-primary">⬆️ Top up the wallet</a>
+        @* DEF-IPD-15: href="#topup-amount" used to resolve against the app's <base href="/">
+           instead of scrolling within the current page, which sent the click to the clinic
+           selector instead. When OnTopUpClick is wired up (the same-page case), render a button
+           that scrolls to and focuses the field via JS instead of a fragment anchor; TopUpHref
+           still works as a real navigation for the cross-page case (the billing overview linking
+           to /billing/wallet). *@
+        @if (OnTopUpClick.HasDelegate)
+        {
+            <button type="button" class="btn btn-primary" @onclick="OnTopUpClick">⬆️ Top up the wallet</button>
+        }
+        else
+        {
+            <a href="@TopUpHref" class="btn btn-primary">⬆️ Top up the wallet</a>
+        }
     </div>
 }
 
@@ -56,6 +69,7 @@
     [Parameter] public string Currency { get; set; } = "INR";
     [Parameter] public bool ShowTopUp { get; set; } = true;
     [Parameter] public string TopUpHref { get; set; } = "/billing/wallet";
+    [Parameter] public EventCallback OnTopUpClick { get; set; }
 
     private static string Money(decimal value, string currency)
         => (currency == "INR" ? "₹" : currency + " ") + value.ToString("N2");

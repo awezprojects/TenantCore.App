@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TenantCore.Application.Common;
 using TenantCore.Application.Common.Behaviors;
 using TenantCore.Application.Common.Workflow;
+using TenantCore.Application.Features.IpdPayments.Services;
 using TenantCore.Application.Features.Onboarding.Services;
 using TenantCore.Application.Features.Subscriptions.Services;
 using TenantCore.Application.Features.UsageBilling.Services;
@@ -48,6 +49,10 @@ public static class DependencyInjection
         // One home for Phase 1's "at most one open clinic link" rule, so a renewal, an admin-assigned
         // plan, a wallet top-up and the registration fee all supersede identically.
         services.AddScoped<IPaymentLinkSuperseder, PaymentLinkSuperseder>();
+
+        // IPD room-charge engine — shared by the live Provisional Bill query and the
+        // discharge-time Final Bill finalize command (ipd-billing-deposit-completion).
+        services.AddScoped<IIpdBillCalculator, IpdBillCalculator>();
 
         return services;
     }

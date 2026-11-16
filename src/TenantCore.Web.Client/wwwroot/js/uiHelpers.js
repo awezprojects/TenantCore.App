@@ -29,6 +29,17 @@ window.ccDownloadBinaryFile = (fileName, base64, mimeType) => {
     URL.revokeObjectURL(url);
 };
 
+// DEF-IPD-15: scrolls to and focuses an element on the CURRENT page. Replaces a same-page
+// href="#elementId" anchor, which resolved against this Blazor app's <base href="/"> instead of
+// scrolling in place — clicking it navigated away (to the clinic selector) rather than jumping
+// down the page.
+window.ccScrollToAndFocus = (elementId) => {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus({ preventScroll: true });
+};
+
 // Saves a string the page already has in memory as a downloaded file (used by the usage CSV export,
 // which must never re-query the API just to produce a file).
 window.ccDownloadTextFile = (fileName, text) => {

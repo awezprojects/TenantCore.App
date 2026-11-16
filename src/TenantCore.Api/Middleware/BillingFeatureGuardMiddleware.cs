@@ -26,7 +26,11 @@ public class BillingFeatureGuardMiddleware(RequestDelegate next, ILogger<Billing
         "/api/counter-sessions",
         "/api/expense-categories",
         "/api/expense-records",
-        "/api/amount-handovers"
+        "/api/amount-handovers",
+        "/api/ipd-deposits",
+        "/api/ipd-particulars",
+        "/api/ipd-payments",
+        "/api/ipd-reports"
     ];
 
     public async Task InvokeAsync(HttpContext context)

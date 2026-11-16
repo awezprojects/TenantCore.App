@@ -22,8 +22,19 @@ public static class UserMessages
     // ── IPD ──────────────────────────────────────────────────────────────────
     public const string PatientAlreadyAdmitted = "This patient is already admitted. Please discharge them before creating a new admission.";
     public const string BedAlreadyOccupied     = "This bed is already occupied. Please select a different bed.";
+    public const string IpdAlreadyInThisBed    = "The patient is already in this bed.";
     public const string IpdNotFound            = "IPD record not found.";
     public const string DischargeAlreadyDone   = "This patient has already been discharged.";
+    public const string IpdBillingSettingsNotConfigured = "Configure IPD room billing settings (Clinic Settings) before allocating a bed to a patient.";
+    public const string IpdNotAdmitted         = "This action is only available while the patient is admitted.";
+    public const string IpdAlreadyCancelled    = "This admission has already been cancelled.";
+    public const string IpdParticularNotFound  = "Particular not found on this admission.";
+    public const string IpdPaymentNotFound     = "No billing record found for this admission.";
+    public const string IpdBillAlreadyFinalized = "This admission's bill has already been finalized.";
+    public const string IpdBillNotFinalized    = "This admission's bill has not been finalized yet — it is only available after discharge.";
+    public const string IpdNoBalanceDue        = "No balance is due on this admission.";
+    public const string IpdBalanceAlreadyCollected = "The balance for this admission has already been collected.";
+    public const string IpdNoRefundPending     = "No refund is pending for this admission.";
 
     // ── OPD ──────────────────────────────────────────────────────────────────
     public const string OpdNotFound = "OPD record not found.";

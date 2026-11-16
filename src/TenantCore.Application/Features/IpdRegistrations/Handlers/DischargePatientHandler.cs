@@ -1,5 +1,6 @@
 using MediatR;
 using TenantCore.Application.Common;
+using TenantCore.Application.Features.IpdPayments.Commands;
 using TenantCore.Application.Features.IpdRegistrations.Commands;
 using TenantCore.Application.Features.IpdRegistrations.Translators;
 using TenantCore.Application.Features.UsageBilling.Commands;
@@ -14,6 +15,7 @@ namespace TenantCore.Application.Features.IpdRegistrations.Handlers;
 public sealed class DischargePatientHandler(
     IIpdRegistrationRepository repository,
     IBedRepository bedRepository,
+    IIpdBedTransferHistoryRepository historyRepository,
     IApplicationAccessValidator accessValidator,
     ISender sender)
     : IRequestHandler<DischargePatientCommand, IpdRegistrationDto>
@@ -27,18 +29,22 @@ public sealed class DischargePatientHandler(
         if (!accessValidator.CanAccess(registration.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
-        // Free the bed before discharging
-        if (!string.IsNullOrWhiteSpace(registration.WardName) &&
-            !string.IsNullOrWhiteSpace(registration.RoomNumber) &&
-            !string.IsNullOrWhiteSpace(registration.BedNumber))
+        // Free the bed via CurrentBedId/the open transfer-history segment — not by re-resolving
+        // free-text ward/room/bed strings, which is what left a "ghost" occupied bed behind
+        // after a transfer (DEF-IPD-01).
+        var currentSegment = await historyRepository.GetCurrentSegmentAsync(registration.Id, registration.ApplicationId, cancellationToken);
+        if (currentSegment is not null)
         {
-            var bed = await bedRepository.FindByLocationAsync(
-                registration.ApplicationId, registration.WardName, registration.RoomNumber, registration.BedNumber, cancellationToken);
+            var bed = await bedRepository.GetByIdAsync(currentSegment.BedId, cancellationToken);
             bed?.MarkAvailable();
+            currentSegment.Close();
+            historyRepository.Update(currentSegment);
         }
 
         registration.Discharge(request.DischargeNotes);
         repository.Update(registration);
+
+        var dischargeDate = registration.DischargeDate!.Value;
 
         // Metered discharge, staged before the save for the same reason as the admission: the
         // discharge, its usage row and any wallet debit are one transaction, so a clinic with an
@@ -46,6 +52,10 @@ public sealed class DischargePatientHandler(
         await sender.Send(new ChargeUsageCommand(
             registration.ApplicationId, BillingItem.IpdDischarge, registration.Id,
             Quantity: 1, UserId: null, OccurredAt: null), cancellationToken);
+
+        // Locks the Final Bill as-of the discharge moment, in the same transaction — a null
+        // result just means billing is disabled for this clinic, which is not an error here.
+        await sender.Send(new FinalizeIpdBillCommand(registration.Id, registration.ApplicationId, dischargeDate), cancellationToken);
 
         await repository.SaveChangesAsync(cancellationToken);
 

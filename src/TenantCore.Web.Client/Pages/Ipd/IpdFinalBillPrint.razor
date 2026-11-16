@@ -1,0 +1,161 @@
+@page "/ipd/final-bill-print"
+@layout PrintLayout
+@inject IClinicApiClient ClinicClient
+@inject ClinicContextService ClinicContext
+@inject TenantCore.Web.Client.Services.AuthStateService AuthState
+@inject IJSRuntime JS
+@using System.Globalization
+@using TenantCore.Shared.Enums
+
+<PageTitle>Final bill - CloudClinic</PageTitle>
+
+@* Only resolves once FinalizeIpdBillCommand has run (i.e. after discharge) — the server
+   returns a 409 beforehand, shown here as an error rather than a bill. *@
+
+<style>
+    .ifb-bg { background:#F1F5F9; min-height:100vh; padding:24px; }
+    .ifb-bar { max-width:720px; margin:0 auto 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .ifb-btn { padding:8px 16px; border-radius:8px; border:none; color:#fff; cursor:pointer; font-size:12px; font-weight:700; }
+    .ifb-sheet { background:#fff; max-width:720px; margin:0 auto; padding:34px 38px 46px; border-radius:12px;
+                 box-shadow:0 4px 16px rgba(15,23,42,0.08); font-family:'Segoe UI',Arial,sans-serif; color:#0F172A; }
+    .ifb-banner { background:#DCFCE7; color:#166534; border-radius:8px; padding:10px 14px; font-size:12px; font-weight:700; margin:14px 0 18px; }
+    .ifb-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F1F5F9; font-size:13px; }
+    .ifb-row.total { font-weight:800; font-size:15px; border-top:2px solid #0F172A; border-bottom:none; padding-top:10px; margin-top:4px; }
+    .ifb-num { text-align:right; font-variant-numeric:tabular-nums; }
+    .ifb-foot { margin-top:26px; padding-top:12px; border-top:1px solid #E2E8F0; font-size:11px; color:#94A3B8; }
+
+    @@media print {
+        .no-print { display:none !important; }
+        .ifb-bg { background:#fff !important; padding:0 !important; }
+        .ifb-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; padding:0 !important; }
+    }
+</style>
+
+<div class="ifb-bg">
+    <div class="ifb-bar no-print">
+        <button class="ifb-btn" style="background:#EF4444;" @onclick='async () => await JS.InvokeVoidAsync("window.close")'>✕ Close</button>
+        <button class="ifb-btn" style="background:#1E3A5F;" @onclick='async () => await JS.InvokeVoidAsync("window.print")' disabled="@(_bill is null)">🖨️ Print</button>
+    </div>
+
+    <div class="ifb-sheet">
+        @if (_loading)
+        {
+            <div style="text-align:center;color:#64748B;font-size:13px;padding:30px 0;">Preparing the final bill…</div>
+        }
+        else if (_bill is null)
+        {
+            <div style="text-align:center;color:#B91C1C;font-size:13px;padding:30px 0;">@(_error ?? "The final bill could not be loaded.")</div>
+        }
+        else
+        {
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:2px solid #0F172A;padding-bottom:14px;">
+                <div>
+                    <div style="font-size:20px;font-weight:800;">@ClinicContext.SelectedApplicationName</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:2px;">@(_admission?.PatientName ?? "—") · Admission @(_admission?.AdmissionNumber ?? "—")</div>
+                </div>
+                <div style="text-align:right;font-size:12px;color:#64748B;">Finalized @_bill.FinalizedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+            </div>
+
+            @if (_bill.WasCancelled)
+            {
+                <div class="ifb-banner" style="background:#FEF2F2;color:#991B1B;">CANCELLED — No charge. All fees below were waived.</div>
+            }
+            else
+            {
+                <div class="ifb-banner">FINAL BILL — Locked at discharge.</div>
+            }
+
+            @* DEF-IPD-22: a cancelled stay's InitialFee/RoomChargesTotal below are the real,
+               un-waived figures the calculator computed from actual occupancy/fee history — kept
+               visible so it's clear *what* was waived, not just that something was — but the
+               Total/Final amount is still correctly ₹0.00, which otherwise read as the numbers not
+               adding up. The "(waived)" tag makes that explicit instead of leaving it implicit. *@
+            <div class="ifb-row"><span>Initial fee@(_bill.WasCancelled ? " (waived)" : "")</span><span class="ifb-num">@Money(_bill.InitialFee)</span></div>
+            <div class="ifb-row"><span>Room charges@(_bill.WasCancelled ? " (waived)" : "")</span><span class="ifb-num">@Money(_bill.RoomChargesTotal)</span></div>
+            <div class="ifb-row"><span>Particulars</span><span class="ifb-num">@Money(_bill.ParticularsTotal)</span></div>
+            <div class="ifb-row"><span>Total@(_bill.WasCancelled ? " (all waived)" : "")</span><span class="ifb-num">@Money(_bill.TotalAmount)</span></div>
+            @if (_bill.Discount > 0)
+            {
+                <div class="ifb-row"><span>Discount</span><span class="ifb-num">- @Money(_bill.Discount)</span></div>
+            }
+            @if (_bill.WriteOffTotal > 0)
+            {
+                <div class="ifb-row"><span>Shift charge write-off</span><span class="ifb-num">- @Money(_bill.WriteOffTotal)</span></div>
+            }
+            <div class="ifb-row total"><span>Final amount</span><span class="ifb-num">@Money(_bill.FinalAmount)</span></div>
+            <div class="ifb-row"><span>Deposited</span><span class="ifb-num">@Money(_bill.TotalDeposited)</span></div>
+            <div class="ifb-row total">
+                <span>@(_bill.BalanceDue >= 0 ? "Balance" : "Refund due")</span>
+                <span class="ifb-num">@Money(Math.Abs(_bill.BalanceDue)) — @StatusLabel()</span>
+            </div>
+
+            <div class="ifb-foot">
+                @if (_bill.WasCancelled)
+                {
+                    <text>This admission was cancelled — no room charge, initial fee or service item is billed, and any deposit collected is refunded in full.</text>
+                }
+                else
+                {
+                    <text>Collected via the clinic counter. This bill was computed from room-occupancy history that is fixed at discharge and cannot change.</text>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private IpdFinalBillDto? _bill;
+    private IpdRegistrationDto? _admission;
+    private bool _loading = true;
+    private string? _error;
+
+    [SupplyParameterFromQuery] public string? Id { get; set; }
+
+    // DEF-IPD-06: new tab via window.open boots a fresh WASM instance with no token until it's
+    // read back from storage — OnAfterRenderAsync(firstRender) is the same fix PrescriptionPrint
+    // uses, since OnInitializedAsync fires too early for that localStorage read to be safe.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        if (!Guid.TryParse(Id, out var id))
+        {
+            _error = "No admission was specified.";
+            _loading = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            await AuthState.InitializeAsync();
+            await ClinicContext.InitializeAsync();
+
+            var admissionTask = ClinicClient.GetIpdRegistrationByIdAsync(id);
+            var billTask = ClinicClient.GetIpdFinalBillAsync(id);
+            await Task.WhenAll(admissionTask, billTask);
+
+            var admissionResponse = await admissionTask;
+            if (admissionResponse.Success) _admission = admissionResponse.Data;
+
+            var billResponse = await billTask;
+            if (billResponse.Success) { _bill = billResponse.Data; _error = null; }
+            else _error = billResponse.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string StatusLabel()
+    {
+        if (_bill is null) return string.Empty;
+        if (_bill.RefundStatus == RefundStatus.PendingRefund) return "Refund pending";
+        if (_bill.RefundStatus == RefundStatus.Refunded) return "Refunded";
+        return _bill.PaymentStatus == PaymentStatus.Received ? "Collected" : "Pending collection";
+    }
+
+    private static string Money(decimal value) => "₹" + value.ToString("N2", CultureInfo.InvariantCulture);
+}

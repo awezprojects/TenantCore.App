@@ -17,6 +17,16 @@ public class ExceptionHandlingMiddlewareTests
     private readonly Mock<ILogger<ExceptionHandlingMiddleware>> _logger = new();
     private readonly Mock<IErrorLogger> _errorLogger = new();
 
+    private void VerifyLog(LogLevel level, Times times) =>
+        _logger.Verify(
+            x => x.Log(
+                level,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            times);
+
     private async Task<JsonDocument> InvokeAndReadResponseAsync(Exception exception)
     {
         var context = new DefaultHttpContext();
@@ -114,6 +124,30 @@ public class ExceptionHandlingMiddlewareTests
         doc.RootElement.GetProperty("status").GetInt32().Should().Be(409);
         doc.RootElement.GetProperty("title").GetString().Should().Be("Conflict");
         doc.RootElement.GetProperty("detail").GetString().Should().Be("This record already exists.");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WhenInvalidOperationException_LogsWarningNotError()
+    {
+        // DEF-IPD-11 (2): an expected business refusal (409) must not be logged as an
+        // "Unhandled exception" at Error severity — only a genuine 5xx should be.
+        var exception = new InvalidOperationException("Payments are not configured.");
+
+        await InvokeAndReadResponseAsync(exception);
+
+        VerifyLog(LogLevel.Warning, Times.Once());
+        VerifyLog(LogLevel.Error, Times.Never());
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WhenUnknownException_LogsErrorNotWarning()
+    {
+        var exception = new Exception("Something unexpected happened.");
+
+        await InvokeAndReadResponseAsync(exception);
+
+        VerifyLog(LogLevel.Error, Times.Once());
+        VerifyLog(LogLevel.Warning, Times.Never());
     }
 
     [Fact]

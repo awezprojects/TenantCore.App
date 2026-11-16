@@ -51,6 +51,22 @@ public class ClinicWalletTests
         wallet.Balance.Should().Be(750.50m);
     }
 
+    [Fact]
+    public void Credit_IsTopUpFalse_AddsFundsButDoesNotStampLastTopUpAt()
+    {
+        // DEF-IPD-23 (14-Nov): a usage-charge reversal (e.g. a cancelled admission) is undoing an
+        // earlier debit, not a top-up — the wallet page's "LAST TOP-UP" used to show the time of
+        // the most recent cancel reversal because this was never distinguished from a real top-up.
+        var wallet = NewWallet();
+        wallet.Credit(500m, Now);
+
+        var later = Now.AddDays(1);
+        wallet.Credit(10m, later, isTopUp: false);
+
+        wallet.Balance.Should().Be(510m, "the balance still moves the same way regardless of why");
+        wallet.LastTopUpAt.Should().Be(Now, "a non-top-up credit must not overwrite the real last top-up instant");
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
