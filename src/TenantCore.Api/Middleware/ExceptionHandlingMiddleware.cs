@@ -31,8 +31,6 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
     {
         var correlationId = context.TraceIdentifier;
 
-        logger.LogError(exception, "Unhandled exception. CorrelationId: {CorrelationId}", correlationId);
-
         var applicationId = context.Items.TryGetValue(ClinicContextMiddleware.ContextKey, out var item) && item is Guid id && id != Guid.Empty
             ? id
             : (Guid?)null;
@@ -69,6 +67,18 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 HttpStatusCode.Conflict, "Conflict", UserMessages.Conflict),
             _ => (HttpStatusCode.InternalServerError, "Server Error",       UserMessages.ServerError)
         };
+
+        // DEF-IPD-11 (2): this used to log every caught exception as LogError("Unhandled
+        // exception...") regardless of status, so an entirely expected, by-design business
+        // refusal (e.g. "Payments are not configured." → 409) was indistinguishable in the logs
+        // from a genuine server fault — full stack trace, [ERR] severity, the works. Only an
+        // actual 5xx is a real fault; every mapped 4xx is the API working as designed, so it now
+        // logs at Warning instead. The resolved status (set just below) is unaffected either way.
+        if ((int)statusCode >= 500)
+            logger.LogError(exception, "Unhandled exception. CorrelationId: {CorrelationId}", correlationId);
+        else
+            logger.LogWarning(exception, "Request refused with {StatusCode} {Title}. CorrelationId: {CorrelationId}",
+                (int)statusCode, title, correlationId);
 
         // Status first, then log: the error row records the ACTUAL status the client receives.
         context.Response.StatusCode = (int)statusCode;

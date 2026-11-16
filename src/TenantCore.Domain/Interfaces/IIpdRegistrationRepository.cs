@@ -9,4 +9,5 @@ public interface IIpdRegistrationRepository : IClinicRepository<IpdRegistration>
 
     Task<string> GetNextAdmissionNumberAsync(Guid applicationId, CancellationToken ct = default);
     Task<bool> HasActiveAdmissionAsync(Guid patientId, Guid applicationId, CancellationToken ct = default);
+    Task<IEnumerable<IpdRegistration>> GetDischargesByDateRangeAsync(DateTime fromUtc, DateTime toUtc, Guid applicationId, CancellationToken ct = default);
 }

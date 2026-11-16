@@ -295,7 +295,7 @@ public class DummyDataStoreTests
         db.Add(OpdParticular.Create(applicationId, dummyVisit.Id, Guid.NewGuid(), "X-Ray", 200m));
         db.Add(IpdRegistration.Create(
             applicationId, dummyPatient.Id, dummyVisit.DoctorUserId, "DUMMY Doctor", "DUMMY-IPD-1",
-            "DUMMY General Ward", "DUMMY-G-101", "DUMMY-1", 500m, null));
+            null, "DUMMY General Ward", "DUMMY-G-101", "DUMMY-1", 500m, null));
         await db.SaveChangesAsync();
 
         await Store(db).PurgeAsync(applicationId);

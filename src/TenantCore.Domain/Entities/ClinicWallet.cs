@@ -44,14 +44,25 @@ public class ClinicWallet : AuditableEntity
 
     public bool HasFunds(decimal amount) => Balance >= amount;
 
-    /// <summary>Adds funds. The caller stages the matching credit ledger row in the same SaveChanges.</summary>
-    public void Credit(decimal amount, DateTime utcNow)
+    /// <summary>
+    /// Adds funds. The caller stages the matching credit ledger row in the same SaveChanges.
+    /// </summary>
+    /// <param name="isTopUp">
+    /// DEF-IPD-23 (14-Nov): true for money genuinely entering the wallet (a paid top-up, or an
+    /// admin goodwill credit) — false for a credit that is only undoing an earlier debit (a
+    /// cancelled admission's usage-charge reversal). Both move <see cref="Balance"/> the same way,
+    /// but only the former should ever update <see cref="LastTopUpAt"/> — before this, "LAST
+    /// TOP-UP" on the wallet page showed the time of the most recent cancel reversal, which isn't
+    /// a top-up at all.
+    /// </param>
+    public void Credit(decimal amount, DateTime utcNow, bool isTopUp = true)
     {
         if (amount <= 0m)
             throw new DomainException("Invalid wallet amount.");
 
         Balance += amount;
-        LastTopUpAt = utcNow;
+        if (isTopUp)
+            LastTopUpAt = utcNow;
         SetUpdatedAt();
     }
 

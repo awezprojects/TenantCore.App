@@ -61,6 +61,25 @@ public class UsageBillingApiClient(HttpClient httpClient, AuthStateService authS
         catch (Exception ex) { return new ApiResponse<WalletTopUpPaymentDto> { Success = false, Message = ex.Message }; }
     }
 
+    public async Task<ApiResponse<WalletTopUpPaymentDto?>> GetActiveTopUpAsync()
+    {
+        try
+        {
+            SetAuth();
+            var response = await httpClient.GetAsync("api/usage-billing/wallet/top-up/active");
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+                return new ApiResponse<WalletTopUpPaymentDto?> { Success = true, Data = null };
+            return await Read<WalletTopUpPaymentDto?>(response);
+        }
+        catch (Exception ex) { return new ApiResponse<WalletTopUpPaymentDto?> { Success = false, Message = ex.Message }; }
+    }
+
+    public async Task<ApiResponse<WalletTopUpPaymentDto>> GetTopUpStatusAsync(Guid paymentId)
+    {
+        try { SetAuth(); return await Read<WalletTopUpPaymentDto>(await httpClient.GetAsync($"api/usage-billing/wallet/top-up/{paymentId}")); }
+        catch (Exception ex) { return new ApiResponse<WalletTopUpPaymentDto> { Success = false, Message = ex.Message }; }
+    }
+
     public async Task<ApiResponse> CheckTopUpAsync(Guid paymentId)
     {
         try { SetAuth(); return await ReadVoid(await httpClient.PostAsync($"api/usage-billing/wallet/top-up/{paymentId}/check", null)); }

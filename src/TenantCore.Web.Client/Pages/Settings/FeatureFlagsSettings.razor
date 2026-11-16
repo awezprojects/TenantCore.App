@@ -4,6 +4,7 @@
 @inject IToastService Toast
 @inject TenantCore.Web.Client.Services.FeatureFlagsContextService FeatureFlagsContext
 @using TenantCore.Shared.Dtos
+@using TenantCore.Shared.Enums
 
 <PageTitle>Feature Flags - Settings</PageTitle>
 
@@ -64,6 +65,127 @@ else
             </label>
         </div>
     </div>
+
+    <div style="background:#fff;border-radius:14px;border:1px solid #E2E8F0;padding:22px;max-width:520px;margin-top:16px;">
+        <div style="font-size:14px;font-weight:800;color:#1E293B;">IPD Room Billing</div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px;margin-bottom:14px;line-height:1.5;">
+            Both settings below must be chosen before this clinic can allocate a bed to any patient — there is
+            no default. Reception will see a clear error on admission or bed transfer until both are set here.
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px;">Room billing cycle</label>
+            <select class="opd-search-input" style="width:100%;" value="@(_ipdRoomBillingCycle?.ToString() ?? "")"
+                    disabled="@_saving" @onchange="OnRoomBillingCycleChangedAsync">
+                <option value="">Select…</option>
+                <option value="@RoomBillingCycle.PerCalendarDay">Per calendar day (charge changes at midnight)</option>
+                <option value="@RoomBillingCycle.Per24HourBlock">Per 24-hour block from admission time</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px;">Mid-stay bed/room change charge</label>
+            <select class="opd-search-input" style="width:100%;" value="@(_ipdMidStayChargeMode?.ToString() ?? "")"
+                    disabled="@_saving" @onchange="OnMidStayChargeModeChangedAsync">
+                <option value="">Select…</option>
+                <option value="@MidStayBedChangeChargeMode.FullDayCharge">Full day/block charge on the day of change</option>
+                <option value="@MidStayBedChangeChargeMode.Prorated">Prorated between the old and new room for that day</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px;">
+                Full-day shift rate rule
+            </label>
+            <div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">
+                Which rate a shift day bills under "Full day/block charge" when the old and new room have
+                different rates. Defaults to the new (destination) room's rate — today's behavior.
+            </div>
+            <select class="opd-search-input" style="width:100%;" value="@_ipdFullDayShiftRateRule"
+                    disabled="@_saving" @onchange="OnFullDayShiftRateRuleChangedAsync">
+                <option value="@IpdFullDayShiftRateRule.DestinationRoomRate">New (destination) room's rate</option>
+                <option value="@IpdFullDayShiftRateRule.OriginRoomRate">Old (origin) room's rate</option>
+                <option value="@IpdFullDayShiftRateRule.HigherRate">Whichever room costs more</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px;">
+                Quick-shift grace window (minutes)
+            </label>
+            <div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">
+                A shift within this many minutes of occupying the current room gets the grace rule below
+                instead of the normal charge. 0 turns this off. Max 1440 (24 hours).
+            </div>
+            <input class="opd-search-input" type="number" min="0" max="1440" step="5" style="width:160px;"
+                   value="@_ipdShiftGraceWindowMinutes" disabled="@_saving"
+                   @onchange="OnGraceWindowChangedAsync" />
+        </div>
+
+        @if (_ipdShiftGraceWindowMinutes > 0)
+        {
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px;">Grace rule</label>
+                <select class="opd-search-input" style="width:100%;" value="@(_ipdShiftGraceRule?.ToString() ?? "")"
+                        disabled="@_saving" @onchange="OnGraceRuleChangedAsync">
+                    <option value="">Select…</option>
+                    <option value="@IpdShiftGraceRule.NewRoomOnly">Charge the new room only</option>
+                    <option value="@IpdShiftGraceRule.LowerRate">Charge the lower of the two rates</option>
+                    <option value="@IpdShiftGraceRule.OldRoomOnly">Charge the old room only (new room starts next day)</option>
+                </select>
+                @if (_ipdShiftGraceRule is null)
+                {
+                    <div style="font-size:11px;color:#D97706;margin-top:6px;">
+                        Select a grace rule to save the window — it isn't saved yet.
+                    </div>
+                }
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(_graceWindowError))
+        {
+            <div style="font-size:12px;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;
+                        border-radius:8px;padding:8px 10px;margin-bottom:14px;">
+                @_graceWindowError
+            </div>
+        }
+
+        <div>
+            <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px;">
+                Manual shift charge override
+            </label>
+            <div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">
+                Who, if anyone, may type in a specific amount for the room being left at shift time (capped
+                at that room's standard charge, with a reason required).
+            </div>
+            <select class="opd-search-input" style="width:100%;" value="@_ipdManualShiftChargeMode"
+                    disabled="@_saving" @onchange="OnManualShiftChargeModeChangedAsync">
+                <option value="@IpdManualShiftChargeMode.Off">Off</option>
+                <option value="@IpdManualShiftChargeMode.AdminOnly">Clinic Admin only</option>
+                <option value="@IpdManualShiftChargeMode.AdminAndReception">Clinic Admin and Reception</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="background:#fff;border-radius:14px;border:1px solid #E2E8F0;padding:22px;max-width:520px;margin-top:16px;">
+        <div style="font-size:14px;font-weight:800;color:#1E293B;">IPD Cancellation Window</div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px;margin-bottom:14px;line-height:1.5;">
+            How long after admission a reception/admin can still Cancel an admission free of charge (₹0 bill,
+            full deposit refund). 0 means unlimited — Cancel is always free, regardless of how long ago the
+            patient was admitted (today's behavior). Once a real value is set, cancelling after the window has
+            passed is refused — the patient must be Discharged instead, which bills for whatever was actually
+            consumed.
+        </div>
+        <label style="font-size:12px;font-weight:700;color:#334155;display:block;margin-bottom:6px;">
+            Cancellation window (minutes)
+        </label>
+        <input class="opd-search-input" type="number" min="0" max="1440" step="5" style="width:160px;"
+               value="@_ipdCancelWindowMinutes" disabled="@_saving"
+               @onchange="OnCancelWindowChangedAsync" />
+        <div style="font-size:11px;color:#94A3B8;margin-top:6px;">
+            Max 1440 (24 hours). For example, 60 means a cancellation within an hour of admission is free;
+            after that, only Discharge is available.
+        </div>
+    </div>
 }
 
 @code {
@@ -71,14 +193,21 @@ else
     private bool _saving;
     private bool _prepaidOpdEnabled = true;
     private bool _billingEnabled = true;
+    private RoomBillingCycle? _ipdRoomBillingCycle;
+    private MidStayBedChangeChargeMode? _ipdMidStayChargeMode;
+    private int _ipdShiftGraceWindowMinutes;
+    private IpdShiftGraceRule? _ipdShiftGraceRule;
+    private IpdManualShiftChargeMode _ipdManualShiftChargeMode = IpdManualShiftChargeMode.Off;
+    private IpdFullDayShiftRateRule _ipdFullDayShiftRateRule = IpdFullDayShiftRateRule.DestinationRoomRate;
+    private int _ipdCancelWindowMinutes;
+    private string? _graceWindowError;
 
     protected override async Task OnInitializedAsync()
     {
         var r = await ClinicClient.GetFeatureFlagsAsync();
         if (r.Success && r.Data is not null)
         {
-            _prepaidOpdEnabled = r.Data.PrepaidOpdEnabled;
-            _billingEnabled = r.Data.BillingEnabled;
+            ApplyFromServer(r.Data);
         }
         else if (!r.Success)
         {
@@ -87,32 +216,150 @@ else
         _loading = false;
     }
 
+    // DEF-IPD-28 (16-Nov): every field here used to be set from the value the *client* just sent
+    // (an "optimistic" local write), not from what the server actually persisted — even though the
+    // PUT response already returns the authoritative, saved DTO. Whenever a save raced with another
+    // in-flight save (e.g. changing two fields in quick succession, each capturing a snapshot of the
+    // other's not-yet-applied local state via its own `?? _field` fallback — see SaveAsync below) or
+    // the server normalized/clamped a value, the page would keep showing what the user *typed*
+    // instead of what actually got saved, with no visible sign anything was wrong until a reload.
+    // Always resync every field from the server's response instead of trusting local state.
+    private void ApplyFromServer(ClinicFeatureFlagsDto dto)
+    {
+        _prepaidOpdEnabled = dto.PrepaidOpdEnabled;
+        _billingEnabled = dto.BillingEnabled;
+        _ipdRoomBillingCycle = dto.IpdRoomBillingCycle;
+        _ipdMidStayChargeMode = dto.IpdMidStayChargeMode;
+        _ipdShiftGraceWindowMinutes = dto.IpdShiftGraceWindowMinutes;
+        _ipdShiftGraceRule = dto.IpdShiftGraceRule;
+        _ipdManualShiftChargeMode = dto.IpdManualShiftChargeMode;
+        _ipdFullDayShiftRateRule = dto.IpdFullDayShiftRateRule;
+        _ipdCancelWindowMinutes = dto.IpdCancelWindowMinutes;
+    }
+
     private async Task TogglePrepaidOpdAsync(ChangeEventArgs e)
     {
         var newValue = e.Value is bool b && b;
-        await SaveAsync(newValue, _billingEnabled, () => _prepaidOpdEnabled = newValue);
+        await SaveAsync(newValue, _billingEnabled, _ipdRoomBillingCycle, _ipdMidStayChargeMode);
     }
 
     private async Task ToggleBillingAsync(ChangeEventArgs e)
     {
         var newValue = e.Value is bool b && b;
-        await SaveAsync(_prepaidOpdEnabled, newValue, () => _billingEnabled = newValue);
+        await SaveAsync(_prepaidOpdEnabled, newValue, _ipdRoomBillingCycle, _ipdMidStayChargeMode);
     }
 
-    private async Task SaveAsync(bool prepaidOpdEnabled, bool billingEnabled, Action applyLocally)
+    private async Task OnRoomBillingCycleChangedAsync(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        var newValue = string.IsNullOrEmpty(raw) ? (RoomBillingCycle?)null : Enum.Parse<RoomBillingCycle>(raw);
+        await SaveAsync(_prepaidOpdEnabled, _billingEnabled, newValue, _ipdMidStayChargeMode);
+    }
+
+    private async Task OnMidStayChargeModeChangedAsync(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        var newValue = string.IsNullOrEmpty(raw) ? (MidStayBedChangeChargeMode?)null : Enum.Parse<MidStayBedChangeChargeMode>(raw);
+        await SaveAsync(_prepaidOpdEnabled, _billingEnabled, _ipdRoomBillingCycle, newValue);
+    }
+
+    private async Task OnFullDayShiftRateRuleChangedAsync(ChangeEventArgs e)
+    {
+        var newValue = Enum.Parse<IpdFullDayShiftRateRule>(e.Value!.ToString()!);
+        await SaveAsync(_prepaidOpdEnabled, _billingEnabled, _ipdRoomBillingCycle, _ipdMidStayChargeMode,
+            fullDayShiftRateRule: newValue);
+    }
+
+    private async Task OnGraceWindowChangedAsync(ChangeEventArgs e)
+    {
+        // OBS-23: clamp client-side too, matching the server's 0..1440 cap, so an obviously too-large
+        // typed value doesn't round-trip to a 400 before the user notices.
+        var newValue = int.TryParse(e.Value?.ToString(), out var minutes) ? Math.Clamp(minutes, 0, 1440) : 0;
+        // Turning the window off clears the (now meaningless) grace rule too, matching the
+        // server's own ClinicFeatureFlags.UpdateShiftChargingSettings behavior.
+        var newRule = newValue > 0 ? _ipdShiftGraceRule : null;
+
+        // DEF-IPD-28 (16-Nov): this used to call SaveAsync immediately with whatever rule happened
+        // to already be set (null, the first time window is turned on) — the server always 400s on
+        // "window > 0 with no rule," and until that save succeeds, _ipdShiftGraceWindowMinutes
+        // (which the rule dropdown's @if gates on) never updates. So the one control the user needs
+        // to fix the 400 never appeared: a catch-22. Set the field immediately so the dropdown shows
+        // up right away, and only hit the server once there's something valid to save.
+        _ipdShiftGraceWindowMinutes = newValue;
+        _graceWindowError = null;
+        if (newValue > 0 && newRule is null)
+        {
+            return;
+        }
+
+        var ok = await SaveAsync(_prepaidOpdEnabled, _billingEnabled, _ipdRoomBillingCycle, _ipdMidStayChargeMode,
+            graceWindowMinutes: newValue, graceRule: newRule);
+        if (!ok) _graceWindowError = _lastSaveError;
+    }
+
+    private async Task OnGraceRuleChangedAsync(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        var newValue = string.IsNullOrEmpty(raw) ? (IpdShiftGraceRule?)null : Enum.Parse<IpdShiftGraceRule>(raw);
+        var ok = await SaveAsync(_prepaidOpdEnabled, _billingEnabled, _ipdRoomBillingCycle, _ipdMidStayChargeMode,
+            graceRule: newValue);
+        _graceWindowError = ok ? null : _lastSaveError;
+    }
+
+    private async Task OnManualShiftChargeModeChangedAsync(ChangeEventArgs e)
+    {
+        var newValue = Enum.Parse<IpdManualShiftChargeMode>(e.Value!.ToString()!);
+        await SaveAsync(_prepaidOpdEnabled, _billingEnabled, _ipdRoomBillingCycle, _ipdMidStayChargeMode,
+            manualShiftChargeMode: newValue);
+    }
+
+    private async Task OnCancelWindowChangedAsync(ChangeEventArgs e)
+    {
+        // Clamp client-side too, matching the server's 0..1440 cap.
+        var newValue = int.TryParse(e.Value?.ToString(), out var minutes) ? Math.Clamp(minutes, 0, 1440) : 0;
+        await SaveAsync(_prepaidOpdEnabled, _billingEnabled, _ipdRoomBillingCycle, _ipdMidStayChargeMode,
+            cancelWindowMinutes: newValue);
+    }
+
+    // Set by SaveAsync on failure (null on success) so a caller that needs a message that
+    // outlives the ~3.5s toast — see DEF-IPD-28's _graceWindowError — can display its own copy.
+    private string? _lastSaveError;
+
+    private async Task<bool> SaveAsync(
+        bool prepaidOpdEnabled, bool billingEnabled,
+        RoomBillingCycle? ipdRoomBillingCycle, MidStayBedChangeChargeMode? ipdMidStayChargeMode,
+        int? graceWindowMinutes = null,
+        IpdShiftGraceRule? graceRule = null,
+        IpdManualShiftChargeMode? manualShiftChargeMode = null,
+        IpdFullDayShiftRateRule? fullDayShiftRateRule = null,
+        int? cancelWindowMinutes = null)
     {
         _saving = true;
-        var r = await ClinicClient.UpdateFeatureFlagsAsync(new UpdateClinicFeatureFlagsDto(prepaidOpdEnabled, billingEnabled));
-        if (r.Success)
+        var r = await ClinicClient.UpdateFeatureFlagsAsync(new UpdateClinicFeatureFlagsDto(
+            prepaidOpdEnabled, billingEnabled, ipdRoomBillingCycle, ipdMidStayChargeMode,
+            graceWindowMinutes ?? _ipdShiftGraceWindowMinutes,
+            graceRule ?? _ipdShiftGraceRule,
+            manualShiftChargeMode ?? _ipdManualShiftChargeMode,
+            fullDayShiftRateRule ?? _ipdFullDayShiftRateRule,
+            cancelWindowMinutes ?? _ipdCancelWindowMinutes));
+        bool success;
+        if (r.Success && r.Data is not null)
         {
-            applyLocally();
+            // DEF-IPD-28: sync from what the server actually saved, not from the value this call
+            // happened to send — see ApplyFromServer's comment above for why that matters.
+            ApplyFromServer(r.Data);
             await FeatureFlagsContext.RefreshAsync();
             Toast.ShowSuccess("Feature flag updated.");
+            _lastSaveError = null;
+            success = true;
         }
         else
         {
-            Toast.ShowError(r.Message ?? "Failed to update feature flag.");
+            _lastSaveError = r.Message ?? "Failed to update feature flag.";
+            Toast.ShowError(_lastSaveError);
+            success = false;
         }
         _saving = false;
+        return success;
     }
 }

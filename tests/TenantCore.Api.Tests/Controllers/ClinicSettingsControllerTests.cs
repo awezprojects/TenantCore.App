@@ -151,7 +151,7 @@ public class ClinicSettingsControllerTests
         _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(dto);
 
-        var result = await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false, false), CancellationToken.None);
+        var result = await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false, false, null, null), CancellationToken.None);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         ok.Value.Should().BeSameAs(dto);
@@ -163,7 +163,7 @@ public class ClinicSettingsControllerTests
         _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(new ClinicFeatureFlagsDto());
 
-        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false, true), CancellationToken.None);
+        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(false, true, null, null), CancellationToken.None);
 
         _sender.Verify(s => s.Send(
             It.Is<UpdateClinicFeatureFlagsCommand>(c => c.ApplicationId == _applicationId && c.PrepaidOpdEnabled == false && c.BillingEnabled == true),
@@ -176,7 +176,7 @@ public class ClinicSettingsControllerTests
         _sender.Setup(s => s.Send(It.IsAny<UpdateClinicFeatureFlagsCommand>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(new ClinicFeatureFlagsDto());
 
-        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(true, false), CancellationToken.None);
+        await _controller.UpdateFeatureFlags(new UpdateClinicFeatureFlagsDto(true, false, null, null), CancellationToken.None);
 
         _sender.Verify(s => s.Send(
             It.Is<UpdateClinicFeatureFlagsCommand>(c => c.ApplicationId == _applicationId && c.PrepaidOpdEnabled == true && c.BillingEnabled == false),

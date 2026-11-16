@@ -18,6 +18,7 @@ public static class IpdRegistrationTranslator
         AdmissionNumber = entity.AdmissionNumber,
         AdmissionDate = entity.AdmissionDate,
         DischargeDate = entity.DischargeDate,
+        CurrentBedId = entity.CurrentBedId,
         WardName = entity.WardName,
         RoomNumber = entity.RoomNumber,
         BedNumber = entity.BedNumber,

@@ -35,6 +35,10 @@ public static class DependencyInjection
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<IOpdRegistrationRepository, OpdRegistrationRepository>();
         services.AddScoped<IIpdRegistrationRepository, IpdRegistrationRepository>();
+        services.AddScoped<IIpdBedTransferHistoryRepository, IpdBedTransferHistoryRepository>();
+        services.AddScoped<IIpdDepositRepository, IpdDepositRepository>();
+        services.AddScoped<IIpdParticularRepository, IpdParticularRepository>();
+        services.AddScoped<IIpdPaymentRepository, IpdPaymentRepository>();
         services.AddScoped<IClinicFeeConfigRepository, ClinicFeeConfigRepository>();
 
         // Pay-as-you-go metering (Phase 2). The options carry safe defaults, so the feature runs with

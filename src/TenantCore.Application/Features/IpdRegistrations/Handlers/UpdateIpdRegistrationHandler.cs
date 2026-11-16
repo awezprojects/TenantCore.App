@@ -21,10 +21,7 @@ public sealed class UpdateIpdRegistrationHandler(IIpdRegistrationRepository repo
         if (!accessValidator.CanAccess(registration.ApplicationId))
             throw new UnauthorizedAccessException("Access denied.");
 
-        registration.Update(
-            request.DoctorUserId, request.DoctorName,
-            request.WardName, request.RoomNumber, request.BedNumber,
-            request.Status, request.AdmissionNotes);
+        registration.Update(request.DoctorUserId, request.DoctorName, request.AdmissionNotes);
 
         repository.Update(registration);
         await repository.SaveChangesAsync(cancellationToken);

@@ -21,6 +21,7 @@ internal sealed class IpdRegistrationConfiguration : IEntityTypeConfiguration<Ip
         builder.Property(i => i.AdmissionNumber).IsRequired().HasMaxLength(30);
         builder.HasIndex(i => new { i.ApplicationId, i.AdmissionNumber }).IsUnique();
         builder.Property(i => i.AdmissionDate).IsRequired();
+        builder.Property(i => i.CurrentBedId);
         builder.Property(i => i.WardName).HasMaxLength(100);
         builder.Property(i => i.RoomNumber).HasMaxLength(20);
         builder.Property(i => i.BedNumber).HasMaxLength(20);
@@ -38,5 +39,10 @@ internal sealed class IpdRegistrationConfiguration : IEntityTypeConfiguration<Ip
                .WithMany()
                .HasForeignKey(i => i.PatientId)
                .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Bed>()
+               .WithMany()
+               .HasForeignKey(i => i.CurrentBedId)
+               .OnDelete(DeleteBehavior.NoAction);
     }
 }

@@ -1,0 +1,161 @@
+@page "/ipd/provisional-bill-print"
+@layout PrintLayout
+@inject IClinicApiClient ClinicClient
+@inject ClinicContextService ClinicContext
+@inject AuthStateService AuthState
+@inject IJSRuntime JS
+@using System.Globalization
+@using TenantCore.Shared.Enums
+@using TenantCore.Web.Client.Services
+
+<PageTitle>Provisional bill - CloudClinic</PageTitle>
+
+@* Reached from the IPD admission's Deposit & Bill tab. Always computed live by the server at
+   the moment this page loads — never assume it matches a previous view. *@
+
+<style>
+    .ipb-bg { background:#F1F5F9; min-height:100vh; padding:24px; }
+    .ipb-bar { max-width:720px; margin:0 auto 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .ipb-btn { padding:8px 16px; border-radius:8px; border:none; color:#fff; cursor:pointer; font-size:12px; font-weight:700; }
+    .ipb-sheet { background:#fff; max-width:720px; margin:0 auto; padding:34px 38px 46px; border-radius:12px;
+                 box-shadow:0 4px 16px rgba(15,23,42,0.08); font-family:'Segoe UI',Arial,sans-serif; color:#0F172A; }
+    .ipb-banner { background:#FEF3C7; color:#92400E; border-radius:8px; padding:10px 14px; font-size:12px; font-weight:700; margin:14px 0 18px; }
+    .ipb-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #F1F5F9; font-size:13px; }
+    .ipb-row.total { font-weight:800; font-size:15px; border-top:2px solid #0F172A; border-bottom:none; padding-top:10px; margin-top:4px; }
+    .ipb-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+    .ipb-table th { text-align:left; background:#F8FAFC; color:#475569; font-size:10.5px; text-transform:uppercase; padding:8px 10px; border-bottom:1.5px solid #E2E8F0; }
+    .ipb-table td { padding:6px 10px; border-bottom:1px solid #F1F5F9; }
+    .ipb-num { text-align:right; font-variant-numeric:tabular-nums; }
+    .ipb-foot { margin-top:26px; padding-top:12px; border-top:1px solid #E2E8F0; font-size:11px; color:#94A3B8; }
+
+    @@media print {
+        .no-print { display:none !important; }
+        .ipb-bg { background:#fff !important; padding:0 !important; }
+        .ipb-sheet { box-shadow:none !important; border-radius:0 !important; max-width:none !important; width:100% !important; padding:0 !important; }
+    }
+</style>
+
+<div class="ipb-bg">
+    <div class="ipb-bar no-print">
+        <button class="ipb-btn" style="background:#EF4444;" @onclick='async () => await JS.InvokeVoidAsync("window.close")'>✕ Close</button>
+        <button class="ipb-btn" style="background:#1E3A5F;" @onclick='async () => await JS.InvokeVoidAsync("window.print")' disabled="@(_bill is null)">🖨️ Print</button>
+    </div>
+
+    <div class="ipb-sheet">
+        @if (_loading)
+        {
+            <div style="text-align:center;color:#64748B;font-size:13px;padding:30px 0;">Preparing the provisional bill…</div>
+        }
+        else if (_bill is null)
+        {
+            <div style="text-align:center;color:#B91C1C;font-size:13px;padding:30px 0;">@(_error ?? "The provisional bill could not be loaded.")</div>
+        }
+        else
+        {
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;border-bottom:2px solid #0F172A;padding-bottom:14px;">
+                <div>
+                    <div style="font-size:20px;font-weight:800;">@ClinicContext.SelectedApplicationName</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:2px;">@(_admission?.PatientName ?? "—") · Admission @(_admission?.AdmissionNumber ?? "—")</div>
+                </div>
+                <div style="text-align:right;font-size:12px;color:#64748B;">Generated @_generatedAt.ToString("dd MMM yyyy HH:mm")</div>
+            </div>
+
+            <div class="ipb-banner">PROVISIONAL BILL — Amount payable if discharged today. Not final, subject to change.</div>
+
+            <div class="ipb-row"><span>Initial fee</span><span class="ipb-num">@Money(_bill.InitialFee)</span></div>
+            <div class="ipb-row"><span>Room charges</span><span class="ipb-num">@Money(_bill.RoomChargesTotal)</span></div>
+            <div class="ipb-row"><span>Particulars</span><span class="ipb-num">@Money(_bill.ParticularsTotal)</span></div>
+            <div class="ipb-row"><span>Total</span><span class="ipb-num">@Money(_bill.TotalAmount)</span></div>
+            @if (_bill.Discount > 0)
+            {
+                <div class="ipb-row"><span>Discount</span><span class="ipb-num">- @Money(_bill.Discount)</span></div>
+            }
+            @if (_bill.WriteOffTotal > 0)
+            {
+                <div class="ipb-row"><span>Shift charge write-off</span><span class="ipb-num">- @Money(_bill.WriteOffTotal)</span></div>
+            }
+            <div class="ipb-row total"><span>Final amount</span><span class="ipb-num">@Money(_bill.FinalAmount)</span></div>
+            <div class="ipb-row"><span>Deposited so far</span><span class="ipb-num">@Money(_bill.TotalDeposited)</span></div>
+            <div class="ipb-row total"><span>@(_bill.BalanceDue >= 0 ? "Balance payable" : "Refund due")</span><span class="ipb-num">@Money(Math.Abs(_bill.BalanceDue))</span></div>
+
+            @if (_bill.RoomChargeLineItems.Count > 0)
+            {
+                <table class="ipb-table">
+                    <thead><tr><th>Period</th><th>Ward / Room / Bed</th><th>Adjustment</th><th class="ipb-num">Amount</th></tr></thead>
+                    <tbody>
+                        @foreach (var item in _bill.RoomChargeLineItems)
+                        {
+                            <tr>
+                                <td>@item.PeriodStart.ToLocalTime().ToString("dd MMM, HH:mm") – @item.PeriodEnd.ToLocalTime().ToString("dd MMM, HH:mm")</td>
+                                <td>@item.WardName / @item.RoomNumber / @item.BedNumber</td>
+                                <td>
+                                    @if (item.AdjustmentType != IpdBillAdjustmentType.None)
+                                    {
+                                        @(item.AdjustmentType == IpdBillAdjustmentType.Grace ? "Grace" : "Manual")
+                                        @(item.Reason is { Length: > 0 } ? $" — {item.Reason}" : "")
+                                        @($" (std. {Money(item.StandardAmount)})")
+                                    }
+                                </td>
+                                <td class="ipb-num">@Money(item.Amount)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <div class="ipb-foot">This is a provisional estimate as of the moment it was generated — it will change if the stay continues, a service item is added, or a deposit is collected. It becomes the Final Bill only at discharge.</div>
+        }
+    </div>
+</div>
+
+@code {
+    private IpdProvisionalBillDto? _bill;
+    private IpdRegistrationDto? _admission;
+    private DateTime _generatedAt = DateTime.Now;
+    private bool _loading = true;
+    private string? _error;
+
+    [SupplyParameterFromQuery] public string? Id { get; set; }
+
+    // DEF-IPD-06: this page opens in a brand-new browser tab via window.open, which boots a
+    // fresh, separate WASM app instance — AuthStateService starts with no token until it reads
+    // one back from storage. OnInitializedAsync ran too early for that localStorage read to be
+    // safe; OnAfterRenderAsync(firstRender) is the same fix PrescriptionPrint.razor already uses.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        if (!Guid.TryParse(Id, out var id))
+        {
+            _error = "No admission was specified.";
+            _loading = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            await AuthState.InitializeAsync();
+            await ClinicContext.InitializeAsync();
+
+            _generatedAt = DateTime.Now;
+            var admissionTask = ClinicClient.GetIpdRegistrationByIdAsync(id);
+            var billTask = ClinicClient.GetIpdProvisionalBillAsync(id);
+            await Task.WhenAll(admissionTask, billTask);
+
+            var admissionResponse = await admissionTask;
+            if (admissionResponse.Success) _admission = admissionResponse.Data;
+
+            var billResponse = await billTask;
+            if (billResponse.Success) { _bill = billResponse.Data; _error = null; }
+            else _error = billResponse.Message;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string Money(decimal value) => "₹" + value.ToString("N2", CultureInfo.InvariantCulture);
+}

@@ -39,14 +39,11 @@ public class BedRepository(ClinicDbContext dbContext) : ClinicRepository<Bed>(db
         return await query.AnyAsync(cancellationToken);
     }
 
-    public async Task<Bed?> FindByLocationAsync(Guid applicationId, string wardName, string roomNumber, string bedNumber, CancellationToken cancellationToken = default)
+    // Admission/transfer now resolve a bed by id, not by free-text name (DEF-IPD-03) — both
+    // need Ward/Room loaded to populate the display snapshot and read Room.PricePerDay.
+    public override async Task<Bed?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await DbSet
             .Include(b => b.Ward)
             .Include(b => b.Room)
-            .FirstOrDefaultAsync(b =>
-                b.ApplicationId == applicationId &&
-                b.Ward.Name == wardName &&
-                b.Room.RoomNumber == roomNumber &&
-                b.BedNumber == bedNumber,
-            cancellationToken);
+            .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
 }

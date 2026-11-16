@@ -4,6 +4,7 @@
 @inject UsageBillingContextService UsageBillingContext
 @inject NavigationManager NavigationManager
 @inject ClinicContextService ClinicContext
+@inject IJSRuntime JS
 @using TenantCore.Shared.Enums
 @using TenantCore.Shared.Dtos.UsageBilling
 
@@ -32,7 +33,7 @@
     else
     {
         @* Balance, threshold, low warning and the top-up shortcut. *@
-        <WalletBalanceCard Wallet="_wallet" TopUpHref="#topup-amount" />
+        <WalletBalanceCard Wallet="_wallet" OnTopUpClick="ScrollToTopUpAsync" />
 
         @* What each metered operation costs — read off the shared billing summary, never a second fetch. *@
         <UsageRatesTable Rates="UsageBillingContext.Summary?.Rates ?? []" Currency="@_wallet.Currency" />
@@ -90,4 +91,9 @@
     {
         await Task.WhenAll(LoadAsync(), UsageBillingContext.RefreshAsync());
     }
+
+    // DEF-IPD-15: replaces href="#topup-amount", which resolved against this app's <base href="/">
+    // and sent the click to the clinic selector instead of scrolling within this page.
+    private async Task ScrollToTopUpAsync()
+        => await JS.InvokeVoidAsync("ccScrollToAndFocus", "topup-amount");
 }

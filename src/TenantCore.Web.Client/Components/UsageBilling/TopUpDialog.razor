@@ -1,7 +1,9 @@
 @using TenantCore.Shared.Dtos.UsageBilling
+@using TenantCore.Shared.Enums
 @inject IUsageBillingApiClient UsageBillingApi
 @inject IToastService Toast
 @inject IJSRuntime JS
+@implements IDisposable
 
 @* Wallet top-up: amount entry with presets and min/max hints, a confirmation, then the payment link
    with copy and "I've paid — check now". Nothing is credited until the gateway confirms; raises
@@ -22,8 +24,12 @@
             <label for="topup-amount" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">
                 Amount (@Currency)
             </label>
-            <input id="topup-amount" class="form-input" type="number" min="1" step="1" @bind="_amount"
-                   style="width:160px;" />
+            @* Bug: @bind defaults to the onchange event, which only fires on blur — so the
+               "Create payment link" button stayed disabled until the field lost focus, even
+               right after typing an amount. @bind:event="oninput" updates _amount (and the
+               button's disabled check) on every keystroke instead. *@
+            <input id="topup-amount" class="form-input" type="number" min="1" step="1"
+                   @bind="_amount" @bind:event="oninput" style="width:160px;" />
         </div>
 
         @foreach (var quick in QuickAmounts)
@@ -33,15 +39,31 @@
             </button>
         }
 
-        <button class="btn btn-primary" @onclick="() => _confirm = true" disabled="@_busy || _amount <= 0m">
+        @* DEF-IPD-10: `@_busy || _amount <= 0m` only treats `@_busy` as an expression — everything
+           after is literal text appended to the attribute, so `disabled` was always a non-empty
+           string and the button was permanently disabled no matter what. Needs one `@(...)`
+           wrapping the whole boolean expression. *@
+        <button class="btn btn-primary" @onclick="() => { _confirm = true; _errorMessage = null; }" disabled="@(_busy || _amount <= 0m)">
             Create payment link
         </button>
     </div>
 
-    <div style="font-size:12px;color:#64748B;margin-top:8px;">
-        The amount is checked against CloudClinic's top-up limits — an amount outside them creates nothing
-        and the reason is shown here.
-    </div>
+    @* DEF-IPD-11(b): this text promised "the reason is shown here", but nothing ever populated it —
+       a failed Create/Check only fired a 3.5s toast and otherwise left the confirm dialog open with
+       no visible explanation. _errorMessage now actually fills this line on failure. *@
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div style="font-size:12px;color:#991B1B;background:#FEF2F2;border-left:3px solid #DC2626;border-radius:6px;padding:8px 10px;margin-top:8px;">
+            @_errorMessage
+        </div>
+    }
+    else
+    {
+        <div style="font-size:12px;color:#64748B;margin-top:8px;">
+            The amount is checked against CloudClinic's top-up limits — an amount outside them creates nothing
+            and the reason is shown here.
+        </div>
+    }
 
     @if (_topUp is not null)
     {
@@ -49,25 +71,41 @@
             <div style="font-size:13px;font-weight:700;color:#1E293B;margin-bottom:6px;">
                 Top-up link — @_topUp.Amount.ToString("N2")
             </div>
-            @if (!string.IsNullOrWhiteSpace(_topUp.PaymentLinkUrl))
+            @if (_topUp.Status == SubscriptionPaymentStatus.Paid)
+            {
+                @* The payment link must disappear once paid — otherwise it sits there forever and
+                   can be clicked (and paid) again. Crediting the wallet is a separate background
+                   step after confirmation (ConfirmPayment marks Paid, CreditWallet moves the
+                   balance), so there's a real — if usually brief — gap between "paid" and "wallet
+                   actually updated". This polls the wallet balance until it moves, then refreshes
+                   the host page and resets this panel automatically. *@
+                <div style="font-size:13px;color:#166534;font-weight:700;">
+                    ✓ Payment received — crediting your wallet… this updates automatically.
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_topUp.PaymentLinkUrl))
             {
                 <a href="@_topUp.PaymentLinkUrl" target="_blank" rel="noopener"
                    style="font-size:13px;font-weight:700;color:#1565C0;word-break:break-all;">@_topUp.PaymentLinkUrl</a>
                 <div style="margin-top:8px;">
                     <button class="btn btn-outline-primary" @onclick="CopyLinkAsync" disabled="@_busy">📋 Copy link</button>
                 </div>
+                <div style="margin-top:10px;">
+                    <button class="btn btn-primary" @onclick="CheckTopUpAsync" disabled="@_busy">
+                        I've paid — check now
+                    </button>
+                </div>
             }
             else
             {
+                @* Link creation is an async background task — this used to leave the admin with no
+                   way to see the link once it was ready short of re-submitting the same amount
+                   (and "Check now" refuses to run before the link exists, so it couldn't help
+                   either). Now polls the top-up's status every few seconds until the link appears. *@
                 <div style="font-size:13px;color:#475569;">
-                    The link is being created — this takes a few seconds. Use <em>Check now</em> shortly.
+                    The link is being created — this takes a few seconds. This updates automatically; no need to do anything.
                 </div>
             }
-            <div style="margin-top:10px;">
-                <button class="btn btn-primary" @onclick="CheckTopUpAsync" disabled="@_busy">
-                    I've paid — check now
-                </button>
-            </div>
         </div>
     }
 </div>
@@ -93,15 +131,34 @@
     private decimal _amount = 1000m;
     private bool _busy;
     private bool _confirm;
+    private string? _errorMessage;
+    private CancellationTokenSource? _pollCts;
 
     private string Currency => string.IsNullOrEmpty(Wallet?.Currency) ? "INR" : Wallet!.Currency;
 
     private void CloseConfirm() => _confirm = false;
 
+    // Recovers an in-flight top-up (e.g. after a page reload) so the admin isn't stuck re-creating
+    // one that already exists — GetOpenLinkForClinicAsync enforces at most one open per clinic.
+    // Note: this only finds a top-up that is still "open" (Pending/LinkCreated) — one that was paid
+    // in the brief window between confirmation and this page load is a narrow, known gap, since
+    // there is no "my most recent top-up regardless of status" read to recover it from instead.
+    protected override async Task OnInitializedAsync()
+    {
+        var active = await UsageBillingApi.GetActiveTopUpAsync();
+        if (active.Success && active.Data is not null)
+        {
+            _topUp = active.Data;
+            _amount = active.Data.Amount;
+            StartPolling(_topUp.PaymentId);
+        }
+    }
+
     private async Task CreateTopUpAsync()
     {
         if (!_confirm || _amount <= 0m) return;
         _busy = true;
+        _errorMessage = null;
 
         var response = await UsageBillingApi.CreateTopUpAsync(_amount);
         if (response.Success)
@@ -109,11 +166,19 @@
             _topUp = response.Data;
             _confirm = false;
             Toast.ShowSuccess("Top-up payment link created.");
+            if (_topUp is not null)
+                StartPolling(_topUp.PaymentId);
             await OnChanged.InvokeAsync();
         }
         else
         {
-            Toast.ShowError(response.Message ?? "Could not create the payment link. Please try again.");
+            // DEF-IPD-11(b): used to only fire a 3.5s toast and leave the confirm dialog open with
+            // no other trace of what went wrong. The dialog now closes and the reason is shown
+            // inline (persistently, not a transient toast) under the amount field, where the
+            // helper text already promised it would be.
+            _confirm = false;
+            _errorMessage = response.Message ?? "Could not create the payment link. Please try again.";
+            Toast.ShowError(_errorMessage);
         }
 
         _busy = false;
@@ -123,21 +188,117 @@
     {
         if (_topUp is null) return;
         _busy = true;
+        _errorMessage = null;
 
         var response = await UsageBillingApi.CheckTopUpAsync(_topUp.PaymentId);
         if (response.Success)
         {
-            // The gateway webhook is the source of truth; this only asks it to look now.
+            // The gateway webhook is the source of truth; this only asks it to look now — the same
+            // poll loop Create starts picks up whatever it finds (still unpaid, paid-and-crediting,
+            // or fully credited), so there's one observable path either way.
             Toast.ShowSuccess("Checking with the payment provider…");
-            await Task.Delay(TimeSpan.FromSeconds(5));
-            await OnChanged.InvokeAsync();
+            StartPolling(_topUp.PaymentId, reportIfStillUnpaid: true);
         }
         else
         {
-            Toast.ShowError(response.Message ?? "Could not check the payment. Please try again shortly.");
+            _errorMessage = response.Message ?? "Could not check the payment. Please try again shortly.";
+            Toast.ShowError(_errorMessage);
         }
 
         _busy = false;
+    }
+
+    private void StartPolling(Guid paymentId, bool reportIfStillUnpaid = false)
+    {
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
+        _pollCts = new CancellationTokenSource();
+        _ = PollPaymentAsync(paymentId, _pollCts.Token, reportIfStillUnpaid);
+    }
+
+    /// <summary>
+    /// Tracks one top-up through its whole lifecycle so the UI never goes stale: link not ready yet
+    /// → link ready (and payable) → paid (link must disappear — it's spendable until Razorpay closes
+    /// it, so leaving it up would let it be paid twice) → wallet credited (panel resets). Capped at
+    /// 40 attempts (~2 minutes) per stage; if something is still not ready by then, the background
+    /// job will still get to it eventually, but polling forever here would serve no purpose.
+    /// </summary>
+    private async Task PollPaymentAsync(Guid paymentId, CancellationToken ct, bool reportIfStillUnpaid = false)
+    {
+        try
+        {
+            for (var attempt = 0; attempt < 40; attempt++)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), ct);
+
+                var response = await UsageBillingApi.GetTopUpStatusAsync(paymentId);
+                if (ct.IsCancellationRequested) return;
+
+                if (!response.Success || response.Data is null)
+                    return;
+
+                _topUp = response.Data;
+                await InvokeAsync(StateHasChanged);
+
+                switch (_topUp.Status)
+                {
+                    case SubscriptionPaymentStatus.Paid:
+                        await PollForCreditAsync(_topUp.Amount, ct);
+                        return;
+                    case SubscriptionPaymentStatus.Cancelled or SubscriptionPaymentStatus.Expired or SubscriptionPaymentStatus.Superseded:
+                        return; // Dead — nothing left to watch for.
+                    default:
+                        // DEF-IPD smaller item: "I've paid — check now" used to give no feedback at
+                        // all when the gateway still hadn't confirmed anything — it silently kept
+                        // polling with nothing on screen to show the click did something. Report
+                        // once, on the very first status read after an explicit Check.
+                        if (reportIfStillUnpaid && attempt == 0)
+                            Toast.ShowWarning("Still waiting for payment confirmation — this will keep checking automatically.");
+                        break; // Pending or LinkCreated — keep polling.
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Component was disposed (navigated away) or a newer poll loop superseded this one.
+        }
+    }
+
+    /// <summary>
+    /// ConfirmPayment (marks Paid) and CreditWallet (moves the balance) are separate background
+    /// steps, so there's a real gap between "paid" and "wallet actually updated". Polls the wallet
+    /// itself — rather than the payment, which never changes again once Paid — until the balance
+    /// reflects this top-up, then refreshes the host page and resets this panel.
+    /// </summary>
+    private async Task PollForCreditAsync(decimal expectedAmount, CancellationToken ct)
+    {
+        var before = await UsageBillingApi.GetWalletAsync();
+        if (ct.IsCancellationRequested || !before.Success || before.Data is null) return;
+        var startingBalance = before.Data.Balance;
+
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3), ct);
+
+            var response = await UsageBillingApi.GetWalletAsync();
+            if (ct.IsCancellationRequested) return;
+            if (!response.Success || response.Data is null) continue;
+
+            if (response.Data.Balance >= startingBalance + expectedAmount)
+            {
+                Toast.ShowSuccess($"Wallet credited — new balance {Money(response.Data.Balance)}.");
+                _topUp = null;
+                await InvokeAsync(StateHasChanged);
+                await OnChanged.InvokeAsync();
+                return;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
     }
 
     private async Task CopyLinkAsync()

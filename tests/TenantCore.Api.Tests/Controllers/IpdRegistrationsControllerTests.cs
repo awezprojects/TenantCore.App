@@ -147,6 +147,118 @@ public class IpdRegistrationsControllerTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    // ?? PATCH /api/ipd-registrations/{id}/transfer-bed ?????????????????????
+
+    [Fact]
+    public async Task TransferBed_ReturnsOk_WithUpdatedDto()
+    {
+        var id = Guid.NewGuid();
+        var dto = BuildDto();
+        _sender.Setup(s => s.Send(It.IsAny<TransferBedCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(dto);
+
+        var result = await _controller.TransferBed(id, new TransferBedRequest(Guid.NewGuid(), "Moved to ICU"), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().BeSameAs(dto);
+    }
+
+    [Fact]
+    public async Task TransferBed_SendsCommandWithCorrectIdAndApplicationId()
+    {
+        var id = Guid.NewGuid();
+        var newBedId = Guid.NewGuid();
+        _sender.Setup(s => s.Send(It.IsAny<TransferBedCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(BuildDto());
+
+        await _controller.TransferBed(id, new TransferBedRequest(newBedId, null), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<TransferBedCommand>(c => c.Id == id && c.ApplicationId == _applicationId && c.NewBedId == newBedId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task PreviewTransferBed_ReturnsOk_WithPreviewDto()
+    {
+        var id = Guid.NewGuid();
+        var newBedId = Guid.NewGuid();
+        var preview = new TransferBedPreviewDto(2500m, 300m, 2500m, true, true);
+        _sender.Setup(s => s.Send(It.IsAny<PreviewTransferBedQuery>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(preview);
+
+        var result = await _controller.PreviewTransferBed(id, newBedId, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().BeSameAs(preview);
+        _sender.Verify(s => s.Send(
+            It.Is<PreviewTransferBedQuery>(q => q.Id == id && q.ApplicationId == _applicationId && q.NewBedId == newBedId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ?? PATCH /api/ipd-registrations/{id}/cancel ???????????????????????????
+
+    [Fact]
+    public async Task Cancel_ReturnsOk_WithCancelledDto()
+    {
+        var id = Guid.NewGuid();
+        var dto = BuildDto();
+        _sender.Setup(s => s.Send(It.IsAny<CancelIpdRegistrationCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(dto);
+
+        var result = await _controller.Cancel(id, new CancelIpdRegistrationRequest("Wrong patient"), CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().BeSameAs(dto);
+    }
+
+    [Fact]
+    public async Task Cancel_SendsCommandWithCorrectIdAndApplicationId()
+    {
+        var id = Guid.NewGuid();
+        _sender.Setup(s => s.Send(It.IsAny<CancelIpdRegistrationCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(BuildDto());
+
+        await _controller.Cancel(id, new CancelIpdRegistrationRequest(null), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<CancelIpdRegistrationCommand>(c => c.Id == id && c.ApplicationId == _applicationId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ?? GET /api/ipd-registrations/{id}/bed-history ????????????????????????
+
+    [Fact]
+    public async Task GetBedHistory_ReturnsOk_WithHistoryList()
+    {
+        var id = Guid.NewGuid();
+        var history = new List<IpdBedTransferHistoryDto>
+        {
+            new(Guid.NewGuid(), Guid.NewGuid(), "Ward A", "101", "B1", 500m, DateTime.UtcNow, null, Guid.NewGuid(), null)
+        };
+        _sender.Setup(s => s.Send(It.IsAny<GetIpdBedTransferHistoryQuery>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(history);
+
+        var result = await _controller.GetBedHistory(id, CancellationToken.None);
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        ok.Value.Should().BeSameAs(history);
+    }
+
+    [Fact]
+    public async Task GetBedHistory_SendsQueryWithCorrectIdAndApplicationId()
+    {
+        var id = Guid.NewGuid();
+        _sender.Setup(s => s.Send(It.IsAny<GetIpdBedTransferHistoryQuery>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync([]);
+
+        await _controller.GetBedHistory(id, CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<GetIpdBedTransferHistoryQuery>(q => q.Id == id && q.ApplicationId == _applicationId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ?? PATCH /api/ipd-registrations/{id}/discharge ????????????????????????
 
     [Fact]
@@ -192,12 +304,10 @@ public class IpdRegistrationsControllerTests
     };
 
     private static CreateIpdRegistrationDto BuildCreateDto() => new(
-        Guid.NewGuid(), Guid.NewGuid(), "Dr. Smith",
-        "Ward A", "101", "B1", 500m, null);
+        Guid.NewGuid(), Guid.NewGuid(), "Dr. Smith", null, 500m, null);
 
     private static UpdateIpdRegistrationDto BuildUpdateDto() => new(
-        Guid.NewGuid(), "Dr. Smith", "Ward A", "101", "B1",
-        IpdStatus.Admitted, null);
+        Guid.NewGuid(), "Dr. Smith", null);
 
     private static PagedResult<IpdRegistrationDto> EmptyPagedResult() =>
         new PagedResult<IpdRegistrationDto> { Items = [], TotalCount = 0, Page = 1, PageSize = 20 };

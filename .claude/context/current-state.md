@@ -1,6 +1,6 @@
 # TenantCore.App — Current State Snapshot
 
-**Last verified:** 2026-10-02 (subscription-billing-activation executed — OtSurgery=4 added to BillingItem, 8 billing-intent columns on ClinicOnboardingRequest, DeleteSubscriptionPlan command, SubscriptionPlans PAYG awareness, Usage per-item stat cards + Excel export)
+**Last verified:** 2026-11-12 (ipd-billing-deposit-completion fully executed — Phase 0 bed-shift/status fix, Phase 1 deposits/discount, Phase 2 particulars/billing engine/Provisional+Final Bill, Phase 3 reports)
 **Verified against:**
 - `src/TenantCore.Infrastructure/Persistence/ClinicDbContext.cs`
 - `src/TenantCore.Infrastructure/DependencyInjection.cs`
@@ -20,6 +20,10 @@
 | Patients | Patient | Yes |
 | OpdRegistrations | OpdRegistration | Yes |
 | IpdRegistrations | IpdRegistration | Yes |
+| IpdBedTransferHistories | IpdBedTransferHistory | Yes |
+| IpdDeposits | IpdDeposit | Yes |
+| IpdParticulars | IpdParticular | Yes |
+| IpdPayments | IpdPayment | Yes |
 | ClinicFeeConfigs | ClinicFeeConfig | Yes |
 | MedicineTypes | MedicineType | Yes |
 | MedicineDosageForms | MedicineDosageForm | No (lookup) |
@@ -63,8 +67,19 @@
 | SubscriptionPayments | SubscriptionPayment | Partial (ApplicationId null until provisioning for onboarding payments; always set for renewals) |
 | WorkflowTasks | WorkflowTask | No (internal durable-outbox job table) |
 | PaymentWebhookEvents | PaymentWebhookEvent | No (internal webhook inbox) |
+| OpdRegistrationNumberCounters | OpdRegistrationNumberCounter | Yes |
+| ClinicWallets | ClinicWallet | Yes |
+| ClinicWalletTransactions | ClinicWalletTransaction | Yes |
+| ClinicUsageRates | ClinicUsageRate | Yes |
+| ClinicUsageRecords | ClinicUsageRecord | Yes |
 
-**Total DbSets: 46**
+**Total DbSets: 55**
+
+**IpdPayment is the 1:1 billing record per IpdRegistration** (auto-created at admission when billing is enabled, mirroring OpdPayment): `InitialFee`/`RoomChargesTotal`/`ParticularsTotal`/`TotalAmount`/`Discount`/`FinalAmount`/`TotalDeposited`/`BalanceDue` plus `FinalizedAt` (locked at discharge), reused `PaymentStatus`/`RefundStatus` enums for settlement/refund. `RoomChargesTotal` is only meaningful once `FinalizedAt` is set — the live pre-discharge number always comes from `IIpdBillCalculator` via `GetIpdProvisionalBillQuery`, never from this entity directly. `IpdDeposit` is an append-only ledger (any amount, any time, while Admitted); `IpdParticular` mirrors `OpdParticular` minus per-item collection tracking (IPD settles once, at discharge).
+
+**IpdRegistration additions (ipd-billing-deposit-completion Phase 0):** `CurrentBedId` (Guid?, FK to Bed, NoAction) — source of truth for occupancy going forward; `WardName`/`RoomNumber`/`BedNumber` are now a denormalized display snapshot only. `Create()` takes `currentBedId` instead of resolving nothing; `Update()` dropped Status/Ward/Room/Bed params (doctor/notes only); new `RecordBedTransfer()` and `Cancel()` methods.
+
+**ClinicFeatureFlags additions:** `IpdRoomBillingCycle` (`RoomBillingCycle?`), `IpdMidStayChargeMode` (`MidStayBedChangeChargeMode?`) — both nullable, no default; bed allocation (Create-with-bed, TransferBed) is blocked until a Clinic Admin sets both in Settings.
 
 **ClinicSubscription additions (clinic-trial-razorpay-subscriptions):** `SubscriptionPaymentId` (Guid?, unique filtered), `OnboardingRequestId` (Guid?, unique filtered), `PurchasedByUserId` (Guid?). `Create()` factory gained 4 new optional trailing params — existing callers unaffected.
 
@@ -89,6 +104,10 @@
 | IPatientRepository | PatientRepository |
 | IOpdRegistrationRepository | OpdRegistrationRepository |
 | IIpdRegistrationRepository | IpdRegistrationRepository |
+| IIpdBedTransferHistoryRepository | IpdBedTransferHistoryRepository |
+| IIpdDepositRepository | IpdDepositRepository |
+| IIpdParticularRepository | IpdParticularRepository |
+| IIpdPaymentRepository | IpdPaymentRepository |
 | IClinicFeeConfigRepository | ClinicFeeConfigRepository |
 | IMedicineTypeRepository | CachedMedicineTypeRepository (wraps MedicineTypeRepository — served from `RefreshableCache<MedicineType>`, kept warm by `MedicineCacheWarmupService`; also reloads inline immediately after a write; see `plan/medicine-search-caching/PLAN.md`) |
 | IMedicineDosageFormRepository | CachedMedicineDosageFormRepository (wraps MedicineDosageFormRepository — same pattern) |
@@ -128,6 +147,10 @@
 | ISubscriptionPaymentRepository | SubscriptionPaymentRepository |
 | IWorkflowTaskRepository | WorkflowTaskRepository |
 | IPaymentWebhookEventRepository | PaymentWebhookEventRepository |
+| IClinicWalletRepository | ClinicWalletRepository |
+| IClinicWalletTransactionRepository | ClinicWalletTransactionRepository |
+| IClinicUsageRateRepository | ClinicUsageRateRepository |
+| IClinicUsageRecordRepository | ClinicUsageRecordRepository |
 
 **Background services:** `MedicineCacheWarmupService` (`TenantCore.Infrastructure.Caching`) — hosted service, refreshes the three medicine-related caches on startup and every 30 minutes.
 

@@ -304,6 +304,35 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("IpdCancelWindowMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("IpdFullDayShiftRateRule")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(2);
+
+                    b.Property<int>("IpdManualShiftChargeMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<int?>("IpdMidStayChargeMode")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IpdRoomBillingCycle")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IpdShiftGraceRule")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IpdShiftGraceWindowMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<bool>("PrepaidOpdEnabled")
                         .HasColumnType("bit");
 
@@ -1779,6 +1808,313 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.ToTable("HistoryLookupItems", "clinic");
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.IpdBedTransferHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("AdjustmentType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("AppliedChargeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("BedId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("IpdRegistrationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("ManualChargeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ManualChargeAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ManualChargeByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ManualChargeReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("OccupiedFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OccupiedTo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("RatePerDayAtTime")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<decimal?>("StandardChargeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("TransferredByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("WardId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BedId");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("WardId");
+
+                    b.HasIndex("ApplicationId", "IpdRegistrationId");
+
+                    b.ToTable("IpdBedTransferHistories", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.IpdDeposit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CollectedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CollectedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CounterSessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("IpdRegistrationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "IpdRegistrationId");
+
+                    b.ToTable("IpdDeposits", "clinic", t =>
+                        {
+                            t.HasCheckConstraint("CK_IpdDeposits_Amount_Positive", "[Amount] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.IpdParticular", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AddedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("IpdRegistrationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ParticularId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ParticularName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "IpdRegistrationId");
+
+                    b.ToTable("IpdParticulars", "clinic");
+                });
+
+            modelBuilder.Entity("TenantCore.Domain.Entities.IpdPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("BalanceDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("CounterSessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<decimal>("Discount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("DiscountedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DiscountedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("FinalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("FinalizedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("InitialFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("IpdRegistrationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ParticularsTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PaymentStatus")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("RefundDue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("RefundStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("RefundedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("RoomChargesTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("SettledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("TotalDeposited")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IpdRegistrationId")
+                        .IsUnique();
+
+                    b.ToTable("IpdPayments", "clinic");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.IpdRegistration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1809,6 +2145,9 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid?>("CurrentBedId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime?>("DischargeDate")
                         .HasColumnType("datetime2");
@@ -1858,6 +2197,8 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationId");
+
+                    b.HasIndex("CurrentBedId");
 
                     b.HasIndex("PatientId");
 
@@ -3528,7 +3869,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0001-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription is set to expire on {ExpiryDate}. Renew now to avoid any interruption to your clinic's access.",
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6205),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 806, DateTimeKind.Utc).AddTicks(1359),
                             DaysBeforeExpiry = 10,
                             DisplayOrder = 1,
                             Headline = "Time to renew soon",
@@ -3540,7 +3881,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0002-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Only a few days left. Renew before {ExpiryDate} to keep your clinic running without interruption.",
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6212),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 806, DateTimeKind.Utc).AddTicks(1367),
                             DaysBeforeExpiry = 5,
                             DisplayOrder = 2,
                             Headline = "Your subscription expires soon",
@@ -3552,7 +3893,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0003-0000-0000-000000000000"),
                             AlertType = 1,
                             BodyMessage = "Your subscription expires on {ExpiryDate}. Renew today to avoid losing access to your clinic.",
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6242),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 806, DateTimeKind.Utc).AddTicks(1370),
                             DaysBeforeExpiry = 2,
                             DisplayOrder = 3,
                             Headline = "Final reminder — act now",
@@ -3564,7 +3905,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                             Id = new Guid("c3d4e5f6-0004-0000-0000-000000000000"),
                             AlertType = 2,
                             BodyMessage = "Your subscription expired on {ExpiryDate}. Choose a plan to restore access to your clinic.",
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 919, DateTimeKind.Utc).AddTicks(6246),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 806, DateTimeKind.Utc).AddTicks(1390),
                             DaysBeforeExpiry = 0,
                             DisplayOrder = 4,
                             Headline = "Subscription expired",
@@ -3820,7 +4161,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0001-0000-0000-000000000000"),
                             Code = 1,
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(171),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 809, DateTimeKind.Utc).AddTicks(6758),
                             Currency = "INR",
                             Description = "Try every feature free for 14 days.",
                             DisplayOrder = 1,
@@ -3837,7 +4178,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0002-0000-0000-000000000000"),
                             Code = 2,
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(182),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 809, DateTimeKind.Utc).AddTicks(6855),
                             Currency = "INR",
                             Description = "Billed every 30 days. Cancel anytime.",
                             DisplayOrder = 2,
@@ -3854,7 +4195,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0003-0000-0000-000000000000"),
                             Code = 3,
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(186),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 809, DateTimeKind.Utc).AddTicks(6894),
                             Currency = "INR",
                             Description = "Our most popular plan — save versus monthly billing.",
                             DisplayOrder = 3,
@@ -3871,7 +4212,7 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         {
                             Id = new Guid("b2c3d4e5-0004-0000-0000-000000000000"),
                             Code = 4,
-                            CreatedAt = new DateTime(2026, 11, 4, 1, 3, 35, 923, DateTimeKind.Utc).AddTicks(189),
+                            CreatedAt = new DateTime(2026, 11, 15, 14, 41, 50, 809, DateTimeKind.Utc).AddTicks(6898),
                             Currency = "INR",
                             Description = "The best value — a full year of every feature.",
                             DisplayOrder = 4,
@@ -4443,8 +4784,40 @@ namespace TenantCore.Infrastructure.Persistence.ClinicMigrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("TenantCore.Domain.Entities.IpdBedTransferHistory", b =>
+                {
+                    b.HasOne("TenantCore.Domain.Entities.Bed", "Bed")
+                        .WithMany()
+                        .HasForeignKey("BedId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TenantCore.Domain.Entities.Room", "Room")
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TenantCore.Domain.Entities.Ward", "Ward")
+                        .WithMany()
+                        .HasForeignKey("WardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Bed");
+
+                    b.Navigation("Room");
+
+                    b.Navigation("Ward");
+                });
+
             modelBuilder.Entity("TenantCore.Domain.Entities.IpdRegistration", b =>
                 {
+                    b.HasOne("TenantCore.Domain.Entities.Bed", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentBedId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("TenantCore.Domain.Entities.Patient", "Patient")
                         .WithMany()
                         .HasForeignKey("PatientId")

@@ -304,6 +304,191 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
         catch (Exception ex) { return Fail<IpdRegistrationDto>(ex.Message); }
     }
 
+    public async Task<ApiResponse<IpdRegistrationDto>> TransferBedAsync(Guid id, TransferBedRequest request)
+    {
+        try
+        {
+            SetAuth();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Patch, $"api/ipd-registrations/{id}/transfer-bed")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            return await Ok<IpdRegistrationDto>(await httpClient.SendAsync(httpRequest));
+        }
+        catch (Exception ex) { return Fail<IpdRegistrationDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<TransferBedPreviewDto>> PreviewTransferBedAsync(Guid id, Guid newBedId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<TransferBedPreviewDto>(
+                await httpClient.GetAsync($"api/ipd-registrations/{id}/transfer-bed/preview?newBedId={newBedId}"));
+        }
+        catch (Exception ex) { return Fail<TransferBedPreviewDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdRegistrationDto>> CancelIpdRegistrationAsync(Guid id, CancelIpdRegistrationRequest request)
+    {
+        try
+        {
+            SetAuth();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Patch, $"api/ipd-registrations/{id}/cancel")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+            return await Ok<IpdRegistrationDto>(await httpClient.SendAsync(httpRequest));
+        }
+        catch (Exception ex) { return Fail<IpdRegistrationDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IEnumerable<IpdBedTransferHistoryDto>>> GetIpdBedHistoryAsync(Guid id)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IEnumerable<IpdBedTransferHistoryDto>>(await httpClient.GetAsync($"api/ipd-registrations/{id}/bed-history"));
+        }
+        catch (Exception ex) { return Fail<IEnumerable<IpdBedTransferHistoryDto>>(ex.Message); }
+    }
+
+    // --- IPD Deposits ---
+
+    public async Task<ApiResponse<IEnumerable<IpdDepositDto>>> GetIpdDepositsAsync(Guid ipdRegistrationId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IEnumerable<IpdDepositDto>>(await httpClient.GetAsync($"api/ipd-deposits/{ipdRegistrationId}"));
+        }
+        catch (Exception ex) { return Fail<IEnumerable<IpdDepositDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdDepositDto>> CollectIpdDepositAsync(Guid ipdRegistrationId, CollectIpdDepositRequest request)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdDepositDto>(await httpClient.PostAsJsonAsync($"api/ipd-deposits/{ipdRegistrationId}", request, JsonOptions));
+        }
+        catch (Exception ex) { return Fail<IpdDepositDto>(ex.Message); }
+    }
+
+    // --- IPD Particulars ---
+
+    public async Task<ApiResponse<IEnumerable<IpdParticularDto>>> GetIpdParticularsAsync(Guid ipdRegistrationId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IEnumerable<IpdParticularDto>>(await httpClient.GetAsync($"api/ipd-particulars/{ipdRegistrationId}"));
+        }
+        catch (Exception ex) { return Fail<IEnumerable<IpdParticularDto>>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdParticularDto>> AddIpdParticularAsync(Guid ipdRegistrationId, AddIpdParticularRequest request)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdParticularDto>(await httpClient.PostAsJsonAsync($"api/ipd-particulars/{ipdRegistrationId}", request, JsonOptions));
+        }
+        catch (Exception ex) { return Fail<IpdParticularDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<bool>> RemoveIpdParticularAsync(Guid id)
+    {
+        try { SetAuth(); var r = await httpClient.DeleteAsync($"api/ipd-particulars/{id}"); return new ApiResponse<bool> { Success = r.IsSuccessStatusCode, Data = r.IsSuccessStatusCode }; }
+        catch (Exception ex) { return Fail<bool>(ex.Message); }
+    }
+
+    // --- IPD Payments / Billing ---
+
+    public async Task<ApiResponse<IpdProvisionalBillDto>> ApplyIpdDiscountAsync(Guid ipdRegistrationId, ApplyIpdDiscountRequest request)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdProvisionalBillDto>(await httpClient.PostAsJsonAsync($"api/ipd-payments/{ipdRegistrationId}/discount", request, JsonOptions));
+        }
+        catch (Exception ex) { return Fail<IpdProvisionalBillDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdProvisionalBillDto>> GetIpdProvisionalBillAsync(Guid ipdRegistrationId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdProvisionalBillDto>(await httpClient.GetAsync($"api/ipd-payments/{ipdRegistrationId}/provisional-bill"));
+        }
+        catch (Exception ex) { return Fail<IpdProvisionalBillDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdFinalBillDto>> GetIpdFinalBillAsync(Guid ipdRegistrationId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdFinalBillDto>(await httpClient.GetAsync($"api/ipd-payments/{ipdRegistrationId}/final-bill"));
+        }
+        catch (Exception ex) { return Fail<IpdFinalBillDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdFinalBillDto>> CollectIpdBalanceAsync(Guid ipdRegistrationId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdFinalBillDto>(await httpClient.PostAsync($"api/ipd-payments/{ipdRegistrationId}/collect-balance", null));
+        }
+        catch (Exception ex) { return Fail<IpdFinalBillDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdFinalBillDto>> ProcessIpdRefundAsync(Guid ipdRegistrationId)
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdFinalBillDto>(await httpClient.PostAsync($"api/ipd-payments/{ipdRegistrationId}/process-refund", null));
+        }
+        catch (Exception ex) { return Fail<IpdFinalBillDto>(ex.Message); }
+    }
+
+    // --- IPD Reports ---
+
+    public async Task<ApiResponse<IpdCensusReportDto>> GetIpdCensusReportAsync()
+    {
+        try
+        {
+            SetAuth();
+            return await Ok<IpdCensusReportDto>(await httpClient.GetAsync("api/ipd-reports/census"));
+        }
+        catch (Exception ex) { return Fail<IpdCensusReportDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdRevenueReportDto>> GetIpdRevenueReportAsync(DateTime fromUtc, DateTime toUtc)
+    {
+        try
+        {
+            SetAuth();
+            var url = $"api/ipd-reports/revenue?fromUtc={Uri.EscapeDataString(fromUtc.ToString("O"))}&toUtc={Uri.EscapeDataString(toUtc.ToString("O"))}";
+            return await Ok<IpdRevenueReportDto>(await httpClient.GetAsync(url));
+        }
+        catch (Exception ex) { return Fail<IpdRevenueReportDto>(ex.Message); }
+    }
+
+    public async Task<ApiResponse<IpdDischargeSummaryReportDto>> GetIpdDischargeSummaryReportAsync(DateTime fromUtc, DateTime toUtc)
+    {
+        try
+        {
+            SetAuth();
+            var url = $"api/ipd-reports/discharge-summary?fromUtc={Uri.EscapeDataString(fromUtc.ToString("O"))}&toUtc={Uri.EscapeDataString(toUtc.ToString("O"))}";
+            return await Ok<IpdDischargeSummaryReportDto>(await httpClient.GetAsync(url));
+        }
+        catch (Exception ex) { return Fail<IpdDischargeSummaryReportDto>(ex.Message); }
+    }
+
     // --- Clinic Settings ---
 
     public async Task<ApiResponse<ClinicFeeConfigDto>> GetFeesAsync()
@@ -428,7 +613,17 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
 
     public async Task<ApiResponse<bool>> DeleteWardAsync(Guid id)
     {
-        try { SetAuth(); var r = await httpClient.DeleteAsync($"api/wards/{id}"); return new ApiResponse<bool> { Success = r.IsSuccessStatusCode, Data = r.IsSuccessStatusCode }; }
+        // DEF-IPD-29 (16-Nov): used to skip ExtractUserMessage on failure, leaving Message at its
+        // default of string.Empty (not null) — so "r.Message ?? "Failed."" in WardManagement.razor
+        // never fell back, and the 409 toast rendered as a blank red bar.
+        try
+        {
+            SetAuth();
+            var r = await httpClient.DeleteAsync($"api/wards/{id}");
+            return r.IsSuccessStatusCode
+                ? new ApiResponse<bool> { Success = true, Data = true }
+                : new ApiResponse<bool> { Success = false, Message = await ExtractUserMessage(r) };
+        }
         catch (Exception ex) { return Fail<bool>(ex.Message); }
     }
 
@@ -454,7 +649,15 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
 
     public async Task<ApiResponse<bool>> DeleteRoomAsync(Guid id)
     {
-        try { SetAuth(); var r = await httpClient.DeleteAsync($"api/rooms/{id}"); return new ApiResponse<bool> { Success = r.IsSuccessStatusCode, Data = r.IsSuccessStatusCode }; }
+        // DEF-IPD-29 (16-Nov): see DeleteWardAsync's comment — same missing-message bug.
+        try
+        {
+            SetAuth();
+            var r = await httpClient.DeleteAsync($"api/rooms/{id}");
+            return r.IsSuccessStatusCode
+                ? new ApiResponse<bool> { Success = true, Data = true }
+                : new ApiResponse<bool> { Success = false, Message = await ExtractUserMessage(r) };
+        }
         catch (Exception ex) { return Fail<bool>(ex.Message); }
     }
 
@@ -485,7 +688,15 @@ public class ClinicApiClient(HttpClient httpClient, AuthStateService authState) 
 
     public async Task<ApiResponse<bool>> DeleteBedAsync(Guid id)
     {
-        try { SetAuth(); var r = await httpClient.DeleteAsync($"api/beds/{id}"); return new ApiResponse<bool> { Success = r.IsSuccessStatusCode, Data = r.IsSuccessStatusCode }; }
+        // DEF-IPD-29 (16-Nov): see DeleteWardAsync's comment — same missing-message bug.
+        try
+        {
+            SetAuth();
+            var r = await httpClient.DeleteAsync($"api/beds/{id}");
+            return r.IsSuccessStatusCode
+                ? new ApiResponse<bool> { Success = true, Data = true }
+                : new ApiResponse<bool> { Success = false, Message = await ExtractUserMessage(r) };
+        }
         catch (Exception ex) { return Fail<bool>(ex.Message); }
     }
 }

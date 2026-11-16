@@ -47,18 +47,49 @@ This ADR defines the complete security and code quality checklist for TenantCore
 
 ## Section 3 — Input Validation
 
-### Rules
+**This section is mandatory for every new command/query validator and every new Blazor input, in every feature, starting 2026-11-12 — not just the feature that prompted it.** It does not retroactively require touching validators this ADR update didn't otherwise touch; apply it going forward and opportunistically when a file is already being edited for another reason.
+
+### 3.1 — Principle: allow-list over block-list, server is authoritative
+
+- Prefer an **allow-list** ("only these characters are permitted") over a **block-list** ("reject these specific characters/strings"). A block-list can always miss a new encoding of the same payload (`<script>` vs `&lt;script&gt;` vs `javascript:` with no angle brackets at all); an allow-list of exactly what legitimate business text needs cannot let anything else through, by construction.
+- Client-side validation (Blazor `type`, `pattern`, `maxlength`) is UX only — faster feedback, nothing more. The FluentValidation validator in `TenantCore.Application` is the only validation that is ever trusted. Never ship a field whose only validation lives in the Blazor component.
+- Centralize, do not duplicate. Reusable predicates live in `TenantCore.Application/Common/` and are referenced from every validator that needs them — never re-write the same regex inline in a new validator (see S13 below).
+
+### 3.2 — Required shared helpers (`TenantCore.Application/Common/`)
+
+| Helper | Use for | Behavior |
+|---|---|---|
+| `NameValidationRules.IsValidName` | Person names (patient, doctor, emergency contact, etc.) | Letters, spaces, hyphens, apostrophes only |
+| `PhoneValidationRules.IsValidPhoneNumber` | Any mobile/phone number field | Exactly 10 digits (current scope: India). Never write a second phone regex in a new validator — extend this helper if a new country/format is genuinely needed |
+| `SafeTextValidationRules.IsSafeText` | Short structured free text (ward/room/bed name, cancellation/discount reason, any new "reason"/"label" field) | Allow-list: letters, digits, spaces, `. , ' - / ( )` — the default choice for any new short text field |
+| `HtmlSanitizationRules.HasNoScriptInjection` | Longer free text that needs its own punctuation/line breaks (notes, address, admission/discharge notes) — anywhere `SafeTextValidationRules` is too strict | Blocks `<script`, `<iframe`, `javascript:`, `vbscript:`, `data:text/html`, inline `on*=` handlers, and the HTML-entity-encoded forms of the same |
+| `HtmlSanitizationRules.HasNoLinks` | Any field from the two rows above where a URL is never a legitimate value (names, reasons, most notes fields) | Blocks bare `http(s)://`, `www.`, `<a `, `href=` — apply this alongside the row above wherever links genuinely can't occur; this is the concrete, checkable part of "no phishing content" — true phishing is a social-engineering concern input validation can only partially address, and this is that part |
+| `NumericValidationRules.IsDigitsOnly` | A **string-typed** field that must hold digits only (Aadhaar, PIN code) | Digits only, no letters. A field already typed `decimal`/`int` gets this for free from model binding and does not need this helper |
+| FluentValidation `.EmailAddress().MaximumLength(256)` | Any email field | The built-in rule is the standard — do not write a custom email regex |
+
+**New fields pick a lane:** structured short text → `SafeTextValidationRules`; longer prose that needs punctuation/newlines → `HtmlSanitizationRules.HasNoScriptInjection` (+ `HasNoLinks` unless a URL is legitimately expected there) **in addition to** `MaximumLength(N)` and `NotEmpty()` — the HTML/link checks are not a substitute for the existing length/emptiness rules, they stack on top.
+
+### 3.3 — General rules (unchanged, still apply)
 - All string inputs: `NotEmpty()` + `MaximumLength(N)` in the FluentValidation validator class
 - All ID route parameters: typed as `Guid` — never `string` or `int` for entity IDs
 - Enum inputs: validated with `Must(v => Enum.IsDefined(typeof(MyEnum), v))` before use in handlers
 - Paging: `pageSize` capped at 100 maximum — reject `pageSize=99999`
 - No dynamic LINQ expressions or raw query predicates built from user-supplied string input
+- A numeric-looking field that must be an integer/decimal is typed `int`/`decimal`/`Guid` on the DTO, never `string` — malformed input is then a 400 from model binding before the validator even runs, which is the strictest and cheapest form of "numbers must not contain text"
+
+### 3.4 — Blazor client-side mirroring (ADR-007 companion, not a replacement for 3.1–3.3)
+- Give every input the matching HTML `type` (`type="email"`, `type="tel"`) and a `maxlength` attribute matching the server's `MaximumLength(N)`
+- Never render user-supplied text through `MarkupString`, `@((MarkupString)...)`, or raw `innerHTML`-style binding — today's `MarkupString` usages in this repo (`FinanceDashboard.razor`, `CounterSession.razor`, `AmountHandovers.razor`, `ExpenseRecords.razor`, `ClinicSuspended.razor`) are all hardcoded status-badge HTML with no user input, which is fine; a new one built from any request/response field is not
+- Razor's default `@value` interpolation already HTML-encodes on output — do not special-case around it to render raw text
 
 ### Violations to detect
 - Validator class with a string property that has `NotEmpty()` but no `MaximumLength()`
 - Route parameter `{id}` bound to `string id` instead of `Guid id`
 - `pageSize` parameter with no maximum cap enforced in validator or handler
 - `(MyEnum)intFromRequest` cast without checking `Enum.IsDefined` first
+- A new validator with an inline `Regex`/`Matches(@"...")` call for a name, phone, free-text, or digits-only field instead of calling the matching `Common` helper (see S13)
+- A free-text field (notes, address, reason, description) with no `HtmlSanitizationRules`/`SafeTextValidationRules` rule at all
+- `MarkupString` constructed from a command/query/DTO field instead of a hardcoded literal
 
 ---
 
@@ -118,7 +149,8 @@ This ADR defines the complete security and code quality checklist for TenantCore
 |---|-------|-----------------|
 | A01 Broken Access Control | Every resource action checks ownership or `applicationId` | Missing tenant filter or auth policy |
 | A02 Cryptographic Failures | No sensitive data stored in plain text | Unencrypted passwords or tokens in DB |
-| A03 Injection | Parameterized queries only | `ExecuteSqlRaw` with string interpolation |
+| A03 Injection (SQL) | Parameterized queries only | `ExecuteSqlRaw` with string interpolation |
+| A03 Injection (XSS/script) | Free-text fields validated per Section 3.2 at the server; no raw rendering at the client | Missing `HtmlSanitizationRules`/`SafeTextValidationRules` rule; `MarkupString` built from user input |
 | A04 Insecure Design | No security-through-obscurity | Hidden endpoints without `[Authorize]` |
 | A05 Security Misconfiguration | Swagger not leaking internal endpoints in production | Swagger enabled without env guard |
 | A07 Auth Failures | Tokens validated with clock skew = 0, expiry enforced | JWT config missing `ValidateLifetime = true` |
@@ -142,6 +174,7 @@ This ADR defines the complete security and code quality checklist for TenantCore
 | S10 | Missing `AsNoTracking()` on read | Read handler's repo call does not use `AsNoTracking()` | Add `AsNoTracking()` in the repository read method |
 | S11 | `Guid.NewGuid()` in handler | `entity.Id = Guid.NewGuid()` set inside a handler method | Move ID generation to `Translator.ToEntity()` |
 | S12 | Handler returns null on not-found | Handler returning `null` instead of throwing `EntityNotFoundException` | Throw `EntityNotFoundException` |
+| S13 | Ad hoc validation regex | A new validator with its own inline `Regex`/`Matches(@"...")` for a name, phone, free-text, or digits-only field | Replace with the matching `TenantCore.Application.Common` helper (Section 3.2); extend the shared helper instead of forking a local copy |
 
 ---
 
@@ -156,6 +189,7 @@ This ADR defines the complete security and code quality checklist for TenantCore
 | V5 | Feature files outside Features folder | Handler or validator placed directly in Application root | Move to `Features/{Area}/Handlers/` or `Features/{Area}/Validators/` |
 | V6 | Repository exposes `DbContext` publicly | `ClinicDbContext` property exposed on a repository class | Remove; access only through repository methods |
 | V7 | Command or query is not a `record` | `class` used instead of `sealed record` for a command or query | Change to `sealed record` |
+| V8 | Unsanitized render of user input | `MarkupString`, `@((MarkupString)...)`, or raw HTML binding built from a command/query/DTO field rather than a hardcoded literal | Render as plain text (Razor auto-encodes) or sanitize through an allow-list HTML sanitizer before ever wrapping in `MarkupString` |
 
 ---
 
