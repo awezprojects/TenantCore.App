@@ -81,10 +81,17 @@ try
         client.BaseAddress = new Uri(authBaseUrl);
     });
 
+    // Policy name reflects what it actually does — it is NOT a wildcard "allow everything"
+    // policy, it's a fixed allow-list. Origins come from config (not hardcoded) so each
+    // environment can have its own list without a code change; the two defaults below are the
+    // local-dev Blazor WASM / Api ports, used only when the section is absent.
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? ["http://localhost:5246", "https://localhost:7247"];
+
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy("AllowAll", policy =>
-            policy.WithOrigins("http://localhost:5246", "https://localhost:7247")
+        options.AddPolicy("AllowedDevOrigins", policy =>
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials());
@@ -122,7 +129,7 @@ try
         }
     });
 
-    app.UseCors("AllowAll");
+    app.UseCors("AllowedDevOrigins");
     app.UseAuthentication();
     app.UseMiddleware<ClinicContextMiddleware>();  // validates X-Application-Id header
     app.UseMiddleware<SubscriptionGuardMiddleware>();  // blocks clinic-scoped requests when the clinic has no active subscription

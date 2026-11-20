@@ -49,4 +49,9 @@ public static class AuthPolicies
 
     // All clinic staff — reception + clinical (e.g. OPD status updates by any staff)
     public const string RequireClinicStaff = "RequireClinicStaff";
+
+    // System Admin only — genuine cross-tenant/platform operations (e.g. listing every clinic
+    // in the system). Not scoped to any single applicationId, so ClinicRoleRequirement (which
+    // checks the route/header-derived clinic) does not apply here.
+    public const string RequireSystemAdmin = "RequireSystemAdmin";
 }

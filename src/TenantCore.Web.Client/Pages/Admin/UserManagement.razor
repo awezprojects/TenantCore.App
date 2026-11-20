@@ -1114,7 +1114,7 @@ else
                 ApplicationId = _applicationId,
                 RoleId        = _selectedRoleId
             };
-            var result = await AppClient.InviteExistingUserAsync(AuthState.CurrentUser.UserId, req);
+            var result = await AppClient.InviteExistingUserAsync(req);
             if (result.Success)
             {
                 Toast.ShowSuccess(result.Message ?? $"{_selectedExistingUser.FullName} added to the clinic.");
@@ -1147,7 +1147,7 @@ else
         _saving = true;
         try
         {
-            var result = await AppClient.InviteUserAsync(AuthState.CurrentUser.UserId, _inviteModel);
+            var result = await AppClient.InviteUserAsync(_inviteModel);
             if (result.Success)
             {
                 Toast.ShowSuccess($"Invitation sent to {_inviteModel.EmailId}.");
@@ -1178,7 +1178,7 @@ else
         try
         {
             var result = await AppClient.ChangeUserRoleAsync(_applicationId, _userToChangeRole.UserId,
-                AuthState.CurrentUser.UserId, new ChangeUserRoleRequestDto { NewRoleId = _newRoleId });
+                new ChangeUserRoleRequestDto { NewRoleId = _newRoleId });
             if (result.Success)
             {
                 Toast.ShowSuccess(result.Message ?? "Role changed.");
@@ -1236,7 +1236,7 @@ else
         try
         {
             var result = await AppClient.RemoveUserFromApplicationAsync(
-                _applicationId, _userToRemove.UserId, AuthState.CurrentUser.UserId);
+                _applicationId, _userToRemove.UserId);
 
             if (result.Success)
             {
@@ -1294,7 +1294,7 @@ else
         try
         {
             var result = await AppClient.ReinviteUserAsync(
-                _applicationId, _invitationToReinvite.InvitationId, AuthState.CurrentUser.UserId);
+                _applicationId, _invitationToReinvite.InvitationId);
 
             if (result.Success)
             {

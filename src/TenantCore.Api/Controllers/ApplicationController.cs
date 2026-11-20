@@ -20,7 +20,7 @@ namespace TenantCore.Api.Controllers;
 [Route("api/Application")]
 [Authorize(Policy = AuthPolicies.RequireAuthenticated)]
 [Produces("application/json")]
-public class ApplicationController(ISender sender) : ControllerBase
+public class ApplicationController(ISender sender) : ClinicControllerBase
 {
     // POST /api/Application?ownerId={guid}
     [HttpPost]
@@ -43,6 +43,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // PUT /api/Application/{applicationId}
     [HttpPut("{applicationId:guid}")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(typeof(ApplicationResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> EditApplicationAsync(
@@ -95,7 +96,16 @@ public class ApplicationController(ISender sender) : ControllerBase
     }
 
     // GET /api/Application/get-all
+    // Genuine cross-tenant "list every clinic" operation — not scoped to any single
+    // applicationId, so RequireClinicAdmin (which checks the route/header-derived clinic) does
+    // not apply here. Nothing in this app's own Web.Client or in TenantCore.Admin calls this
+    // route today (Admin reads TenantClinicDb/AuthDBNew directly, read-only); it previously
+    // allowed ANY authenticated user of ANY clinic to enumerate every clinic in the system.
+    // Restricted to System Admin rather than deleted, since a System Admin-held token hitting
+    // this route directly (support/ops tooling) is a legitimate, if currently unexercised, use
+    // of a "list every clinic" platform operation.
     [HttpGet("get-all")]
+    [Authorize(Policy = AuthPolicies.RequireSystemAdmin)]
     [ProducesResponseType(typeof(List<ApplicationResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllApplicationsAsync(CancellationToken cancellationToken)
     {
@@ -137,7 +147,10 @@ public class ApplicationController(ISender sender) : ControllerBase
     }
 
     // GET /api/Application/{applicationId}/users
+    // Full roster incl. email/phone — Clinic Admin management view only (see
+    // GetClinicStaffDirectoryAsync below for the any-member-readable minimal roster).
     [HttpGet("{applicationId:guid}/users")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(typeof(List<ApplicationUserResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken)
     {
@@ -170,17 +183,18 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
-    // POST /api/Application/invite-user?invitedBy={guid}
+    // POST /api/Application/invite-user
+    // invitedBy is derived from the authenticated caller, never accepted from the client —
+    // see GetCurrentUserId() on ClinicControllerBase.
     [HttpPost("invite-user")]
     [ProducesResponseType(typeof(InvitationResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> InviteUserAsync(
-        [FromQuery] Guid invitedBy,
         [FromBody] InviteUserRequestDto request,
         CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new InviteUserCommand(invitedBy, request), cancellationToken);
+        var result = await sender.Send(new InviteUserCommand(GetCurrentUserId(), request), cancellationToken);
         var response = new ApiResponse<InvitationResponseDto>
         {
             Success = result != null,
@@ -190,17 +204,17 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
-    // POST /api/Application/invite-existing-user?invitedBy={guid}
+    // POST /api/Application/invite-existing-user
+    // invitedBy is derived from the authenticated caller, never accepted from the client.
     [HttpPost("invite-existing-user")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> InviteExistingUserAsync(
-        [FromQuery] Guid invitedBy,
         [FromBody] InviteExistingUserRequestDto request,
         CancellationToken cancellationToken)
     {
-        await sender.Send(new InviteExistingUserCommand(invitedBy, request), cancellationToken);
+        await sender.Send(new InviteExistingUserCommand(GetCurrentUserId(), request), cancellationToken);
         var response = new ApiResponse
         {
             Success = true,
@@ -211,6 +225,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // GET /api/Application/{applicationId}/users/deactivated
     [HttpGet("{applicationId:guid}/users/deactivated")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(typeof(List<ApplicationUserResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetDeactivatedApplicationUsersAsync(Guid applicationId, CancellationToken cancellationToken)
     {
@@ -241,6 +256,7 @@ public class ApplicationController(ISender sender) : ControllerBase
 
     // GET /api/Application/{applicationId}/invitations
     [HttpGet("{applicationId}/invitations")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(typeof(List<InvitationResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetApplicationInvitationsAsync(Guid applicationId, CancellationToken cancellationToken)
     {
@@ -254,7 +270,8 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
-    // POST /api/Application/{applicationId}/invitations/{invitationId}/reinvite?reinvitedBy={guid}
+    // POST /api/Application/{applicationId}/invitations/{invitationId}/reinvite
+    // reinvitedBy is derived from the authenticated caller, never accepted from the client.
     [HttpPost("{applicationId}/invitations/{invitationId}/reinvite")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -262,10 +279,9 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> ReinviteUserAsync(
         Guid applicationId,
         Guid invitationId,
-        [FromQuery] Guid reinvitedBy,
         CancellationToken cancellationToken)
     {
-        await sender.Send(new ReinviteUserCommand(applicationId, invitationId, reinvitedBy), cancellationToken);
+        await sender.Send(new ReinviteUserCommand(applicationId, invitationId, GetCurrentUserId()), cancellationToken);
         var response = new ApiResponse
         {
             Success = true,
@@ -274,34 +290,41 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
-    // POST /api/Application/{applicationId}/users/{userId}/assign?roleId={guid}&assignedBy={guid}
+    // POST /api/Application/{applicationId}/users/{userId}/assign?roleId={guid}
+    // assignedBy is derived from the authenticated caller, never accepted from the client.
+    // CRITICAL fix: this previously only required RequireAuthenticated, with no check the
+    // caller administers applicationId — any logged-in user could grant any role (incl. Clinic
+    // Admin) at any clinic. Now matches the other clinic-mutation actions on this controller.
     [HttpPost("{applicationId:guid}/users/{userId:guid}/assign")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> AssignUserToApplicationAsync(
         Guid applicationId,
         Guid userId,
         [FromQuery] Guid roleId,
-        [FromQuery] Guid assignedBy,
         CancellationToken cancellationToken)
     {
-        await sender.Send(new AssignUserCommand(applicationId, userId, roleId, assignedBy), cancellationToken);
+        await sender.Send(new AssignUserCommand(applicationId, userId, roleId, GetCurrentUserId()), cancellationToken);
         return Ok();
     }
 
-    // POST /api/Application/{applicationId}/users/{userId}/mapping?assignedBy={guid}
+    // POST /api/Application/{applicationId}/users/{userId}/mapping
+    // assignedBy is derived from the authenticated caller, never accepted from the client.
+    // CRITICAL fix: see AssignUserToApplicationAsync above — same gap, same fix.
     [HttpPost("{applicationId:guid}/users/{userId:guid}/mapping")]
+    [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> AddApplicationUserMappingAsync(
         Guid applicationId,
         Guid userId,
-        [FromQuery] Guid assignedBy,
         CancellationToken cancellationToken)
     {
-        await sender.Send(new AddUserMappingCommand(applicationId, userId, assignedBy), cancellationToken);
+        await sender.Send(new AddUserMappingCommand(applicationId, userId, GetCurrentUserId()), cancellationToken);
         return Ok();
     }
 
-    // DELETE /api/Application/{applicationId}/users/{userId}?removedBy={guid}
+    // DELETE /api/Application/{applicationId}/users/{userId}
+    // removedBy is derived from the authenticated caller, never accepted from the client.
     [HttpDelete("{applicationId:guid}/users/{userId:guid}")]
     [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -309,10 +332,9 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> RemoveUserFromApplicationAsync(
         Guid applicationId,
         Guid userId,
-        [FromQuery] Guid removedBy,
         CancellationToken cancellationToken)
     {
-        await sender.Send(new RemoveUserCommand(applicationId, userId, removedBy), cancellationToken);
+        await sender.Send(new RemoveUserCommand(applicationId, userId, GetCurrentUserId()), cancellationToken);
         return Ok();
     }
 
@@ -368,7 +390,8 @@ public class ApplicationController(ISender sender) : ControllerBase
         return Ok(response);
     }
 
-    // PUT /api/Application/{applicationId}/users/{userId}/role?modifiedBy={guid}
+    // PUT /api/Application/{applicationId}/users/{userId}/role
+    // modifiedBy is derived from the authenticated caller, never accepted from the client.
     [HttpPut("{applicationId:guid}/users/{userId:guid}/role")]
     [Authorize(Policy = AuthPolicies.RequireClinicAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -376,11 +399,10 @@ public class ApplicationController(ISender sender) : ControllerBase
     public async Task<IActionResult> ChangeUserRoleAsync(
         Guid applicationId,
         Guid userId,
-        [FromQuery] Guid modifiedBy,
         [FromBody] ChangeUserRoleRequestDto request,
         CancellationToken cancellationToken)
     {
-        await sender.Send(new ChangeUserRoleCommand(applicationId, userId, modifiedBy, request.NewRoleId), cancellationToken);
+        await sender.Send(new ChangeUserRoleCommand(applicationId, userId, GetCurrentUserId(), request.NewRoleId), cancellationToken);
         var response = new ApiResponse
         {
             Success = true,

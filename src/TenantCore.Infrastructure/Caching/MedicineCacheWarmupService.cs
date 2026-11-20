@@ -59,6 +59,10 @@ public sealed class MedicineCacheWarmupService(
             using var scope = scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<ClinicDbContext>();
 
+            List<Medicine> systemMedicines;
+            List<MedicineType> medicineTypes;
+            List<MedicineDosageForm> dosageForms;
+
             if (dbContext.Database.IsRelational())
             {
                 dbContext.Database.SetCommandTimeout(QueryTimeout);
@@ -66,14 +70,24 @@ public sealed class MedicineCacheWarmupService(
                 // Cache warmup is a best-effort snapshot — it never participates in any business
                 // transaction and refreshes every 30 minutes, so dirty reads are fine. READ
                 // UNCOMMITTED means the queries acquire no shared locks and can never be blocked
-                // by a concurrent writer holding a lock on the Medicines table.
-                await dbContext.Database.ExecuteSqlRawAsync(
-                    "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED", ct);
-            }
+                // by a concurrent writer holding a lock on the Medicines table. Using EF Core's
+                // transaction API (rather than a raw SET TRANSACTION ISOLATION LEVEL statement)
+                // keeps this off the repo's no-raw-SQL rule while preserving the exact same
+                // dirty-read behavior for the duration of the three loads below.
+                await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadUncommitted, ct);
 
-            var systemMedicines = await MedicineCacheQueries.LoadSystemMedicinesAsync(dbContext, ct);
-            var medicineTypes = await MedicineCacheQueries.LoadMedicineTypesAsync(dbContext, ct);
-            var dosageForms = await MedicineCacheQueries.LoadMedicineDosageFormsAsync(dbContext, ct);
+                systemMedicines = await MedicineCacheQueries.LoadSystemMedicinesAsync(dbContext, ct);
+                medicineTypes = await MedicineCacheQueries.LoadMedicineTypesAsync(dbContext, ct);
+                dosageForms = await MedicineCacheQueries.LoadMedicineDosageFormsAsync(dbContext, ct);
+
+                await transaction.CommitAsync(ct);
+            }
+            else
+            {
+                systemMedicines = await MedicineCacheQueries.LoadSystemMedicinesAsync(dbContext, ct);
+                medicineTypes = await MedicineCacheQueries.LoadMedicineTypesAsync(dbContext, ct);
+                dosageForms = await MedicineCacheQueries.LoadMedicineDosageFormsAsync(dbContext, ct);
+            }
 
             scope.ServiceProvider.GetRequiredService<RefreshableCache<Medicine>>().Set(systemMedicines);
             scope.ServiceProvider.GetRequiredService<RefreshableCache<MedicineType>>().Set(medicineTypes);

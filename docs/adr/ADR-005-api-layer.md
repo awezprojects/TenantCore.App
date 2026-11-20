@@ -133,7 +133,7 @@ app.UseBlazorFrameworkFiles();
 app.UseStaticFiles(new StaticFileOptions { ... });
 
 // 6. CORS — before auth
-app.UseCors("AllowAll");
+app.UseCors("AllowedDevOrigins");
 
 // 7. Authentication — validates JWT bearer tokens
 app.UseAuthentication();
