@@ -1,10 +1,14 @@
+using System.Security.Claims;
 using FluentAssertions;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using TenantCore.Api.Controllers;
 using TenantCore.Application.Features.Applications.Commands;
 using TenantCore.Application.Features.Applications.Queries;
+using TenantCore.Shared.Authorization;
 using TenantCore.Shared.Dtos;
 using TenantCore.Shared.Dtos.Auth;
 
@@ -14,10 +18,27 @@ public class ApplicationControllerTests
 {
     private readonly Mock<ISender> _sender = new();
     private readonly ApplicationController _controller;
+    private readonly Guid _userId = Guid.NewGuid();
 
     public ApplicationControllerTests()
     {
         _controller = new ApplicationController(_sender.Object);
+
+        // DEF-SEC-AUDIT-2026-11: InviteUserAsync/InviteExistingUserAsync/ReinviteUserAsync/
+        // AssignUserToApplicationAsync/AddApplicationUserMappingAsync/RemoveUserFromApplicationAsync/
+        // ChangeUserRoleAsync no longer accept the actor id (invitedBy/assignedBy/removedBy/
+        // modifiedBy/reinvitedBy) as a request parameter — they derive it from the authenticated
+        // caller via ClinicControllerBase.GetCurrentUserId(), which requires a "nameid" claim.
+        var identity = new ClaimsIdentity(
+        [
+            new Claim("nameid", _userId.ToString())
+        ], "TestAuth");
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(identity)
+        };
+        _controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
     // ?? POST /api/Application ???????????????????????????????????????????????
@@ -209,12 +230,28 @@ public class ApplicationControllerTests
         _sender.Setup(s => s.Send(It.IsAny<InviteUserCommand>(), It.IsAny<CancellationToken>()))
                .ReturnsAsync(invitation);
 
-        var result = await _controller.InviteUserAsync(Guid.NewGuid(), BuildInviteRequest(), CancellationToken.None);
+        var result = await _controller.InviteUserAsync(BuildInviteRequest(), CancellationToken.None);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var response = ok.Value.Should().BeOfType<ApiResponse<InvitationResponseDto>>().Subject;
         response.Success.Should().BeTrue();
         response.Data.Should().BeSameAs(invitation);
+    }
+
+    // Vulnerability scenario (item 3): invitedBy used to be a client-supplied query parameter —
+    // a malicious/buggy client could attribute the invite to anyone. It must now always be the
+    // authenticated caller's own id, regardless of anything the client sends.
+    [Fact]
+    public async Task InviteUserAsync_SendsCommandWithCallerIdAsInvitedBy()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<InviteUserCommand>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new InvitationResponseDto());
+
+        await _controller.InviteUserAsync(BuildInviteRequest(), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<InviteUserCommand>(c => c.InvitedBy == _userId),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ?? POST /api/Application/invite-existing-user ?????????????????????????
@@ -225,11 +262,24 @@ public class ApplicationControllerTests
         _sender.Setup(s => s.Send(It.IsAny<InviteExistingUserCommand>(), It.IsAny<CancellationToken>()))
                .Returns(Task.FromResult(Unit.Value));
 
-        var result = await _controller.InviteExistingUserAsync(Guid.NewGuid(), BuildInviteExistingRequest(), CancellationToken.None);
+        var result = await _controller.InviteExistingUserAsync(BuildInviteExistingRequest(), CancellationToken.None);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var response = ok.Value.Should().BeOfType<ApiResponse>().Subject;
         response.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task InviteExistingUserAsync_SendsCommandWithCallerIdAsInvitedBy()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<InviteExistingUserCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.FromResult(Unit.Value));
+
+        await _controller.InviteExistingUserAsync(BuildInviteExistingRequest(), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<InviteExistingUserCommand>(c => c.InvitedBy == _userId),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ?? GET /api/Application/{applicationId}/users/deactivated ?????????????
@@ -287,14 +337,34 @@ public class ApplicationControllerTests
         _sender.Setup(s => s.Send(It.IsAny<ReinviteUserCommand>(), It.IsAny<CancellationToken>()))
                .Returns(Task.FromResult(Unit.Value));
 
-        var result = await _controller.ReinviteUserAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+        var result = await _controller.ReinviteUserAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var response = ok.Value.Should().BeOfType<ApiResponse>().Subject;
         response.Success.Should().BeTrue();
     }
 
-    // ?? POST /api/Application/{applicationId}/users/{userId}/assign ????????
+    [Fact]
+    public async Task ReinviteUserAsync_SendsCommandWithCallerIdAsReinvitedBy()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<ReinviteUserCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.FromResult(Unit.Value));
+
+        await _controller.ReinviteUserAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<ReinviteUserCommand>(c => c.ReinvitedBy == _userId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── POST /api/Application/{applicationId}/users/{userId}/assign ────────
+    // CRITICAL fix (item 1): this action previously had no [Authorize] override, inheriting only
+    // the class-level RequireAuthenticated — any logged-in user of any clinic could grant any
+    // role (including Clinic Admin) at any clinic, with assignedBy also forgeable via the query
+    // string. See Action_RequiresClinicAdminPolicy below for the authorization-attribute
+    // assertion and ClinicRoleAuthorizationHandlerTests for the cross-tenant-isolation proof
+    // (the handler checks the "applicationId" route value generically for every action that
+    // uses RequireClinicAdmin, including this one).
 
     [Fact]
     public async Task AssignUserToApplicationAsync_ReturnsOk()
@@ -303,12 +373,34 @@ public class ApplicationControllerTests
                .Returns(Task.FromResult(Unit.Value));
 
         var result = await _controller.AssignUserToApplicationAsync(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<OkResult>();
     }
 
+    [Fact]
+    public async Task AssignUserToApplicationAsync_SendsCommandWithCallerIdAsAssignedBy()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<AssignUserCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.FromResult(Unit.Value));
+
+        var applicationId = Guid.NewGuid();
+        var targetUserId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+
+        await _controller.AssignUserToApplicationAsync(applicationId, targetUserId, roleId, CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<AssignUserCommand>(c =>
+                c.ApplicationId == applicationId &&
+                c.UserId == targetUserId &&
+                c.RoleId == roleId &&
+                c.AssignedBy == _userId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ?? POST /api/Application/{applicationId}/users/{userId}/mapping ???????
+    // CRITICAL fix (item 1): same gap/fix as AssignUserToApplicationAsync above.
 
     [Fact]
     public async Task AddApplicationUserMappingAsync_ReturnsOk()
@@ -317,9 +409,22 @@ public class ApplicationControllerTests
                .Returns(Task.FromResult(Unit.Value));
 
         var result = await _controller.AddApplicationUserMappingAsync(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+            Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<OkResult>();
+    }
+
+    [Fact]
+    public async Task AddApplicationUserMappingAsync_SendsCommandWithCallerIdAsAssignedBy()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<AddUserMappingCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.FromResult(Unit.Value));
+
+        await _controller.AddApplicationUserMappingAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<AddUserMappingCommand>(c => c.AssignedBy == _userId),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ?? DELETE /api/Application/{applicationId}/users/{userId} ?????????????
@@ -331,9 +436,22 @@ public class ApplicationControllerTests
                .Returns(Task.FromResult(Unit.Value));
 
         var result = await _controller.RemoveUserFromApplicationAsync(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+            Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
         result.Should().BeOfType<OkResult>();
+    }
+
+    [Fact]
+    public async Task RemoveUserFromApplicationAsync_SendsCommandWithCallerIdAsRemovedBy()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<RemoveUserCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.FromResult(Unit.Value));
+
+        await _controller.RemoveUserFromApplicationAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<RemoveUserCommand>(c => c.RemovedBy == _userId),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // ?? DELETE /api/Application/{applicationId} ?????????????????????????????
@@ -392,12 +510,63 @@ public class ApplicationControllerTests
                .Returns(Task.FromResult(Unit.Value));
 
         var result = await _controller.ChangeUserRoleAsync(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            Guid.NewGuid(), Guid.NewGuid(),
             new ChangeUserRoleRequestDto { NewRoleId = Guid.NewGuid() }, CancellationToken.None);
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var response = ok.Value.Should().BeOfType<ApiResponse>().Subject;
         response.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ChangeUserRoleAsync_SendsCommandWithCallerIdAsModifiedBy()
+    {
+        _sender.Setup(s => s.Send(It.IsAny<ChangeUserRoleCommand>(), It.IsAny<CancellationToken>()))
+               .Returns(Task.FromResult(Unit.Value));
+
+        var newRoleId = Guid.NewGuid();
+
+        await _controller.ChangeUserRoleAsync(
+            Guid.NewGuid(), Guid.NewGuid(),
+            new ChangeUserRoleRequestDto { NewRoleId = newRoleId }, CancellationToken.None);
+
+        _sender.Verify(s => s.Send(
+            It.Is<ChangeUserRoleCommand>(c => c.ModifiedBy == _userId && c.NewRoleId == newRoleId),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── Authorization (items 1 & 2): actions that used to only require RequireAuthenticated
+    // (any logged-in user, any clinic) must now require RequireClinicAdmin — matching the
+    // 9 siblings that were already correctly guarded on this controller. ──────────────────────
+
+    [Theory]
+    [InlineData(nameof(ApplicationController.EditApplicationAsync))]
+    [InlineData(nameof(ApplicationController.GetApplicationUsersAsync))]
+    [InlineData(nameof(ApplicationController.GetApplicationInvitationsAsync))]
+    [InlineData(nameof(ApplicationController.GetDeactivatedApplicationUsersAsync))]
+    [InlineData(nameof(ApplicationController.AssignUserToApplicationAsync))]
+    [InlineData(nameof(ApplicationController.AddApplicationUserMappingAsync))]
+    public void Action_RequiresClinicAdminPolicy(string actionName)
+    {
+        var method = typeof(ApplicationController).GetMethod(actionName);
+        var attribute = method!.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
+            .Cast<AuthorizeAttribute>().SingleOrDefault();
+
+        attribute.Should().NotBeNull($"{actionName} must have its own [Authorize] override");
+        attribute!.Policy.Should().Be(AuthPolicies.RequireClinicAdmin);
+    }
+
+    // GetAllApplicationsAsync has no single applicationId to scope against (genuine
+    // cross-tenant "list everything") — restricted to System Admin instead (see item 2).
+    [Fact]
+    public void GetAllApplicationsAsync_RequiresSystemAdminPolicy()
+    {
+        var method = typeof(ApplicationController).GetMethod(nameof(ApplicationController.GetAllApplicationsAsync));
+        var attribute = method!.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
+            .Cast<AuthorizeAttribute>().SingleOrDefault();
+
+        attribute.Should().NotBeNull();
+        attribute!.Policy.Should().Be(AuthPolicies.RequireSystemAdmin);
     }
 
     // ?? Helpers ?????????????????????????????????????????????????????????????

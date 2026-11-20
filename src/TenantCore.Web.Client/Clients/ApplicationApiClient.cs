@@ -149,12 +149,12 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
-    public async Task<ApiResponse<InvitationResponseDto>> InviteUserAsync(Guid invitedBy, InviteUserRequestDto request)
+    public async Task<ApiResponse<InvitationResponseDto>> InviteUserAsync(InviteUserRequestDto request)
     {
         try
         {
             SetAuthorizationHeader();
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/invite-user?invitedBy={invitedBy}")
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/invite-user")
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
@@ -172,13 +172,13 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
-    public async Task<ApiResponse> AssignUserToApplicationAsync(Guid applicationId, Guid userId, Guid roleId, Guid assignedBy)
+    public async Task<ApiResponse> AssignUserToApplicationAsync(Guid applicationId, Guid userId, Guid roleId)
     {
         try
         {
             SetAuthorizationHeader();
             var response = await httpClient.PostAsync(
-                $"{BaseRoute}/{applicationId}/users/{userId}/assign?roleId={roleId}&assignedBy={assignedBy}",
+                $"{BaseRoute}/{applicationId}/users/{userId}/assign?roleId={roleId}",
                 null);
             return await HandleBasicResponse(response);
         }
@@ -188,13 +188,13 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
-    public async Task<ApiResponse> AddApplicationUserMappingAsync(Guid applicationId, Guid userId, Guid assignedBy)
+    public async Task<ApiResponse> AddApplicationUserMappingAsync(Guid applicationId, Guid userId)
     {
         try
         {
             SetAuthorizationHeader();
             var response = await httpClient.PostAsync(
-                $"{BaseRoute}/{applicationId}/users/{userId}/mapping?assignedBy={assignedBy}",
+                $"{BaseRoute}/{applicationId}/users/{userId}/mapping",
                 null);
             return await HandleBasicResponse(response);
         }
@@ -204,13 +204,13 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
-    public async Task<ApiResponse> RemoveUserFromApplicationAsync(Guid applicationId, Guid userId, Guid removedBy)
+    public async Task<ApiResponse> RemoveUserFromApplicationAsync(Guid applicationId, Guid userId)
     {
         try
         {
             SetAuthorizationHeader();
             var response = await httpClient.DeleteAsync(
-                $"{BaseRoute}/{applicationId}/users/{userId}?removedBy={removedBy}");
+                $"{BaseRoute}/{applicationId}/users/{userId}");
             return await HandleBasicResponse(response);
         }
         catch (Exception ex)
@@ -271,12 +271,12 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
-    public async Task<ApiResponse> ChangeUserRoleAsync(Guid applicationId, Guid userId, Guid modifiedBy, ChangeUserRoleRequestDto request)
+    public async Task<ApiResponse> ChangeUserRoleAsync(Guid applicationId, Guid userId, ChangeUserRoleRequestDto request)
     {
         try
         {
             SetAuthorizationHeader();
-            var httpRequest = new HttpRequestMessage(HttpMethod.Put, $"{BaseRoute}/{applicationId}/users/{userId}/role?modifiedBy={modifiedBy}")
+            var httpRequest = new HttpRequestMessage(HttpMethod.Put, $"{BaseRoute}/{applicationId}/users/{userId}/role")
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
@@ -290,12 +290,12 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
-    public async Task<ApiResponse> InviteExistingUserAsync(Guid invitedBy, InviteExistingUserRequestDto request)
+    public async Task<ApiResponse> InviteExistingUserAsync(InviteExistingUserRequestDto request)
     {
         try
         {
             SetAuthorizationHeader();
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/invite-existing-user?invitedBy={invitedBy}")
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{BaseRoute}/invite-existing-user")
             {
                 Content = JsonContent.Create(request, options: JsonOptions)
             };
@@ -354,13 +354,13 @@ public class ApplicationApiClient(HttpClient httpClient, AuthStateService authSt
         }
     }
 
-    public async Task<ApiResponse> ReinviteUserAsync(Guid applicationId, Guid invitationId, Guid reinvitedBy)
+    public async Task<ApiResponse> ReinviteUserAsync(Guid applicationId, Guid invitationId)
     {
         try
         {
             SetAuthorizationHeader();
             var response = await httpClient.PostAsync(
-                $"{BaseRoute}/{applicationId}/invitations/{invitationId}/reinvite?reinvitedBy={reinvitedBy}",
+                $"{BaseRoute}/{applicationId}/invitations/{invitationId}/reinvite",
                 null);
             return await HandleBasicResponse(response);
         }

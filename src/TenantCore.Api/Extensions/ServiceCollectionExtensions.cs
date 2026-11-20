@@ -80,7 +80,12 @@ public static class ServiceCollectionExtensions
             // All clinic staff: reception + clinical combined (e.g. OPD status updates)
             .AddPolicy(AuthPolicies.RequireClinicStaff, policy =>
                 policy.RequireAuthenticatedUser()
-                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicStaffRoles)));
+                      .AddRequirements(new ClinicRoleRequirement(AppRoles.ClinicStaffRoles)))
+            // System Admin only — genuine cross-tenant platform operations (e.g. listing every
+            // clinic). Role check only; no per-clinic route/header context to validate.
+            .AddPolicy(AuthPolicies.RequireSystemAdmin, policy =>
+                policy.RequireAuthenticatedUser()
+                      .RequireRole(AppRoles.SystemAdmin));
 
         return services;
     }

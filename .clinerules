@@ -200,7 +200,7 @@ Every controller action carries an explicit `[Authorize(...)]` or `[AllowAnonymo
 ### Middleware pipeline order — `src/TenantCore.Api/Program.cs` (current @ 2026-09-15 — NEVER reorder)
 `CorrelationIdMiddleware` → `ExceptionHandlingMiddleware` → `UseSerilogRequestLogging` →
 (`UseSwagger` + `UseSwaggerUI` in Development) → `UseBlazorFrameworkFiles` → `UseStaticFiles` (index.html no-cache)
-→ `UseCors("AllowAll")` → `UseAuthentication` → `ClinicContextMiddleware` → `SubscriptionGuardMiddleware` →
+→ `UseCors("AllowedDevOrigins")` → `UseAuthentication` → `ClinicContextMiddleware` → `SubscriptionGuardMiddleware` →
 `BillingFeatureGuardMiddleware` → `UseAuthorization` → `MapControllers` → `MapHealthChecks("/health")` → `MapFallbackToFile("index.html")`.
 
 Why the order matters: `ClinicContextMiddleware` must run **after** `UseAuthentication` (it reads the JWT `app_ids`
